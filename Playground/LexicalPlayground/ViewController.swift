@@ -33,6 +33,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
 
     let listPlugin = ListPlugin()
     let imagePlugin = InlineImagePlugin()
+    let eventPlugin = EventPlugin()
 
     let linkPlugin = LinkPlugin()
 
@@ -42,7 +43,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
       .foregroundColor: UIColor.systemBlue,
     ]
 
-    let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
+    let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, eventPlugin, editorHistoryPlugin])
     let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: FeatureFlags())
 
     linkPlugin.lexicalView = lexicalView

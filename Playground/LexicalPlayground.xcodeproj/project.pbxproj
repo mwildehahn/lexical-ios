@@ -24,6 +24,9 @@
 		06F7CF942A542E4E0024CD5A /* LexicalInlineImagePlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 06F7CF932A542E4E0024CD5A /* LexicalInlineImagePlugin */; };
 		06F7CF962A545C7C0024CD5A /* lexical-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 06F7CF952A545C7C0024CD5A /* lexical-logo.png */; };
 		3C48FEE42B04F2C5009BBFA2 /* LexicalMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = 3C48FEE32B04F2C5009BBFA2 /* LexicalMarkdown */; };
+		7F8378792CE8EF190014A70C /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8378742CE8EF190014A70C /* Event.swift */; };
+		7F83787A2CE8EF190014A70C /* EventPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8378772CE8EF190014A70C /* EventPlugin.swift */; };
+		7F83787B2CE8EF190014A70C /* EventNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8378752CE8EF190014A70C /* EventNode.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +41,9 @@
 		069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportOutputViewController.swift; sourceTree = "<group>"; };
 		06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeHierarchyViewPlugin.swift; sourceTree = "<group>"; };
 		06F7CF952A545C7C0024CD5A /* lexical-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "lexical-logo.png"; sourceTree = "<group>"; };
+		7F8378742CE8EF190014A70C /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
+		7F8378752CE8EF190014A70C /* EventNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventNode.swift; sourceTree = "<group>"; };
+		7F8378772CE8EF190014A70C /* EventPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +87,7 @@
 		0656CF7729D1E438009CA08F /* LexicalPlayground */ = {
 			isa = PBXGroup;
 			children = (
+				7F8378782CE8EF190014A70C /* Events */,
 				0656CF7829D1E438009CA08F /* AppDelegate.swift */,
 				0656CF7C29D1E438009CA08F /* ViewController.swift */,
 				069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */,
@@ -107,6 +114,16 @@
 				0656CFA029D4837C009CA08F /* lexical-ios */,
 			);
 			name = Packages;
+			sourceTree = "<group>";
+		};
+		7F8378782CE8EF190014A70C /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				7F8378742CE8EF190014A70C /* Event.swift */,
+				7F8378752CE8EF190014A70C /* EventNode.swift */,
+				7F8378772CE8EF190014A70C /* EventPlugin.swift */,
+			);
+			path = Events;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -198,6 +215,9 @@
 				0656CF7929D1E438009CA08F /* AppDelegate.swift in Sources */,
 				0656CF9029D1ED8F009CA08F /* ToolbarPlugin.swift in Sources */,
 				069E59DD2A1F726D00CA4296 /* ExportOutputViewController.swift in Sources */,
+				7F8378792CE8EF190014A70C /* Event.swift in Sources */,
+				7F83787A2CE8EF190014A70C /* EventPlugin.swift in Sources */,
+				7F83787B2CE8EF190014A70C /* EventNode.swift in Sources */,
 				06CB47B429DE0139005AC7BD /* NodeHierarchyViewPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -450,9 +470,9 @@
 			productName = LexicalInlineImagePlugin;
 		};
 		3C48FEE32B04F2C5009BBFA2 /* LexicalMarkdown */ = {
- 			isa = XCSwiftPackageProductDependency;
- 			productName = LexicalMarkdown;
- 		};
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalMarkdown;
+		};
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0656CF6D29D1E438009CA08F /* Project object */;

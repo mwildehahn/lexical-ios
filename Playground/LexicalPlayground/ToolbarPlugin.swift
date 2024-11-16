@@ -99,6 +99,7 @@ public class ToolbarPlugin: Plugin {
   var increaseIndentButton: UIBarButtonItem?
   var decreaseIndentButton: UIBarButtonItem?
   var insertImageButton: UIBarButtonItem?
+  var insertEventButton: UIBarButtonItem?
 
   private func setUpToolbar() {
     let undo = UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.backward"),
@@ -139,8 +140,14 @@ public class ToolbarPlugin: Plugin {
 
     let insertImage = UIBarButtonItem(image: UIImage(systemName: "photo"), menu: self.imageMenu)
     self.insertImageButton = insertImage
+      
+    let insertEvent = UIBarButtonItem(image: UIImage(systemName: "figure.socialdance"),
+                                      style: .plain,
+                                      target: self,
+                                      action: #selector(event))
+    self.insertEventButton = insertEvent
 
-    toolbar.items = [undo, redo, paragraph, styling, link, decreaseIndent, increaseIndent, insertImage]
+    toolbar.items = [undo, redo, paragraph, styling, link, decreaseIndent, increaseIndent, insertImage, insertEvent]
   }
 
   private enum ParagraphMenuSelectedItemType {
@@ -349,6 +356,9 @@ public class ToolbarPlugin: Plugin {
   @objc private func link() {
     showLinkEditor()
   }
+  @objc private func event() {
+    showEventEditor()
+  }
   @objc private func increaseIndent() {
     editor?.dispatchCommand(type: .indentContent, payload: nil)
   }
@@ -397,6 +407,19 @@ public class ToolbarPlugin: Plugin {
           let urlString = "https://"
           showAlert(url: urlString, isEdit: false)
         }
+      }
+    } catch {
+      print("Error getting the selected node: \(error.localizedDescription)")
+    }
+  }
+    
+  // MARK: - Event handling
+
+  internal func showEventEditor() {
+    guard let editor else { return }
+    do {
+      try editor.read {
+          showEventAlert()
       }
     } catch {
       print("Error getting the selected node: \(error.localizedDescription)")
@@ -452,6 +475,43 @@ public class ToolbarPlugin: Plugin {
     alertController.addTextField { textField in
       textField.layer.cornerRadius = 20
       textField.text = url
+    }
+
+    alertController.addAction(doneAction)
+    alertController.addAction(cancelAction)
+
+    viewControllerForPresentation?.present(alertController, animated: true)
+  }
+  
+  func showEventAlert(selection: RangeSelection? = nil) {
+    guard let editor else { return }
+
+    var originalSelection: RangeSelection?
+
+    do {
+      try editor.read {
+        originalSelection = try getSelection() as? RangeSelection
+      }
+    } catch {
+      print("Error: \(error.localizedDescription)")
+    }
+
+    let title = "Event title"
+    let alertController = UIAlertController(title: title, message: nil, preferredStyle: .alert)
+    let doneAction = UIAlertAction(title: "Done", style: .default) { [weak self, weak alertController] action in
+      guard let strongSelf = self else { return }
+
+      if let textField = alertController?.textFields?.first, let originalSelection, let text = textField.text, text.count > 0 {
+        
+        strongSelf.editor?.dispatchCommand(type: .event, payload: EventPayload(event: Event(title: text), originalSelection: selection))
+      }
+    }
+
+    let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+
+    alertController.addTextField { textField in
+      textField.layer.cornerRadius = 20
+      textField.text = "" // nktodo
     }
 
     alertController.addAction(doneAction)
