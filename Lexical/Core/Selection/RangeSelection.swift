@@ -255,7 +255,7 @@ public class RangeSelection: BaseSelection {
 
     return textContent
   }
-  
+
   public func insertText(_ text: String) throws {
     let anchor = anchor
     let focus = focus
@@ -265,8 +265,8 @@ public class RangeSelection: BaseSelection {
     let style = style
     let anchorNode = try anchor.getNode()
 
-    if let _ = anchorNode as? DecoratorBlockNode {
-      // we're not allowing inserting text into decorator block nodeaaa
+    if anchorNode is DecoratorBlockNode {
+      // we're not allowing inserting text into decorator block node
       return
     }
     
@@ -820,7 +820,7 @@ public class RangeSelection: BaseSelection {
         nodesToMove.append(anchorNode)
       } else {
         if isInline {
-          // For inline nodes, we want to move all the siblings to the new
+          // For inline nodes, we want to move all the siblings to the new paragraph
           // if selection is at the end, we just move the siblings. Otherwise, we also
           // split the text node and add that and it's siblings below.
           siblingsToMove = currentElement.getNextSiblings()
@@ -992,7 +992,8 @@ public class RangeSelection: BaseSelection {
         // Make it possible to move selection from range selection to
         // node selection on the node.
         if /* possibleNode.isKeyboardSelectable() && */
-          let anchorNode = anchorNode as? ElementNode, anchorNode.getChildrenSize() == 0 {
+          let anchorNode = anchorNode as? ElementNode,
+          anchorNode.getChildrenSize() == 0 {
           try anchorNode.remove()
           let nodeSelection = NodeSelection(nodes: Set([possibleNode.key]))
           try setSelection(nodeSelection)
