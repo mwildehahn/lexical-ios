@@ -359,9 +359,10 @@ public class ToolbarPlugin: Plugin {
   }
   @objc private func block() {
     try? editor?.update {
-      let blockNode = DecoratorBlockNode()
-      if let selection = try getSelection() {
-        _ = try selection.insertNodes(nodes: [blockNode], selectStart: false)
+      if let selection = try getSelection() as? RangeSelection {
+        let dbn = DecoratorBlockNode()
+       try dbn.append([InnerDecoratorBlockNode()])
+        _ = try selection.insertNodes(nodes: [dbn], selectStart: false)
       }
     }
   }

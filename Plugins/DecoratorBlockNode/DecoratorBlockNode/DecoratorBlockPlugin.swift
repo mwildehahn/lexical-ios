@@ -20,17 +20,14 @@ open class BlockPlugin: Plugin {
     self.editor = editor
     do {
       try editor.registerNode(nodeType: DecoratorBlockNode.getType(), class: DecoratorBlockNode.self)
+      try editor.registerNode(nodeType: InnerDecoratorBlockNode.getType(), class: InnerDecoratorBlockNode.self)
     } catch {
       print("\(error)")
     }
   }
   
   public func tearDown() {
-  }
-
-  public func isBlockNode(_ node: Node?) -> Bool {
-    node is DecoratorBlockNode
-  }
+  }  
 
 }
 

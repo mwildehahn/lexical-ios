@@ -255,7 +255,7 @@ public class RangeSelection: BaseSelection {
 
     return textContent
   }
-
+  
   public func insertText(_ text: String) throws {
     let anchor = anchor
     let focus = focus
@@ -263,7 +263,13 @@ public class RangeSelection: BaseSelection {
     let isBefore = isCollapsed() || anchorIsBefore
     let format = format
     let style = style
+    let anchorNode = try anchor.getNode()
 
+    if let _ = anchorNode as? DecoratorBlockNode {
+      // we're not allowing inserting text into decorator block nodeaaa
+      return
+    }
+    
     if isBefore && anchor.type == .element {
       try transferStartingElementPointToTextPoint(start: anchor, end: focus, format: format, style: style)
     } else if !isBefore && focus.type == .element {
@@ -570,6 +576,10 @@ public class RangeSelection: BaseSelection {
     let anchorNode = try anchor.getNode()
     var target = anchorNode
 
+    if anchorNode is DecoratorBlockNode {
+      return false // there is no insertion into DecoratorBlockNode
+    }
+    
     if anchor.type == .element {
       if let element = try anchor.getNode() as? ElementNode {
         if let placementNode = element.getChildAtIndex(index: anchorOffset - 1) {
@@ -619,23 +629,6 @@ public class RangeSelection: BaseSelection {
     var didReplaceOrMerge = false
 
     for node in nodes {
-
-      if let node = node as? DecoratorNode {
-        if node == firstNode && node.isTopLevel() {
-          if let unwrappedTarget = target as? ElementNode,
-             unwrappedTarget.isEmpty() &&
-             unwrappedTarget.canReplaceWith(replacement: node) &&
-             isRootNode(node: unwrappedTarget.getParent()) {
-            try target.replace(replaceWith: node)
-            target = node
-            didReplaceOrMerge = true
-            continue
-          }
-        }
-        if !isRootNode(node: topLevelElement) {
-          target = topLevelElement
-        }
-      }
 
       if let node = node as? ElementNode {
         if node == firstNode {
@@ -692,12 +685,8 @@ public class RangeSelection: BaseSelection {
       didReplaceOrMerge = false
 
       if let unwrappedTarget = target as? ElementNode {
-        if isTopLevelDecoratorNode(node) {
-          if let root = target as? RootNode {
-            try root.append([node])
-          } else {
-            target = try target.insertAfter(nodeToInsert: node)
-          }
+        if let node = node as? DecoratorNode, node.isTopLevel() {
+          target = try target.insertAfter(nodeToInsert: node)
         } else if !isElementNode(node: node) {
           if let firstChild = unwrappedTarget.getFirstChild() {
             try firstChild.insertBefore(nodeToInsert: node)
@@ -715,7 +704,8 @@ public class RangeSelection: BaseSelection {
             target = try target.insertAfter(nodeToInsert: node)
           }
         }
-      } else if isTopLevelDecoratorNode(node) {
+      } else if !isElementNode(node: node) ||
+                        isDecoratorNode(node) && (node as? DecoratorNode)?.isTopLevel() == true {
         target = try target.insertAfter(nodeToInsert: node)
       } else {
         target = try node.getParentOrThrow() // Re-try again with the target being the parent
@@ -830,7 +820,7 @@ public class RangeSelection: BaseSelection {
         nodesToMove.append(anchorNode)
       } else {
         if isInline {
-          // For inline nodes, we want to move all the siblings to the new paragraph
+          // For inline nodes, we want to move all the siblings to the new
           // if selection is at the end, we just move the siblings. Otherwise, we also
           // split the text node and add that and it's siblings below.
           siblingsToMove = currentElement.getNextSiblings()
@@ -982,14 +972,27 @@ public class RangeSelection: BaseSelection {
         }
       }
 
+      // Handle the deletion around decorator block nodes.
+      if let decoratorBlockNode = anchorNode as? DecoratorBlockNode {
+        // NK TODO this should take into account direction, for right to left text I guess
+        let previousSibling = decoratorBlockNode.getPreviousSibling()
+        if anchor.offset == 1 {
+          try decoratorBlockNode.remove()
+        }
+        if  let previousSiblingAsParagraphNode = previousSibling as? ParagraphNode,
+            let lastTextNodeInPreviousSibling = previousSiblingAsParagraphNode.getLastChild() as? TextNode{
+          try? _ = lastTextNodeInPreviousSibling.select(anchorOffset: nil, focusOffset: nil)
+        }
+        return
+      }
+      
       // Handle the deletion around decorators.
       let possibleNode = try getAdjacentNode(focus: focus, isBackward: isBackwards)
       if let possibleNode = possibleNode as? DecoratorNode, !possibleNode.isIsolated() {
         // Make it possible to move selection from range selection to
         // node selection on the node.
         if /* possibleNode.isKeyboardSelectable() && */
-          let anchorNode = anchorNode as? ElementNode,
-          anchorNode.getChildrenSize() == 0 {
+          let anchorNode = anchorNode as? ElementNode, anchorNode.getChildrenSize() == 0 {
           try anchorNode.remove()
           let nodeSelection = NodeSelection(nodes: Set([possibleNode.key]))
           try setSelection(nodeSelection)
