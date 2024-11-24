@@ -9,27 +9,19 @@ import Foundation
 import UIKit
 
 extension NodeType {
-  static let block = NodeType(rawValue: "block")
-  static let innerBlock = NodeType(rawValue: "innerBlock")
+  static let decoratorBlock = NodeType(rawValue: "decorator-block")
 }
 
-/*
- DecoratorBlockNode was originally subclass of a DecoratorNode.
- However there is a glitch with cursor position being falsly reported
- when DecoratorNode is directly in the RootNode and cursor is behind it.
- I tried to solve this with this somewhat strange construction.
- */
-open class DecoratorBlockNode: ParagraphNode {
-  
+open class DecoratorBlockNode: ElementNode {
   override public class func getType() -> NodeType {
-    return .block
+    return .decoratorBlock
   }
-  
-  override public init() {
+
+  override public required init() {
     super.init()
   }
 
-  public required init(_ key: NodeKey?) {
+  override public required init(_ key: NodeKey?) {
     super.init(key)
   }
 
@@ -37,33 +29,36 @@ open class DecoratorBlockNode: ParagraphNode {
     try super.init(from: decoder)
   }
 
-  override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
-    return [:]
+  override public func clone() -> Self {
+    Self(key)
   }
 
+  open func createDecoratorNode() -> DecoratorNode {
+    fatalError("createDecoratorNode: base method not extended")
+  }
+
+  override open func insertNewAfter(selection: RangeSelection?) throws
+    -> RangeSelection.InsertNewAfterResult
+  {
+    let newElement = createParagraphNode()
+
+    try newElement.setDirection(direction: getDirection())
+    try insertAfter(nodeToInsert: newElement)
+
+    return .init(element: newElement)
+  }
+
+  open func getDecoratorNode() -> DecoratorNode {
+    return getChildren().first! as! DecoratorNode
+  }
 }
 
-open class InnerDecoratorBlockNode: DecoratorNode {
-  
-  override public class func getType() -> NodeType {
-    return .innerBlock
+public func insertDecoratorBlock(editor: Editor, decoratorBlock: DecoratorBlockNode.Type) throws {
+  try editor.update {
+    if let selection = try getSelection() as? RangeSelection {
+      let block = decoratorBlock.init()
+      try block.append([block.createDecoratorNode()])
+      _ = try selection.insertNodes(nodes: [block], selectStart: false)
+    }
   }
-  
-  override public func createView() -> UILabel {
-    let view = UILabel(frame: CGRect(origin: CGPoint.zero, size: CGSizeMake(50, 50)))
-    return view
-  }
-
-  override open func decorate(view: UIView) {
-    view.backgroundColor = .lightGray
-  }
-  
-  open override func sizeForDecoratorView(textViewWidth: CGFloat, attributes: [NSAttributedString.Key : Any]) -> CGSize {
-    return CGSizeMake(textViewWidth, 50)
-  }
-  
-  open override func isTopLevel() -> Bool {
-    return false
-  }
-
 }
