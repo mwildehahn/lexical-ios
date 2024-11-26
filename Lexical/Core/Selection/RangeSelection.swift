@@ -559,6 +559,12 @@ public class RangeSelection: BaseSelection {
       for selectedNode in selectedNodes.dropFirst() {
         let key = selectedNode.key
         if !markedNodeKeysForKeep.contains(key) {
+          if  selectedNode.isToBeReplacedWithEmptyParagraphOnDeletion() && selectedNode.isParentOf(anchorNode) {
+            let paragraphNode = ParagraphNode()
+            try selectedNode.replace(replaceWith: paragraphNode)
+            try paragraphNode.selectStart()
+            continue
+          }
           try selectedNode.remove()
         }
       }

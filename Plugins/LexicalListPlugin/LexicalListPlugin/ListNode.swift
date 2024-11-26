@@ -87,4 +87,8 @@ public class ListNode: ElementNode {
   override public func clone() -> Self {
     Self(listType: listType, start: start, key: key, withPlaceholders: withPlaceholders)
   }
+
+  public override func isToBeReplacedWithEmptyParagraphOnDeletion() -> Bool {
+    return true
+  }
 }

@@ -781,6 +781,10 @@ open class Node: Codable {
   public func isSameNode(_ node: Node) -> Bool {
     return self.getKey() == node.getKey()
   }
+
+  open func isToBeReplacedWithEmptyParagraphOnDeletion() -> Bool {
+    return false
+  }
 }
 
 extension Node: Hashable {
