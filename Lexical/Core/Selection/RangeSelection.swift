@@ -795,8 +795,11 @@ public class RangeSelection: BaseSelection {
     var updatedTarget = target
 
     if isDecoratorBlockNode(target) {
-      updatedTarget = try target.insertAfter(nodeToInsert: node)
-      return updatedTarget
+      return try target.insertAfter(nodeToInsert: node)
+    }
+
+    if !isElementNode(node: node) {
+      return try target.insertAfter(nodeToInsert: node)
     }
 
     guard let elementTarget = target as? ElementNode else {
