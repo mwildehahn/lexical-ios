@@ -1046,7 +1046,6 @@ public class RangeSelection: BaseSelection {
         return
       } else if isRootNode(node: anchorNode),
                 let adjacentNode = adjacentNode as? ElementNode,
-                adjacentNode.isEmpty(),
                 let adjacentNodeSibling = adjacentNode.getNextSibling() as? DecoratorNode,
                 !adjacentNodeSibling.isInline() {
         // A decorator block node's selection is represented as an index within
@@ -1055,8 +1054,14 @@ public class RangeSelection: BaseSelection {
         // the adjacent node is the node preceding the decorator block node
         // (adjacentNode here). We check the adjacent node next sibling to see
         // if it's a decorator node to properly handle this case.
-        try adjacentNode.remove()
-        try adjacentNodeSibling.selectStart()
+
+        if adjacentNode.isEmpty() {
+          try adjacentNode.remove()
+          try adjacentNodeSibling.selectStart()
+        } else {
+          try adjacentNode.selectEnd()
+        }
+
         return
       } else if !isBackwards, let possibleNode = adjacentNode as? ElementNode, let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
         try anchorNode.remove()

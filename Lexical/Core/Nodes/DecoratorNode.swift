@@ -112,9 +112,12 @@ open class DecoratorNode: Node {
 
     let parent = try getParentOrThrow()
     let selectionIndex = max(0, indexWithinParent - 1)
+    if selectionIndex == 0 {
+      return try selectPrevious(anchorOffset: nil, focusOffset: nil)
+    }
+
     return try parent.select(anchorOffset: selectionIndex, focusOffset: selectionIndex)
   }
-
 
   @discardableResult
   public func selectEnd() throws -> RangeSelection {
