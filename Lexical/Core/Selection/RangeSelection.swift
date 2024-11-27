@@ -463,8 +463,7 @@ public class RangeSelection: BaseSelection {
         endPoint.type == .element && (lastNode?.getIndexWithinParent() ?? 0 < endOffset)
       let shouldModifyDecoratorNode = !isDecoratorBlockNode(lastNode)
 
-      if (shouldModifyTextNode || shouldModifyElementNode) && !isDecoratorNode(lastNode) {
-
+      if (shouldModifyTextNode || shouldModifyElementNode) && !shouldModifyDecoratorNode {
         if let lastNodeAsTextNode = lastNode as? TextNode,
            !lastNodeAsTextNode.isToken(),
            endOffset != lastNodeAsTextNode.getTextContentSize() {
@@ -1003,21 +1002,33 @@ public class RangeSelection: BaseSelection {
       
       // Handle the deletion around decorators.
       let possibleNode = try getAdjacentNode(focus: focus, isBackward: isBackwards)
-      if let possibleNode = possibleNode as? DecoratorNode, !possibleNode.isIsolated() {
-        // Make it possible to move selection from range selection to
-        // node selection on the node.
-        if /* possibleNode.isKeyboardSelectable() && */
-          let anchorNode = anchorNode as? ElementNode,
-          anchorNode.getChildrenSize() == 0 {
-          try anchorNode.remove()
-          let nodeSelection = NodeSelection(nodes: Set([possibleNode.key]))
-          try setSelection(nodeSelection)
+      if let possibleNode = possibleNode as? DecoratorNode {
+        if possibleNode.isInline() {
+          // Make it possible to move selection from range selection to
+          // node selection on the node.
+          if /* possibleNode.isKeyboardSelectable() && */
+            let anchorNode = anchorNode as? ElementNode,
+            anchorNode.isEmpty() {
+            try anchorNode.remove()
+            let nodeSelection = NodeSelection(nodes: Set([possibleNode.key]))
+            try setSelection(nodeSelection)
+          } else {
+            try possibleNode.selectStart()
+            try possibleNode.remove()
+            if let editor = getActiveEditor() {
+              editor.dispatchCommand(type: .selectionChange)
+            }
+          }
         } else {
-          try possibleNode.remove()
-          if let editor = getActiveEditor() {
-            editor.dispatchCommand(type: .selectionChange)
+          if let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
+            try anchorNode.remove()
+            try possibleNode.selectEnd()
+          } else {
+            try possibleNode.selectStart()
+            try possibleNode.remove()
           }
         }
+
         return
       } else if !isBackwards, let possibleNode = possibleNode as? ElementNode, let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
         try anchorNode.remove()

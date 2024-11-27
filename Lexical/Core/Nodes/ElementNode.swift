@@ -304,7 +304,7 @@ open class ElementNode: Node {
       return ""
     }
 
-    guard !prevSibling.isInline() else {
+    guard prevSibling is ElementNode else {
       // Since prev is inline but not an element node, and we're not inline, return a newline
       return "\n"
     }

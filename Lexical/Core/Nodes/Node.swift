@@ -756,8 +756,7 @@ open class Node: Codable {
     } else if let previousSibling = previousSibling as? TextNode {
       return try previousSibling.select(anchorOffset: anchorOffset, focusOffset: focusOffset)
     } else if let previousSibling = previousSibling as? DecoratorNode {
-      print("select previous: \(previousSibling)")
-      return try previousSibling.select(anchorOffset: anchorOffset, focusOffset: focusOffset)
+      return try previousSibling.selectEnd()
     } else {
       var index = previousSibling?.getIndexWithinParent()
       index = index ?? 0 + 1
@@ -780,8 +779,7 @@ open class Node: Codable {
     } else if let nextSibling = nextSibling as? TextNode {
       return try nextSibling.select(anchorOffset: anchorOffset, focusOffset: focusOffset)
     } else if let nextSibling = nextSibling as? DecoratorNode {
-      print("select next: \(nextSibling)")
-      return try nextSibling.select(anchorOffset: anchorOffset, focusOffset: focusOffset)
+      return try nextSibling.selectStart()
     } else {
       let index = nextSibling?.getIndexWithinParent()
       return try parent.select(anchorOffset: index, focusOffset: index)

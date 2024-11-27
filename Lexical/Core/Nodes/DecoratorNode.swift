@@ -93,10 +93,6 @@ open class DecoratorNode: Node {
     fatalError("sizeForDecoratorView: base method not extended")
   }
 
-  public func isIsolated() -> Bool {
-    return false
-  }
-
   override open func getPreamble() -> String {
     guard let unicodeScalar = Unicode.Scalar(NSTextAttachment.character) else {
       return ""
@@ -108,39 +104,27 @@ open class DecoratorNode: Node {
     return ""
   }
 
-  // TODO: I tried copying this from element node but it doesn't look like it's getting called
   @discardableResult
-  public func select(anchorOffset: Int?, focusOffset: Int?) throws -> RangeSelection {
-    try errorOnReadOnly()
-
-    let selection = try getSelection()
-    let childrenCount = 0
-    var updatedAnchorOffset = childrenCount
-    var updatedFocusOffset = childrenCount
-
-    if let anchorOffset {
-      updatedAnchorOffset = anchorOffset
+  public func selectStart() throws -> RangeSelection {
+    guard let indexWithinParent = getIndexWithinParent() else {
+      throw LexicalError.invariantViolation("DecoratorNode has no parent")
     }
 
-    if let focusOffset {
-      updatedFocusOffset = focusOffset
+    let parent = try getParentOrThrow()
+    let selectionIndex = indexWithinParent - 1
+    return try parent.select(anchorOffset: selectionIndex, focusOffset: selectionIndex)
+  }
+
+
+  @discardableResult
+  public func selectEnd() throws -> RangeSelection {
+    guard let indexWithinParent = getIndexWithinParent() else {
+      throw LexicalError.invariantViolation("DecoratorNode has no parent")
     }
 
-    guard let selection = selection as? RangeSelection else {
-      return try makeRangeSelection(
-        anchorKey: key,
-        anchorOffset: updatedAnchorOffset,
-        focusKey: key,
-        focusOffset: updatedFocusOffset,
-        anchorType: .element,
-        focusType: .element)
-    }
-
-    selection.anchor.updatePoint(key: key, offset: updatedAnchorOffset, type: .element)
-    selection.focus.updatePoint(key: key, offset: updatedFocusOffset, type: .element)
-    selection.dirty = true
-
-    return selection
+    let parent = try getParentOrThrow()
+    let selectionIndex = indexWithinParent + 1
+    return try parent.select(anchorOffset: selectionIndex, focusOffset: selectionIndex)
   }
 
   override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
