@@ -77,6 +77,11 @@ private func evaluateNode(_ nodeKey: NodeKey, stringLocation: Int, searchDirecti
     }
   }
 
+  if isDecoratorBlockNode(node) {
+    let boundary: RangeCacheSearchResultType = (searchDirection == .forward) ? .startBoundary : .endBoundary
+    return RangeCacheSearchResult(nodeKey: nodeKey, type: boundary, offset: nil)
+  }
+
   if let node = node as? ElementNode {
     let childrenArray = (searchDirection == .forward) ? node.getChildrenKeys() : node.getChildrenKeys().reversed()
 
@@ -97,6 +102,7 @@ private func evaluateNode(_ nodeKey: NodeKey, stringLocation: Int, searchDirecti
         possibleBoundaryElementResult = RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: childIndex + 1)
       }
     }
+
     if let possibleBoundaryElementResult {
       // We do this 'possible result' check so that we prioritise text results where we can.
       return possibleBoundaryElementResult
@@ -124,6 +130,12 @@ private func evaluateNode(_ nodeKey: NodeKey, stringLocation: Int, searchDirecti
 
   if stringLocation == rangeCacheItem.entireRange().upperBound {
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .endBoundary, offset: nil)
+  }
+
+  let preambleEnd = rangeCacheItem.location + rangeCacheItem.preambleLength
+  if stringLocation == preambleEnd {
+    print("returning start boundary: \(nodeKey) -- \(stringLocation) -- \(preambleEnd)")
+    return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
   }
 
   return RangeCacheSearchResult(nodeKey: nodeKey, type: .illegal, offset: nil)
