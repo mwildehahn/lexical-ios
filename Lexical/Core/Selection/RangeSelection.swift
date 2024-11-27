@@ -591,10 +591,11 @@ public class RangeSelection: BaseSelection {
     let anchorNode = try anchor.getNode()
     var target = anchorNode
 
+    // TODO: delete DecoratorBlockNode
     if anchorNode is DecoratorBlockNode {
       return false // there is no insertion into DecoratorBlockNode
     }
-    
+
     if anchor.type == .element {
       if let element = try anchor.getNode() as? ElementNode {
         if let placementNode = element.getChildAtIndex(index: anchorOffset - 1) {
@@ -693,38 +694,33 @@ public class RangeSelection: BaseSelection {
         if isTextNode(target) {
           target = topLevelElement
         }
+      } else if isDecoratorBlockNode(node) {
+        if node == firstNode {
+          if let unwrappedTarget = target as? ElementNode,
+             unwrappedTarget.isEmpty() &&
+              unwrappedTarget.canReplaceWith(replacement: node) {
+            try target.replace(replaceWith: node)
+            target = node
+            didReplaceOrMerge = true
+            continue
+          }
+        }
+
+        if isTextNode(target) {
+          target = topLevelElement
+        }
       } else if didReplaceOrMerge && !isDecoratorNode(node) && isRootNode(node: target.getParent()) {
         throw LexicalError.invariantViolation("insertNodes: cannot insert a non-element into a root node")
       }
 
       didReplaceOrMerge = false
 
-      if let unwrappedTarget = target as? ElementNode {
-        if let node = node as? DecoratorNode, !node.isInline() {
-          target = try target.insertAfter(nodeToInsert: node)
-        } else if !isElementNode(node: node) {
-          if let firstChild = unwrappedTarget.getFirstChild() {
-            try firstChild.insertBefore(nodeToInsert: node)
-          } else {
-            try unwrappedTarget.append([node])
-          }
-
-          target = node
-        } else {
-          if let elementNode = node as? ElementNode {
-            if !elementNode.canBeEmpty() && elementNode.isEmpty() {
-              continue
-            }
-
-            target = try target.insertAfter(nodeToInsert: node)
-          }
-        }
-      } else if !isElementNode(node: node) || isDecoratorBlockNode(node) {
-        target = try target.insertAfter(nodeToInsert: node)
-      } else {
-        target = try node.getParentOrThrow() // Re-try again with the target being the parent
+      let newTarget = try insertNodeIntoTarget(node: node, target: target)
+      guard let newTarget else {
         continue
       }
+
+      target = newTarget
     }
 
     if selectStart {
@@ -793,6 +789,41 @@ public class RangeSelection: BaseSelection {
       }
     }
     return true
+  }
+
+  private func insertNodeIntoTarget(node: Node, target: Node) throws -> Node? {
+    var updatedTarget = target
+
+    if isDecoratorBlockNode(target) {
+      updatedTarget = try target.insertAfter(nodeToInsert: node)
+      return updatedTarget
+    }
+
+    guard let elementTarget = target as? ElementNode else {
+      return try insertNodeIntoTarget(node: node, target: try target.getParentOrThrow())
+    }
+
+    if !isElementNode(node: node) && !isDecoratorBlockNode(node) {
+      if let firstChild = elementTarget.getFirstChild() {
+        try firstChild.insertBefore(nodeToInsert: node)
+      } else {
+        try elementTarget.append([node])
+      }
+
+      updatedTarget = node
+    } else {
+      if let elementNode = node as? ElementNode {
+        if !elementNode.canBeEmpty() && elementNode.isEmpty() {
+          return nil
+        }
+
+        updatedTarget = try target.insertAfter(nodeToInsert: node)
+      } else if isDecoratorBlockNode(node) {
+        updatedTarget = try target.insertAfter(nodeToInsert: node)
+      }
+    }
+
+    return updatedTarget
   }
 
   public func getPlaintext() throws -> String {
