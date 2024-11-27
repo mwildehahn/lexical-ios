@@ -265,11 +265,6 @@ public class RangeSelection: BaseSelection {
     let style = style
     let anchorNode = try anchor.getNode()
 
-    if anchorNode is DecoratorBlockNode {
-      // we're not allowing inserting text into decorator block node
-      return
-    }
-
     if isBefore && anchor.type == .element {
       try transferStartingElementPointToTextPoint(start: anchor, end: focus, format: format, style: style)
     } else if !isBefore && focus.type == .element {
@@ -590,11 +585,6 @@ public class RangeSelection: BaseSelection {
     let anchorOffset = anchor.offset
     let anchorNode = try anchor.getNode()
     var target = anchorNode
-
-    // TODO: delete DecoratorBlockNode
-    if anchorNode is DecoratorBlockNode {
-      return false // there is no insertion into DecoratorBlockNode
-    }
 
     if anchor.type == .element {
       if let element = try anchor.getNode() as? ElementNode {
@@ -1018,20 +1008,6 @@ public class RangeSelection: BaseSelection {
             return
           }
         }
-      }
-
-      // Handle the deletion around decorator block nodes.
-      if let decoratorBlockNode = anchorNode as? DecoratorBlockNode {
-        // NK TODO this should take into account direction, for right to left text I guess
-        let previousSibling = decoratorBlockNode.getPreviousSibling()
-        if anchor.offset == 1 {
-          try decoratorBlockNode.remove()
-        }
-        if  let previousSiblingAsParagraphNode = previousSibling as? ParagraphNode,
-            let lastTextNodeInPreviousSibling = previousSiblingAsParagraphNode.getLastChild() as? TextNode{
-          try? _ = lastTextNodeInPreviousSibling.select(anchorOffset: nil, focusOffset: nil)
-        }
-        return
       }
 
       // Handle the deletion around decorators.

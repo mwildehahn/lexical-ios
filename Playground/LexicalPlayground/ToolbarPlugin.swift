@@ -14,17 +14,11 @@ import LexicalListPlugin
 import SelectableDecoratorNode
 import UIKit
 
-class SampleDecoratorBlockNode: DecoratorBlockNode {
-  override func createDecoratorNode() -> DecoratorNode {
-    return SampleDecoratorNode()
-  }
-}
-
 extension NodeType {
   static let sampleDecorator = NodeType(rawValue: "sampleDecorator")
 }
 
-class SampleDecoratorNode: DecoratorNode {
+class SampleDecoratorNode: DecoratorBlockNode {
 
   override public class func getType() -> NodeType {
     return .sampleDecorator
@@ -43,10 +37,6 @@ class SampleDecoratorNode: DecoratorNode {
     textViewWidth: CGFloat, attributes: [NSAttributedString.Key: Any]
   ) -> CGSize {
     return CGSizeMake(textViewWidth, 50)
-  }
-
-  override open func isInline() -> Bool {
-    return false
   }
 
 }
