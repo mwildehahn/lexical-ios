@@ -463,7 +463,7 @@ public class RangeSelection: BaseSelection {
         endPoint.type == .element && (lastNode?.getIndexWithinParent() ?? 0 < endOffset)
       let shouldModifyDecoratorNode = !isDecoratorBlockNode(lastNode)
 
-      if (shouldModifyTextNode || shouldModifyElementNode) && !shouldModifyDecoratorNode {
+      if (shouldModifyTextNode || shouldModifyElementNode) && shouldModifyDecoratorNode {
         if let lastNodeAsTextNode = lastNode as? TextNode,
            !lastNodeAsTextNode.isToken(),
            endOffset != lastNodeAsTextNode.getTextContentSize() {
