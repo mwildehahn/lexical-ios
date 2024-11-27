@@ -137,4 +137,17 @@ open class DecoratorNode: Node {
 
     return [.attachment: textAttachment]
   }
+
+  @discardableResult
+  open func collapseAtStart(selection: RangeSelection) throws -> Bool {
+    if !isInline() {
+      let paragraph = createParagraphNode()
+      try replace(replaceWith: paragraph)
+      try paragraph.selectStart()
+      return true
+    }
+
+    return false
+  }
+
 }

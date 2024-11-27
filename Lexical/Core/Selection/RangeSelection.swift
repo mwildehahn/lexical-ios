@@ -269,7 +269,7 @@ public class RangeSelection: BaseSelection {
       // we're not allowing inserting text into decorator block node
       return
     }
-    
+
     if isBefore && anchor.type == .element {
       try transferStartingElementPointToTextPoint(start: anchor, end: focus, format: format, style: style)
     } else if !isBefore && focus.type == .element {
@@ -1030,22 +1030,22 @@ public class RangeSelection: BaseSelection {
         }
         return
       }
-      
+
       // Handle the deletion around decorators.
-      let possibleNode = try getAdjacentNode(focus: focus, isBackward: isBackwards)
-      if let possibleNode = possibleNode as? DecoratorNode {
-        if possibleNode.isInline() {
+      let adjacentNode = try getAdjacentNode(focus: focus, isBackward: isBackwards)
+      if let adjacentNode = adjacentNode as? DecoratorNode {
+        if adjacentNode.isInline() {
           // Make it possible to move selection from range selection to
           // node selection on the node.
           if /* possibleNode.isKeyboardSelectable() && */
             let anchorNode = anchorNode as? ElementNode,
             anchorNode.isEmpty() {
             try anchorNode.remove()
-            let nodeSelection = NodeSelection(nodes: Set([possibleNode.key]))
+            let nodeSelection = NodeSelection(nodes: Set([adjacentNode.key]))
             try setSelection(nodeSelection)
           } else {
-            try possibleNode.selectStart()
-            try possibleNode.remove()
+            try adjacentNode.selectStart()
+            try adjacentNode.remove()
             if let editor = getActiveEditor() {
               editor.dispatchCommand(type: .selectionChange)
             }
@@ -1053,15 +1053,33 @@ public class RangeSelection: BaseSelection {
         } else {
           if let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
             try anchorNode.remove()
-            try possibleNode.selectEnd()
+            try adjacentNode.selectEnd()
           } else {
-            try possibleNode.selectStart()
-            try possibleNode.remove()
+            if try adjacentNode.collapseAtStart(selection: self) {
+              return
+            } else {
+              try adjacentNode.selectPrevious(anchorOffset: nil, focusOffset: nil)
+              try adjacentNode.remove()
+            }
           }
         }
 
         return
-      } else if !isBackwards, let possibleNode = possibleNode as? ElementNode, let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
+      } else if isRootNode(node: anchorNode),
+                let adjacentNode = adjacentNode as? ElementNode,
+                adjacentNode.isEmpty(),
+                let adjacentNodeSibling = adjacentNode.getNextSibling() as? DecoratorNode,
+                !adjacentNodeSibling.isInline() {
+        // A decorator block node's selection is represented as an index within
+        // the root node. We need to handle the case where the cursor is at the
+        // start of a decorator block node and you hit backspace. In this case,
+        // the adjacent node is the node preceding the decorator block node
+        // (adjacentNode here). We check the adjacent node next sibling to see
+        // if it's a decorator node to properly handle this case.
+        try adjacentNode.remove()
+        try adjacentNodeSibling.selectStart()
+        return
+      } else if !isBackwards, let possibleNode = adjacentNode as? ElementNode, let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
         try anchorNode.remove()
         try possibleNode.selectStart()
         return
