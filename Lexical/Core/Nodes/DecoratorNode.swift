@@ -111,7 +111,7 @@ open class DecoratorNode: Node {
     }
 
     let parent = try getParentOrThrow()
-    let selectionIndex = indexWithinParent - 1
+    let selectionIndex = max(0, indexWithinParent - 1)
     return try parent.select(anchorOffset: selectionIndex, focusOffset: selectionIndex)
   }
 
