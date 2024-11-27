@@ -77,11 +77,6 @@ private func evaluateNode(_ nodeKey: NodeKey, stringLocation: Int, searchDirecti
     }
   }
 
-  if isDecoratorBlockNode(node) {
-    let boundary: RangeCacheSearchResultType = (searchDirection == .forward) ? .startBoundary : .endBoundary
-    return RangeCacheSearchResult(nodeKey: nodeKey, type: boundary, offset: nil)
-  }
-
   if let node = node as? ElementNode {
     let childrenArray = (searchDirection == .forward) ? node.getChildrenKeys() : node.getChildrenKeys().reversed()
 
@@ -134,7 +129,6 @@ private func evaluateNode(_ nodeKey: NodeKey, stringLocation: Int, searchDirecti
 
   let preambleEnd = rangeCacheItem.location + rangeCacheItem.preambleLength
   if stringLocation == preambleEnd {
-    print("returning start boundary: \(nodeKey) -- \(stringLocation) -- \(preambleEnd)")
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
   }
 
