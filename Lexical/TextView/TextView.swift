@@ -542,14 +542,18 @@ private class CaretAndSelectionRectsAdjuster {
 
   static func adjustCaretRect(_ originalRect: CGRect, for position: UITextPosition, in textView: UITextView) -> CGRect {
     var result = originalRect
-    if isCaretOnLastLine(for: position, in: textView) {
-      // Find the caret position as an index in the text
-      let offset = textView.offset(from: textView.beginningOfDocument, to: position)
-      // Retrieve attributes at the caret position
-      let attributes = textView.textStorage.attributes(at: offset, effectiveRange: nil)
-      if let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle {
-        result.size.height = result.size.height - paragraphStyle.paragraphSpacing
-      }
+    // Find the caret position as an index in the text
+    let offset = textView.offset(from: textView.beginningOfDocument, to: position)
+    // Retrieve attributes at the caret position
+    let attributes = textView.textStorage.attributes(at: offset, effectiveRange: nil)
+    if let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle,
+       paragraphStyle.paragraphSpacing > 0 {
+      // there is paragraph spacing, in that case we opt for a fixed size caret
+      guard let font = textView.font else { return result }
+
+      // "descender" is expressed as a negative value,
+      // so to add its height you must subtract its value
+      result.size.height = font.pointSize - font.descender
     }
 
     return result
