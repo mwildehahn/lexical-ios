@@ -8,6 +8,15 @@
 import Foundation
 internal let kRootNodeKey = "root"
 
+public typealias EditorStateMigrationHandler = (EditorState) throws -> Void
+
+public struct EditorStateMigration {
+  let fromVersion: Int
+  let toVersion: Int
+
+  let handler: EditorStateMigrationHandler
+}
+
 /**
  The Lexical data model.
 
@@ -17,6 +26,7 @@ public class EditorState: NSObject {
 
   internal var nodeMap: [NodeKey: Node] = [:]
   public var selection: BaseSelection?
+  public var version: Int = 1
 
   override init() {
     let rootNode = RootNode()
@@ -25,6 +35,7 @@ public class EditorState: NSObject {
 
   init(_ editorState: EditorState) {
     nodeMap = editorState.nodeMap
+    version = editorState.version
   }
 
   /// Returns the root node for this EditorState, if one is set.
@@ -81,7 +92,7 @@ public class EditorState: NSObject {
       selectionEqual = false
     }
 
-    return isEqual && selectionEqual
+    return lhs.version == rhs.version && isEqual && selectionEqual
   }
 
   public func hasSameState(as rhs: EditorState) -> Bool {
@@ -100,8 +111,10 @@ public class EditorState: NSObject {
     return isEqual
   }
 
-  static func createEmptyEditorState() -> EditorState {
-    EditorState()
+  static func createEmptyEditorState(version: Int = 1) -> EditorState {
+    let editorState = EditorState()
+    editorState.version = version
+    return editorState
   }
 
   /**
@@ -114,7 +127,7 @@ public class EditorState: NSObject {
       guard let rootNode = getRootNode() else {
         throw LexicalError.invariantViolation("Could not get RootNode")
       }
-      let persistedEditorState = SerializedEditorState(rootNode: rootNode)
+      let persistedEditorState = SerializedEditorState(rootNode: rootNode, version: version)
       let encoder = JSONEncoder()
       encoder.outputFormatting = outputFormatting
       let encodedData = try encoder.encode(persistedEditorState)
@@ -133,11 +146,11 @@ public class EditorState: NSObject {
    This function requires an ``Editor`` to be passed in, so that the list of registered node classes and plugins can be used when deserializing the JSON.
    The newly created EditorState is not added to the Editor; it is expected that the API consumer will call ``Editor/setEditorState(_:)`` if that is desired.
    */
-  public static func fromJSON(json: String, editor: Editor) throws -> EditorState {
+  public static func fromJSON(json: String, editor: Editor, migrations: [EditorStateMigration] = []) throws -> EditorState {
     guard let stateData = json.data(using: .utf8) else {
       throw LexicalError.internal("Could not generate data from string JSON state")
     }
 
-    return try editor.parseEditorState(json: stateData)
+    return try editor.parseEditorState(json: stateData, migrations: migrations)
   }
 }

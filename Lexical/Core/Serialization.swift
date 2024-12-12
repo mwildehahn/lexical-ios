@@ -15,21 +15,30 @@ enum PartialCodingKeys: String, CodingKey {
 public struct SerializedEditorState: Codable {
   enum RootCodingKeys: String, CodingKey {
     case root
+    case version
   }
 
   public var rootNode: RootNode?
+  public var version: Int
 
-  public init(rootNode: RootNode) {
+  public init(rootNode: RootNode, version: Int = 1) {
     self.rootNode = rootNode
+    self.version = version
   }
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: RootCodingKeys.self)
+    self.version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
     self.rootNode = try container.decode(RootNode.self, forKey: .root)
   }
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: RootCodingKeys.self)
+    // Only encode version if it's not the default
+    if version != 1 {
+      try container.encode(version, forKey: .version)
+    }
+
     try container.encode(rootNode, forKey: .root)
   }
 }
@@ -88,7 +97,7 @@ let defaultDeserializationMapping: DeserializationMapping = [
   NodeType.element: { decoder in try ElementNode(from: decoder) },
   NodeType.heading: { decoder in try HeadingNode(from: decoder) },
   NodeType.paragraph: { decoder in try ParagraphNode(from: decoder) },
-  NodeType.quote: { decoder in try QuoteNode(from: decoder) }
+  NodeType.quote: { decoder in try QuoteNode(from: decoder) },
 ]
 
 func makeDeserializationMap() -> DeserializationMapping {

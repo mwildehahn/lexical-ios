@@ -450,6 +450,14 @@ public class Editor: NSObject {
 
   // MARK: - Internal
 
+  public func setEditorStateVersion(_ version: Int) {
+    if let pendingEditorState {
+      pendingEditorState.version = version
+    }
+
+    editorState.version = version
+  }
+
   public func setEditorState(_ newEditorState: EditorState) throws {
     // If we already have a pending editor state, modify that one. Otherwise, if we're inside an update block, the previous pending editor state
     // will remain attached to the thread as activeEditorState, and things like getLatest won't work right.
@@ -890,7 +898,7 @@ public class Editor: NSObject {
     }
   }
 
-  internal func parseEditorState(json: Data) throws -> EditorState {
+  internal func parseEditorState(json: Data, migrations: [EditorStateMigration] = []) throws -> EditorState {
     let previousActiveEditorState = self.editorState
     let previousPendingEditorState = self.pendingEditorState
     let previousDirtyNodes = self.dirtyNodes
@@ -924,6 +932,10 @@ public class Editor: NSObject {
 
     try self.beginUpdate({
       let serializedEditorState = try JSONDecoder().decode(SerializedEditorState.self, from: json)
+      guard let editor = getActiveEditor() else {
+        throw LexicalError.invariantViolation("Editor is unexpectedly nil")
+      }
+      editor.setEditorStateVersion(serializedEditorState.version)
 
       guard let serializedRootNode = serializedEditorState.rootNode, let rootNode = getRoot() else {
         throw LexicalError.internal("Failed to decode RootNode")
@@ -932,6 +944,17 @@ public class Editor: NSObject {
       try rootNode.append(serializedRootNode.getChildren())
       try rootNode.setDirection(direction: serializedRootNode.direction)
     }, mode: UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil, skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .parseState)
+
+    for migration in migrations where self.editorState.version == migration.fromVersion {
+      try self.beginUpdate({
+        guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
+          throw LexicalError.invariantViolation("Editor is unexpectedly nil")
+        }
+
+        try migration.handler(editorState)
+        editor.setEditorStateVersion(migration.toVersion)
+      }, mode: UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil, skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .migrateState)
+    }
 
     return self.editorState
   }

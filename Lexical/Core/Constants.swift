@@ -75,6 +75,7 @@ public enum EditorUpdateReason: String {
   case update = "update"
   case reset = "reset"
   case parseState = "parseState"
+  case migrateState = "migrateState"
   case setState = "setState"
   case errorRecovery = "errorRecovery"
   case initialization = "initialization"
