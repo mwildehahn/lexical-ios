@@ -578,25 +578,6 @@ private class CaretAndSelectionRectsAdjuster {
     return modifiedRects
   }
 
-  static func isCaretOnLastLine(for position: UITextPosition, in textView: UITextView) -> Bool {
-    let caretOffset = textView.offset(from: textView.beginningOfDocument, to: position)
-
-    // Get the paragraph range containing the caret
-    let nsText = textView.textStorage.string as NSString
-    let paragraphRange = nsText.paragraphRange(for: NSRange(location: caretOffset, length: 0))
-
-    // Check line fragment of the caret
-    let glyphIndex = textView.layoutManager.glyphIndexForCharacter(at: caretOffset)
-    let lineFragmentRect = textView.layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil)
-
-    // Determine the last line of the paragraph
-    let paragraphEndGlyphIndex = textView.layoutManager.glyphIndexForCharacter(at: paragraphRange.upperBound - 1)
-    let lastLineFragmentRect = textView.layoutManager.lineFragmentRect(forGlyphAt: paragraphEndGlyphIndex, effectiveRange: nil)
-
-    // Compare the current caret's line to the last line of the paragraph
-    return lineFragmentRect == lastLineFragmentRect
-  }
-
 }
 
 // Custom UITextSelectionRect subclass for modified rects
