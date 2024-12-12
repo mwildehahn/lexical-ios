@@ -13,8 +13,13 @@ public typealias EditorStateMigrationHandler = (EditorState) throws -> Void
 public struct EditorStateMigration {
   let fromVersion: Int
   let toVersion: Int
-
   let handler: EditorStateMigrationHandler
+
+  public init(fromVersion: Int, toVersion: Int, handler: @escaping EditorStateMigrationHandler) {
+    self.fromVersion = fromVersion
+    self.toVersion = toVersion
+    self.handler = handler
+  }
 }
 
 /**
