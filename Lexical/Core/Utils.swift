@@ -170,6 +170,10 @@ public func isElementNode(node: Node?) -> Bool {
   node is ElementNode
 }
 
+public func isElementNode(_ node: Node?) -> Bool {
+  return isElementNode(node: node)
+}
+
 public func isTextNode(_ node: Node?) -> Bool {
   node is TextNode
 }

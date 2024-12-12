@@ -784,41 +784,33 @@ public class RangeSelection: BaseSelection {
   }
 
   private func insertNodeIntoTarget(node: Node, target: Node) throws -> Node? {
-    var updatedTarget = target
-
-    if isDecoratorBlockNode(target) {
-      return try target.insertAfter(nodeToInsert: node)
-    }
-
-    if !isElementNode(node: node) {
-      return try target.insertAfter(nodeToInsert: node)
-    }
-
-    guard let elementTarget = target as? ElementNode else {
-      return try insertNodeIntoTarget(node: node, target: try target.getParentOrThrow())
-    }
-
-    if !isElementNode(node: node) && !isDecoratorBlockNode(node) {
-      if let firstChild = elementTarget.getFirstChild() {
-        try firstChild.insertBefore(nodeToInsert: node)
-      } else {
-        try elementTarget.append([node])
-      }
-
-      updatedTarget = node
-    } else {
-      if let elementNode = node as? ElementNode {
-        if !elementNode.canBeEmpty() && elementNode.isEmpty() {
-          return nil
+    if let elementTarget = target as? ElementNode {
+      if isDecoratorBlockNode(node) {
+        return try elementTarget.insertAfter(nodeToInsert: node)
+      } else if !isElementNode(node) {
+        if let firstChild = elementTarget.getFirstChild() {
+          try firstChild.insertBefore(nodeToInsert: node)
+        } else {
+          try elementTarget.append([node])
         }
 
-        updatedTarget = try target.insertAfter(nodeToInsert: node)
-      } else if isDecoratorBlockNode(node) {
-        updatedTarget = try target.insertAfter(nodeToInsert: node)
+        return node
+      } else {
+        if let elementNode = node as? ElementNode {
+          if !elementNode.canBeEmpty() && elementNode.isEmpty() {
+            return nil
+          }
+
+          return try target.insertAfter(nodeToInsert: node)
+        } else if isDecoratorBlockNode(node) {
+          return try target.insertAfter(nodeToInsert: node)
+        }
       }
+    } else if !isElementNode(node: node) {
+      return try target.insertAfter(nodeToInsert: node)
     }
 
-    return updatedTarget
+    return try insertNodeIntoTarget(node: node, target: try target.getParentOrThrow())
   }
 
   public func getPlaintext() throws -> String {

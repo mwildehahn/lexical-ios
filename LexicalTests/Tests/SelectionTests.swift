@@ -1174,11 +1174,11 @@ class SelectionTests: XCTestCase {
       let startPoint = createPoint(key: textNode.key, offset: endIndex, type: .text)
       let endPoint = createPoint(key: textNode.key, offset: endIndex, type: .text)
       let selection = RangeSelection(anchor: startPoint, focus: endPoint, format: TextFormat())
-
       try selection.insertText("Welcome to Lexical iOS")
       XCTAssertEqual(view.textView.text, "Hello!")
       try selection.insertLineBreak(selectStart: true)
     }
+
     XCTAssertEqual(view.textView.text, "Hello!\n\nWelcome to Lexical iOS")
   }
 

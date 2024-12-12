@@ -190,10 +190,23 @@ class DecoratorBlockNodeTests: XCTestCase {
       // Select the first decorator node
       try decoratorNode1.selectStart()
 
+    }
+
+    try editor.update {
+      guard let root = getRoot() else {
+        XCTFail("No root node")
+        return
+      }
+
       guard let selection = try getSelection() as? RangeSelection else {
         XCTFail("No selection")
         return
       }
+
+      XCTAssertEqual(root.getChildrenSize(), 3)
+      XCTAssertTrue(root.getChildAtIndex(index: 0) is ParagraphNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 1) is ParagraphNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNode)
 
       // Insert second decorator node
       let decoratorNode2 = TestDecoratorBlockNode()
@@ -212,5 +225,6 @@ class DecoratorBlockNodeTests: XCTestCase {
       XCTAssertTrue(root.getChildAtIndex(index: 1) is ParagraphNode)
       XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNode)
     }
+
   }
 }
