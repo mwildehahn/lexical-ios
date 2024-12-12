@@ -10,7 +10,7 @@ internal let kRootNodeKey = "root"
 
 public typealias EditorStateMigrationHandler = (EditorState) throws -> Void
 
-public struct EditorStateMigration {
+public struct EditorStateMigration: Sendable {
   let fromVersion: Int
   let toVersion: Int
   let handler: EditorStateMigrationHandler
