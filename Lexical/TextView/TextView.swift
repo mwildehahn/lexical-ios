@@ -31,6 +31,8 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   weak var lexicalDelegate: LexicalTextViewDelegate?
   private var placeholderLabel: UILabel
 
+  private var interceptNextTypingAttributes: [NSAttributedString.Key: Any]?
+
   private let useInputDelegateProxy: Bool
   private let inputDelegateProxy: InputDelegateProxy
 
@@ -115,6 +117,11 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   }
 
   public override func caretRect(for position: UITextPosition) -> CGRect {
+    if let interceptNextTypingAttributes {
+      typingAttributes = interceptNextTypingAttributes
+      self.interceptNextTypingAttributes = nil
+    }
+
     let originalRect = super.caretRect(for: position)
     return CaretAndSelectionRectsAdjuster.adjustCaretRect(originalRect, for: position, in: self)
   }
@@ -181,6 +188,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       theme: editor.getTheme()
     )
     typingAttributes = attributes
+    interceptNextTypingAttributes = attributes
   }
 
   override public func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
