@@ -437,7 +437,7 @@ func moveSelectionPointToEnd(point: Point, node: Node) {
 func transferStartingElementPointToTextPoint(start: Point, end: Point, format: TextFormat, style: String) throws {
   guard let element = try start.getNode() as? ElementNode else { return }
 
-  var placementNode = element.getChildAtIndex(index: start.offset)
+  let placementNode = element.getChildAtIndex(index: start.offset)
   let textNode = try createTextNode(text: nil).setFormat(format: format)
   var target: Node
 

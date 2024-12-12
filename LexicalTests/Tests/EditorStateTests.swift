@@ -77,4 +77,20 @@ class EditorStateTests: XCTestCase {
     let deserializedMigratedState = try EditorState.fromJSON(json: postMigrationState, editor: editor, migrations: migrations)
     XCTAssertEqual(deserializedMigratedState.version, 3)
   }
+
+  func testEditorStateVersionDefault() throws {
+    let view = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let editor = view.editor
+
+    XCTAssertEqual(editor.getEditorState().version, 1)
+  }
+
+  func testEditorStateVersion() throws {
+    let view = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [], editorStateVersion: 2), featureFlags: FeatureFlags())
+    let editor = view.editor
+
+    XCTAssertEqual(editor.getEditorState().version, 2)
+  }
 }

@@ -265,7 +265,6 @@ public class RangeSelection: BaseSelection {
     let isBefore = isCollapsed() || anchorIsBefore
     let format = format
     let style = style
-    let anchorNode = try anchor.getNode()
 
     if isBefore && anchor.type == .element {
       try transferStartingElementPointToTextPoint(start: anchor, end: focus, format: format, style: style)
@@ -511,7 +510,7 @@ public class RangeSelection: BaseSelection {
         insertionTarget = try insertionTarget.getParentOrThrow()
       }
 
-      for (index, lastNodeChild) in lastElementChildren.enumerated().reversed() {
+      for (_, lastNodeChild) in lastElementChildren.enumerated().reversed() {
         if lastNodeChild.isSameNode(firstNode) {
           break
         }

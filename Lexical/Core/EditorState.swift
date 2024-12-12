@@ -33,6 +33,11 @@ public class EditorState: NSObject {
     nodeMap[kRootNodeKey] = rootNode
   }
 
+  convenience init(version: Int = 1) {
+    self.init()
+    self.version = version
+  }
+
   init(_ editorState: EditorState) {
     nodeMap = editorState.nodeMap
     version = editorState.version

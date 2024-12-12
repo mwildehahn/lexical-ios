@@ -17,10 +17,12 @@ import UIKit
 @objc public class EditorConfig: NSObject {
   let theme: Theme
   let plugins: [Plugin]
+  let editorStateVersion: Int
 
-  @objc public init(theme: Theme, plugins: [Plugin]) {
+  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1) {
     self.theme = theme
     self.plugins = plugins
+    self.editorStateVersion = editorStateVersion
   }
 }
 
@@ -52,6 +54,7 @@ public class Editor: NSObject {
   internal static var maxUpdateCount = 99
 
   private var editorState: EditorState
+  private var editorStateVersion: Int
   private var pendingEditorState: EditorState?
   private var theme: Theme
 
@@ -124,7 +127,8 @@ public class Editor: NSObject {
   /// You will usually not need to directly init an Editor; instead you will create a TextView
   /// which will initialise the Editor for you.
   public init(editorConfig: EditorConfig) {
-    editorState = EditorState()
+    editorStateVersion = editorConfig.editorStateVersion
+    editorState = EditorState(version: editorConfig.editorStateVersion)
     guard let rootNodeKey = editorState.getRootNode()?.key else {
       fatalError("Expected root node key when creating new editor state")
     }
@@ -358,7 +362,7 @@ public class Editor: NSObject {
       pendingEditorState = nil
     }
     compositionKey = nil
-    editorState = EditorState()
+    editorState = EditorState(version: editorStateVersion)
 
     rangeCache = [:]
     rangeCache[kRootNodeKey] = RangeCacheItem()
@@ -908,6 +912,7 @@ public class Editor: NSObject {
     let previousNormalizedNodes = self.normalizedNodes
     let previousHeadless = self.headless
 
+    // We don't init the version here because this should come from the JSON we're parsing
     let editorState = EditorState()
 
     self.dirtyNodes = [:]
