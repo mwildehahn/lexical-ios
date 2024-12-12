@@ -1607,10 +1607,10 @@ class NodeTests: XCTestCase {
       }
 
       let rootNode = editorState.getRootNode()
-      let paragraphNode = ParagraphNode() // key 0
-      let textNode = TextNode() // key 1
+      let paragraphNode = ParagraphNode() // key 1 (there is a default paragraph node)
+      let textNode = TextNode() // key 2
       try textNode.setText("Text Node")
-      let anotherParagraphNode = ParagraphNode() // key 2
+      let anotherParagraphNode = ParagraphNode() // key 3
       try paragraphNode.append([textNode])
       key = textNode.key
 
@@ -1630,7 +1630,7 @@ class NodeTests: XCTestCase {
       }
 
       if let rootNode = editorState.getRootNode() {
-        XCTAssertFalse(rootNode.children.contains("2"))
+        XCTAssertFalse(rootNode.children.contains(key))
       }
     }
 

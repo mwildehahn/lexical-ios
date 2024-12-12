@@ -553,7 +553,7 @@ public func setBlocksType(
 
 private func isBlock(_ node: Node) -> Bool {
   guard let node = node as? ElementNode, !isRootNode(node: node) else {
-    return !node.isInline()
+    return !node.isInline() && !isRootNode(node: node)
   }
 
   let firstChild = node.getFirstChild()
