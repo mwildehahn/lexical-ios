@@ -741,6 +741,8 @@ public class RangeSelection: BaseSelection {
           try unwrappedTarget.select(anchorOffset: nil, focusOffset: nil)
         } else if let lastChild = lastChild as? TextNode {
           try lastChild.select(anchorOffset: nil, focusOffset: nil)
+        } else if let lastChild = lastChild as? ElementNode {
+          try lastChild.select(anchorOffset: nil, focusOffset: nil)
         } else {
           _ = try lastChild?.selectNext(anchorOffset: nil, focusOffset: nil)
         }
