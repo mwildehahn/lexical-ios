@@ -13,8 +13,11 @@ extension String {
     return nsString.length
   }
 
-  public func lengthAsNSString(excludingWhitespace: Bool) -> Int {
-    let nsString = excludingWhitespace ? (self.filter { !$0.isWhitespace }) as NSString : self as NSString
-    return nsString.length
+  public func lengthAsNSString(includingCharacters: [Character] = []) -> Int {
+    let filtered = self.filter { char in
+      includingCharacters.contains(char)
+    }
+    return (filtered as NSString).length
   }
+
 }
