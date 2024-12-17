@@ -662,31 +662,28 @@ internal func normalizeSelectionPointsForBoundaries(
 
 func validatePosition(textView: UITextView, position: UITextPosition, direction: UITextStorageDirection) -> UITextPosition {
   var currentPosition = position
-  let textLength = textView.text.count
+  let nsText = textView.text as NSString
+  let textLength = nsText.length
 
   while true {
     let offset = textView.offset(from: textView.beginningOfDocument, to: currentPosition)
 
-    // Check if we've reached the text boundaries
-    if direction == .forward && offset >= textLength {
+    // Check if we've reached text boundaries
+    if (direction == .forward && offset >= textLength) ||
+        (direction == .backward && offset <= 0) {
       break
     }
-    if direction == .backward && offset <= 0 {
-      break
-    }
 
-    // If we're beyond the text length, adjust to check the last character
-    let offsetToCheck = min(offset, textLength - 1)
+    let offsetToCheck = min(max(offset, 0), textLength - 1)
+    let charRange = nsText.rangeOfComposedCharacterSequence(at: offsetToCheck)
+    let substring = nsText.substring(with: charRange)
 
-    if offsetToCheck >= 0 {
-      let char = textView.text[textView.text.index(textView.text.startIndex, offsetBy: offsetToCheck)]
-
-      if char.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "\u{200B}").contains($0) }) {
-        let newOffset = direction == .forward ? 1 : -1
-        if let newPosition = textView.position(from: currentPosition, offset: newOffset) {
-          currentPosition = newPosition
-          continue
-        }
+    // Check for zero-width characters
+    if substring.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "\u{200B}").contains($0) }) {
+      let adjustment = direction == .forward ? charRange.length : -charRange.length
+      if let newPosition = textView.position(from: currentPosition, offset: adjustment) {
+        currentPosition = newPosition
+        continue
       }
     }
 
