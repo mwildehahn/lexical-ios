@@ -574,7 +574,7 @@ open class Node: Codable {
     }
 
     if !isRootNode(node: parent) && !parent.canBeEmpty() && parent.getChildrenSize() == 0 {
-      try removeNode(nodeToRemove: parent, restoreSelection: restoreSelection)
+      try parent.remove()
     }
   }
 
