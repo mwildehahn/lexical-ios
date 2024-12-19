@@ -573,7 +573,7 @@ open class Node: Codable {
         times: -1)
     }
 
-    if !isRootNode(node: parent) && !parent.canBeEmpty() && parent.getChildrenSize() == 0 {
+    if !isRootNode(node: parent) && !parent.canBeEmpty() && parent.getChildrenSize() == 0 && parent.isAttached() {
       try parent.remove()
     }
   }
