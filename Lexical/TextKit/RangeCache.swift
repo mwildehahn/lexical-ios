@@ -69,6 +69,14 @@ private func evaluateNode(_ nodeKey: NodeKey, stringLocation: Int, searchDirecti
     throw LexicalError.rangeCacheSearch("Couldn't find node or range cache item for key \(nodeKey)")
   }
 
+  if let parentKey = node.parent, let parentRangeCacheItem = rangeCache[parentKey] {
+    if stringLocation == parentRangeCacheItem.location && parentRangeCacheItem.preambleSpecialCharacterLength - parentRangeCacheItem.preambleLength == 0 {
+      if node is TextNode {
+        return RangeCacheSearchResult(nodeKey: nodeKey, type: .text, offset: 0)
+      }
+    }
+  }
+
   if !rangeCacheItem.entireRange().byAddingOne().contains(stringLocation) {
     return nil
   }
