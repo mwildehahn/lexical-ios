@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -39,6 +39,10 @@
 		06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeHierarchyViewPlugin.swift; sourceTree = "<group>"; };
 		06F7CF952A545C7C0024CD5A /* lexical-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "lexical-logo.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		7F290E822D1D5E3D00716EB9 /* Automerge */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Automerge; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		0656CF7229D1E438009CA08F /* Frameworks */ = {
@@ -81,6 +85,7 @@
 		0656CF7729D1E438009CA08F /* LexicalPlayground */ = {
 			isa = PBXGroup;
 			children = (
+				7F290E822D1D5E3D00716EB9 /* Automerge */,
 				0656CF7829D1E438009CA08F /* AppDelegate.swift */,
 				0656CF7C29D1E438009CA08F /* ViewController.swift */,
 				069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */,
@@ -124,6 +129,9 @@
 			);
 			dependencies = (
 				0656CF9629D2373C009CA08F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7F290E822D1D5E3D00716EB9 /* Automerge */,
 			);
 			name = LexicalPlayground;
 			packageProductDependencies = (

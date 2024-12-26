@@ -35,6 +35,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
     let imagePlugin = InlineImagePlugin()
 
     let linkPlugin = LinkPlugin()
+    let automergePlugin = LexicalAutomergePlugin()
 
     let theme = Theme()
     theme.setBlockLevelAttributes(.heading, value: BlockLevelAttributes(marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 20))
@@ -43,7 +44,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
       .foregroundColor: UIColor.systemBlue,
     ]
 
-    let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
+    let editorConfig = EditorConfig(theme: theme, plugins: [automergePlugin, toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
     let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: FeatureFlags())
 
     linkPlugin.lexicalView = lexicalView

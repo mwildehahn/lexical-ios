@@ -10,7 +10,7 @@ import PackageDescription
 
 let package = Package(
   name: "Lexical",
-  platforms: [.iOS(.v13)],
+  platforms: [.macOS(.v10_15), .iOS(.v15)],
   products: [
     .library(
       name: "Lexical",
@@ -43,11 +43,12 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
     .package(url: "https://github.com/apple/swift-markdown.git", branch: "main"),
+    .package(url: "https://github.com/automerge/automerge-swift.git", from: "0.5.19"),
   ],
   targets: [
     .target(
       name: "Lexical",
-      dependencies: [],
+      dependencies: [.product(name: "Automerge", package: "automerge-swift")],
       path: "./Lexical"),
     .testTarget(
       name: "LexicalTests",
@@ -125,5 +126,6 @@ let package = Package(
         .product(name: "Markdown", package: "swift-markdown"),
       ],
       path: "./Plugins/LexicalMarkdown/LexicalMarkdownTests"),
+    
   ]
 )
