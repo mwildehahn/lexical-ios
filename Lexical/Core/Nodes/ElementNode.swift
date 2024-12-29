@@ -285,9 +285,13 @@ open class ElementNode: Node {
     }
   }
 
-  public func getChildrenKeys() -> [NodeKey] {
-    let latest: ElementNode = getLatest()
-    return latest.children
+  public func getChildrenKeys(fromLatest: Bool = true) -> [NodeKey] {
+    if fromLatest {
+      let latest: ElementNode = getLatest()
+      return latest.children
+    }
+
+    return children
   }
 
   // Element nodes can't have a text part. Making this final so subclasses are bound by that rule.
