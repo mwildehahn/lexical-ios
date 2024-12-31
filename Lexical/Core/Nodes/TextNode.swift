@@ -659,7 +659,7 @@ open class TextNode: Node {
     return node.detail.isUnmergable
   }
 
-  func getDetail() -> TextNodeDetail {
+  public func getDetail() -> TextNodeDetail {
     let node = getLatest() as TextNode
     return node.detail
   }
