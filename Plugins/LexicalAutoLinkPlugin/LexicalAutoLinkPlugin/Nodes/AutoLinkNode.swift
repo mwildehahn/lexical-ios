@@ -17,10 +17,6 @@ protocol AutoLinkNodeVisitor {
   func visitAutoLinkNode(_ node: AutoLinkNode) throws
 }
 
-extension NodeVisitor {
-  func visitAutoLinkNode(_ node: AutoLinkNode) throws {}
-}
-
 public class AutoLinkNode: LinkNode {
   enum CodingKeys: String, CodingKey {
     case url
@@ -68,8 +64,6 @@ public class AutoLinkNode: LinkNode {
   override open func accept<V: NodeVisitor>(visitor: V) throws {
     if let visitor = visitor as? AutoLinkNodeVisitor {
       try visitor.visitAutoLinkNode(self)
-    } else {
-      try visitor.visitLinkNode(self)
     }
   }
 }

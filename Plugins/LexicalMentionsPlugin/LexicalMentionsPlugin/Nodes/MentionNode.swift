@@ -13,8 +13,8 @@ extension NodeType {
   static let mention = NodeType(rawValue: "mention")
 }
 
-extension NodeVisitor {
-  func visitMentionNode(_ node: MentionNode) throws {}
+protocol MentionNodeVisitor {
+  func visitMentionNode(_ node: MentionNode) throws
 }
 
 public class MentionNode: TextNode {
@@ -65,7 +65,9 @@ public class MentionNode: TextNode {
   }
 
   override open func accept<Visitor: NodeVisitor>(visitor: Visitor) throws -> Visitor.Result {
-    try visitor.visitMentionNode(self)
+    if let visitor = visitor as? MentionNodeVisitor {
+      try visitor.visitMentionNode(self)
+    }
   }
 }
 

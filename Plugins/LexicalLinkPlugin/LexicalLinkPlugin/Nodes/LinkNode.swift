@@ -16,10 +16,6 @@ protocol LinkNodeVisitor {
   func visitLinkNode(_ node: LinkNode) throws
 }
 
-extension NodeVisitor {
-  func visitLinkNode(_ node: LinkNode) throws {}
-}
-
 open class LinkNode: ElementNode {
   enum CodingKeys: String, CodingKey {
     case url
@@ -105,8 +101,6 @@ open class LinkNode: ElementNode {
   open override func accept<V>(visitor: V) throws where V : NodeVisitor {
     if let visitor = visitor as? LinkNodeVisitor {
       try visitor.visitLinkNode(self)
-    } else {
-      try visitor.visitElementNode(self)
     }
   }
 }
