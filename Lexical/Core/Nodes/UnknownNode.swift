@@ -127,7 +127,7 @@ public class UnknownNode: Node {
     try container.encode(data)
   }
 
-  override public func getTextPart() -> String {
+  override public func getTextPart(fromLatest: Bool = true) -> String {
     "□"
   }
 }

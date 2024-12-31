@@ -295,7 +295,7 @@ open class ElementNode: Node {
   }
 
   // Element nodes can't have a text part. Making this final so subclasses are bound by that rule.
-  override public final func getTextPart() -> String {
+  override public final func getTextPart(fromLatest: Bool = true) -> String {
     return ""
   }
 
