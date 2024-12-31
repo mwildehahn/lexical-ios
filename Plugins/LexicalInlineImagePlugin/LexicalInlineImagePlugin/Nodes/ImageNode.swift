@@ -14,6 +14,10 @@ extension NodeType {
   static let image = NodeType(rawValue: "image")
 }
 
+protocol ImageNodeVisitor {
+  func visitImageNode(_ node: ImageNode) throws
+}
+
 extension NodeVisitor {
   func visitImageNode(_ node: ImageNode) throws {}
 }
@@ -143,6 +147,10 @@ public class ImageNode: DecoratorNode {
   }
 
   open override func accept<V>(visitor: V) throws where V : NodeVisitor {
-    try visitor.visitImageNode(self)
+    if let visitor = visitor as? ImageNodeVisitor {
+      try visitor.visitImageNode(self)
+    } else {
+      try visitor.visitDecoratorNode(self)
+    }
   }
 }

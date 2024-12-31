@@ -13,6 +13,10 @@ extension NodeType {
   public static let autoLink = NodeType(rawValue: "autoLink")
 }
 
+protocol AutoLinkNodeVisitor {
+  func visitAutoLinkNode(_ node: AutoLinkNode) throws
+}
+
 extension NodeVisitor {
   func visitAutoLinkNode(_ node: AutoLinkNode) throws {}
 }
@@ -62,6 +66,10 @@ public class AutoLinkNode: LinkNode {
   }
 
   override open func accept<V: NodeVisitor>(visitor: V) throws {
-    try visitor.visitAutoLinkNode(self)
+    if let visitor = visitor as? AutoLinkNodeVisitor {
+      try visitor.visitAutoLinkNode(self)
+    } else {
+      try visitor.visitLinkNode(self)
+    }
   }
 }
