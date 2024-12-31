@@ -179,8 +179,8 @@ struct SerializedTextNodeDetail: OptionSet, Codable {
 }
 
 public struct TextNodeDetail: Codable {
-  var isDirectionless: Bool = false
-  var isUnmergable: Bool = false
+  public var isDirectionless: Bool = false
+  public var isUnmergable: Bool = false
 }
 
 open class TextNode: Node {
