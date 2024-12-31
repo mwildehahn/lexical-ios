@@ -659,6 +659,11 @@ open class TextNode: Node {
     return node.detail.isUnmergable
   }
 
+  func getDetail() -> TextNodeDetail {
+    let node = getLatest() as TextNode
+    return node.detail
+  }
+
   public static func canSimpleTextNodesBeMerged(node1: TextNode, node2: TextNode) -> Bool {
     let node1Mode = node1.mode
     let node1Format = node1.format
