@@ -139,6 +139,10 @@ public class CodeNode: ElementNode {
       return .init()
     }
   }
+
+  override public func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitCodeNode(self)
+  }
 }
 
 extension CodeNode {

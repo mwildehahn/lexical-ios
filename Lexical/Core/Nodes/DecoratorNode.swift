@@ -159,4 +159,8 @@ open class DecoratorNode: Node {
     return false
   }
 
+  override open func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitDecoratorNode(self)
+  }
+
 }

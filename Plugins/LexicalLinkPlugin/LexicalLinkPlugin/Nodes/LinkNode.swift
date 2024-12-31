@@ -12,6 +12,10 @@ extension NodeType {
   public static let link = NodeType(rawValue: "link")
 }
 
+extension NodeVisitor {
+  func visitLinkNode(_ node: LinkNode) throws {}
+}
+
 open class LinkNode: ElementNode {
   enum CodingKeys: String, CodingKey {
     case url
@@ -92,5 +96,9 @@ open class LinkNode: ElementNode {
     }
 
     return .init()
+  }
+
+  open override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitLinkNode(self)
   }
 }

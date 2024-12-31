@@ -51,4 +51,8 @@ open class ParagraphNode: ElementNode {
   open func createParagraphNode() -> ParagraphNode {
     return ParagraphNode()
   }
+
+  public override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitParagraphNode(self)
+  }
 }

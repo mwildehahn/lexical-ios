@@ -52,4 +52,8 @@ public class CodeHighlightNode: TextNode {
   override public func setFormat(format: TextFormat) throws -> CodeHighlightNode {
     return try self.getWritable()
   }
+
+  override public func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitCodeHighlightNode(self)
+  }
 }

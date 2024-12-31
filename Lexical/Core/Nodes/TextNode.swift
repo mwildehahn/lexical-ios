@@ -718,6 +718,10 @@ open class TextNode: Node {
   public static func ==(lhs: TextNode, rhs: TextNode) -> Bool {
     return (lhs.getTextPart() == rhs.getTextPart()) && (lhs.key == rhs.key)
   }
+
+  open override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitTextNode(self)
+  }
 }
 
 extension TextNode: CustomDebugStringConvertible {

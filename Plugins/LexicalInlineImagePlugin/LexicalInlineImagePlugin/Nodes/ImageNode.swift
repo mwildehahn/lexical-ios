@@ -14,6 +14,10 @@ extension NodeType {
   static let image = NodeType(rawValue: "image")
 }
 
+extension NodeVisitor {
+  func visitImageNode(_ node: ImageNode) throws {}
+}
+
 extension CommandType {
   public static let imageTap = CommandType(rawValue: "imageTap")
 }
@@ -136,5 +140,9 @@ public class ImageNode: DecoratorNode {
       return size
     }
     return AVMakeRect(aspectRatio: size, insideRect: CGRect(x: 0, y: 0, width: textViewWidth, height: maxImageHeight)).size
+  }
+
+  open override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitImageNode(self)
   }
 }

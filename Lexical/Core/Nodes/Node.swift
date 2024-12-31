@@ -789,6 +789,10 @@ open class Node: Codable {
   public func isSameNode(_ node: Node) -> Bool {
     return self.getKey() == node.getKey()
   }
+
+  open func accept<V: NodeVisitor>(visitor: V) throws {
+    try visitor.visitNode(self)
+  }
 }
 
 extension Node: Hashable {
@@ -842,4 +846,36 @@ extension Node: Equatable {
     }
     return isSelected
   }
+}
+
+public protocol NodeVisitor {
+  func visitNode(_ node: Node) throws
+  func visitElementNode(_ node: ElementNode) throws
+  func visitParagraphNode(_ node: ParagraphNode) throws
+  func visitCodeHighlightNode(_ node: CodeHighlightNode) throws
+  func visitCodeNode(_ node: CodeNode) throws
+  func visitDecoratorNode(_ node: DecoratorNode) throws
+  func visitDecoratorBlockNode(_ node: DecoratorBlockNode) throws
+  func visitHeadingNode(_ node: HeadingNode) throws
+  func visitLineBreakNode(_ node: LineBreakNode) throws
+  func visitPlaceholderNode(_ node: PlaceholderNode) throws
+  func visitQuoteNode(_ node: QuoteNode) throws
+  func visitRootNode(_ node: RootNode) throws
+  func visitTextNode(_ node: TextNode) throws
+}
+
+public extension NodeVisitor {
+  func visitNode(_ node: Node) throws {}
+  func visitElementNode(_ node: ElementNode) throws {}
+  func visitParagraphNode(_ node: ParagraphNode) throws {}
+  func visitCodeHighlightNode(_ node: CodeHighlightNode) throws {}
+  func visitCodeNode(_ node: CodeNode) throws {}
+  func visitDecoratorNode(_ node: DecoratorNode) throws {}
+  func visitDecoratorBlockNode(_ node: DecoratorBlockNode) throws {}
+  func visitHeadingNode(_ node: HeadingNode) throws {}
+  func visitLineBreakNode(_ node: LineBreakNode) throws {}
+  func visitPlaceholderNode(_ node: PlaceholderNode) throws {}
+  func visitQuoteNode(_ node: QuoteNode) throws {}
+  func visitRootNode(_ node: RootNode) throws {}
+  func visitTextNode(_ node: TextNode) throws {}
 }

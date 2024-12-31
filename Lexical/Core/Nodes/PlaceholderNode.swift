@@ -48,5 +48,9 @@ public class PlaceholderNode: TextNode {
       try super.remove()
   }
 
+  public override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitPlaceholderNode(self)
+  }
+
 }
 

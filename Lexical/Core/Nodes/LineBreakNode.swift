@@ -33,4 +33,8 @@ public class LineBreakNode: Node {
   public func createLineBreakNode() -> LineBreakNode {
     return LineBreakNode()
   }
+
+  public override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitLineBreakNode(self)
+  }
 }

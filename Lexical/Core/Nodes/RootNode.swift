@@ -58,6 +58,10 @@ public class RootNode: ElementNode {
   override public func insertAfter(nodeToInsert: Node) throws -> Node {
     throw LexicalError.invariantViolation("insertAfter: cannot be called on root nodes")
   }
+
+  public override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitRootNode(self)
+  }
 }
 
 extension RootNode: CustomDebugStringConvertible {

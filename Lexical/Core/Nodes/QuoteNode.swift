@@ -56,6 +56,10 @@ public class QuoteNode: ElementNode {
 
     return true
   }
+
+  public override func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitQuoteNode(self)
+  }
 }
 
 @objc public class QuoteCustomDrawingAttributes: NSObject {

@@ -13,6 +13,10 @@ extension NodeType {
   public static let autoLink = NodeType(rawValue: "autoLink")
 }
 
+extension NodeVisitor {
+  func visitAutoLinkNode(_ node: AutoLinkNode) throws {}
+}
+
 public class AutoLinkNode: LinkNode {
   enum CodingKeys: String, CodingKey {
     case url
@@ -55,5 +59,9 @@ public class AutoLinkNode: LinkNode {
     }
 
     return .init()
+  }
+
+  override open func accept<V: NodeVisitor>(visitor: V) throws {
+    try visitor.visitAutoLinkNode(self)
   }
 }

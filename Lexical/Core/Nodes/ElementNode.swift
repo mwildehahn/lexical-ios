@@ -475,4 +475,8 @@ open class ElementNode: Node {
   public func isShadowRoot() -> Bool {
     return false
   }
+
+  override open func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitElementNode(self)
+  }
 }

@@ -104,4 +104,8 @@ public class HeadingNode: ElementNode {
 
     return true
   }
+
+  override public func accept<V>(visitor: V) throws where V : NodeVisitor {
+    try visitor.visitHeadingNode(self)
+  }
 }

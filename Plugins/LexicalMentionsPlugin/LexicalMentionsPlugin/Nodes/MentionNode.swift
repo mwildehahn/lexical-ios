@@ -13,6 +13,10 @@ extension NodeType {
   static let mention = NodeType(rawValue: "mention")
 }
 
+extension NodeVisitor {
+  func visitMentionNode(_ node: MentionNode) throws {}
+}
+
 public class MentionNode: TextNode {
   enum CodingKeys: String, CodingKey {
     case mention
@@ -58,6 +62,10 @@ public class MentionNode: TextNode {
     var attributeDictionary = super.getAttributedStringAttributes(theme: theme)
     attributeDictionary[.backgroundColor] = UIColor.lightGray
     return attributeDictionary
+  }
+
+  override open func accept<Visitor: NodeVisitor>(visitor: Visitor) throws -> Visitor.Result {
+    try visitor.visitMentionNode(self)
   }
 }
 
