@@ -95,13 +95,13 @@ open class Node: Codable {
   /// Provides the **text** part of the node's content. The text part of a node represents the text this node is providing (but not including the text of any children).
   ///
   /// In Lexical iOS, a node's content is split into four parts: preamble, children, text, postamble. ``ElementNode`` subclasses can implement preamble/postamble, and TextNode subclasses can implement the text part.
-  public func getTextPart() -> String {
+  public func getTextPart(fromLatest: Bool = true) -> String {
     return ""
   }
 
   // Returns the length of the text part (as UTF 16 codepoints). Note that all string lengths within Lexical work using UTF 16 codepoints, because that is what TextKit uses.
-  public func getTextPartSize() -> Int {
-    return getTextPart().lengthAsNSString()
+  public func getTextPartSize(fromLatest: Bool = true) -> Int {
+    return getTextPart(fromLatest: fromLatest).lengthAsNSString()
   }
 
   /// Returns true if this node has been marked dirty during this update cycle.

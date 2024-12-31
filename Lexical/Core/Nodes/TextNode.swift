@@ -238,8 +238,12 @@ open class TextNode: Node {
     try container.encode(self.style, forKey: .style)
   }
 
-  override public func getTextPart() -> String {
-    return getLatest().text
+  override public func getTextPart(fromLatest: Bool = true) -> String {
+    if fromLatest {
+      return getLatest().text
+    }
+
+    return text
   }
 
   public func setText(_ text: String) throws {
