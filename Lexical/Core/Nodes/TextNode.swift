@@ -178,7 +178,7 @@ struct SerializedTextNodeDetail: OptionSet, Codable {
   }
 }
 
-struct TextNodeDetail: Codable {
+public struct TextNodeDetail: Codable {
   var isDirectionless: Bool = false
   var isUnmergable: Bool = false
 }
