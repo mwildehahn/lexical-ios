@@ -9,7 +9,7 @@ import UIKit
 
 public class RootNode: ElementNode {
 
-  override required init() {
+  public override required init() {
     super.init(kRootNodeKey)
   }
 
