@@ -15,6 +15,7 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
     throw LexicalError.invariantViolation("Could not get editor")
   }
   let nodes = try generateArrayFromSelectedNodes(editor: editor, selection: selection).nodes
+  let text = try selection.getTextContent()
   let encodedData = try JSONEncoder().encode(nodes)
   guard let jsonString = String(data: encodedData, encoding: .utf8) else { return }
 
@@ -32,6 +33,9 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
           documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])],
         [LexicalConstants.pasteboardIdentifier: encodedData]
       ]
+    if ProcessInfo.processInfo.isMacCatalystApp {
+      pasteboard.string = text
+    }
   } else {
     pasteboard.items =
       [
