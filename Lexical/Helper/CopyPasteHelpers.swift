@@ -15,6 +15,7 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
     throw LexicalError.invariantViolation("Could not get editor")
   }
   let nodes = try generateArrayFromSelectedNodes(editor: editor, selection: selection).nodes
+  let text = try selection.getTextContent()
   let encodedData = try JSONEncoder().encode(nodes)
   guard let jsonString = String(data: encodedData, encoding: .utf8) else { return }
 
@@ -32,6 +33,14 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
           documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])],
         [LexicalConstants.pasteboardIdentifier: encodedData]
       ]
+    if ProcessInfo.processInfo.isMacCatalystApp {
+      // added this to enable copy/paste in the mac catalyst app
+      // the problem is in the TextView.canPerformAction
+      // after copy on iOS pasteboard.hasStrings returns true but on Mac it returns false for some reason
+      // setting this string here will make it return true, pasting will take serialized nodes from the pasteboard
+      // anyhow so this should not have any adverse effect
+      pasteboard.string = text
+    }
   } else {
     pasteboard.items =
       [
