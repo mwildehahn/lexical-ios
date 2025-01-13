@@ -116,20 +116,20 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     }
   }
 
-  public override func caretRect(for position: UITextPosition) -> CGRect {
-    if let interceptNextTypingAttributes {
-      typingAttributes = interceptNextTypingAttributes
-      self.interceptNextTypingAttributes = nil
-    }
-
-    let originalRect = super.caretRect(for: position)
-    return CaretAndSelectionRectsAdjuster.adjustCaretRect(originalRect, for: position, in: self)
-  }
-
-  override public func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
-    let originalRects = super.selectionRects(for: range)
-    return CaretAndSelectionRectsAdjuster.adjustSelectionRects(originalRects, for: range, in: self)
-  }
+//  public override func caretRect(for position: UITextPosition) -> CGRect {
+//    if let interceptNextTypingAttributes {
+//      typingAttributes = interceptNextTypingAttributes
+//      self.interceptNextTypingAttributes = nil
+//    }
+//
+//    let originalRect = super.caretRect(for: position)
+//    return CaretAndSelectionRectsAdjuster.adjustCaretRect(originalRect, for: position, in: self)
+//  }
+//
+//  override public func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
+//    let originalRects = super.selectionRects(for: range)
+//    return CaretAndSelectionRectsAdjuster.adjustSelectionRects(originalRects, for: range, in: self)
+//  }
 
   // MARK: - Incoming events
 
