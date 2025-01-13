@@ -547,7 +547,7 @@ private class CaretAndSelectionRectsAdjuster {
     // Retrieve attributes at the caret position
     let attributes = textView.textStorage.attributes(at: offset, effectiveRange: nil)
     if let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle,
-       paragraphStyle.paragraphSpacing > 0 {
+       paragraphStyle.paragraphSpacing > 0 || paragraphStyle.lineSpacing > 0 {
       // there is paragraph spacing, in that case we opt for a fixed size caret
       guard let font = textView.font else { return result }
 
