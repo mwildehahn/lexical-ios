@@ -116,20 +116,20 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     }
   }
 
-//  public override func caretRect(for position: UITextPosition) -> CGRect {
-//    if let interceptNextTypingAttributes {
-//      typingAttributes = interceptNextTypingAttributes
-//      self.interceptNextTypingAttributes = nil
-//    }
-//
-//    let originalRect = super.caretRect(for: position)
-//    return CaretAndSelectionRectsAdjuster.adjustCaretRect(originalRect, for: position, in: self)
-//  }
-//
-//  override public func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
-//    let originalRects = super.selectionRects(for: range)
-//    return CaretAndSelectionRectsAdjuster.adjustSelectionRects(originalRects, for: range, in: self)
-//  }
+  public override func caretRect(for position: UITextPosition) -> CGRect {
+    if let interceptNextTypingAttributes {
+      typingAttributes = interceptNextTypingAttributes
+      self.interceptNextTypingAttributes = nil
+    }
+
+    let originalRect = super.caretRect(for: position)
+    return CaretAndSelectionRectsAdjuster.adjustCaretRect(originalRect, for: position, in: self)
+  }
+
+  override public func selectionRects(for range: UITextRange) -> [UITextSelectionRect] {
+    let originalRects = super.selectionRects(for: range)
+    return CaretAndSelectionRectsAdjuster.adjustSelectionRects(originalRects, for: range, in: self)
+  }
 
   // MARK: - Incoming events
 
@@ -547,7 +547,7 @@ private class CaretAndSelectionRectsAdjuster {
     // Retrieve attributes at the caret position
     let attributes = textView.textStorage.attributes(at: offset, effectiveRange: nil)
     if let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle,
-       paragraphStyle.paragraphSpacing > 0 {
+       paragraphStyle.paragraphSpacing > 0 || paragraphStyle.lineSpacing > 0 {
       // there is paragraph spacing, in that case we opt for a fixed size caret
       guard let font = textView.font else { return result }
 
