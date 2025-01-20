@@ -51,12 +51,18 @@ public class TextStorage: NSTextStorage {
 
   override open func replaceCharacters(in range: NSRange, with attrString: NSAttributedString) {
     if mode == .none {
-      // If mode is none (i.e. an update that hasn't gone through either controller or non-controlled mode yet),
-      // we discard attribute information here. This applies to e.g. autocomplete, but it lets us handle it
-      // using Lexical's own attribute persistence logic rather than UIKit's. The reason for doing it this way
-      // is to avoid UIKit stomping on our custom attributes.
-      editor?.log(.NSTextStorage, .verboseIncludingUserContent, "Replace characters mode=none, string length \(self.backingAttributedString.length), range \(range), replacement \(attrString.string)")
-      performControllerModeUpdate(attrString.string, range: range)
+      let newString = attrString.string
+      let currentString = backingAttributedString.attributedSubstring(from: range).string
+
+      if currentString != newString {
+        print("replace characters: \(newString) [\(mode)]")
+        // If mode is none (i.e. an update that hasn't gone through either controller or non-controlled mode yet),
+        // we discard attribute information here. This applies to e.g. autocomplete, but it lets us handle it
+        // using Lexical's own attribute persistence logic rather than UIKit's. The reason for doing it this way
+        // is to avoid UIKit stomping on our custom attributes.
+        editor?.log(.NSTextStorage, .verboseIncludingUserContent, "Replace characters mode=none, string length \(self.backingAttributedString.length), range \(range), replacement \(attrString.string)")
+        performControllerModeUpdate(attrString.string, range: range)
+      }
       return
     }
     // Since we're in either controller or non-controlled mode, call super -- this will in turn call
@@ -66,7 +72,10 @@ public class TextStorage: NSTextStorage {
 
   override open func replaceCharacters(in range: NSRange, with str: String) {
     if mode == .none {
-      performControllerModeUpdate(str, range: range)
+      let currentString = backingAttributedString.attributedSubstring(from: range).string
+      if currentString != str {
+        performControllerModeUpdate(str, range: range)
+      }
       return
     }
 
