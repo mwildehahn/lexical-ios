@@ -53,9 +53,9 @@ public class TextStorage: NSTextStorage {
     if mode == .none {
       let newString = attrString.string
       let currentString = backingAttributedString.attributedSubstring(from: range).string
-
+      // We are introducing this check to fix a bug where app is getting the same string over and over again in a loop
+      // when run on Mac (in Designed for iPad mode)
       if currentString != newString {
-        print("replace characters: \(newString) [\(mode)]")
         // If mode is none (i.e. an update that hasn't gone through either controller or non-controlled mode yet),
         // we discard attribute information here. This applies to e.g. autocomplete, but it lets us handle it
         // using Lexical's own attribute persistence logic rather than UIKit's. The reason for doing it this way
