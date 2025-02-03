@@ -8,11 +8,11 @@
 import Foundation
 import UIKit
 
-public struct NodeType: Hashable, RawRepresentable {
+public struct NodeType: Hashable, RawRepresentable, Sendable {
   public init(rawValue: String) {
     self.rawValue = rawValue
   }
-  public var rawValue: String
+  public let rawValue: String
 
   public static let unknown = NodeType(rawValue: "unknown")
   public static let root = NodeType(rawValue: "root")
