@@ -18,11 +18,13 @@ import UIKit
   public let theme: Theme
   public let plugins: [Plugin]
   public let editorStateVersion: Int
+  public let nodeKeyMultiplier: Int
 
-  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1) {
+  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1, nodeKeyMultiplier: Int = 0) {
     self.theme = theme
     self.plugins = plugins
     self.editorStateVersion = editorStateVersion
+    self.nodeKeyMultiplier = nodeKeyMultiplier
   }
 }
 
@@ -78,6 +80,8 @@ public class Editor: NSObject {
   internal var infiniteUpdateLoopCount = 0
   // keyCounter is the next available node key to be used.
   internal var keyCounter: Int = 0
+  // The optional multiplier to use when generating node keys
+  internal(set) var keyMultiplier: Int = 0
 
   // Transforms are defined as functions that operate on nodes. In the JS code, functions are
   // equatable but Swift for a variety of reasons does not support this. To keep track of transforms
@@ -128,6 +132,7 @@ public class Editor: NSObject {
   /// which will initialise the Editor for you.
   public init(editorConfig: EditorConfig) {
     editorStateVersion = editorConfig.editorStateVersion
+    keyMultiplier = editorConfig.nodeKeyMultiplier
     editorState = EditorState(version: editorConfig.editorStateVersion)
     guard let rootNodeKey = editorState.getRootNode()?.key else {
       fatalError("Expected root node key when creating new editor state")

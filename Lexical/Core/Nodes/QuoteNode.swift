@@ -16,8 +16,8 @@ public class QuoteNode: ElementNode {
     super.init(key)
   }
 
-  public required init(from decoder: Decoder) throws {
-    try super.init(from: decoder)
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
   }
 
   override public class func getType() -> NodeType {

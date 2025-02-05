@@ -32,7 +32,7 @@ open class ElementNode: Node {
     super.init(key)
   }
 
-  public required init(from decoder: Decoder) throws {
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.children = []
     var childNodes: [Node] = []
@@ -44,6 +44,7 @@ open class ElementNode: Node {
     do {
       let deserializationMap = editor.registeredNodes
       var childrenUnkeyedContainer = try container.nestedUnkeyedContainer(forKey: .children)
+      var childIndex = 0
 
       while !childrenUnkeyedContainer.isAtEnd {
         var containerCopy = childrenUnkeyedContainer
@@ -54,12 +55,15 @@ open class ElementNode: Node {
 
         do {
           let decoder = try containerCopy.superDecoder()
-          let decodedNode = try klass.init(from: decoder)
+          let childDepth = depth != nil ? (depth ?? 0) + 1 : nil
+          let decodedNode = try klass.init(from: decoder, depth: childDepth, index: childIndex, parentIndex: index)
           childNodes.append(decodedNode)
           self.children.append(decodedNode.key)
         } catch {
           print(error)
         }
+
+        childIndex += 1
       }
     } catch {
       print(error)
@@ -67,7 +71,7 @@ open class ElementNode: Node {
 
     self.direction = try container.decodeIfPresent(Direction.self, forKey: .direction)
     self.indent = try container.decodeIfPresent(Int.self, forKey: .indent) ?? 0
-    try super.init(from: decoder)
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
     for node in childNodes {
       node.parent = self.key

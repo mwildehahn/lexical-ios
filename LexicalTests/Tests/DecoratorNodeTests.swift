@@ -28,7 +28,7 @@ class TestDecoratorNode: DecoratorNode {
     super.init(key)
   }
 
-  required init(from decoder: Decoder) throws {
+  required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     fatalError("init(from:) has not been implemented")
   }
 

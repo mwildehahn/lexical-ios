@@ -111,7 +111,11 @@ public class UnknownNode: Node {
     }
   }
 
-  public required init(from decoder: Decoder) throws {
+  public required convenience init(from decoder: Decoder) throws {
+    try self.init(from: decoder, depth: nil, index: nil)
+  }
+
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     let container = try decoder.singleValueContainer()
 
     data = try container.decode(SupportedValue.self)

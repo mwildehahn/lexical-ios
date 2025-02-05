@@ -51,9 +51,13 @@ public class CodeNode: ElementNode {
     self.language = language
   }
 
-  public required init(from decoder: Decoder) throws {
+  public required convenience init(from decoder: Decoder) throws {
+    try self.init(from: decoder, depth: nil, index: nil)
+  }
+
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    try super.init(from: decoder)
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
     self.language = try container.decode(String.self, forKey: .language)
   }

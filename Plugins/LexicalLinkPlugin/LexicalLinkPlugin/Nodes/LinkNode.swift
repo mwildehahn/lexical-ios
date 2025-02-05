@@ -32,12 +32,17 @@ open class LinkNode: ElementNode {
     self.url = url
   }
 
-  public required init(from decoder: Decoder) throws {
+  public required convenience init(from decoder: Decoder) throws {
+    try self.init(from: decoder, depth: nil, index: nil)
+  }
+
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    try super.init(from: decoder)
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
     self.url = try container.decode(String.self, forKey: .url)
   }
+
   override open class func getType() -> NodeType {
     return .link
   }

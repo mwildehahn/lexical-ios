@@ -15,20 +15,48 @@ public func getNodeByKey<N: Node>(key: NodeKey) -> N? {
   return node as? N
 }
 
+private func uniqueKey(from candidate: Int, in editorState: EditorState) -> Int {
+  if editorState.nodeMap[String(candidate)] != nil {
+    return uniqueKey(from: candidate + 1, in: editorState)
+  }
+  return candidate
+}
+
 @discardableResult
-public func generateKey(node: Node) throws -> NodeKey? {
+public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws -> NodeKey? {
   try errorOnReadOnly()
 
   guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
     return nil
   }
 
-  while editorState.nodeMap[String(editor.keyCounter)] != nil {
-    editor.keyCounter += 1
+  let candidateKey: Int
+  var withMultiplier = false
+  // Support generating keys for nodes with ranges reserved for specific depths
+  if editor.keyMultiplier > 0, let depth, let index {
+    withMultiplier = true
+    var baseIndex = 0
+
+    // The root node always has a nodeKey of 1, so start at 2 for children.
+    if depth == 0 {
+      baseIndex = 2
+    } else if depth < 0 {
+      // Effectively the root node key
+      baseIndex = 1
+    }
+
+    // The root node has a depth of -1 to ensure that it's children don't have a
+    // multiplier applied since we know there is only a single root. This max(0,
+    // depth) ensures we never use that negative number here.
+    candidateKey = (max(0, depth) * editor.keyMultiplier) + ((parentIndex ?? 0) * editor.keyMultiplier) + baseIndex + index
+  } else {
+    candidateKey = editor.keyCounter
   }
 
-  let key = editor.keyCounter
-  editor.keyCounter += 1
+  let key = uniqueKey(from: candidateKey, in: editorState)
+  if !withMultiplier {
+    editor.keyCounter = key + 1
+  }
 
   let stringKey = String(key)
   node.key = stringKey

@@ -14,8 +14,12 @@ class TestAttributesNode: ElementNode {
     super.init()
   }
 
-  public required init(from decoder: Decoder) throws {
-    try super.init(from: decoder)
+  public required convenience init(from decoder: Decoder) throws {
+    try self.init(from: decoder, depth: nil, index: nil)
+  }
+
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
   }
 
   override class func getType() -> NodeType {

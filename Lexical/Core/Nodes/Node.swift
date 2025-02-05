@@ -42,13 +42,17 @@ open class Node: Codable {
     }
   }
 
+  public required convenience init(from decoder: Decoder) throws {
+    try self.init(from: decoder, depth: nil, index: nil)
+  }
+
   /// Used when initialising node from JSON
-  public required init(from decoder: Decoder) throws {
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
     key = LexicalConstants.uninitializedNodeKey
     version = try values.decode(Int.self, forKey: .version)
 
-    _ = try? generateKey(node: self)
+    _ = try? generateKey(node: self, depth: depth, index: index, parentIndex: parentIndex)
   }
 
   /// Used when serialising node to JSON

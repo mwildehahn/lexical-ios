@@ -42,19 +42,19 @@ public class ListNode: ElementNode {
     super.init(key)
   }
 
-    public required init(from decoder: Decoder) throws {
-        try super.init(from: decoder)
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.listType = try container.decodeIfPresent(ListType.self, forKey: .listType) ?? .bullet
-    }
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.listType = try container.decodeIfPresent(ListType.self, forKey: .listType) ?? .bullet
+  }
 
-    public override func encode(to encoder: Encoder) throws {
-        try super.encode(to: encoder)
+  public override func encode(to encoder: Encoder) throws {
+    try super.encode(to: encoder)
 
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(listType, forKey: .listType)
-    }
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(listType, forKey: .listType)
+  }
 
   override public class func getType() -> NodeType {
     return .list

@@ -47,10 +47,14 @@ public class HeadingNode: ElementNode {
     return .heading
   }
 
-  public required init(from decoder: Decoder) throws {
+  public required convenience init(from decoder: Decoder) throws {
+    try self.init(from: decoder, depth: nil, index: nil)
+  }
+
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.tag = try container.decode(HeadingTagType.self, forKey: .tag)
-    try super.init(from: decoder)
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
   }
 
   override public func encode(to encoder: Encoder) throws {

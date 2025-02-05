@@ -32,8 +32,12 @@ public class SelectableImageNode: SelectableDecoratorNode {
     super.init(key)
   }
 
-  public required init(from decoder: Decoder) throws {
-    try super.init(from: decoder)
+  public required convenience init(from decoder: Decoder) throws {
+    try self.init(from: decoder, depth: nil, index: nil)
+  }
+
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
   }
 
   override public class func getType() -> NodeType {

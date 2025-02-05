@@ -16,8 +16,8 @@ public class PlaceholderNode: TextNode {
     self.mode = .token
   }
 
-  public required init(from decoder: Decoder) throws {
-    try super.init(from: decoder)
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
   }
 
   public required init(text: String, key: NodeKey?) {

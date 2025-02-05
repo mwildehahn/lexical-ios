@@ -23,9 +23,9 @@ public class CodeHighlightNode: TextNode {
     self.highlightType = highlightType
   }
 
-  public required init(from decoder: Decoder) throws {
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    try super.init(from: decoder)
+    try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
     self.highlightType = try container.decode(String.self, forKey: .highlightType)
   }
