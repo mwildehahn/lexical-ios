@@ -11,7 +11,7 @@ import UIKit
   let depthBlockSize: UInt64
   let multiplier: UInt64
 
-  init(depthBlockSize: UInt64, multiplier: UInt64) {
+  public init(depthBlockSize: UInt64, multiplier: UInt64) {
     self.depthBlockSize = depthBlockSize
     self.multiplier = multiplier
   }
