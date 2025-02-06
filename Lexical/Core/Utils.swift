@@ -50,12 +50,12 @@ public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parent
     // depth) ensures we never use that negative number here.
     candidateKey = (UInt64(max(0, depth)) * keyMultiplier.multiplier * keyMultiplier.depthBlockSize) + (UInt64(parentIndex ?? 0) * keyMultiplier.multiplier) + baseIndex + UInt64(index)
   } else {
-    candidateKey = editor.keyCounter
+    candidateKey = UInt64(editor.keyCounter)
   }
 
   let key = uniqueKey(from: candidateKey, in: editorState)
   if !withMultiplier {
-    editor.keyCounter = key + 1
+    editor.keyCounter = Int(key) + 1
   }
 
   let stringKey = String(key)

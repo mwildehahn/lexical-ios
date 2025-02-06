@@ -7,9 +7,14 @@
 
 import UIKit
 
-struct NodeKeyMultiplier {
+@objc public class NodeKeyMultiplier: NSObject {
   let depthBlockSize: UInt64
   let multiplier: UInt64
+
+  init(depthBlockSize: UInt64, multiplier: UInt64) {
+    self.depthBlockSize = depthBlockSize
+    self.multiplier = multiplier
+  }
 }
 
 /**

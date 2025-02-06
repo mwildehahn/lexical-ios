@@ -50,7 +50,7 @@ class EditorStateTests: XCTestCase {
     }
 
     let json = try editor.getEditorState().toJSON()
-    let editorWithMultiplier = Editor(editorConfig: .init(theme: Theme(), plugins: [], nodeKeyMultiplier: 1000))
+    let editorWithMultiplier = Editor(editorConfig: .init(theme: Theme(), plugins: [], nodeKeyMultiplier: NodeKeyMultiplier(depthBlockSize: 1000000, multiplier: 1000)))
     let state = try EditorState.fromJSON(json: json, editor: editorWithMultiplier)
 
     try state.read {
@@ -75,23 +75,22 @@ class EditorStateTests: XCTestCase {
       let text2 = preParagraphChildren[1] as! TextNode
       XCTAssertEqual(text1.getTextPart(), "hello ")
       XCTAssertEqual(text2.getTextPart(), "world")
-      XCTAssertEqual(text1.key, "1000")
-      XCTAssertEqual(text2.key, "1001")
+      XCTAssertEqual(text1.key, "1000000000")
+      XCTAssertEqual(text2.key, "1000000001")
 
       // Validate paragraph2's child.
       let paragraph2Children = paragraph2.getChildren()
       XCTAssertEqual(paragraph2Children.count, 1)
       let text3 = paragraph2Children[0] as! TextNode
       XCTAssertEqual(text3.getTextPart(), "Paragraph 2 contains another text node")
-      XCTAssertEqual(text3.key, "2000")
+      XCTAssertEqual(text3.key, "1000001000")
 
       // Validate paragraph3's child.
       let paragraph3Children = paragraph3.getChildren()
       XCTAssertEqual(paragraph3Children.count, 1)
       let text4 = paragraph3Children[0] as! TextNode
       XCTAssertEqual(text4.getTextPart(), "Third para.")
-      // text4's candidate key = 1000; conflicts with 1000, 1001, and 1002, so it becomes "1003"
-      XCTAssertEqual(text4.key, "4000")
+      XCTAssertEqual(text4.key, "1000003000")
     }
   }
 
