@@ -15,7 +15,7 @@ public func getNodeByKey<N: Node>(key: NodeKey) -> N? {
   return node as? N
 }
 
-private func uniqueKey(from candidate: Int, in editorState: EditorState) -> Int {
+private func uniqueKey(from candidate: UInt64, in editorState: EditorState) -> UInt64 {
   if editorState.nodeMap[String(candidate)] != nil {
     return uniqueKey(from: candidate + 1, in: editorState)
   }
@@ -30,12 +30,12 @@ public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parent
     return nil
   }
 
-  let candidateKey: Int
+  let candidateKey: UInt64
   var withMultiplier = false
   // Support generating keys for nodes with ranges reserved for specific depths
-  if editor.keyMultiplier > 0, let depth, let index {
+  if let keyMultiplier = editor.keyMultiplier,let depth, let index {
     withMultiplier = true
-    var baseIndex = 0
+    var baseIndex: UInt64 = 0
 
     // The root node always has a nodeKey of 1, so start at 2 for children.
     if depth == 0 {
@@ -48,7 +48,7 @@ public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parent
     // The root node has a depth of -1 to ensure that it's children don't have a
     // multiplier applied since we know there is only a single root. This max(0,
     // depth) ensures we never use that negative number here.
-    candidateKey = (max(0, depth) * editor.keyMultiplier) + ((parentIndex ?? 0) * editor.keyMultiplier) + baseIndex + index
+    candidateKey = (UInt64(max(0, depth)) * keyMultiplier.multiplier * keyMultiplier.depthBlockSize) + (UInt64(parentIndex ?? 0) * keyMultiplier.multiplier) + baseIndex + UInt64(index)
   } else {
     candidateKey = editor.keyCounter
   }

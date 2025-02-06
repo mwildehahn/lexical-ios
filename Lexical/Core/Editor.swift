@@ -7,6 +7,11 @@
 
 import UIKit
 
+struct NodeKeyMultiplier {
+  let depthBlockSize: UInt64
+  let multiplier: UInt64
+}
+
 /**
  Used to initialize an Editor with a Theme and some Plugins.
 
@@ -18,9 +23,9 @@ import UIKit
   public let theme: Theme
   public let plugins: [Plugin]
   public let editorStateVersion: Int
-  public let nodeKeyMultiplier: Int
+  public let nodeKeyMultiplier: NodeKeyMultiplier?
 
-  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1, nodeKeyMultiplier: Int = 0) {
+  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1, nodeKeyMultiplier: NodeKeyMultiplier? = nil) {
     self.theme = theme
     self.plugins = plugins
     self.editorStateVersion = editorStateVersion
@@ -81,7 +86,7 @@ public class Editor: NSObject {
   // keyCounter is the next available node key to be used.
   internal var keyCounter: Int = 0
   // The optional multiplier to use when generating node keys
-  internal(set) var keyMultiplier: Int = 0
+  internal(set) var keyMultiplier: NodeKeyMultiplier?
 
   // Transforms are defined as functions that operate on nodes. In the JS code, functions are
   // equatable but Swift for a variety of reasons does not support this. To keep track of transforms
