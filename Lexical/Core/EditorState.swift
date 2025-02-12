@@ -121,7 +121,7 @@ public class EditorState: NSObject {
     return isEqual
   }
 
-  static func createEmptyEditorState(version: Int = 1) -> EditorState {
+  static public func empty(version: Int = 1) -> EditorState {
     let editorState = EditorState()
     editorState.version = version
     return editorState
