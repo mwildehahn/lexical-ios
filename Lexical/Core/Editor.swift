@@ -213,9 +213,11 @@ public class Editor: NSObject {
     let mode: UpdateBehaviourModificationMode
     if reason == .sync {
       mode = UpdateBehaviourModificationMode(
-        suppressReconcilingSelection: true,
-        suppressSanityCheck: true,
+        suppressReconcilingSelection: false,
+        suppressSanityCheck: false,
         markedTextOperation: nil,
+        // when syncing we want to skip transforms to ensure we're in the same
+        // state as the remote editor
         skipTransforms: true,
         allowUpdateWithoutTextStorage: false
       )
