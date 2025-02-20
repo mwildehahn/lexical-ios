@@ -210,7 +210,19 @@ public class Editor: NSObject {
   /// > Important: Your code within the `update()` closure must run synchronously on the thread that
   /// Lexical calls it on. Do not dispatch to another thread!
   public func update(reason: EditorUpdateReason = .update, _ closure: () throws -> Void) throws {
-    try beginUpdate(closure, mode: UpdateBehaviourModificationMode(), reason: reason)
+    let mode: UpdateBehaviourModificationMode
+    if reason == .sync {
+      mode = UpdateBehaviourModificationMode(
+        suppressReconcilingSelection: true,
+        suppressSanityCheck: true,
+        markedTextOperation: nil,
+        skipTransforms: true,
+        allowUpdateWithoutTextStorage: false
+      )
+    } else {
+      mode = UpdateBehaviourModificationMode()
+    }
+    try beginUpdate(closure, mode: mode, reason: reason)
   }
 
   /// Convenience function to read the Editor's current EditorState.
