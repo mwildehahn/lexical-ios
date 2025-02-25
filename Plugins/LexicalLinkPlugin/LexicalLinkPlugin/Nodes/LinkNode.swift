@@ -12,7 +12,7 @@ extension NodeType {
   public static let link = NodeType(rawValue: "link")
 }
 
-protocol LinkNodeVisitor {
+public protocol LinkNodeVisitor {
   func visitLinkNode(_ node: LinkNode) throws
 }
 
