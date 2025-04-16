@@ -42,7 +42,9 @@ internal class InputDelegateProxy: NSObject, UITextInputDelegate {
     }
   }
 
+#if compiler(>=6.1)
   @available(iOS 18.4, *)
   func conversationContext(_ context: UIConversationContext?, didChange textInput: (any UITextInput)?) {
   }
+#endif
 }
