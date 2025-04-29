@@ -29,12 +29,14 @@ import UIKit
   public let plugins: [Plugin]
   public let editorStateVersion: Int
   public let nodeKeyMultiplier: NodeKeyMultiplier?
+  public let keyCommands: [UIKeyCommand]?
 
-  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1, nodeKeyMultiplier: NodeKeyMultiplier? = nil) {
+  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1, nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil) {
     self.theme = theme
     self.plugins = plugins
     self.editorStateVersion = editorStateVersion
     self.nodeKeyMultiplier = nodeKeyMultiplier
+    self.keyCommands = keyCommands
   }
 }
 

@@ -35,8 +35,13 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
   private let useInputDelegateProxy: Bool
   private let inputDelegateProxy: InputDelegateProxy
+  private let _keyCommands: [UIKeyCommand]?
 
   fileprivate var textViewDelegate: TextViewDelegate
+
+  override public var keyCommands: [UIKeyCommand]? {
+    return _keyCommands
+  }
 
   // MARK: - Init
 
@@ -67,6 +72,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     useInputDelegateProxy = featureFlags.proxyTextViewInputDelegate
     inputDelegateProxy = InputDelegateProxy()
     textViewDelegate = TextViewDelegate(editor: editor)
+    _keyCommands = editorConfig.keyCommands
 
     super.init(frame: .zero, textContainer: textContainer)
 
