@@ -71,6 +71,16 @@ class LexicalOverlayView: UIView {
     return false
   }
 
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    print("🟢 touchesBegan")
+    super.touchesBegan(touches, with: event)
+  }
+
+  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+    print("🔴 touchesCancelled")
+    super.touchesCancelled(touches, with: event)
+  }
+
   override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
     super.touchesEnded(touches, with: event)
     if let touch = touches.first {
