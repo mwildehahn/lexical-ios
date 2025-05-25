@@ -47,7 +47,9 @@ open class Node: Codable {
   }
 
   /// Used when initialising node from JSON
-  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+  public required init(
+    from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
+  ) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
     key = LexicalConstants.uninitializedNodeKey
     version = try values.decode(Int.self, forKey: .version)
@@ -73,9 +75,7 @@ open class Node: Codable {
   }
 
   public var type: NodeType {
-    get {
-      Self.getType()
-    }
+    Self.getType()
   }
 
   open func isInline() -> Bool {
@@ -136,7 +136,7 @@ open class Node: Codable {
 
   /**
    Attributes that apply to an entire block.
-
+  
    This is conceptually not a thing in TextKit, so we had to build our own solution. Note that a block
    is an element or decorator that is not inline. The values of the block level attributes are applied
    to the relevant paragraph style for the first or last paragraph within the node. (Paragraph is here
@@ -152,7 +152,8 @@ open class Node: Codable {
     try errorOnReadOnly()
 
     guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
-      throw LexicalError.invariantViolation("LexicalNode: Could not get active editor for \(String(describing: self)).")
+      throw LexicalError.invariantViolation(
+        "LexicalNode: Could not get active editor for \(String(describing: self)).")
     }
 
     let latestNode = getLatest()
@@ -363,10 +364,11 @@ open class Node: Codable {
       }
 
       let elementNode = node as? ElementNode
-      let child = isElementNode(node: node)
+      let child =
+        isElementNode(node: node)
         ? isBefore
-        ? elementNode?.getFirstChild()
-        : elementNode?.getLastChild()
+          ? elementNode?.getFirstChild()
+          : elementNode?.getLastChild()
         : nil
 
       if child != nil {
@@ -463,8 +465,8 @@ open class Node: Codable {
 
     let commonAncestor = getCommonAncestor(node: targetNode)
 
-    return getChildIndex(commonAncestor: commonAncestor, node: self) <
-      getChildIndex(commonAncestor: commonAncestor, node: targetNode)
+    return getChildIndex(commonAncestor: commonAncestor, node: self)
+      < getChildIndex(commonAncestor: commonAncestor, node: targetNode)
   }
 
   func getChildIndex(commonAncestor: ElementNode?, node: Node) -> Int {
@@ -517,12 +519,16 @@ open class Node: Codable {
   /// Returns the text content of the node, typically including its children.
   ///
   /// This is different from ``getTextPart()``, which just returns the text provided by this node.
-  public func getTextContent(includeInert: Bool = false, includeDirectionless: Bool = false, maxLength: Int? = nil) -> String {
+  public func getTextContent(
+    includeInert: Bool = false, includeDirectionless: Bool = false, maxLength: Int? = nil
+  ) -> String {
     return ""
   }
 
   /// Returns the length of the string produced by calling getTextContent on this node.
-  public func getTextContentSize(includeInert: Bool = false, includeDirectionless: Bool = false) -> Int {
+  public func getTextContentSize(includeInert: Bool = false, includeDirectionless: Bool = false)
+    -> Int
+  {
     return getTextContent(
       includeInert: includeInert,
       includeDirectionless: includeDirectionless
@@ -577,7 +583,9 @@ open class Node: Codable {
         times: -1)
     }
 
-    if !isRootNode(node: parent) && !parent.canBeEmpty() && parent.getChildrenSize() == 0 && parent.isAttached() {
+    if !isRootNode(node: parent) && !parent.canBeEmpty() && parent.getChildrenSize() == 0
+      && parent.isAttached()
+    {
       try parent.remove()
     }
   }
@@ -599,14 +607,15 @@ open class Node: Codable {
       try removeFromParent(node: writableNodeToInsert)
 
       if let selection = selection as? RangeSelection,
-         let oldIndex = nodeToInsert.getIndexWithinParent() {
+        let oldIndex = nodeToInsert.getIndexWithinParent()
+      {
         let oldParentKey = oldParent.key
-        elementAnchorSelectionOnNode = selection.anchor.type == .element &&
-          selection.anchor.key == oldParentKey &&
-          selection.anchor.offset == oldIndex + 1
-        elementFocusSelectionOnNode = selection.focus.type == .element &&
-          selection.focus.key == oldParentKey &&
-          selection.focus.offset == oldIndex + 1
+        elementAnchorSelectionOnNode =
+          selection.anchor.type == .element && selection.anchor.key == oldParentKey
+          && selection.anchor.offset == oldIndex + 1
+        elementFocusSelectionOnNode =
+          selection.focus.type == .element && selection.focus.key == oldParentKey
+          && selection.focus.offset == oldIndex + 1
       }
     }
 
@@ -724,11 +733,13 @@ open class Node: Codable {
     try Node.removeNode(nodeToRemove: self, restoreSelection: false)
     internallyMarkSiblingsAsDirty(node: writableReplaceWith, status: .userInitiated)
 
-    if includeChildren, let writableReplaceWith = writableReplaceWith as? ElementNode, let selfElement = self as? ElementNode {
+    if includeChildren, let writableReplaceWith = writableReplaceWith as? ElementNode,
+      let selfElement = self as? ElementNode
+    {
       try writableReplaceWith.append(selfElement.getChildren())
     }
 
-    if let selection = try getSelection() as? RangeSelection { // TODO: the logic here differs from web. Web clones the selection further up. Should make iOS match.
+    if let selection = try getSelection() as? RangeSelection {  // TODO: the logic here differs from web. Web clones the selection further up. Should make iOS match.
       let anchor = selection.anchor
       let focus = selection.focus
 
@@ -806,7 +817,7 @@ extension Node: Hashable {
 }
 
 extension Node: Equatable {
-  public static func ==(lhs: Node, rhs: Node) -> Bool {
+  public static func == (lhs: Node, rhs: Node) -> Bool {
     //    return ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
     return lhs.isSameKey(rhs)
   }
@@ -842,10 +853,10 @@ extension Node: Equatable {
     // For inline images inside of element nodes.
     // Without this change the image will be selected if the cursor is before or after it.
     if let selection = selection as? RangeSelection,
-       selection.anchor.type == .element &&
-        selection.focus.type == .element &&
-        selection.anchor.key == selection.focus.key &&
-        selection.anchor.offset == selection.focus.offset {
+      selection.anchor.type == .element && selection.focus.type == .element
+        && selection.anchor.key == selection.focus.key
+        && selection.anchor.offset == selection.focus.offset
+    {
       return false
     }
     return isSelected
@@ -860,6 +871,7 @@ public protocol NodeVisitor {
   func visitCodeNode(_ node: CodeNode) throws
   func visitDecoratorNode(_ node: DecoratorNode) throws
   func visitDecoratorBlockNode(_ node: DecoratorBlockNode) throws
+  func visitDecoratorContainerNode(_ node: DecoratorContainerNode) throws
   func visitHeadingNode(_ node: HeadingNode) throws
   func visitLineBreakNode(_ node: LineBreakNode) throws
   func visitPlaceholderNode(_ node: PlaceholderNode) throws
@@ -868,18 +880,19 @@ public protocol NodeVisitor {
   func visitTextNode(_ node: TextNode) throws
 }
 
-public extension NodeVisitor {
-  func visitNode(_ node: Node) throws {}
-  func visitElementNode(_ node: ElementNode) throws {}
-  func visitParagraphNode(_ node: ParagraphNode) throws {}
-  func visitCodeHighlightNode(_ node: CodeHighlightNode) throws {}
-  func visitCodeNode(_ node: CodeNode) throws {}
-  func visitDecoratorNode(_ node: DecoratorNode) throws {}
-  func visitDecoratorBlockNode(_ node: DecoratorBlockNode) throws {}
-  func visitHeadingNode(_ node: HeadingNode) throws {}
-  func visitLineBreakNode(_ node: LineBreakNode) throws {}
-  func visitPlaceholderNode(_ node: PlaceholderNode) throws {}
-  func visitQuoteNode(_ node: QuoteNode) throws {}
-  func visitRootNode(_ node: RootNode) throws {}
-  func visitTextNode(_ node: TextNode) throws {}
+extension NodeVisitor {
+  public func visitNode(_ node: Node) throws {}
+  public func visitElementNode(_ node: ElementNode) throws {}
+  public func visitParagraphNode(_ node: ParagraphNode) throws {}
+  public func visitCodeHighlightNode(_ node: CodeHighlightNode) throws {}
+  public func visitCodeNode(_ node: CodeNode) throws {}
+  public func visitDecoratorNode(_ node: DecoratorNode) throws {}
+  public func visitDecoratorBlockNode(_ node: DecoratorBlockNode) throws {}
+  public func visitDecoratorContainerNode(_ node: DecoratorContainerNode) throws {}
+  public func visitHeadingNode(_ node: HeadingNode) throws {}
+  public func visitLineBreakNode(_ node: LineBreakNode) throws {}
+  public func visitPlaceholderNode(_ node: PlaceholderNode) throws {}
+  public func visitQuoteNode(_ node: QuoteNode) throws {}
+  public func visitRootNode(_ node: RootNode) throws {}
+  public func visitTextNode(_ node: TextNode) throws {}
 }
