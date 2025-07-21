@@ -583,6 +583,7 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
 //  If, at some point, we want to use paragraphStyle.beforeParagraphSpacing, to add some space on the top of the paragraph
 //  we will have to adjust this adjuster. Since we don't have such plans atm I opted to skip it to save time and effort
 //  and also not complicate this code unnecessarily.
+@MainActor
 private class CaretAndSelectionRectsAdjuster {
 
   static func adjustCaretRect(

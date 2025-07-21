@@ -145,7 +145,7 @@ public class NodeSelection: BaseSelection {
   }
 }
 
-extension NodeSelection: CustomDebugStringConvertible {
+extension NodeSelection: @preconcurrency CustomDebugStringConvertible {
   public var debugDescription: String {
     return "Node Selection"
   }

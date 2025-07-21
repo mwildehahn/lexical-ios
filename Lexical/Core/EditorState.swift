@@ -9,7 +9,7 @@ import Foundation
 
 internal let kRootNodeKey = "root"
 
-public typealias EditorStateMigrationHandler = (EditorState) throws -> Void
+public typealias EditorStateMigrationHandler = @Sendable (EditorState) throws -> Void
 
 public struct EditorStateMigration: Sendable {
   let fromVersion: Int

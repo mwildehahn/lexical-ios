@@ -107,7 +107,7 @@ enum TextStorageEditingMode {
   case controllerMode
 }
 
-public struct CommandType: RawRepresentable, Hashable {
+public struct CommandType: RawRepresentable, Hashable, Sendable {
   public var rawValue: String
   public init(rawValue: String) {
     self.rawValue = rawValue
@@ -143,7 +143,8 @@ public struct CommandType: RawRepresentable, Hashable {
   public static let readOnlyViewTapped = CommandType(rawValue: "readOnlyViewTapped")
   public static let indentContent = CommandType(rawValue: "indentContent")
   public static let outdentContent = CommandType(rawValue: "outdentContent")
-  public static let updatePlaceholderVisibility = CommandType(rawValue: "updatePlaceholderVisibility")
+  public static let updatePlaceholderVisibility = CommandType(
+    rawValue: "updatePlaceholderVisibility")
 }
 
 @objc public enum CommandPriority: Int {
@@ -154,10 +155,14 @@ public struct CommandType: RawRepresentable, Hashable {
   case Critical
 }
 
-public typealias UpdateListener = (_ activeEditorState: EditorState, _ previousEditorState: EditorState, _ dirtyNodes: DirtyNodeMap) -> Void
+public typealias UpdateListener = (
+  _ activeEditorState: EditorState, _ previousEditorState: EditorState, _ dirtyNodes: DirtyNodeMap
+) -> Void
 public typealias TextContentListener = (_ text: String) -> Void
 public typealias CommandListener = (_ payload: Any?) -> Bool
-public typealias ErrorListener = (_ activeEditorState: EditorState, _ previousEditorState: EditorState, _ error: Error) -> Void
+public typealias ErrorListener = (
+  _ activeEditorState: EditorState, _ previousEditorState: EditorState, _ error: Error
+) -> Void
 
 struct Listeners {
   var update: [UUID: UpdateListener] = [:]
@@ -202,7 +207,9 @@ public typealias CustomDrawingHandler = (
 ) -> Void
 
 @objc public class BlockLevelAttributes: NSObject {
-  public init(marginTop: CGFloat, marginBottom: CGFloat, paddingTop: CGFloat, paddingBottom: CGFloat) {
+  public init(
+    marginTop: CGFloat, marginBottom: CGFloat, paddingTop: CGFloat, paddingBottom: CGFloat
+  ) {
     self.marginTop = marginTop
     self.marginBottom = marginBottom
     self.paddingTop = paddingTop
@@ -216,7 +223,8 @@ public typealias CustomDrawingHandler = (
 
   override public func isEqual(_ object: Any?) -> Bool {
     if let object = object as? BlockLevelAttributes {
-      return self.marginTop == object.marginTop && self.marginBottom == object.marginBottom && self.paddingTop == object.paddingTop && self.paddingBottom == object.paddingBottom
+      return self.marginTop == object.marginTop && self.marginBottom == object.marginBottom
+        && self.paddingTop == object.paddingTop && self.paddingBottom == object.paddingBottom
     }
     return false
   }

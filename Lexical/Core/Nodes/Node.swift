@@ -15,7 +15,7 @@ public typealias NodeKey = String
 ///
 /// If you're creating your own node class, typically you would inherit from ``TextNode``, ``DecoratorNode`` or ``ElementNode``, rather than directly inheriting from ``Node``.
 @MainActor
-open class Node: Codable {
+open class Node: @preconcurrency Codable {
   enum CodingKeys: String, CodingKey {
     case type
     case version
@@ -817,7 +817,7 @@ extension Node: Hashable {
   }
 }
 
-extension Node: Equatable {
+extension Node: @preconcurrency Equatable {
   public static func == (lhs: Node, rhs: Node) -> Bool {
     //    return ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
     return lhs.isSameKey(rhs)

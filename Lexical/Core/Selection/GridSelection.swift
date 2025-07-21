@@ -78,7 +78,7 @@ public class GridSelection: BaseSelection {
   }
 }
 
-extension GridSelection: CustomDebugStringConvertible {
+extension GridSelection: @preconcurrency CustomDebugStringConvertible {
   public var debugDescription: String {
     return "Grid Selection"
   }

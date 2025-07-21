@@ -165,7 +165,7 @@ public class TextStorage: NSTextStorage {
 }
 
 extension TextStorage {
-  override public var debugDescription: String {
+  @MainActor override public var debugDescription: String {
     return
       "TextStorage[\(backingAttributedString.string.utf16.enumerated().map { "(\($0)=U+\(String(format:"%04X",$1)))" }.joined())]"
   }
