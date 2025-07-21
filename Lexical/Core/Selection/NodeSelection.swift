@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 public class NodeSelection: BaseSelection {
 
   public var nodes: Set<NodeKey>

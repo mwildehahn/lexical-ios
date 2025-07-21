@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 public class RangeSelection: BaseSelection {
 
   public class InsertNewAfterResult {
