@@ -54,6 +54,7 @@ public struct SerializedNodeArray: Decodable {
     self.nodeArray = nodeArray
   }
 
+  @MainActor
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     var nodeArray = [Node]()

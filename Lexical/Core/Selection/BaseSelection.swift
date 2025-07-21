@@ -7,9 +7,8 @@
 
 import Foundation
 
-/**
- This protocol represents things common to all types of selection.
- */
+/// This protocol represents things common to all types of selection.
+@MainActor
 public protocol BaseSelection: AnyObject, CustomDebugStringConvertible {
   /// True if the selection has had any changes made that need reconciling.
   var dirty: Bool { get set }

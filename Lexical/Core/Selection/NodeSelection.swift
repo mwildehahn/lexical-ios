@@ -41,6 +41,7 @@ public class NodeSelection: BaseSelection {
     return nodes.contains(key)
   }
 
+  @MainActor
   public func getNodes() throws -> [Node] {
     let objects = self.nodes
     var nodesToReturn: [Node] = []
@@ -52,10 +53,12 @@ public class NodeSelection: BaseSelection {
     return nodesToReturn
   }
 
+  @MainActor
   public func extract() throws -> [Node] {
     return try getNodes()
   }
 
+  @MainActor
   public func getTextContent() throws -> String {
     let nodes = try getNodes()
     var textContent = ""
@@ -81,6 +84,7 @@ public class NodeSelection: BaseSelection {
     return false
   }
 
+  @MainActor
   public func deleteCharacter(isBackwards: Bool) throws {
     for node in try getNodes() {
       try node.remove()
@@ -95,6 +99,7 @@ public class NodeSelection: BaseSelection {
     try deleteCharacter(isBackwards: isBackwards)
   }
 
+  @MainActor
   public func insertParagraph() throws {
     guard isSingleNode(), let node = try getNodes().first else {
       return
@@ -103,6 +108,7 @@ public class NodeSelection: BaseSelection {
     try rangeSelection.insertParagraph()
   }
 
+  @MainActor
   public func insertLineBreak(selectStart: Bool) throws {
     guard isSingleNode(), let node = try getNodes().first else {
       return
@@ -111,6 +117,7 @@ public class NodeSelection: BaseSelection {
     try rangeSelection.insertLineBreak(selectStart: selectStart)
   }
 
+  @MainActor
   public func insertText(_ text: String) throws {
     guard isSingleNode(), let node = try getNodes().first else {
       return

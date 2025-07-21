@@ -32,7 +32,7 @@ private class ReconcilerState {
     self.prevEditorState = currentEditorState
     self.nextEditorState = pendingEditorState
     self.prevRangeCache = rangeCache
-    self.nextRangeCache = rangeCache // Use the previous range cache as a starting point
+    self.nextRangeCache = rangeCache  // Use the previous range cache as a starting point
     self.locationCursor = 0
     self.rangesToDelete = []
     self.rangesToAdd = []
@@ -73,11 +73,12 @@ internal struct MarkedTextOperation {
 
 internal enum Reconciler {
 
+  @MainActor
   internal static func updateEditorState(
     currentEditorState: EditorState,
     pendingEditorState: EditorState,
     editor: Editor,
-    shouldReconcileSelection: Bool, // the situations where we would want to not do this include handling non-controlled mode
+    shouldReconcileSelection: Bool,  // the situations where we would want to not do this include handling non-controlled mode
     markedTextOperation: MarkedTextOperation?
   ) throws {
     editor.log(.reconciler, .verbose)
@@ -87,20 +88,23 @@ internal enum Reconciler {
     }
 
     if editor.dirtyNodes.isEmpty,
-       editor.dirtyType == .noDirtyNodes,
-       let currentSelection = currentEditorState.selection,
-       let pendingSelection = pendingEditorState.selection,
-       currentSelection.isSelection(pendingSelection),
-       pendingSelection.dirty == false,
-       markedTextOperation == nil {
+      editor.dirtyType == .noDirtyNodes,
+      let currentSelection = currentEditorState.selection,
+      let pendingSelection = pendingEditorState.selection,
+      currentSelection.isSelection(pendingSelection),
+      pendingSelection.dirty == false,
+      markedTextOperation == nil
+    {
       // should be nothing to reconcile
       return
     }
 
     if let markedTextOperation, markedTextOperation.createMarkedText {
       guard shouldReconcileSelection == false else {
-        editor.log(.reconciler, .warning, "should not reconcile selection whilst starting marked text!")
-        throw LexicalError.invariantViolation("should not reconcile selection whilst starting marked text!")
+        editor.log(
+          .reconciler, .warning, "should not reconcile selection whilst starting marked text!")
+        throw LexicalError.invariantViolation(
+          "should not reconcile selection whilst starting marked text!")
       }
     }
 
@@ -108,12 +112,13 @@ internal enum Reconciler {
     let nextSelection = pendingEditorState.selection
     let needsUpdate = editor.dirtyType != .noDirtyNodes
 
-    let reconcilerState = ReconcilerState(currentEditorState: currentEditorState,
-                                          pendingEditorState: pendingEditorState,
-                                          rangeCache: editor.rangeCache,
-                                          dirtyNodes: editor.dirtyNodes,
-                                          treatAllNodesAsDirty: editor.dirtyType == .fullReconcile,
-                                          markedTextOperation: markedTextOperation)
+    let reconcilerState = ReconcilerState(
+      currentEditorState: currentEditorState,
+      pendingEditorState: pendingEditorState,
+      rangeCache: editor.rangeCache,
+      dirtyNodes: editor.dirtyNodes,
+      treatAllNodesAsDirty: editor.dirtyType == .fullReconcile,
+      markedTextOperation: markedTextOperation)
 
     try reconcileNode(key: kRootNodeKey, reconcilerState: reconcilerState)
 
@@ -121,13 +126,18 @@ internal enum Reconciler {
     textStorage.mode = .controllerMode
     textStorage.beginEditing()
 
-    editor.log(.reconciler, .verbose, "about to do rangesToDelete: total \(reconcilerState.rangesToDelete.count)")
+    editor.log(
+      .reconciler, .verbose,
+      "about to do rangesToDelete: total \(reconcilerState.rangesToDelete.count)")
     var nonEmptyDeletionsCount = 0
 
     for deletionRange in reconcilerState.rangesToDelete.reversed() {
       if deletionRange.length > 0 {
         nonEmptyDeletionsCount += 1
-        editor.log(.reconciler, .verboseIncludingUserContent, "deleting range \(NSStringFromRange(deletionRange)) `\((textStorage.string as NSString).substring(with: deletionRange))`")
+        editor.log(
+          .reconciler, .verboseIncludingUserContent,
+          "deleting range \(NSStringFromRange(deletionRange)) `\((textStorage.string as NSString).substring(with: deletionRange))`"
+        )
         textStorage.deleteCharacters(in: deletionRange)
       }
     }
@@ -173,7 +183,8 @@ internal enum Reconciler {
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
     }
 
-    editor.log(.reconciler, .verbose, "about to do rangesToAdd: total \(reconcilerState.rangesToAdd.count)")
+    editor.log(
+      .reconciler, .verbose, "about to do rangesToAdd: total \(reconcilerState.rangesToAdd.count)")
 
     var nonEmptyRangesToAddCount = 0
     var rangesInserted: [NSRange] = []
@@ -184,13 +195,20 @@ internal enum Reconciler {
         theme: editor.getTheme())
       if attributedString.length > 0 {
         nonEmptyRangesToAddCount += 1
-        editor.log(.reconciler, .verboseIncludingUserContent, "inserting at \(insertion.location), `\(attributedString.string)`")
+        editor.log(
+          .reconciler, .verboseIncludingUserContent,
+          "inserting at \(insertion.location), `\(attributedString.string)`")
         textStorage.insert(attributedString, at: insertion.location)
-        rangesInserted.append(NSRange(location: insertion.location, length: attributedString.length))
+        rangesInserted.append(
+          NSRange(location: insertion.location, length: attributedString.length))
 
         // If this insertion corresponds to the marked text location, keep hold of the attributed string.
-        if let pointForAddition = markedTextPointForAddition, let length = markedTextOperation?.markedTextString.lengthAsNSString() {
-          if insertion.part == .text && pointForAddition.key == insertion.nodeKey && pointForAddition.offset + length <= attributedString.length {
+        if let pointForAddition = markedTextPointForAddition,
+          let length = markedTextOperation?.markedTextString.lengthAsNSString()
+        {
+          if insertion.part == .text && pointForAddition.key == insertion.nodeKey
+            && pointForAddition.offset + length <= attributedString.length
+          {
             markedTextAttributedString = attributedString
           }
         }
@@ -206,7 +224,8 @@ internal enum Reconciler {
 
     // BLOCK LEVEL ATTRIBUTES
 
-    let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(theme: editor.getTheme())
+    let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(
+      theme: editor.getTheme())
 
     // TODO: this iteration applies the attributes in an arbitrary order. If we are to handle nesting nodes with these block level attributes
     // we may want to apply them in a deterministic order, and also make them nest additively (i.e. for when two blocks start at the same paragraph)
@@ -225,12 +244,14 @@ internal enum Reconciler {
     let rangeCache = reconcilerState.nextRangeCache
     for nodeKey in nodesToApplyBlockAttributes {
       guard let node = getNodeByKey(key: nodeKey),
-            node.isAttached(),
-            let cacheItem = rangeCache[nodeKey],
-            let attributes = node.getBlockLevelAttributes(theme: editor.getTheme())
+        node.isAttached(),
+        let cacheItem = rangeCache[nodeKey],
+        let attributes = node.getBlockLevelAttributes(theme: editor.getTheme())
       else { continue }
 
-      AttributeUtils.applyBlockLevelAttributes(attributes, cacheItem: cacheItem, textStorage: textStorage, nodeKey: nodeKey, lastDescendentAttributes: lastDescendentAttributes ?? [:])
+      AttributeUtils.applyBlockLevelAttributes(
+        attributes, cacheItem: cacheItem, textStorage: textStorage, nodeKey: nodeKey,
+        lastDescendentAttributes: lastDescendentAttributes ?? [:])
     }
 
     editor.rangeCache = reconcilerState.nextRangeCache
@@ -238,10 +259,11 @@ internal enum Reconciler {
     textStorage.mode = previousMode
 
     if let markedTextOperation,
-       markedTextOperation.createMarkedText,
-       let markedTextAttributedString,
-       let startPoint = markedTextPointForAddition,
-       let frontend = editor.frontend {
+      markedTextOperation.createMarkedText,
+      let markedTextAttributedString,
+      let startPoint = markedTextPointForAddition,
+      let frontend = editor.frontend
+    {
       // We have a marked text operation, an attributed string, we know the Point at which it should be added.
       // Note that the text has _already_ been inserted into the TextStorage, so we actually have to _replace_ the
       // marked text range with the same text, but via a marked text operation. Hence we deduce the end point
@@ -249,9 +271,12 @@ internal enum Reconciler {
       // marked text operation.
       let length = markedTextOperation.markedTextString.lengthAsNSString()
       let endPoint = Point(key: startPoint.key, offset: startPoint.offset + length, type: .text)
-      try frontend.updateNativeSelection(from: RangeSelection(anchor: startPoint, focus: endPoint, format: TextFormat()))
-      let attributedSubstring = markedTextAttributedString.attributedSubstring(from: NSRange(location: startPoint.offset, length: length))
-      editor.frontend?.setMarkedTextFromReconciler(attributedSubstring, selectedRange: markedTextOperation.markedTextInternalSelection)
+      try frontend.updateNativeSelection(
+        from: RangeSelection(anchor: startPoint, focus: endPoint, format: TextFormat()))
+      let attributedSubstring = markedTextAttributedString.attributedSubstring(
+        from: NSRange(location: startPoint.offset, length: length))
+      editor.frontend?.setMarkedTextFromReconciler(
+        attributedSubstring, selectedRange: markedTextOperation.markedTextInternalSelection)
 
       // do not do selection reconcile after marked text!
       // The selection will be correctly set as part of the setMarkedTextFromReconciler() call.
@@ -265,14 +290,19 @@ internal enum Reconciler {
     }
 
     if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
-      try reconcileSelection(prevSelection: currentSelection, nextSelection: nextSelection, editor: editor)
+      try reconcileSelection(
+        prevSelection: currentSelection, nextSelection: nextSelection, editor: editor)
     }
   }
 
+  @MainActor
   private static func reconcileNode(key: NodeKey, reconcilerState: ReconcilerState) throws {
-    guard let prevNode = reconcilerState.prevEditorState.nodeMap[key], let nextNode = reconcilerState.nextEditorState.nodeMap[key] else {
+    guard let prevNode = reconcilerState.prevEditorState.nodeMap[key],
+      let nextNode = reconcilerState.nextEditorState.nodeMap[key]
+    else {
       throw LexicalError.invariantViolation(
-        "reconcileNode should only be called when a node is present in both node maps, otherwise create or delete should be called")
+        "reconcileNode should only be called when a node is present in both node maps, otherwise create or delete should be called"
+      )
     }
     guard let prevRange = reconcilerState.prevRangeCache[key] else {
       throw LexicalError.invariantViolation(
@@ -289,7 +319,9 @@ internal enum Reconciler {
       } else {
         // cache is already valid, just update the cursor
         // no need to iterate into children, since their cache values are valid too and we've got a cached childrenLength we can use.
-        reconcilerState.locationCursor += prevRange.preambleLength + prevRange.textLength + prevRange.childrenLength + prevRange.postambleLength
+        reconcilerState.locationCursor +=
+          prevRange.preambleLength + prevRange.textLength + prevRange.childrenLength
+          + prevRange.postambleLength
       }
       return
     }
@@ -307,7 +339,8 @@ internal enum Reconciler {
       part: .preamble
     )
     nextRangeCacheItem.preambleLength = nextPreambleLength
-    nextRangeCacheItem.preambleSpecialCharacterLength = nextNode.getPreamble().lengthAsNSString(includingCharacters: ["\u{200B}"])
+    nextRangeCacheItem.preambleSpecialCharacterLength = nextNode.getPreamble().lengthAsNSString(
+      includingCharacters: ["\u{200B}"])
 
     // right, now we have finished the preamble, and the cursor is in the right place. Time for children.
     if nextNode is ElementNode {
@@ -341,7 +374,8 @@ internal enum Reconciler {
     let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
     createAddRemoveRanges(
       key: key,
-      prevLocation: prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength,
+      prevLocation: prevRange.location + prevRange.preambleLength + prevRange.childrenLength
+        + prevRange.textLength,
       prevLength: prevRange.postambleLength,
       nextLength: nextPostambleLength,
       reconcilerState: reconcilerState,
@@ -365,12 +399,14 @@ internal enum Reconciler {
       reconcilerState.rangesToDelete.append(prevRange)
     }
     if nextLength > 0 {
-      let insertion = ReconcilerInsertion(location: reconcilerState.locationCursor, nodeKey: key, part: part)
+      let insertion = ReconcilerInsertion(
+        location: reconcilerState.locationCursor, nodeKey: key, part: part)
       reconcilerState.rangesToAdd.append(insertion)
     }
     reconcilerState.locationCursor += nextLength
   }
 
+  @MainActor
   private static func createNode(key: NodeKey, reconcilerState: ReconcilerState) {
     guard let nextNode = reconcilerState.nextEditorState.nodeMap[key] else {
       return
@@ -380,28 +416,33 @@ internal enum Reconciler {
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
     let nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
-    let preambleInsertion = ReconcilerInsertion(location: reconcilerState.locationCursor, nodeKey: key, part: .preamble)
+    let preambleInsertion = ReconcilerInsertion(
+      location: reconcilerState.locationCursor, nodeKey: key, part: .preamble)
     reconcilerState.rangesToAdd.append(preambleInsertion)
     reconcilerState.locationCursor += nextPreambleLength
     nextRangeCacheItem.preambleLength = nextPreambleLength
-    nextRangeCacheItem.preambleSpecialCharacterLength = nextNode.getPreamble().lengthAsNSString(includingCharacters: ["\u{200B}"])
+    nextRangeCacheItem.preambleSpecialCharacterLength = nextNode.getPreamble().lengthAsNSString(
+      includingCharacters: ["\u{200B}"])
 
     if let nextNode = nextNode as? ElementNode, nextNode.children.count > 0 {
       let cursorBeforeChildren = reconcilerState.locationCursor
-      createChildren(nextNode.children, range: 0...nextNode.children.count - 1, reconcilerState: reconcilerState)
+      createChildren(
+        nextNode.children, range: 0...nextNode.children.count - 1, reconcilerState: reconcilerState)
       nextRangeCacheItem.childrenLength = reconcilerState.locationCursor - cursorBeforeChildren
     } else if nextNode is DecoratorNode {
       reconcilerState.decoratorsToAdd.append(key)
     }
 
     let nextTextLength = nextNode.getTextPart().lengthAsNSString()
-    let textInsertion = ReconcilerInsertion(location: reconcilerState.locationCursor, nodeKey: key, part: .text)
+    let textInsertion = ReconcilerInsertion(
+      location: reconcilerState.locationCursor, nodeKey: key, part: .text)
     reconcilerState.rangesToAdd.append(textInsertion)
     reconcilerState.locationCursor += nextTextLength
     nextRangeCacheItem.textLength = nextTextLength
 
     let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
-    let postambleInsertion = ReconcilerInsertion(location: reconcilerState.locationCursor, nodeKey: key, part: .postamble)
+    let postambleInsertion = ReconcilerInsertion(
+      location: reconcilerState.locationCursor, nodeKey: key, part: .postamble)
     reconcilerState.rangesToAdd.append(postambleInsertion)
     reconcilerState.locationCursor += nextPostambleLength
     nextRangeCacheItem.postambleLength = nextPostambleLength
@@ -409,24 +450,34 @@ internal enum Reconciler {
     reconcilerState.nextRangeCache[key] = nextRangeCacheItem
   }
 
+  @MainActor
   private static func destroyNode(key: NodeKey, reconcilerState: ReconcilerState) {
-    guard let prevNode = reconcilerState.prevEditorState.nodeMap[key], let prevRangeCacheItem = reconcilerState.prevRangeCache[key] else {
+    guard let prevNode = reconcilerState.prevEditorState.nodeMap[key],
+      let prevRangeCacheItem = reconcilerState.prevRangeCache[key]
+    else {
       return
     }
 
-    let prevPreambleRange = NSRange(location: prevRangeCacheItem.location, length: prevRangeCacheItem.preambleLength)
+    let prevPreambleRange = NSRange(
+      location: prevRangeCacheItem.location, length: prevRangeCacheItem.preambleLength)
     reconcilerState.rangesToDelete.append(prevPreambleRange)
 
     if let prevNode = prevNode as? ElementNode, prevNode.children.count > 0 {
-      destroyChildren(prevNode.children, range: 0...prevNode.children.count - 1, reconcilerState: reconcilerState)
+      destroyChildren(
+        prevNode.children, range: 0...prevNode.children.count - 1, reconcilerState: reconcilerState)
     } else if prevNode is DecoratorNode {
       reconcilerState.possibleDecoratorsToRemove.append(key)
     }
 
-    let prevTextRange = NSRange(location: prevRangeCacheItem.location + prevRangeCacheItem.preambleLength + prevRangeCacheItem.childrenLength, length: prevRangeCacheItem.textLength)
+    let prevTextRange = NSRange(
+      location: prevRangeCacheItem.location + prevRangeCacheItem.preambleLength
+        + prevRangeCacheItem.childrenLength, length: prevRangeCacheItem.textLength)
     reconcilerState.rangesToDelete.append(prevTextRange)
 
-    let prevPostambleRange = NSRange(location: prevRangeCacheItem.location + prevRangeCacheItem.preambleLength + prevRangeCacheItem.childrenLength + prevRangeCacheItem.textLength, length: prevRangeCacheItem.postambleLength)
+    let prevPostambleRange = NSRange(
+      location: prevRangeCacheItem.location + prevRangeCacheItem.preambleLength
+        + prevRangeCacheItem.childrenLength + prevRangeCacheItem.textLength,
+      length: prevRangeCacheItem.postambleLength)
     reconcilerState.rangesToDelete.append(prevPostambleRange)
 
     if reconcilerState.nextEditorState.nodeMap[key] == nil {
@@ -434,9 +485,11 @@ internal enum Reconciler {
     }
   }
 
+  @MainActor
   private static func reconcileChildren(key: NodeKey, reconcilerState: ReconcilerState) throws {
     guard let prevNode = reconcilerState.prevEditorState.nodeMap[key] as? ElementNode,
-          let nextNode = reconcilerState.nextEditorState.nodeMap[key] as? ElementNode else {
+      let nextNode = reconcilerState.nextEditorState.nodeMap[key] as? ElementNode
+    else {
       return
     }
     // in JS, this method does a few optimisation codepaths, then calls to the slow path reconcileNodeChildren. I'll not program the optimisations yet.
@@ -448,11 +501,13 @@ internal enum Reconciler {
       reconcilerState: reconcilerState)
   }
 
-  private static func reconcileNodeChildren(prevChildren: [NodeKey],
-                                            nextChildren: [NodeKey],
-                                            prevChildrenLength: Int,
-                                            nextChildrenLength: Int,
-                                            reconcilerState: ReconcilerState) throws {
+  private static func reconcileNodeChildren(
+    prevChildren: [NodeKey],
+    nextChildren: [NodeKey],
+    prevChildrenLength: Int,
+    nextChildrenLength: Int,
+    reconcilerState: ReconcilerState
+  ) throws {
     let prevEndIndex = prevChildrenLength - 1
     let nextEndIndex = nextChildrenLength - 1
     var prevIndex = 0
@@ -503,27 +558,36 @@ internal enum Reconciler {
     let removeOldChildren = nextIndex > nextEndIndex
 
     if appendNewChildren && !removeOldChildren {
-      createChildren(nextChildren, range: nextIndex...nextEndIndex, reconcilerState: reconcilerState)
+      createChildren(
+        nextChildren, range: nextIndex...nextEndIndex, reconcilerState: reconcilerState)
     } else if removeOldChildren && !appendNewChildren {
-      destroyChildren(prevChildren, range: prevIndex...prevEndIndex, reconcilerState: reconcilerState)
+      destroyChildren(
+        prevChildren, range: prevIndex...prevEndIndex, reconcilerState: reconcilerState)
     }
   }
 
-  private static func createChildren(_ children: [NodeKey], range: ClosedRange<Int>, reconcilerState: ReconcilerState) {
+  private static func createChildren(
+    _ children: [NodeKey], range: ClosedRange<Int>, reconcilerState: ReconcilerState
+  ) {
     for child in children[range] {
       createNode(key: child, reconcilerState: reconcilerState)
     }
   }
 
-  private static func destroyChildren(_ children: [NodeKey], range: ClosedRange<Int>, reconcilerState: ReconcilerState) {
+  private static func destroyChildren(
+    _ children: [NodeKey], range: ClosedRange<Int>, reconcilerState: ReconcilerState
+  ) {
     for child in children[range] {
       destroyNode(key: child, reconcilerState: reconcilerState)
     }
   }
 
+  @MainActor
   private static func updateLocationOfNonDirtyNode(key: NodeKey, reconcilerState: ReconcilerState) {
     // not a typo that I'm setting nextRangeCacheItem to prevRangeCache[key]. We want to start with the prev cache item and update it.
-    guard var nextRangeCacheItem = reconcilerState.prevRangeCache[key], let nextNode = reconcilerState.nextEditorState.nodeMap[key] else {
+    guard var nextRangeCacheItem = reconcilerState.prevRangeCache[key],
+      let nextNode = reconcilerState.nextEditorState.nodeMap[key]
+    else {
       // expected range cache entry to already exist
       return
     }
@@ -542,6 +606,7 @@ internal enum Reconciler {
     return
   }
 
+  @MainActor
   private static func attributedStringFromInsertion(
     _ insertion: ReconcilerInsertion,
     state: EditorState,
@@ -571,10 +636,12 @@ internal enum Reconciler {
     return attributedString
   }
 
+  @MainActor
   private static func reconcileSelection(
     prevSelection: BaseSelection?,
     nextSelection: BaseSelection?,
-    editor: Editor) throws {
+    editor: Editor
+  ) throws {
     guard let nextSelection else {
       if let prevSelection {
         if !prevSelection.dirty {
@@ -595,7 +662,8 @@ internal enum Reconciler {
 
 internal func performReconcilerSanityCheck(
   editor sanityCheckEditor: Editor,
-  expectedOutput: NSAttributedString) throws {
+  expectedOutput: NSAttributedString
+) throws {
   // TODO @amyworrall: this was commented out during the Frontend refactor. Create a new Frontend that contains
   // a TextKit stack but no selection or UI. Use that to re-implement the reconciler.
 

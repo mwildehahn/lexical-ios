@@ -13,14 +13,16 @@ public func cloneWithProperties<T: Node>(node: T) throws -> Node {
   let clone = latest.clone()
   clone.parent = latest.parent
   if let latestTextNode = latest as? TextNode,
-     let latestCloneNode = clone as? TextNode {
+    let latestCloneNode = clone as? TextNode
+  {
     latestCloneNode.format = latestTextNode.format
     latestCloneNode.style = latestTextNode.style
     latestCloneNode.mode = latestTextNode.mode
     latestCloneNode.detail = latestTextNode.detail
     return latestCloneNode
   } else if let latestElementNode = latest as? ElementNode,
-            let latestCloneNode = clone as? ElementNode {
+    let latestCloneNode = clone as? ElementNode
+  {
     latestCloneNode.children = latestElementNode.children
     latestCloneNode.direction = latestElementNode.direction
     //    latestCloneNode.indent = latestElementNode.indent
@@ -70,7 +72,9 @@ func copyLeafNodeBranchToRoot(
   while let unwrappedNode = node {
     guard let parent = getParentAvoidingExcludedElements(node: unwrappedNode) else { break }
 
-    if !((unwrappedNode as? ElementNode)?.excludeFromCopy() ?? false) || !isElementNode(node: unwrappedNode) {
+    if !((unwrappedNode as? ElementNode)?.excludeFromCopy() ?? false)
+      || !isElementNode(node: unwrappedNode)
+    {
       let key = unwrappedNode.getKey()
       var clone = mutableNodeMap[key]
       let needsClone = clone == nil
@@ -80,7 +84,9 @@ func copyLeafNodeBranchToRoot(
       }
       if let textClone = clone as? TextNode, !textClone.isSegmented() && !textClone.isToken() {
         let textCloneText = textClone.getText_dangerousPropertyAccess() as NSString
-        let length = textCloneText.length - (isLeftSide ? offset : 0) - (isLeftSide ? 0 : textCloneText.length - offset)
+        let length =
+          textCloneText.length - (isLeftSide ? offset : 0)
+          - (isLeftSide ? 0 : textCloneText.length - offset)
 
         let range = NSRange(location: isLeftSide ? offset : 0, length: length)
         let subString = textCloneText.substring(with: range)
@@ -112,6 +118,7 @@ func copyLeafNodeBranchToRoot(
   return (range: mutableRange, nodeMap: mutableNodeMap)
 }
 
+@MainActor
 public func cloneContents(selection: RangeSelection) throws -> (
   nodeMap: [NodeKey: Node],
   range: [NodeKey]
@@ -126,8 +133,9 @@ public func cloneContents(selection: RangeSelection) throws -> (
 
   // Handle a single text node extraction
   if let anchorTextNode = anchorNode as? TextNode,
-     anchorNode.isSameKey(focusNode) &&
-      (anchorNodeParent.canBeEmpty() || anchorNodeParent.getChildrenSize() > 1) {
+    anchorNode.isSameKey(focusNode)
+      && (anchorNodeParent.canBeEmpty() || anchorNodeParent.getChildrenSize() > 1)
+  {
     guard let clonedFirstNode = try cloneWithProperties(node: anchorTextNode) as? TextNode else {
       throw LexicalError.internal("Could not clone anchorNode as TextNode")
     }
@@ -135,7 +143,8 @@ public func cloneContents(selection: RangeSelection) throws -> (
     let textCloneText = clonedFirstNode.getText_dangerousPropertyAccess() as NSString
     let startOffset = isBefore ? anchorOffset : focusOffset
     let endOffset = isBefore ? focusOffset : anchorOffset
-    let subString = textCloneText.substring(with: NSRange(location: startOffset, length: endOffset - startOffset))
+    let subString = textCloneText.substring(
+      with: NSRange(location: startOffset, length: endOffset - startOffset))
 
     clonedFirstNode.setText_dangerousPropertyAccess(String(subString))
 
@@ -152,7 +161,8 @@ public func cloneContents(selection: RangeSelection) throws -> (
   var nodesLength = nodes.count
   let firstNode = nodes[0]
   if let firstNodeParent = firstNode.getParent(),
-     !firstNodeParent.canBeEmpty() || isRootNode(node: firstNodeParent) {
+    !firstNodeParent.canBeEmpty() || isRootNode(node: firstNodeParent)
+  {
     let parentChildren = firstNodeParent.children
     let parentChildrenLength = parentChildren.count
     if parentChildrenLength == nodesLength {
@@ -186,7 +196,9 @@ public func cloneContents(selection: RangeSelection) throws -> (
   for i in 0..<nodesLength - 1 {
     let node = nodes[i]
     let key = node.getKey()
-    if !nodeMap.keys.contains(key) && (!((node as? ElementNode)?.excludeFromCopy() ?? false) || !isElementNode(node: node)) {
+    if !nodeMap.keys.contains(key)
+      && (!((node as? ElementNode)?.excludeFromCopy() ?? false) || !isElementNode(node: node))
+    {
       let clone = try cloneWithProperties(node: node)
       if isRootNode(node: node.getParent()) {
         range.append(node.getKey())

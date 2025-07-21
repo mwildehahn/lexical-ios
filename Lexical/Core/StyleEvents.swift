@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 public func updateTextFormat(type: TextFormatType, editor: Editor) throws {
   guard getActiveEditor() != nil else {
     throw LexicalError.invariantViolation("Must have editor")

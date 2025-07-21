@@ -28,6 +28,7 @@ public class Point {
     self.selection = nil
   }
 
+  @MainActor
   func isBefore(point b: Point) throws -> Bool {
     var aNode = try getNode()
     var bNode = try b.getNode()
@@ -49,6 +50,7 @@ public class Point {
     return aNode.isBefore(bNode)
   }
 
+  @MainActor
   public func getNode() throws -> Node {
     guard let node = getNodeByKey(key: key) else {
       throw LexicalError.internal("Point.getNode: node not found")
@@ -65,6 +67,7 @@ public class Point {
     return type
   }
 
+  @MainActor
   public func updatePoint(key: NodeKey, offset: Int, type: SelectionType) {
     self.key = key
     self.offset = offset
@@ -81,6 +84,7 @@ public class Point {
     type == .text ? offset : 0
   }
 
+  @MainActor
   public func isAtNodeEnd() throws -> Bool {
     switch type {
     case .element:
@@ -106,9 +110,7 @@ public class Point {
 
 extension Point: Equatable {
   public static func == (lhs: Point, rhs: Point) -> Bool {
-    return lhs.key == rhs.key &&
-      lhs.offset == rhs.offset &&
-      lhs.type == rhs.type
+    return lhs.key == rhs.key && lhs.offset == rhs.offset && lhs.type == rhs.type
   }
 }
 
