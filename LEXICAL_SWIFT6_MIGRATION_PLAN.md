@@ -3,6 +3,12 @@
 ## Overview
 Migrate Lexical iOS from thread dictionary pattern to MainActor for Swift 6 compatibility while maintaining API compatibility. When working on this plan, use this space to add notes / context / record progress so we can be efficient with the context window as we pass this work off between LLM agents.
 
+## Quick Status Summary (December 2024)
+- **Phase 1**: ✅ COMPLETED - Core migration done (EditorContext, Updates, Editor, EditorState)
+- **Phase 2**: 🚧 IN PROGRESS - 19 files need @MainActor annotations
+- **Next Steps**: Work through the file list in "Files Requiring Updates - Detailed Instructions" section
+- **Build Command**: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "x86_64-apple-ios13.0-simulator"`
+
 ## Current State Summary
 
 ### Thread Dictionary Pattern (Updates.swift)
@@ -217,17 +223,45 @@ grep -rn "Task {" Lexical/ Plugins/
 
 ## Progress Tracking
 
-### Phase 1: Core Migration
-- [ ] Create EditorContext.swift
-- [ ] Update Updates.swift
-- [ ] Update Editor.swift
-- [ ] Run basic tests
+### Phase 1: Core Migration - COMPLETED ✅
+- [x] Create EditorContext.swift
+- [x] Update Updates.swift
+- [x] Update Editor.swift
+- [x] Run basic tests
 
-### Phase 2: Full Migration
-- [ ] Update all call sites
-- [ ] Update plugins
+### Phase 2: Full Migration - IN PROGRESS
+- [x] Update core selection files (Point, RangeSelection, NodeSelection, SelectionUtils)
+- [x] Update Utils.swift
+- [x] Update Reconciler.swift (partial)
+- [x] Update Serialization.swift (partial)
+- [ ] **Fix remaining compilation errors** (19 files identified)
+- [ ] Update all plugins
 - [ ] Update tests
 - [ ] Update documentation
+
+### Phase 2.1: Remaining File Updates (For Sub-Agent)
+**Priority 1 - Simple @MainActor additions (5 min each):**
+- [ ] Plugin.swift - Add @MainActor to installedInstance()
+- [ ] GarbageCollection.swift - Add @MainActor to garbageCollectDetachedNodes
+- [ ] Events.swift - Add @MainActor to event handlers
+
+**Priority 2 - Node classes (10 min each):**
+- [ ] CodeNode.swift - Add @MainActor to setLanguage, insertNewAfter
+- [ ] ElementNode.swift - Add @MainActor to text-related methods
+- [ ] Node.swift - Add @MainActor to getWritable and related methods
+- [ ] TextNode.swift - Add @MainActor to text manipulation methods
+- [ ] DecoratorNode.swift - Add @MainActor to state access methods
+- [ ] DecoratorContainerNode.swift - Add @MainActor to state access methods
+
+**Priority 3 - Helper/Utility files (10 min each):**
+- [ ] AttributesUtils.swift - Add @MainActor to attribute creation functions
+- [ ] CopyPasteHelpers.swift - Add @MainActor to paste handling functions
+
+**Priority 4 - TextKit integration (15 min each):**
+- [ ] LayoutManager.swift - Add @MainActor where needed
+- [ ] RangeCache.swift - Add @MainActor where needed
+- [ ] TextAttachment.swift - Add @MainActor where needed
+- [ ] TextStorage.swift - Add @MainActor where needed
 
 ### Phase 3: Cleanup
 - [ ] Remove old thread dictionary code
@@ -356,6 +390,110 @@ When resuming this migration:
 2. **Decodable Conformance**: SerializedNodeArray shows a warning about MainActor-isolated init(from:) and Decodable protocol.
 
 3. **Cross-actor calls**: Any remaining errors about calling MainActor-isolated functions from non-isolated contexts.
+
+## Files Requiring Updates - Detailed Instructions
+
+### Instructions for Lower Intelligence LLM
+
+For each file below, apply the changes exactly as specified. When you see "Add @MainActor to function/method X", add the `@MainActor` annotation on the line before the function declaration.
+
+#### 1. Lexical/Plugin/Plugin.swift
+**Changes needed:**
+- Add `@MainActor` to the static method `installedInstance()` in the Plugin extension
+- Location: Line 18
+- Change from:
+  ```swift
+  public static func installedInstance() throws -> Self? {
+  ```
+- Change to:
+  ```swift
+  @MainActor
+  public static func installedInstance() throws -> Self? {
+  ```
+
+#### 2. Lexical/Core/GarbageCollection.swift
+**Changes needed:**
+- Add `@MainActor` to the global function `garbageCollectDetachedNodes`
+- Location: Line 43
+- Change from:
+  ```swift
+  func garbageCollectDetachedNodes(
+  ```
+- Change to:
+  ```swift
+  @MainActor
+  func garbageCollectDetachedNodes(
+  ```
+
+#### 3. Lexical/Core/Nodes/CodeNode.swift
+**Changes needed:**
+- Add `@MainActor` to the following methods:
+  - `setLanguage(_:)` at line 80
+  - `insertNewAfter(selection:)` at line 91 (approximately)
+- For each method, add `@MainActor` on the line before the function declaration
+
+#### 4. Lexical/Core/Nodes/ElementNode.swift
+**Changes needed:**
+- Add `@MainActor` to any methods that show errors about calling MainActor-isolated functions
+- Common methods that need it: `getAllTextNodes()`, `getDescendantTextNodeList()`, `getTextContent()`
+
+#### 5. Lexical/Core/Nodes/Node.swift
+**Changes needed:**
+- Add `@MainActor` to the `getWritable()` method
+- Add `@MainActor` to any other methods that access `getActiveEditor()` or `getActiveEditorState()`
+
+#### 6. Lexical/Core/Nodes/TextNode.swift
+**Changes needed:**
+- Add `@MainActor` to methods that access selection or editor state
+- Common methods: `getTextContent()`, `splitText()`, `mergeWithSibling()`
+
+#### 7. Lexical/Core/Nodes/DecoratorNode.swift & DecoratorContainerNode.swift
+**Changes needed:**
+- Add `@MainActor` to methods that access editor state or selection
+- Look for any methods calling `getActiveEditor()` or `getActiveEditorState()`
+
+#### 8. Lexical/Helper/AttributesUtils.swift
+**Changes needed:**
+- Add `@MainActor` to functions that access editor state
+- Common functions: `createAttributedStringForElement()`, `createAttributedString()`
+
+#### 9. Lexical/Helper/CopyPasteHelpers.swift
+**Changes needed:**
+- Add `@MainActor` to functions that manipulate editor state or selection
+
+#### 10. Lexical/TextKit Files (LayoutManager.swift, RangeCache.swift, TextAttachment.swift, TextStorage.swift)
+**Changes needed:**
+- Add `@MainActor` to methods that access editor or selection properties
+- These files interact with UIKit which is already MainActor-bound
+
+#### 11. Lexical/Core/Events.swift
+**Changes needed:**
+- Add `@MainActor` to event handling functions that access editor state
+
+#### 12. Lexical/Core/Reconciler.swift
+**Changes needed:**
+- Already has some @MainActor annotations, but may need more on specific methods that show errors
+
+### Common Patterns to Fix
+
+1. **Error: "call to main actor-isolated global function 'X' in a synchronous nonisolated context"**
+   - Solution: Add `@MainActor` to the calling function/method
+
+2. **Error: "main actor-isolated property 'X' can not be referenced from a nonisolated context"**
+   - Solution: Add `@MainActor` to the function/method accessing the property
+
+3. **Error: "main actor-isolated property 'X' can not be mutated from a nonisolated context"**
+   - Solution: Add `@MainActor` to the function/method mutating the property
+
+### Verification After Each File
+
+After updating each file, run:
+```bash
+swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+  -Xswiftc "-target" -Xswiftc "x86_64-apple-ios13.0-simulator" 2>&1 | grep -A5 -B5 "<filename>"
+```
+
+Replace `<filename>` with the file you just updated to verify the errors are resolved.
 
 ### Migration Pattern Reference
 

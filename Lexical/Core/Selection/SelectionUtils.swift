@@ -243,6 +243,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
     affinity: affinity)
 }
 
+@MainActor
 func createEmptyRangeSelection() -> RangeSelection {
   let anchor = Point(key: kRootNodeKey, offset: 0, type: .element)
   let focus = Point(key: kRootNodeKey, offset: 0, type: .element)

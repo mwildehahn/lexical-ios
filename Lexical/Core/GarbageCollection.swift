@@ -40,6 +40,7 @@ internal func garbageCollectDetachedDeepChildNodes(
   }
 }
 
+@MainActor
 func garbageCollectDetachedNodes(
   prevEditorState: EditorState,
   editorState: EditorState,
@@ -70,7 +71,9 @@ func garbageCollectDetachedNodes(
     if let node = nodeMap[nodeKey] {
       if !node.isAttached() {
         if let node = node as? ElementNode {
-          garbageCollectDetachedDeepChildNodes(node: node, parentKey: nodeKey, prevNodeMap: prevNodeMap, nodeMap: nodeMap, dirtyNodes: dirtyElements)
+          garbageCollectDetachedDeepChildNodes(
+            node: node, parentKey: nodeKey, prevNodeMap: prevNodeMap, nodeMap: nodeMap,
+            dirtyNodes: dirtyElements)
         }
 
         if prevNodeMap[nodeKey] == nil {

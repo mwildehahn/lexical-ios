@@ -14,6 +14,7 @@ public typealias NodeKey = String
 /// This class provides various methods for reading and manipulating the node tree, as well as node lifecycle support.
 ///
 /// If you're creating your own node class, typically you would inherit from ``TextNode``, ``DecoratorNode`` or ``ElementNode``, rather than directly inheriting from ``Node``.
+@MainActor
 open class Node: Codable {
   enum CodingKeys: String, CodingKey {
     case type
