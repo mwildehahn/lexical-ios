@@ -7,6 +7,7 @@
 
 import UIKit
 
+@MainActor
 internal class InputDelegateProxy: NSObject, UITextInputDelegate {
   internal weak var targetInputDelegate: UITextInputDelegate?
   internal var isSuspended: Bool = false
@@ -42,9 +43,11 @@ internal class InputDelegateProxy: NSObject, UITextInputDelegate {
     }
   }
 
-#if compiler(>=6.1) && !targetEnvironment(macCatalyst)
-  @available(iOS 18.4, *)
-  func conversationContext(_ context: UIConversationContext?, didChange textInput: (any UITextInput)?) {
-  }
-#endif
+  #if compiler(>=6.1) && !targetEnvironment(macCatalyst)
+    @available(iOS 18.4, *)
+    func conversationContext(
+      _ context: UIConversationContext?, didChange textInput: (any UITextInput)?
+    ) {
+    }
+  #endif
 }

@@ -7,6 +7,7 @@
 
 import UIKit
 
+@MainActor
 public class TextStorage: NSTextStorage {
 
   internal typealias CharacterLocation = Int
@@ -60,7 +61,10 @@ public class TextStorage: NSTextStorage {
         // we discard attribute information here. This applies to e.g. autocomplete, but it lets us handle it
         // using Lexical's own attribute persistence logic rather than UIKit's. The reason for doing it this way
         // is to avoid UIKit stomping on our custom attributes.
-        editor?.log(.NSTextStorage, .verboseIncludingUserContent, "Replace characters mode=none, string length \(self.backingAttributedString.length), range \(range), replacement \(attrString.string)")
+        editor?.log(
+          .NSTextStorage, .verboseIncludingUserContent,
+          "Replace characters mode=none, string length \(self.backingAttributedString.length), range \(range), replacement \(attrString.string)"
+        )
         performControllerModeUpdate(attrString.string, range: range)
       }
       return
@@ -111,7 +115,7 @@ public class TextStorage: NSTextStorage {
         }
 
         guard let selection = try getSelection() as? RangeSelection else {
-          return // we should have a range selection by now, so this is unexpected
+          return  // we should have a range selection by now, so this is unexpected
         }
         try selection.applyNativeSelection(nativeSelection)
         try selection.insertText(str)
@@ -120,7 +124,8 @@ public class TextStorage: NSTextStorage {
         guard let updatedSelection = try getSelection() as? RangeSelection else {
           return
         }
-        let updatedNativeSelection = try createNativeSelection(from: updatedSelection, editor: editor)
+        let updatedNativeSelection = try createNativeSelection(
+          from: updatedSelection, editor: editor)
         frontend.interceptNextSelectionChangeAndReplaceWithRange = updatedNativeSelection.range
       }
 
@@ -149,7 +154,10 @@ public class TextStorage: NSTextStorage {
     didSet {
       beginEditing()
       if backingAttributedString.length > 0 {
-        edited(.editedAttributes, range: NSRange(location: backingAttributedString.length - 1, length: 1), changeInLength: 0)
+        edited(
+          .editedAttributes,
+          range: NSRange(location: backingAttributedString.length - 1, length: 1), changeInLength: 0
+        )
       }
       endEditing()
     }

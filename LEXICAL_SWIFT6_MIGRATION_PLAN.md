@@ -36,7 +36,7 @@ public func getActiveEditor() -> Editor? {
 ## Migration Strategy
 
 ### Phase 1: MainActor Annotation
-Mark Editor and related classes as @MainActor since they already run on main thread in practice.
+Mark Editor and related classes as @MainActor since they already run on main thread in practice. Prefer to mark classes we own in the library with @MainActor vs adding it to each individual mehtod.
 
 ### Phase 2: Context Storage Replacement
 Replace thread dictionary with a MainActor-isolated context manager.

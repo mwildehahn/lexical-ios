@@ -17,12 +17,20 @@ import UIKit
 public protocol LexicalViewDelegate: NSObjectProtocol {
   func textViewDidBeginEditing(textView: LexicalView)
   func textViewDidEndEditing(textView: LexicalView)
-  func textViewShouldChangeText(_ textView: LexicalView, range: NSRange, replacementText text: String) -> Bool
-  func textView(_ textView: LexicalView, shouldInteractWith URL: URL, in selection: RangeSelection?, interaction: UITextItemInteraction) -> Bool
+  func textViewShouldChangeText(
+    _ textView: LexicalView, range: NSRange, replacementText text: String
+  ) -> Bool
+  func textView(
+    _ textView: LexicalView, shouldInteractWith URL: URL, in selection: RangeSelection?,
+    interaction: UITextItemInteraction
+  ) -> Bool
 }
 
-public extension LexicalViewDelegate {
-  func textView(_ textView: LexicalView, shouldInteractWith URL: URL, in selection: RangeSelection?, interaction: UITextItemInteraction) -> Bool {
+extension LexicalViewDelegate {
+  public func textView(
+    _ textView: LexicalView, shouldInteractWith URL: URL, in selection: RangeSelection?,
+    interaction: UITextItemInteraction
+  ) -> Bool {
     return true
   }
 }
@@ -46,9 +54,12 @@ public extension LexicalViewDelegate {
 /// In order to avoid the possibility of accidentally using UITextView methods that Lexical does not expect, we've
 /// encapsulated our UITextView subclass as a private property of LexicalView. The aim is to consider the UITextView
 /// as below the abstraction level for developers using Lexical.
+@MainActor
 @objc public class LexicalView: UIView, Frontend {
   var textLayoutWidth: CGFloat {
-    return max(textView.bounds.width - textView.textContainerInset.left - textView.textContainerInset.right - 2 * textView.textContainer.lineFragmentPadding, 0)
+    return max(
+      textView.bounds.width - textView.textContainerInset.left - textView.textContainerInset.right
+        - 2 * textView.textContainer.lineFragmentPadding, 0)
   }
 
   /// The underlying UITextView. Note that this should not be accessed unless there's no way to do what you want
@@ -58,7 +69,10 @@ public extension LexicalViewDelegate {
 
   let responderForNodeSelection: ResponderForNodeSelection
 
-  @objc public init(editorConfig: EditorConfig, featureFlags: FeatureFlags, placeholderText: LexicalPlaceholderText? = nil) {
+  @objc public init(
+    editorConfig: EditorConfig, featureFlags: FeatureFlags,
+    placeholderText: LexicalPlaceholderText? = nil
+  ) {
     self.textView = TextView(editorConfig: editorConfig, featureFlags: featureFlags)
     self.textView.showsVerticalScrollIndicator = false
     self.textView.clipsToBounds = true
@@ -69,7 +83,8 @@ public extension LexicalViewDelegate {
     guard let textStorage = textView.textStorage as? TextStorage else {
       fatalError()
     }
-    self.responderForNodeSelection = ResponderForNodeSelection(editor: textView.editor, textStorage: textStorage, nextResponder: textView)
+    self.responderForNodeSelection = ResponderForNodeSelection(
+      editor: textView.editor, textStorage: textStorage, nextResponder: textView)
 
     super.init(frame: .zero)
 
@@ -77,7 +92,8 @@ public extension LexicalViewDelegate {
 
     self.textView.lexicalDelegate = self
     if let placeholderText {
-      self.textView.setPlaceholderText(placeholderText.text, textColor: placeholderText.color, font: placeholderText.font)
+      self.textView.setPlaceholderText(
+        placeholderText.text, textColor: placeholderText.color, font: placeholderText.font)
     }
 
     addSubview(self.textView)
@@ -115,7 +131,9 @@ public extension LexicalViewDelegate {
 
   var nativeSelection: NativeSelection {
     if responderForNodeSelection.isFirstResponder {
-      return NativeSelection(range: nil, opaqueRange: nil, affinity: .forward, markedRange: nil, markedOpaqueRange: nil, selectionIsNodeOrObject: true)
+      return NativeSelection(
+        range: nil, opaqueRange: nil, affinity: .forward, markedRange: nil, markedOpaqueRange: nil,
+        selectionIsNodeOrObject: true)
     }
 
     let selectionNSRange = textView.selectedRange
@@ -125,15 +143,20 @@ public extension LexicalViewDelegate {
     let markedOpaqueRange = textView.markedTextRange
     var markedNSRange: NSRange?
     if let markedOpaqueRange {
-      let markedStart: Int = textView.offset(from: textView.beginningOfDocument, to: markedOpaqueRange.start)
-      let markedEnd: Int = textView.offset(from: textView.beginningOfDocument, to: markedOpaqueRange.end)
+      let markedStart: Int = textView.offset(
+        from: textView.beginningOfDocument, to: markedOpaqueRange.start)
+      let markedEnd: Int = textView.offset(
+        from: textView.beginningOfDocument, to: markedOpaqueRange.end)
       if markedStart != NSNotFound && markedEnd != NSNotFound {
         markedNSRange = NSRange(
           location: markedStart,
           length: markedEnd - markedStart)
       }
     }
-    return NativeSelection(range: selectionNSRange, opaqueRange: selectionOpaqueRange, affinity: selectionAffinity, markedRange: markedNSRange, markedOpaqueRange: markedOpaqueRange, selectionIsNodeOrObject: false)
+    return NativeSelection(
+      range: selectionNSRange, opaqueRange: selectionOpaqueRange, affinity: selectionAffinity,
+      markedRange: markedNSRange, markedOpaqueRange: markedOpaqueRange,
+      selectionIsNodeOrObject: false)
   }
 
   var isUpdatingNativeSelection: Bool {
@@ -153,7 +176,10 @@ public extension LexicalViewDelegate {
     textView
   }
 
-  func moveNativeSelection(type: NativeSelectionModificationType, direction: UITextStorageDirection, granularity: UITextGranularity) {
+  func moveNativeSelection(
+    type: NativeSelectionModificationType, direction: UITextStorageDirection,
+    granularity: UITextGranularity
+  ) {
     textView.isUpdatingNativeSelection = true
 
     let selection = nativeSelection
@@ -168,7 +194,10 @@ public extension LexicalViewDelegate {
 
     switch direction {
     case .forward:
-      end = textView.tokenizer.position(from: end, toBoundary: granularity, inDirection: UITextDirection(rawValue: UITextStorageDirection.forward.rawValue)) ?? end
+      end =
+        textView.tokenizer.position(
+          from: end, toBoundary: granularity,
+          inDirection: UITextDirection(rawValue: UITextStorageDirection.forward.rawValue)) ?? end
       end = validatePosition(textView: textView, position: end, direction: direction)
       start = validatePosition(textView: textView, position: start, direction: direction)
 
@@ -176,7 +205,10 @@ public extension LexicalViewDelegate {
         start = end
       }
     case .backward:
-      start = textView.tokenizer.position(from: start, toBoundary: granularity, inDirection: UITextDirection(rawValue: UITextStorageDirection.backward.rawValue)) ?? start
+      start =
+        textView.tokenizer.position(
+          from: start, toBoundary: granularity,
+          inDirection: UITextDirection(rawValue: UITextStorageDirection.backward.rawValue)) ?? start
       start = validatePosition(textView: textView, position: start, direction: direction)
       end = validatePosition(textView: textView, position: end, direction: direction)
 
@@ -278,31 +310,23 @@ public extension LexicalViewDelegate {
   /// This needs a refactor. Probably this method should be deleted entirely (and the recommended approach for working with
   /// selections should be to go through the Lexical EditorState selection), unless a justification for its usefulness can be discovered.
   public var selectedTextRange: UITextRange? {
-    get {
-      textView.selectedTextRange
-    }
+    textView.selectedTextRange
   }
 
   /// Returns the attributed string fetched from the underlying text view's text storage.
   public var attributedText: NSAttributedString {
-    get {
-      textView.attributedText
-    }
+    textView.attributedText
   }
 
   /// Returns the Lexical ``Editor`` owned by this LexicalView.
   ///
   /// This is the primary entry point for working with Lexical.
   @objc public var editor: Editor {
-    get {
-      textView.editor
-    }
+    textView.editor
   }
 
   public var text: String {
-    get {
-      textView.text
-    }
+    textView.text
   }
 
   /// A proxy for the underlying `UITextView`'s `isScrollEnabled` property.
@@ -331,32 +355,24 @@ public extension LexicalViewDelegate {
   ///
   /// Marked Text corresponds to Lexical's `composition`.
   public var markedTextRange: UITextRange? {
-    get {
-      textView.markedTextRange
-    }
+    textView.markedTextRange
   }
 
   /// Returns the current text input mode from the underlying UITextView.
   ///
   /// This can be used to access the input language.
   public var textViewInputMode: UITextInputMode? {
-    get {
-      textView.textInputMode
-    }
+    textView.textInputMode
   }
 
   /// A convenience method for working out if there is any text in the text view.
   public var isTextViewEmpty: Bool {
-    get {
-      textView.text.lengthAsNSString() == 0
-    }
+    textView.text.lengthAsNSString() == 0
   }
 
   /// A proxy for the underlying UITextView's `isFirstResponder` method
   public var textViewIsFirstResponder: Bool {
-    get {
-      textView.isFirstResponder
-    }
+    textView.isFirstResponder
   }
 
   /// A proxy for the underlying UITextView's CALayer's `borderWidth` property
@@ -389,7 +405,7 @@ public extension LexicalViewDelegate {
     super.layoutSubviews()
 
     textView.frame = CGRect(x: 0, y: 0, width: bounds.width, height: bounds.height)
-      overlayView.frame = textView.frame // Ensure overlay covers the textView
+    overlayView.frame = textView.frame  // Ensure overlay covers the textView
 
   }
 
@@ -432,7 +448,8 @@ public extension LexicalViewDelegate {
   }
 
   public func shouldInvalidateTextViewHeight(maxHeight: CGFloat) -> Bool {
-    let textViewSize = textView.sizeThatFits(CGSize(width: textView.bounds.size.width, height: CGFloat.greatestFiniteMagnitude))
+    let textViewSize = textView.sizeThatFits(
+      CGSize(width: textView.bounds.size.width, height: CGFloat.greatestFiniteMagnitude))
     let calculatedHeight = min(maxHeight, textViewSize.height)
 
     return calculatedHeight != textView.bounds.size.height
@@ -442,7 +459,8 @@ public extension LexicalViewDelegate {
     let fullHeight = textView.sizeThatFits(
       CGSize(
         width: containerSize.width - padding.left - padding.right,
-        height: containerSize.height - padding.top - padding.bottom)).height
+        height: containerSize.height - padding.top - padding.bottom)
+    ).height
 
     return fullHeight
   }
@@ -498,7 +516,10 @@ public extension LexicalViewDelegate {
 // MARK: - LexicalTextViewDelegate
 
 extension LexicalView: LexicalTextViewDelegate {
-  func textView(_ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange, interaction: UITextItemInteraction) -> Bool {
+  func textView(
+    _ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange,
+    interaction: UITextItemInteraction
+  ) -> Bool {
     var selection: RangeSelection?
 
     do {
@@ -510,7 +531,8 @@ extension LexicalView: LexicalTextViewDelegate {
       print("Error received in LexicalView(shouldInteractWith): \(error.localizedDescription)")
     }
 
-    return delegate?.textView(self, shouldInteractWith: URL, in: selection, interaction: interaction) ?? false
+    return delegate?.textView(
+      self, shouldInteractWith: URL, in: selection, interaction: interaction) ?? false
   }
 
   func textViewDidBeginEditing(textView: TextView) {
@@ -521,7 +543,9 @@ extension LexicalView: LexicalTextViewDelegate {
     delegate?.textViewDidEndEditing(textView: self)
   }
 
-  func textViewShouldChangeText(_ textView: UITextView, range: NSRange, replacementText text: String) -> Bool {
+  func textViewShouldChangeText(
+    _ textView: UITextView, range: NSRange, replacementText text: String
+  ) -> Bool {
     if let delegate {
       return delegate.textViewShouldChangeText(self, range: range, replacementText: text)
     }

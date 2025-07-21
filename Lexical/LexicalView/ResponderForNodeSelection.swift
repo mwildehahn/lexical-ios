@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 class ResponderForNodeSelection: UIResponder, UIKeyInput {
 
   private weak var editor: Editor?
@@ -21,7 +22,7 @@ class ResponderForNodeSelection: UIResponder, UIKeyInput {
   }
 
   var hasText: Bool {
-    true // if this class is being used, _something_ is selected from a Lexical point of view!
+    true  // if this class is being used, _something_ is selected from a Lexical point of view!
   }
 
   func insertText(_ text: String) {
@@ -42,8 +43,6 @@ class ResponderForNodeSelection: UIResponder, UIKeyInput {
   }
 
   override var next: UIResponder? {
-    get {
-      textView
-    }
+    textView
   }
 }
