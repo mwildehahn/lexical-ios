@@ -9,12 +9,16 @@ import Lexical
 import SwiftSoup
 
 public typealias DOMConversionOutputAfter = ([Lexical.Node]) throws -> [Lexical.Node]
-public typealias DOMChildConversion = (Lexical.Node, Lexical.Node?) throws -> Lexical.Node? // arguments: node, parent
-public typealias DOMConversionOutput = (after: DOMConversionOutputAfter?, forChild: DOMChildConversion?, node: [Lexical.Node])
+public typealias DOMChildConversion = (Lexical.Node, Lexical.Node?) throws -> Lexical.Node?  // arguments: node, parent
+public typealias DOMConversionOutput = (
+  after: DOMConversionOutputAfter?, forChild: DOMChildConversion?, node: [Lexical.Node]
+)
 
-public typealias DOMExportOutputAfter = (Lexical.Node, SwiftSoup.Element?) throws -> SwiftSoup.Element?
+public typealias DOMExportOutputAfter = (Lexical.Node, SwiftSoup.Element?) throws -> SwiftSoup
+  .Element?
 public typealias DOMExportOutput = (after: DOMExportOutputAfter?, element: SwiftSoup.Element?)
 
+@MainActor
 public protocol NodeHTMLSupport: Lexical.Node {
   static func importDOM(domNode: SwiftSoup.Node) throws -> DOMConversionOutput
   func exportDOM(editor: Editor) throws -> DOMExportOutput
