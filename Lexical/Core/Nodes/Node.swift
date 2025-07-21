@@ -864,6 +864,7 @@ extension Node: @preconcurrency Equatable {
   }
 }
 
+@MainActor
 public protocol NodeVisitor {
   func visitNode(_ node: Node) throws
   func visitElementNode(_ node: ElementNode) throws
