@@ -67,8 +67,8 @@ func triggerErrorListeners(
 public func triggerTextContentListeners(
   activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState
 ) throws {
-  let activeTextContent = activeEditorState.getTextContent()
-  let previousTextContent = previousEditorState.getTextContent()
+  let activeTextContent = try getEditorStateTextContent(editorState: activeEditorState)
+  let previousTextContent = try getEditorStateTextContent(editorState: previousEditorState)
 
   if activeTextContent != previousTextContent {
     for listener in activeEditor.listeners.textContent.values {

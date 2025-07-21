@@ -108,6 +108,7 @@ private func sanityCheckPoint(_ point: Point) -> Bool {
   return false
 }
 
+@MainActor
 func adjustPointOffsetForMergedSibling(
   point: Point,
   isBefore: Bool,
@@ -508,6 +509,7 @@ func transferStartingElementPointToTextPoint(
   start.updatePoint(key: textNode.getKey(), offset: 0, type: .text)
 }
 
+@MainActor
 func removeSegment(node: TextNode, isBackward: Bool, offset: Int) throws {
   let textNode = node
   let textContent = textNode.getTextContent(includeInert: false, includeDirectionless: true)
@@ -589,6 +591,7 @@ public func setBlocksType(
   }
 }
 
+@MainActor
 private func isBlock(_ node: Node) -> Bool {
   guard let node = node as? ElementNode, !isRootNode(node: node) else {
     return !node.isInline() && !isRootNode(node: node)
@@ -703,6 +706,7 @@ internal func normalizeSelectionPointsForBoundaries(
   }
 }
 
+@MainActor
 func validatePosition(
   textView: UITextView, position: UITextPosition, direction: UITextStorageDirection
 ) -> UITextPosition {

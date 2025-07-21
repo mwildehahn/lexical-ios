@@ -24,6 +24,7 @@ public struct LinkPayload {
   }
 }
 
+@MainActor
 open class LinkPlugin: Plugin {
   public init() {}
 
@@ -38,24 +39,28 @@ open class LinkPlugin: Plugin {
       print("\(error)")
     }
 
-    _ = editor.registerCommand(type: .link, listener: { [weak self] payload in
-      guard let strongSelf = self,
-            let linkPayload = payload as? LinkPayload,
-            let editor = strongSelf.editor
-      else { return false }
+    _ = editor.registerCommand(
+      type: .link,
+      listener: { [weak self] payload in
+        guard let strongSelf = self,
+          let linkPayload = payload as? LinkPayload,
+          let editor = strongSelf.editor
+        else { return false }
 
-      strongSelf.insertLink(linkPayload: linkPayload, editor: editor)
-      return true
-    })
+        strongSelf.insertLink(linkPayload: linkPayload, editor: editor)
+        return true
+      })
 
-    _ = editor.registerCommand(type: .removeLink, listener: { [weak self] _ in
-      guard let strongSelf = self,
-            let editor = strongSelf.editor
-      else { return false }
+    _ = editor.registerCommand(
+      type: .removeLink,
+      listener: { [weak self] _ in
+        guard let strongSelf = self,
+          let editor = strongSelf.editor
+        else { return false }
 
-      strongSelf.insertLink(linkPayload: nil, editor: editor)
-      return true
-    })
+        strongSelf.insertLink(linkPayload: nil, editor: editor)
+        return true
+      })
   }
 
   public func tearDown() {
@@ -135,7 +140,9 @@ open class LinkPlugin: Plugin {
     try nodes.forEach { node in
       let parent = node.getParent()
 
-      if let elementNode = node as? ElementNode, !elementNode.isInline() || parent == linkNode || parent == nil {
+      if let elementNode = node as? ElementNode,
+        !elementNode.isInline() || parent == linkNode || parent == nil
+      {
         return
       }
 

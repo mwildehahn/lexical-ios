@@ -386,6 +386,7 @@ internal enum Reconciler {
     reconcilerState.nextRangeCache[key] = nextRangeCacheItem
   }
 
+  @MainActor
   private static func createAddRemoveRanges(
     key: NodeKey,
     prevLocation: Int,
@@ -501,6 +502,7 @@ internal enum Reconciler {
       reconcilerState: reconcilerState)
   }
 
+  @MainActor
   private static func reconcileNodeChildren(
     prevChildren: [NodeKey],
     nextChildren: [NodeKey],
@@ -566,6 +568,7 @@ internal enum Reconciler {
     }
   }
 
+  @MainActor
   private static func createChildren(
     _ children: [NodeKey], range: ClosedRange<Int>, reconcilerState: ReconcilerState
   ) {
@@ -574,6 +577,7 @@ internal enum Reconciler {
     }
   }
 
+  @MainActor
   private static func destroyChildren(
     _ children: [NodeKey], range: ClosedRange<Int>, reconcilerState: ReconcilerState
   ) {

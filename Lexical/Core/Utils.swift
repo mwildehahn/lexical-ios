@@ -16,6 +16,7 @@ public func getNodeByKey<N: Node>(key: NodeKey) -> N? {
   return node as? N
 }
 
+@MainActor
 private func uniqueKey(from candidate: UInt64, in editorState: EditorState) -> UInt64 {
   if editorState.nodeMap[String(candidate)] != nil {
     return uniqueKey(from: candidate + 1, in: editorState)
@@ -73,6 +74,7 @@ public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parent
   return stringKey
 }
 
+@MainActor
 private func internallyMarkChildrenAsDirty(
   element: ElementNode,
   nodeMap: [NodeKey: Node],
@@ -87,6 +89,7 @@ private func internallyMarkChildrenAsDirty(
   }
 }
 
+@MainActor
 private func internallyMarkParentElementsAsDirty(
   parentKey: NodeKey,
   nodeMap: [NodeKey: Node],
@@ -112,6 +115,7 @@ private func internallyMarkParentElementsAsDirty(
 }  // Never use this function directly! It will break
 // the cloning heuristic. Instead use node.getWritable().
 
+@MainActor
 internal func internallyMarkNodeAsDirty(node: Node, cause: DirtyStatusCause = .editorInitiated) {
   let latest = node.getLatest()
   guard
@@ -134,6 +138,7 @@ internal func internallyMarkNodeAsDirty(node: Node, cause: DirtyStatusCause = .e
   editor.dirtyNodes[latest.key] = cause
 }
 
+@MainActor
 internal func internallyMarkSiblingsAsDirty(node: Node, status: DirtyStatusCause = .editorInitiated)
 {
   if let previousNode = node.getPreviousSibling() {
@@ -149,34 +154,42 @@ public func getCompositionKey() -> NodeKey? {
   return getActiveEditor()?.compositionKey
 }
 
+@MainActor
 public func createTextNode(text: String?) -> TextNode {
   TextNode(text: text ?? "", key: nil)
 }
 
+@MainActor
 public func createParagraphNode() -> ParagraphNode {
   ParagraphNode()
 }
 
+@MainActor
 public func createHeadingNode(headingTag: HeadingTagType) -> HeadingNode {
   HeadingNode(tag: headingTag)
 }
 
+@MainActor
 public func createQuoteNode() -> QuoteNode {
   QuoteNode()
 }
 
+@MainActor
 public func createLineBreakNode() -> LineBreakNode {
   LineBreakNode()
 }
 
+@MainActor
 public func createCodeNode(language: String = "") -> CodeNode {
   CodeNode(language: language)
 }
 
+@MainActor
 public func createCodeHighlightNode(text: String, highlightType: String?) -> CodeHighlightNode {
   CodeHighlightNode(text: text, highlightType: highlightType)
 }
 
+@MainActor
 public func toggleTextFormatType(
   format: TextFormat, type: TextFormatType, alignWithFormat: TextFormat?
 ) -> TextFormat {
@@ -247,6 +260,7 @@ public func isDecoratorNode(_ node: Node?) -> Bool {
   node is DecoratorNode
 }
 
+@MainActor
 public func isDecoratorBlockNode(_ node: Node?) -> Bool {
   if let decoratorNode = node as? DecoratorNode {
     return !decoratorNode.isInline()
@@ -259,16 +273,19 @@ public func isLeafNode(_ node: Node?) -> Bool {
   node is TextNode || node is LineBreakNode
 }
 
+@MainActor
 public func isTokenOrInert(_ node: TextNode?) -> Bool {
   guard let node else { return false }
   return node.isToken() || node.isInert()
 }
 
+@MainActor
 public func isTokenOrInertOrSegmented(_ node: TextNode?) -> Bool {
   guard let node else { return false }
   return isTokenOrInert(node) || node.isSegmented()
 }
 
+@MainActor
 public func isTokenOrSegmented(_ node: TextNode?) -> Bool {
   guard let node else { return false }
   return node.isToken() || node.isSegmented()
@@ -283,6 +300,7 @@ public func getRoot() -> RootNode? {
   return rootNode
 }
 
+@MainActor
 func getEditorStateTextContent(editorState: EditorState) throws -> String {
   var textContent: String = ""
 
@@ -295,6 +313,7 @@ func getEditorStateTextContent(editorState: EditorState) throws -> String {
   return textContent
 }
 
+@MainActor
 public func getNodeHierarchy(editorState: EditorState?) throws -> String {
   var hierarchyString = ""
   var cacheString = ""
@@ -345,6 +364,7 @@ public func getNodeHierarchy(editorState: EditorState?) throws -> String {
   return "Tree:\n\(hierarchyString)\nCache:\n\(cacheString)"
 }
 
+@MainActor
 public func getSelectionData(editorState: EditorState?) throws -> String {
   var selectionString = "selection: range\n"
 
@@ -357,6 +377,7 @@ public func getSelectionData(editorState: EditorState?) throws -> String {
   return selectionString
 }
 
+@MainActor
 public func removeParentEmptyElements(startingNode: ElementNode?) throws {
   guard var node = startingNode else { return }
 
@@ -373,11 +394,13 @@ public func removeParentEmptyElements(startingNode: ElementNode?) throws {
   }
 }
 
+@MainActor
 func checkSelectionIsOnlyLinebreak(selection: RangeSelection) throws -> Bool {
   let nodes = try selection.getNodes()
   return nodes.count == 1 && nodes.contains(where: { $0 is LineBreakNode })
 }
 
+@MainActor
 public func sliceSelectedTextNodeContent(selection: BaseSelection, textNode: TextNode) throws
   -> TextNode
 {
@@ -459,6 +482,7 @@ public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UIVie
   }
 }
 
+@MainActor
 internal func destroyCachedDecoratorView(forKey key: NodeKey) {
   guard let editor = getActiveEditor() else {
     return
@@ -470,6 +494,7 @@ public typealias FindFunction = (
   _ node: Node
 ) -> Bool
 
+@MainActor
 public func findMatchingParent(startingNode: Node?, findFn: FindFunction) -> Node? {
   var currentNode: Node? = startingNode
 
@@ -487,6 +512,7 @@ public func findMatchingParent(startingNode: Node?, findFn: FindFunction) -> Nod
 /// *Returns the element node of the nearest ancestor, otherwise throws an error.
 /// * @param startNode - The starting node of the search
 /// * @returns The ancestor node found
+@MainActor
 public func getNearestBlockElementAncestorOrThrow(startNode: Node) throws -> ElementNode {
   let blockNode = findMatchingParent(startingNode: startNode) { node in
     if let elementNode = node as? ElementNode {
@@ -514,6 +540,7 @@ public func applyNodeReplacement<N: Node>(
 /// @param node - the node to begin searching.
 /// @param klass - an instance of the type of node to look for.
 /// @returns the node of type klass that was passed, or null if none exist.
+@MainActor
 public func getNearestNodeOfType<T: ElementNode>(
   node: Node,
   type: NodeType
@@ -531,6 +558,7 @@ public func getNearestNodeOfType<T: ElementNode>(
   return nil
 }
 
+@MainActor
 public func hasAncestor(
   child: Node,
   targetNode: Node
@@ -545,6 +573,7 @@ public func hasAncestor(
   return false
 }
 
+@MainActor
 public func maybeMoveChildrenSelectionToParent(
   parentNode: Node,
   offset: Int = 0
@@ -583,6 +612,7 @@ public func getAttributedStringFromFrontend() throws -> NSAttributedString {
   }
 }
 
+@MainActor
 public func removeFromParent(node: Node) throws {
   guard let writableParent = try node.getParent()?.getWritable() else {
     return
@@ -597,6 +627,7 @@ public func removeFromParent(node: Node) throws {
   internallyMarkNodeAsDirty(node: writableParent)
 }
 
+@MainActor
 private func resolveElement(
   element: ElementNode,
   isBackward: Bool,
@@ -619,6 +650,7 @@ private func resolveElement(
   return block.getChildAtIndex(index: isBackward ? offset - 1 : offset)
 }
 
+@MainActor
 public func getAdjacentNode(
   focus: Point,
   isBackward: Bool

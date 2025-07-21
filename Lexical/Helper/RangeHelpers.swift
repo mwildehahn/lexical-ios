@@ -22,6 +22,7 @@ public typealias RangePayloadPair<Payload> = (range: NSRange, payload: Payload)
 ///
 /// This function mirrors some of the work done by the reconciler/range cache combo, but does not rely on the range
 /// cache so that it can be used in headless/no editor situations (e.g. when doing `EditorState.read {}`).
+@MainActor
 public func performRangeSearchWithPayload<Payload: Equatable>(
   searchRoot: Node, comparison: (Node) -> (RangeSearchInclusionResult, Payload)
 ) throws -> [RangePayloadPair<Payload>] {
@@ -50,6 +51,7 @@ public func performRangeSearchWithPayload<Payload: Equatable>(
 }
 
 /// Searches a Lexical subtree for nodes matching a condition, and returns the text range.
+@MainActor
 public func performRangeSearch(searchRoot: Node, comparison: (Node) -> (RangeSearchInclusionResult))
   throws -> [NSRange]
 {
@@ -65,6 +67,7 @@ public func performRangeSearch(searchRoot: Node, comparison: (Node) -> (RangeSea
 }
 
 // the recursive helper function for the above
+@MainActor
 func searchInNode<Payload: Equatable>(
   node: Node, comparison: (Node) -> (RangeSearchInclusionResult, Payload), cursor: inout Int,
   ranges: inout [RangePayloadPair<Payload>], parentMatch: Bool, parentPayload: Payload?

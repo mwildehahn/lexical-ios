@@ -173,6 +173,7 @@ public func shouldInsertTextAfterOrBeforeTextNode(selection: RangeSelection, nod
   return shouldInsertTextBefore || shouldInsertTextAfter
 }
 
+@MainActor
 func checkIfTokenOrCanTextBeInserted(node: TextNode) -> Bool {
   let isToken = node.isToken()
   let parent = node.getParent()
@@ -251,6 +252,7 @@ internal func handleIndentAndOutdent(
   }
 }
 
+@MainActor
 public func registerRichText(editor: Editor) {
 
   _ = editor.registerCommand(

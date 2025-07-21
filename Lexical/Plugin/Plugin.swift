@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 @objc public protocol Plugin {
   func setUp(editor: Editor)
   func tearDown()

@@ -1479,13 +1479,13 @@ public class RangeSelection: BaseSelection {
 }
 
 extension RangeSelection: @preconcurrency Equatable {
-  nonisolated public static func == (lhs: RangeSelection, rhs: RangeSelection) -> Bool {
+  public static func == (lhs: RangeSelection, rhs: RangeSelection) -> Bool {
     return lhs.anchor == rhs.anchor && lhs.focus == rhs.focus && lhs.format == rhs.format
   }
 }
 
 extension RangeSelection: @preconcurrency CustomDebugStringConvertible {
-  nonisolated public var debugDescription: String {
+  public var debugDescription: String {
     return "\tanchor { \(anchor)\n\tfocus { \(focus)"
   }
 }

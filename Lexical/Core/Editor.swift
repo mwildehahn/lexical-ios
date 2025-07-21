@@ -204,7 +204,7 @@ public class Editor: NSObject {
     }
   }
 
-  deinit {
+  public func tearDown() {
     plugins.forEach { plugin in
       plugin.tearDown()
     }
