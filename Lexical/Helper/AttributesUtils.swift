@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 enum AttributeUtils {
   static func attributedStringByAddingStyles(
     _ attributedString: NSAttributedString,
@@ -25,12 +26,16 @@ enum AttributeUtils {
     }
 
     let copiedAttributes: NSDictionary = NSDictionary(dictionary: combinedAttributes)
-    guard let copiedAttributesSwiftDict: [NSAttributedString.Key: Any] = copiedAttributes as? [NSAttributedString.Key: Any] else {
+    guard
+      let copiedAttributesSwiftDict: [NSAttributedString.Key: Any] = copiedAttributes
+        as? [NSAttributedString.Key: Any]
+    else {
       return NSAttributedString()
     }
 
     // update font and rest of the attributes
-    mutableCopy.addAttributes(copiedAttributesSwiftDict, range: NSRange(location: 0, length: length))
+    mutableCopy.addAttributes(
+      copiedAttributesSwiftDict, range: NSRange(location: 0, length: length))
 
     guard let copiedString: NSAttributedString = mutableCopy.copy() as? NSAttributedString else {
       return NSAttributedString()
@@ -85,7 +90,9 @@ enum AttributeUtils {
 
     combinedAttributes[.font] = font
 
-    if let paragraphStyle = getParagraphStyle(attributes: combinedAttributes, indentSize: CGFloat(theme.indentSize)) {
+    if let paragraphStyle = getParagraphStyle(
+      attributes: combinedAttributes, indentSize: CGFloat(theme.indentSize))
+    {
       combinedAttributes[.paragraphStyle] = paragraphStyle
       combinedAttributes[.paragraphSpacingBefore_internal] = paragraphStyle.paragraphSpacingBefore
       combinedAttributes[.paragraphSpacing_internal] = paragraphStyle.paragraphSpacing
@@ -121,7 +128,9 @@ enum AttributeUtils {
     return attributes
   }
 
-  private static func getParagraphStyle(attributes: [NSAttributedString.Key: Any], indentSize: CGFloat) -> NSParagraphStyle? {
+  private static func getParagraphStyle(
+    attributes: [NSAttributedString.Key: Any], indentSize: CGFloat
+  ) -> NSParagraphStyle? {
     let paragraphStyle = NSMutableParagraphStyle()
     var styleFound = false
 
@@ -182,22 +191,30 @@ enum AttributeUtils {
     let textAsNSString: NSString = textStorage.string as NSString
     guard textAsNSString.length > 0 else { return true }
 
-    guard let scalar = Unicode.Scalar(textAsNSString.character(at: textAsNSString.length - 1)) else { return false }
+    guard let scalar = Unicode.Scalar(textAsNSString.character(at: textAsNSString.length - 1))
+    else { return false }
     if NSCharacterSet.newlines.contains(scalar) { return true }
     return false
   }
 
   private enum BlockParagraphLocation {
-    case range(NSRange, NSRange) // non-enclosing range, enclosing range
+    case range(NSRange, NSRange)  // non-enclosing range, enclosing range
     case extraLineFragment
   }
 
-  internal static func applyBlockLevelAttributes(_ attributes: BlockLevelAttributes, cacheItem: RangeCacheItem, textStorage: TextStorage, nodeKey: NodeKey, lastDescendentAttributes: [NSAttributedString.Key: Any]) {
+  internal static func applyBlockLevelAttributes(
+    _ attributes: BlockLevelAttributes, cacheItem: RangeCacheItem, textStorage: TextStorage,
+    nodeKey: NodeKey, lastDescendentAttributes: [NSAttributedString.Key: Any]
+  ) {
 
     // for more information about the extraLineFragment, see NSLayoutManager docs
     let extraLineFragmentIsPresent = extraLineFragmentIsPresent(textStorage)
-    let startTouchesExtraLineFragment = (extraLineFragmentIsPresent && cacheItem.range.length == 0 && cacheItem.range.location == textStorage.length)
-    let endTouchesExtraLineFragment = (extraLineFragmentIsPresent && (NSMaxRange(cacheItem.range) - cacheItem.postambleLength) == textStorage.length) // ignore postamble, since postamble terminates the block
+    let startTouchesExtraLineFragment =
+      (extraLineFragmentIsPresent && cacheItem.range.length == 0
+        && cacheItem.range.location == textStorage.length)
+    let endTouchesExtraLineFragment =
+      (extraLineFragmentIsPresent
+        && (NSMaxRange(cacheItem.range) - cacheItem.postambleLength) == textStorage.length)  // ignore postamble, since postamble terminates the block
 
     var extraLineFragmentAttributes = (extraLineFragmentIsPresent) ? lastDescendentAttributes : [:]
 
@@ -207,7 +224,8 @@ enum AttributeUtils {
       paragraphs.append(.extraLineFragment)
     } else {
       // this time we _don't_ ignore postamble, since we want the applied styles to touch the newlines, and enumerateSubstrings handles trimming newlines anyway
-      textStorage.mutableString.enumerateSubstrings(in: cacheItem.range, options: .byParagraphs) { _, substringRange, enclosingRange, _ in
+      textStorage.mutableString.enumerateSubstrings(in: cacheItem.range, options: .byParagraphs) {
+        _, substringRange, enclosingRange, _ in
         paragraphs.append(.range(substringRange, enclosingRange))
       }
       if endTouchesExtraLineFragment {
@@ -224,14 +242,22 @@ enum AttributeUtils {
     let spacingBeforeInternal: CGFloat?
     switch first {
     case .extraLineFragment:
-      firstParaStyle = extraLineFragmentAttributes[.paragraphStyle] as? NSParagraphStyle ?? NSParagraphStyle()
-      spacingBeforeInternal = extraLineFragmentAttributes[.paragraphSpacingBefore_internal] as? CGFloat
+      firstParaStyle =
+        extraLineFragmentAttributes[.paragraphStyle] as? NSParagraphStyle ?? NSParagraphStyle()
+      spacingBeforeInternal =
+        extraLineFragmentAttributes[.paragraphSpacingBefore_internal] as? CGFloat
     case .range(let nonEnclosing, _):
-      firstParaStyle = textStorage.attribute(.paragraphStyle, at: nonEnclosing.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle()
-      spacingBeforeInternal = textStorage.attribute(.paragraphSpacingBefore_internal, at: nonEnclosing.location, effectiveRange: nil) as? CGFloat
+      firstParaStyle =
+        textStorage.attribute(.paragraphStyle, at: nonEnclosing.location, effectiveRange: nil)
+        as? NSParagraphStyle ?? NSParagraphStyle()
+      spacingBeforeInternal =
+        textStorage.attribute(
+          .paragraphSpacingBefore_internal, at: nonEnclosing.location, effectiveRange: nil)
+        as? CGFloat
     }
 
-    guard let firstMutableParaStyle = firstParaStyle.mutableCopy() as? NSMutableParagraphStyle else {
+    guard let firstMutableParaStyle = firstParaStyle.mutableCopy() as? NSMutableParagraphStyle
+    else {
       return
     }
     var spacingBefore = spacingBeforeInternal ?? firstMutableParaStyle.paragraphSpacingBefore
@@ -253,11 +279,17 @@ enum AttributeUtils {
 
     switch last {
     case .extraLineFragment:
-      lastParaStyle = extraLineFragmentAttributes[.paragraphStyle] as? NSParagraphStyle ?? NSParagraphStyle()
+      lastParaStyle =
+        extraLineFragmentAttributes[.paragraphStyle] as? NSParagraphStyle ?? NSParagraphStyle()
       spacingInternal = extraLineFragmentAttributes[.paragraphSpacing_internal] as? CGFloat
     case .range(let nonEnclosing, _):
-      lastParaStyle = textStorage.attribute(.paragraphStyle, at: nonEnclosing.location, effectiveRange: nil) as? NSParagraphStyle ?? NSParagraphStyle()
-      spacingInternal = textStorage.attribute(.paragraphSpacingBefore_internal, at: nonEnclosing.location, effectiveRange: nil) as? CGFloat
+      lastParaStyle =
+        textStorage.attribute(.paragraphStyle, at: nonEnclosing.location, effectiveRange: nil)
+        as? NSParagraphStyle ?? NSParagraphStyle()
+      spacingInternal =
+        textStorage.attribute(
+          .paragraphSpacingBefore_internal, at: nonEnclosing.location, effectiveRange: nil)
+        as? CGFloat
     }
 
     guard let lastMutableParaStyle = lastParaStyle.mutableCopy() as? NSMutableParagraphStyle else {
@@ -283,7 +315,8 @@ enum AttributeUtils {
 
     // see comment on `appliedBlockLevelStyles_internal`. We're only doing this to provide data to our custom drawing routines.
     if !startTouchesExtraLineFragment, case .range(_, let enclosing) = first {
-      textStorage.addAttribute(.appliedBlockLevelStyles_internal, value: attributes, range: enclosing)
+      textStorage.addAttribute(
+        .appliedBlockLevelStyles_internal, value: attributes, range: enclosing)
     }
   }
 }
@@ -293,11 +326,14 @@ extension NSAttributedString.Key {
 
   // These two properties are for Lexical to store the derived paragraph spacing. The reason for this is, when we calculate block
   // level styles, we need to read it back and adjust.
-  internal static let paragraphSpacingBefore_internal: NSAttributedString.Key = .init(rawValue: "paragraphSpacingBefore_internal")
-  internal static let paragraphSpacing_internal: NSAttributedString.Key = .init(rawValue: "paragraphSpacing_internal")
+  internal static let paragraphSpacingBefore_internal: NSAttributedString.Key = .init(
+    rawValue: "paragraphSpacingBefore_internal")
+  internal static let paragraphSpacing_internal: NSAttributedString.Key = .init(
+    rawValue: "paragraphSpacing_internal")
 
   // This attribute exists purely for storing the block level styles that have already been applied, so that the drawing code
   // within LayoutManager can read them back and pass them to any custom drawing functions. This attribute is not used to actually get
   // the spacing for margin/padding to be reserved, as they're already applied to the paragraph style!
-  internal static let appliedBlockLevelStyles_internal: NSAttributedString.Key = .init(rawValue: "appliedBlockLevelStyles_internal")
+  internal static let appliedBlockLevelStyles_internal: NSAttributedString.Key = .init(
+    rawValue: "appliedBlockLevelStyles_internal")
 }

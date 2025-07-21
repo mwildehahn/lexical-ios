@@ -6,9 +6,10 @@
  */
 
 import Foundation
+
 internal let kRootNodeKey = "root"
 
-public typealias EditorStateMigrationHandler = (EditorState) throws -> Void
+public typealias EditorStateMigrationHandler = @Sendable (EditorState) throws -> Void
 
 public struct EditorStateMigration: Sendable {
   let fromVersion: Int
@@ -22,11 +23,10 @@ public struct EditorStateMigration: Sendable {
   }
 }
 
-/**
- The Lexical data model.
-
- An EditorState contains nodes and a selection. It can be serialized to and from JSON, and passed around between Lexical ``Editor`` instances.
- */
+/// The Lexical data model.
+///
+/// An EditorState contains nodes and a selection. It can be serialized to and from JSON, and passed around between Lexical ``Editor`` instances.
+@MainActor
 public class EditorState: NSObject {
 
   internal var nodeMap: [NodeKey: Node] = [:]
@@ -68,7 +68,10 @@ public class EditorState: NSObject {
     closure: () throws -> V
   ) throws -> V {
     var result: V?
-    try runWithStateLexicalScopeProperties(activeEditor: nil, activeEditorState: activeEditorState, readOnlyMode: true, editorUpdateReason: nil) {
+    try runWithStateLexicalScopeProperties(
+      activeEditor: nil, activeEditorState: activeEditorState, readOnlyMode: true,
+      editorUpdateReason: nil
+    ) {
       result = try closure()
     }
     guard let result else {
@@ -90,7 +93,7 @@ public class EditorState: NSObject {
     return editorState
   }
 
-  public static func ==(lhs: EditorState, rhs: EditorState) -> Bool {
+  public static func == (lhs: EditorState, rhs: EditorState) -> Bool {
     let isEqual = lhs.hasSameState(as: rhs)
 
     let selectionEqual: Bool
@@ -129,7 +132,7 @@ public class EditorState: NSObject {
 
   /**
    Returns a JSON string representing this EditorState.
-
+  
    The JSON string is designed to be interoperable with Lexical JavaScript (subject to the individual node classes using matching keys).
    */
   public func toJSON(outputFormatting: JSONEncoder.OutputFormatting = []) throws -> String {
@@ -152,11 +155,13 @@ public class EditorState: NSObject {
 
   /**
    Creates a new EditorState from a JSON string.
-
+  
    This function requires an ``Editor`` to be passed in, so that the list of registered node classes and plugins can be used when deserializing the JSON.
    The newly created EditorState is not added to the Editor; it is expected that the API consumer will call ``Editor/setEditorState(_:)`` if that is desired.
    */
-  public static func fromJSON(json: String, editor: Editor, migrations: [EditorStateMigration] = []) throws -> EditorState {
+  public static func fromJSON(json: String, editor: Editor, migrations: [EditorStateMigration] = [])
+    throws -> EditorState
+  {
     guard let stateData = json.data(using: .utf8) else {
       throw LexicalError.internal("Could not generate data from string JSON state")
     }

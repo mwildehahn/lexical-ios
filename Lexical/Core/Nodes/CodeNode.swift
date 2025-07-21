@@ -25,14 +25,14 @@ import UIKit
     guard let rhs = object as? CodeBlockCustomDrawingAttributes else {
       return false
     }
-    return lhs.background == rhs.background &&
-      lhs.border == rhs.border &&
-      lhs.borderWidth == rhs.borderWidth
+    return lhs.background == rhs.background && lhs.border == rhs.border
+      && lhs.borderWidth == rhs.borderWidth
   }
 }
 
-public extension NSAttributedString.Key {
-  static let codeBlockCustomDrawing: NSAttributedString.Key = .init(rawValue: "codeBlockCustomDrawing")
+extension NSAttributedString.Key {
+  public static let codeBlockCustomDrawing: NSAttributedString.Key = .init(
+    rawValue: "codeBlockCustomDrawing")
 }
 
 public class CodeNode: ElementNode {
@@ -55,7 +55,9 @@ public class CodeNode: ElementNode {
     try self.init(from: decoder, depth: nil, index: nil)
   }
 
-  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+  public required init(
+    from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
+  ) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
@@ -102,7 +104,8 @@ public class CodeNode: ElementNode {
     return true
   }
 
-  override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
+  override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any]
+  {
     var attributeDictionary = super.getAttributedStringAttributes(theme: theme)
     if let codeTheme = theme.code {
       attributeDictionary.merge(codeTheme) { (_, new) in new }
@@ -113,14 +116,17 @@ public class CodeNode: ElementNode {
     }
 
     if attributeDictionary[.codeBlockCustomDrawing] == nil {
-      let customAttr = CodeBlockCustomDrawingAttributes(background: .lightGray, border: .gray, borderWidth: 1)
+      let customAttr = CodeBlockCustomDrawingAttributes(
+        background: .lightGray, border: .gray, borderWidth: 1)
       attributeDictionary[.codeBlockCustomDrawing] = customAttr
     }
 
     return attributeDictionary
   }
 
-  override open func insertNewAfter(selection: RangeSelection?) throws -> RangeSelection.InsertNewAfterResult {
+  override open func insertNewAfter(selection: RangeSelection?) throws
+    -> RangeSelection.InsertNewAfterResult
+  {
     guard let selection else {
       return .init()
     }
@@ -128,12 +134,10 @@ public class CodeNode: ElementNode {
     let children = self.getChildren()
     let childrenLength = children.count
 
-    if childrenLength >= 2 &&
-        children.last is LineBreakNode &&
-        children[childrenLength - 2] is LineBreakNode &&
-        selection.isCollapsed() &&
-        selection.anchor.key == self.key &&
-        selection.anchor.offset == childrenLength {
+    if childrenLength >= 2 && children.last is LineBreakNode
+      && children[childrenLength - 2] is LineBreakNode && selection.isCollapsed()
+      && selection.anchor.key == self.key && selection.anchor.offset == childrenLength
+    {
       try children[childrenLength - 1].remove()
       try children[childrenLength - 2].remove()
       let newElement = createParagraphNode()
@@ -144,22 +148,24 @@ public class CodeNode: ElementNode {
     }
   }
 
-  override public func accept<V>(visitor: V) throws where V : NodeVisitor {
+  override public func accept<V>(visitor: V) throws where V: NodeVisitor {
     try visitor.visitCodeNode(self)
   }
 }
 
 extension CodeNode {
   internal static var codeBlockBackgroundDrawing: CustomDrawingHandler {
-    get {
-      return { attributeKey, attributeValue, layoutManager, attributeRunCharacterRange, granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
-        guard let context = UIGraphicsGetCurrentContext(), let attributeValue = attributeValue as? CodeBlockCustomDrawingAttributes else { return }
-        context.setFillColor(attributeValue.background.cgColor)
-        context.fill(rect)
+    return {
+      attributeKey, attributeValue, layoutManager, attributeRunCharacterRange,
+      granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
+      guard let context = UIGraphicsGetCurrentContext(),
+        let attributeValue = attributeValue as? CodeBlockCustomDrawingAttributes
+      else { return }
+      context.setFillColor(attributeValue.background.cgColor)
+      context.fill(rect)
 
-        context.setStrokeColor(attributeValue.border.cgColor)
-        context.stroke(rect, width: attributeValue.borderWidth)
-      }
+      context.setStrokeColor(attributeValue.border.cgColor)
+      context.stroke(rect, width: attributeValue.borderWidth)
     }
   }
 }

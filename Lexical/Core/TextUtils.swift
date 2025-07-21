@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 internal func isRootTextContentEmpty(isEditorComposing: Bool, trim: Bool = true) -> Bool {
   if isEditorComposing {
     return false
@@ -20,12 +21,14 @@ internal func isRootTextContentEmpty(isEditorComposing: Bool, trim: Bool = true)
   return text.isEmpty
 }
 
+@MainActor
 internal func rootTextContent() -> String {
   guard let root = getRoot() else { return "" }
 
   return root.getTextContent()
 }
 
+@MainActor
 internal func canShowPlaceholder(isComposing: Bool) -> Bool {
   if !isRootTextContentEmpty(isEditorComposing: isComposing, trim: false) {
     return false

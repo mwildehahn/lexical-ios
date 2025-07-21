@@ -8,6 +8,7 @@
 import Lexical
 import SwiftSoup
 
+@MainActor
 public func generateHTMLFromNodes(editor: Editor, selection: BaseSelection?) throws -> String {
   let container = SwiftSoup.Element(Tag("div"), "")
   guard let root = getRoot() else {
@@ -16,16 +17,23 @@ public func generateHTMLFromNodes(editor: Editor, selection: BaseSelection?) thr
   let topLevelChildren = root.getChildren()
 
   for topLevelNode in topLevelChildren {
-    _ = try appendNodesToHTML(editor: editor, currentNode: topLevelNode, parentElement: container, selection: selection)
+    _ = try appendNodesToHTML(
+      editor: editor, currentNode: topLevelNode, parentElement: container, selection: selection)
   }
 
   return try container.html()
 }
 
-private func appendNodesToHTML(editor: Editor, currentNode: Lexical.Node, parentElement: SwiftSoup.Element, selection: BaseSelection?) throws -> Bool {
+@MainActor
+private func appendNodesToHTML(
+  editor: Editor, currentNode: Lexical.Node, parentElement: SwiftSoup.Element,
+  selection: BaseSelection?
+) throws -> Bool {
   var shouldInclude = selection != nil ? try currentNode.isSelected() : true
   let shouldExclude: Bool
-  if let currentNode = currentNode as? Lexical.ElementNode, currentNode.excludeFromCopy(destination: .html) {
+  if let currentNode = currentNode as? Lexical.ElementNode,
+    currentNode.excludeFromCopy(destination: .html)
+  {
     shouldExclude = true
   } else {
     shouldExclude = false
@@ -59,8 +67,11 @@ private func appendNodesToHTML(editor: Editor, currentNode: Lexical.Node, parent
 
   let fragmentElement = SwiftSoup.Element(Tag("div"), "")
   for childNode in children {
-    let shouldIncludeChild = try appendNodesToHTML(editor: editor, currentNode: childNode, parentElement: fragmentElement, selection: selection)
-    if !shouldInclude, let currentNode = currentNode as? Lexical.ElementNode, shouldIncludeChild, currentNode.extractWithChild(child: childNode, selection: selection, destination: .html) {
+    let shouldIncludeChild = try appendNodesToHTML(
+      editor: editor, currentNode: childNode, parentElement: fragmentElement, selection: selection)
+    if !shouldInclude, let currentNode = currentNode as? Lexical.ElementNode, shouldIncludeChild,
+      currentNode.extractWithChild(child: childNode, selection: selection, destination: .html)
+    {
       shouldInclude = true
     }
   }

@@ -7,7 +7,8 @@
 
 import UIKit
 
-class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
+@MainActor
+class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {
   func layoutManager(
     _ layoutManager: NSLayoutManager,
     shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
@@ -24,13 +25,16 @@ class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
     let incomingGlyphsLength = glyphRange.length
     let firstCharIndex = characterIndexes[0]
     let lastCharIndex = characterIndexes[glyphRange.length - 1]
-    let charactersRange = NSRange(location: firstCharIndex, length: lastCharIndex - firstCharIndex + 1)
+    let charactersRange = NSRange(
+      location: firstCharIndex, length: lastCharIndex - firstCharIndex + 1)
 
     var operationRanges: [(range: NSRange, operation: TextTransform)] = []
     var hasOperations = false
 
-    textStorage.enumerateAttribute(.textTransform, in: charactersRange, options: []) { attributeValue, range, _ in
-      let transform = TextTransform(rawValue: attributeValue as? String ?? TextTransform.none.rawValue) ?? .none
+    textStorage.enumerateAttribute(.textTransform, in: charactersRange, options: []) {
+      attributeValue, range, _ in
+      let transform =
+        TextTransform(rawValue: attributeValue as? String ?? TextTransform.none.rawValue) ?? .none
       operationRanges.append((range: range, operation: transform))
       if transform != .none {
         hasOperations = true
@@ -42,7 +46,9 @@ class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
       return 0
     }
 
-    var operationResults: [(glyphs: [CGGlyph], properties: [NSLayoutManager.GlyphProperty], characterIndexes: [Int])] = []
+    var operationResults:
+      [(glyphs: [CGGlyph], properties: [NSLayoutManager.GlyphProperty], characterIndexes: [Int])] =
+        []
     var bufferLength = 0
     var locationWithinIncomingGlyphsRange = 0
 
@@ -51,7 +57,7 @@ class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
 
     for operationRange in operationRanges {
       // derive the end location for the current string range in terms of the passed in glyph range
-      var glyphSubrangeEnd = locationWithinIncomingGlyphsRange + operationRange.range.length // start the search here, it can't be less than that
+      var glyphSubrangeEnd = locationWithinIncomingGlyphsRange + operationRange.range.length  // start the search here, it can't be less than that
       while glyphSubrangeEnd <= incomingGlyphsLength {
         let nextCharIndex = characterIndexes[glyphSubrangeEnd + 1]
         if !operationRange.range.contains(nextCharIndex) {
@@ -63,36 +69,55 @@ class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
 
       if operationRange.operation == .none {
         // copy the original glyphs from the input to this method
-        let newGlyphs = Array(UnsafeBufferPointer(start: glyphs + locationWithinIncomingGlyphsRange, count: glyphSubrangeLength))
-        let newProperties = Array(UnsafeBufferPointer(start: properties + locationWithinIncomingGlyphsRange, count: glyphSubrangeLength))
-        let newCharIndexes = Array(UnsafeBufferPointer(start: characterIndexes + locationWithinIncomingGlyphsRange, count: glyphSubrangeLength))
+        let newGlyphs = Array(
+          UnsafeBufferPointer(
+            start: glyphs + locationWithinIncomingGlyphsRange, count: glyphSubrangeLength))
+        let newProperties = Array(
+          UnsafeBufferPointer(
+            start: properties + locationWithinIncomingGlyphsRange, count: glyphSubrangeLength))
+        let newCharIndexes = Array(
+          UnsafeBufferPointer(
+            start: characterIndexes + locationWithinIncomingGlyphsRange, count: glyphSubrangeLength)
+        )
 
-        operationResults.append((glyphs: newGlyphs, properties: newProperties, characterIndexes: newCharIndexes))
+        operationResults.append(
+          (glyphs: newGlyphs, properties: newProperties, characterIndexes: newCharIndexes))
         bufferLength += glyphSubrangeLength
       } else {
         // We now have a transform to do. Do it one character at a time in order to keep our character mapping accurate.
-        textStorageString.enumerateSubstrings(in: operationRange.range, options: .byComposedCharacterSequences) { substring, substringRange, enclosingRange, _ in
+        textStorageString.enumerateSubstrings(
+          in: operationRange.range, options: .byComposedCharacterSequences
+        ) { substring, substringRange, enclosingRange, _ in
           guard let substring else {
             return
           }
 
           // first check if we are one half of a composed character
-          let composedNormalisedRange = textStorageString.rangeOfComposedCharacterSequence(at: substringRange.location)
+          let composedNormalisedRange = textStorageString.rangeOfComposedCharacterSequence(
+            at: substringRange.location)
           if composedNormalisedRange != substringRange {
             // for this case, we can't upper or lower case _half_ a character.
-            operationResults.append((glyphs: [CGGlyph](repeating: CGGlyph(0), count: substringRange.length),
-                                     properties: [NSLayoutManager.GlyphProperty](repeating: .null, count: substringRange.length),
-                                     characterIndexes: Array(substringRange.location...(substringRange.location + substringRange.length))))
+            operationResults.append(
+              (
+                glyphs: [CGGlyph](repeating: CGGlyph(0), count: substringRange.length),
+                properties: [NSLayoutManager.GlyphProperty](
+                  repeating: .null, count: substringRange.length),
+                characterIndexes: Array(
+                  substringRange.location...(substringRange.location + substringRange.length))
+              ))
             bufferLength += substringRange.length
             return
           }
 
           // upper case the character
-          let modifiedSubstring = operationRange.operation == .lowercase ? substring.lowercased() : substring.uppercased()
+          let modifiedSubstring =
+            operationRange.operation == .lowercase ? substring.lowercased() : substring.uppercased()
 
           // iterate through this _new_ string, in case upper casing it resulted in more than one composed character
-          (modifiedSubstring as NSString).enumerateSubstrings(in: NSRange(location: 0, length: modifiedSubstring.lengthAsNSString()),
-                                                              options: .byComposedCharacterSequences) { innerSubstring, innerSubstringRange, innerEnclosingRange, _ in
+          (modifiedSubstring as NSString).enumerateSubstrings(
+            in: NSRange(location: 0, length: modifiedSubstring.lengthAsNSString()),
+            options: .byComposedCharacterSequences
+          ) { innerSubstring, innerSubstringRange, innerEnclosingRange, _ in
             guard let innerSubstring else {
               return
             }
@@ -100,13 +125,15 @@ class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
             // Generate glyphs for the character
             let utf16 = Array(innerSubstring.utf16)
             var newGlyphs = [CGGlyph](repeating: 0, count: utf16.count)
-            CTFontGetGlyphsForCharacters(ctFont, utf16, &newGlyphs, utf16.count) // if failure, glyph array will be empty as desired
+            CTFontGetGlyphsForCharacters(ctFont, utf16, &newGlyphs, utf16.count)  // if failure, glyph array will be empty as desired
 
             // build up our best guess at the glyph properties!
-            var newProperties = [NSLayoutManager.GlyphProperty](repeating: .init(rawValue: 0), count: utf16.count)
+            var newProperties = [NSLayoutManager.GlyphProperty](
+              repeating: .init(rawValue: 0), count: utf16.count)
             if let firstChar = innerSubstring.first, firstChar.isWhitespace {
               // checking the first char for whitespace is a reasonable approximation, because we don't expect there to be more than one character here
-              newProperties = [NSLayoutManager.GlyphProperty](repeating: .elastic, count: utf16.count)
+              newProperties = [NSLayoutManager.GlyphProperty](
+                repeating: .elastic, count: utf16.count)
             }
             if utf16.count > 1 {
               for i in 1..<utf16.count {
@@ -127,7 +154,8 @@ class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
               }
             }
 
-            operationResults.append((glyphs: newGlyphs, properties: newProperties, characterIndexes: newCharIndexes))
+            operationResults.append(
+              (glyphs: newGlyphs, properties: newProperties, characterIndexes: newCharIndexes))
             bufferLength += newGlyphs.count
           }
         }
@@ -144,12 +172,16 @@ class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
       sumProps.withUnsafeBufferPointer { sumPropsBuffer in
         sumCharacterIndexes.withUnsafeBufferPointer { sumCharsBuffer in
           guard let sumGlyphsBaseAddress = sumGlyphsBuffer.baseAddress,
-                let sumPropsBaseAddress = sumPropsBuffer.baseAddress,
-                let sumCharsBaseAddress = sumCharsBuffer.baseAddress else {
+            let sumPropsBaseAddress = sumPropsBuffer.baseAddress,
+            let sumCharsBaseAddress = sumCharsBuffer.baseAddress
+          else {
             fail = true
             return
           }
-          layoutManager.setGlyphs(sumGlyphsBaseAddress, properties: sumPropsBaseAddress, characterIndexes: sumCharsBaseAddress, font: font, forGlyphRange: NSRange(location: glyphRange.location, length: bufferLength))
+          layoutManager.setGlyphs(
+            sumGlyphsBaseAddress, properties: sumPropsBaseAddress,
+            characterIndexes: sumCharsBaseAddress, font: font,
+            forGlyphRange: NSRange(location: glyphRange.location, length: bufferLength))
         }
       }
     }

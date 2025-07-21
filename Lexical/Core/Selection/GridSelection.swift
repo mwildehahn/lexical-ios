@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 public class GridSelection: BaseSelection {
 
   public func getTextContent() throws -> String {
@@ -19,7 +20,7 @@ public class GridSelection: BaseSelection {
   }
 
   public func isSelection(_ selection: BaseSelection) -> Bool {
-    return false // TODO
+    return false  // TODO
   }
 
   public var gridKey: NodeKey
@@ -77,7 +78,7 @@ public class GridSelection: BaseSelection {
   }
 }
 
-extension GridSelection: CustomDebugStringConvertible {
+extension GridSelection: @preconcurrency CustomDebugStringConvertible {
   public var debugDescription: String {
     return "Grid Selection"
   }

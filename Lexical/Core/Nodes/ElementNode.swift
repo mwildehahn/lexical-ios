@@ -12,7 +12,7 @@ open class ElementNode: Node {
     case children
     case direction
     case indent
-    case format // text alignment. Not supported yet.
+    case format  // text alignment. Not supported yet.
   }
 
   // TODO: once the various accessor methods are written, make this var private
@@ -32,7 +32,9 @@ open class ElementNode: Node {
     super.init(key)
   }
 
-  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+  public required init(
+    from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
+  ) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.children = []
     var childNodes: [Node] = []
@@ -48,7 +50,8 @@ open class ElementNode: Node {
 
       while !childrenUnkeyedContainer.isAtEnd {
         var containerCopy = childrenUnkeyedContainer
-        let unprocessedContainer = try childrenUnkeyedContainer.nestedContainer(keyedBy: PartialCodingKeys.self)
+        let unprocessedContainer = try childrenUnkeyedContainer.nestedContainer(
+          keyedBy: PartialCodingKeys.self)
         let type = try NodeType(rawValue: unprocessedContainer.decode(String.self, forKey: .type))
 
         let klass = deserializationMap[type] ?? UnknownNode.self
@@ -56,7 +59,8 @@ open class ElementNode: Node {
         do {
           let decoder = try containerCopy.superDecoder()
           let childDepth = depth != nil ? (depth ?? 0) + 1 : nil
-          let decodedNode = try klass.init(from: decoder, depth: childDepth, index: childIndex, parentIndex: index)
+          let decodedNode = try klass.init(
+            from: decoder, depth: childDepth, index: childIndex, parentIndex: index)
           childNodes.append(decodedNode)
           self.children.append(decodedNode.key)
         } catch {
@@ -187,7 +191,8 @@ open class ElementNode: Node {
 
     if index >= children.count {
       if let resolvedNode = children.last as? ElementNode,
-         let lastDescendant = resolvedNode.getLastDescendant() {
+        let lastDescendant = resolvedNode.getLastDescendant()
+      {
         return lastDescendant
       }
 
@@ -279,7 +284,8 @@ open class ElementNode: Node {
   public func extractWithChild(
     child: Node,
     selection: BaseSelection?,
-    destination: Destination) -> Bool {
+    destination: Destination
+  ) -> Bool {
     return false
   }
 
@@ -361,7 +367,9 @@ open class ElementNode: Node {
     return textNodes
   }
 
-  override public func getTextContent(includeInert: Bool = false, includeDirectionless: Bool = false, maxLength: Int? = nil) -> String {
+  override public func getTextContent(
+    includeInert: Bool = false, includeDirectionless: Bool = false, maxLength: Int? = nil
+  ) -> String {
     let children = getChildren()
     let preamble = getPreamble()
     let postamble = getPostamble()
@@ -370,7 +378,8 @@ open class ElementNode: Node {
     textContent += preamble
 
     for child in children {
-      textContent += child.getTextContent(includeInert: includeInert, includeDirectionless: includeDirectionless)
+      textContent += child.getTextContent(
+        includeInert: includeInert, includeDirectionless: includeDirectionless)
       if child is LineBreakNode {
         textContent += child.getPostamble()
       }
@@ -425,7 +434,8 @@ open class ElementNode: Node {
   }
 
   // These are intended to be extends for specific element heuristics.
-  open func insertNewAfter(selection: RangeSelection?) throws -> RangeSelection.InsertNewAfterResult {
+  open func insertNewAfter(selection: RangeSelection?) throws -> RangeSelection.InsertNewAfterResult
+  {
     throw LexicalError.internal("Subclasses need to implement this method")
   }
 
@@ -480,7 +490,7 @@ open class ElementNode: Node {
     return false
   }
 
-  override open func accept<V>(visitor: V) throws where V : NodeVisitor {
+  override open func accept<V>(visitor: V) throws where V: NodeVisitor {
     try visitor.visitElementNode(self)
   }
 }

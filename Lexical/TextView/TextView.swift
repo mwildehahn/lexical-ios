@@ -9,14 +9,21 @@ import MobileCoreServices
 import UIKit
 import UniformTypeIdentifiers
 
+@MainActor
 protocol LexicalTextViewDelegate: NSObjectProtocol {
   func textViewDidBeginEditing(textView: TextView)
   func textViewDidEndEditing(textView: TextView)
-  func textViewShouldChangeText(_ textView: UITextView, range: NSRange, replacementText text: String) -> Bool
-  func textView(_ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange, interaction: UITextItemInteraction) -> Bool
+  func textViewShouldChangeText(
+    _ textView: UITextView, range: NSRange, replacementText text: String
+  ) -> Bool
+  func textView(
+    _ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange,
+    interaction: UITextItemInteraction
+  ) -> Bool
 }
 
 /// Lexical's subclass of UITextView. Note that using this can be dangerous, if you make changes that Lexical does not expect.
+@MainActor
 @objc public class TextView: UITextView {
   let editor: Editor
 
@@ -51,7 +58,8 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     layoutManagerDelegate = LayoutManagerDelegate()
     layoutManager.delegate = layoutManagerDelegate
 
-    let textContainer = TextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+    let textContainer = TextContainer(
+      size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
     textContainer.widthTracksTextView = true
 
     layoutManager.addTextContainer(textContainer)
@@ -60,7 +68,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     var reconcilerSanityCheck = featureFlags.reconcilerSanityCheck
 
     #if targetEnvironment(simulator)
-    reconcilerSanityCheck = false
+      reconcilerSanityCheck = false
     #endif
 
     editor = Editor(
@@ -101,7 +109,9 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   override public func layoutSubviews() {
     super.layoutSubviews()
 
-    placeholderLabel.frame.origin = CGPoint(x: textContainer.lineFragmentPadding * 1.5 + textContainerInset.left, y: textContainerInset.top)
+    placeholderLabel.frame.origin = CGPoint(
+      x: textContainer.lineFragmentPadding * 1.5 + textContainerInset.left,
+      y: textContainerInset.top)
     placeholderLabel.sizeToFit()
   }
 
@@ -144,7 +154,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
     let previousSelectedRange = selectedRange
 
-    inputDelegateProxy.isSuspended = true // do not send selection changes during deleteBackwards, to not confuse third party keyboards
+    inputDelegateProxy.isSuspended = true  // do not send selection changes during deleteBackwards, to not confuse third party keyboards
     defer {
       inputDelegateProxy.isSuspended = false
     }
@@ -171,10 +181,10 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     do {
       try editor.read {
         guard let editor = getActiveEditor(),
-              let point = try pointAtStringLocation(
-                selectedRange.location,
-                searchDirection: .forward,
-                rangeCache: editor.rangeCache)
+          let point = try pointAtStringLocation(
+            selectedRange.location,
+            searchDirection: .forward,
+            rangeCache: editor.rangeCache)
         else {
           return
         }
@@ -201,14 +211,18 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     if action == #selector(paste(_:)) {
       if pasteboard.hasStrings {
         return true
-      } else if !(pasteboard.data(forPasteboardType: LexicalConstants.pasteboardIdentifier)?.isEmpty ?? true) {
+      } else if !(pasteboard.data(forPasteboardType: LexicalConstants.pasteboardIdentifier)?.isEmpty
+        ?? true)
+      {
         return true
       } else if #available(iOS 14.0, *) {
-        if !(pasteboard.data(forPasteboardType: (UTType.utf8PlainText.identifier))?.isEmpty ?? true) {
+        if !(pasteboard.data(forPasteboardType: (UTType.utf8PlainText.identifier))?.isEmpty ?? true)
+        {
           return true
         }
       } else {
-        if !(pasteboard.data(forPasteboardType: (kUTTypeUTF8PlainText as String))?.isEmpty ?? true) {
+        if !(pasteboard.data(forPasteboardType: (kUTTypeUTF8PlainText as String))?.isEmpty ?? true)
+        {
           return true
         }
       }
@@ -231,11 +245,12 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   }
 
   override public func insertText(_ text: String) {
-    editor.log(.UITextView, .verbose, "Text view selected range \(String(describing: self.selectedRange))")
+    editor.log(
+      .UITextView, .verbose, "Text view selected range \(String(describing: self.selectedRange))")
 
     let expectedSelectionLocation = selectedRange.location + text.lengthAsNSString()
 
-    inputDelegateProxy.isSuspended = true // do not send selection changes during insertText, to not confuse third party keyboards
+    inputDelegateProxy.isSuspended = true  // do not send selection changes during insertText, to not confuse third party keyboards
     defer {
       inputDelegateProxy.isSuspended = false
     }
@@ -258,7 +273,9 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
   // MARK: Marked text
 
-  override public func setAttributedMarkedText(_ markedText: NSAttributedString?, selectedRange: NSRange) {
+  override public func setAttributedMarkedText(
+    _ markedText: NSAttributedString?, selectedRange: NSRange
+  ) {
     editor.log(.UITextView, .verbose)
     if let markedText {
       setMarkedTextInternal(markedText.string, selectedRange: selectedRange)
@@ -290,12 +307,15 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       return
     }
 
-    let markedTextOperation = MarkedTextOperation(createMarkedText: true,
-                                                  selectionRangeToReplace: editor.getNativeSelection().markedRange ?? self.selectedRange,
-                                                  markedTextString: markedText,
-                                                  markedTextInternalSelection: selectedRange)
+    let markedTextOperation = MarkedTextOperation(
+      createMarkedText: true,
+      selectionRangeToReplace: editor.getNativeSelection().markedRange ?? self.selectedRange,
+      markedTextString: markedText,
+      markedTextInternalSelection: selectedRange)
 
-    let behaviourModificationMode = UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: markedTextOperation)
+    let behaviourModificationMode = UpdateBehaviourModificationMode(
+      suppressReconcilingSelection: true, suppressSanityCheck: true,
+      markedTextOperation: markedTextOperation)
 
     textStorage.mode = TextStorageEditingMode.controllerMode
     defer {
@@ -313,16 +333,21 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       }
 
       // insert text
-      try onInsertTextFromUITextView(text: markedText, editor: editor, updateMode: behaviourModificationMode)
+      try onInsertTextFromUITextView(
+        text: markedText, editor: editor, updateMode: behaviourModificationMode)
     } catch {
       let language = textInputMode?.primaryLanguage
-      editor.log(.TextView, .error, "exception thrown, lang \(String(describing: language)): \(String(describing: error))")
+      editor.log(
+        .TextView, .error,
+        "exception thrown, lang \(String(describing: language)): \(String(describing: error))")
       unmarkTextWithoutUpdate()
       return
     }
   }
 
-  internal func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
+  internal func setMarkedTextFromReconciler(
+    _ markedText: NSAttributedString, selectedRange: NSRange
+  ) {
     editor.log(.TextView, .verbose)
     isUpdatingNativeSelection = true
     super.setAttributedMarkedText(markedText, selectedRange: selectedRange)
@@ -344,12 +369,19 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       // find all nodes in selection. Mark dirty. Reconcile. This should correct all the attributes to be what we expect.
       do {
         try editor.update {
-          guard let anchor = try pointAtStringLocation(previousMarkedRange.location, searchDirection: .forward, rangeCache: editor.rangeCache),
-                let focus = try pointAtStringLocation(previousMarkedRange.location + previousMarkedRange.length, searchDirection: .forward, rangeCache: editor.rangeCache) else {
+          guard
+            let anchor = try pointAtStringLocation(
+              previousMarkedRange.location, searchDirection: .forward, rangeCache: editor.rangeCache
+            ),
+            let focus = try pointAtStringLocation(
+              previousMarkedRange.location + previousMarkedRange.length, searchDirection: .forward,
+              rangeCache: editor.rangeCache)
+          else {
             return
           }
 
-          let markedRangeSelection = RangeSelection(anchor: anchor, focus: focus, format: TextFormat())
+          let markedRangeSelection = RangeSelection(
+            anchor: anchor, focus: focus, format: TextFormat())
           _ = try markedRangeSelection.getNodes().map { node in
             internallyMarkNodeAsDirty(node: node, cause: .userInitiated)
           }
@@ -448,7 +480,8 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   internal func validateNativeSelection(_ textView: UITextView) {
     guard let selectedRange = textView.selectedTextRange else { return }
 
-    let start = validatePosition(textView: textView, position: selectedRange.start, direction: .forward)
+    let start = validatePosition(
+      textView: textView, position: selectedRange.start, direction: .forward)
     let end = validatePosition(textView: textView, position: selectedRange.end, direction: .forward)
 
     if start != selectedRange.start || end != selectedRange.end {
@@ -459,6 +492,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   }
 }
 
+@MainActor
 private class TextViewDelegate: NSObject, UITextViewDelegate {
   private var editor: Editor
 
@@ -483,7 +517,9 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
     onSelectionChange(editor: textView.editor)
   }
 
-  public func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+  public func textView(
+    _ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String
+  ) -> Bool {
     guard let textView = textView as? TextView else { return false }
 
     textView.hidePlaceholderLabel()
@@ -508,19 +544,22 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
     textView.lexicalDelegate?.textViewDidEndEditing(textView: textView)
   }
 
-  public func textView(_ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange, interaction: UITextItemInteraction) -> Bool {
+  public func textView(
+    _ textView: UITextView, shouldInteractWith URL: URL, in characterRange: NSRange,
+    interaction: UITextItemInteraction
+  ) -> Bool {
     guard let textView = textView as? TextView else { return false }
 
-      // TODO: consider updating `.linkTapped` payload to include this native selection if we want that behavior.
-//    let nativeSelection = NativeSelection(range: characterRange, affinity: .backward)
-//    try? textView.editor.update {
-//      guard let selection = try getSelection() as? RangeSelection else {
-//        // TODO: cope with non range selections. Should just make a range selection here
-//        return
-//      }
-//      try selection.applyNativeSelection(nativeSelection)
-//    }
-      
+    // TODO: consider updating `.linkTapped` payload to include this native selection if we want that behavior.
+    //    let nativeSelection = NativeSelection(range: characterRange, affinity: .backward)
+    //    try? textView.editor.update {
+    //      guard let selection = try getSelection() as? RangeSelection else {
+    //        // TODO: cope with non range selections. Should just make a range selection here
+    //        return
+    //      }
+    //      try selection.applyNativeSelection(nativeSelection)
+    //    }
+
     let handledByLexical = textView.editor.dispatchCommand(type: .linkTapped, payload: URL)
 
     if handledByLexical {
@@ -531,7 +570,8 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
       return true
     }
 
-    return textView.lexicalDelegate?.textView(textView, shouldInteractWith: URL, in: characterRange, interaction: interaction) ?? false
+    return textView.lexicalDelegate?.textView(
+      textView, shouldInteractWith: URL, in: characterRange, interaction: interaction) ?? false
   }
 }
 
@@ -544,16 +584,20 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
 //  If, at some point, we want to use paragraphStyle.beforeParagraphSpacing, to add some space on the top of the paragraph
 //  we will have to adjust this adjuster. Since we don't have such plans atm I opted to skip it to save time and effort
 //  and also not complicate this code unnecessarily.
+@MainActor
 private class CaretAndSelectionRectsAdjuster {
 
-  static func adjustCaretRect(_ originalRect: CGRect, for position: UITextPosition, in textView: UITextView) -> CGRect {
+  static func adjustCaretRect(
+    _ originalRect: CGRect, for position: UITextPosition, in textView: UITextView
+  ) -> CGRect {
     var result = originalRect
     // Find the caret position as an index in the text
     let offset = textView.offset(from: textView.beginningOfDocument, to: position)
     // Retrieve attributes at the caret position
     let attributes = textView.textStorage.attributes(at: offset, effectiveRange: nil)
     if let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle,
-       paragraphStyle.paragraphSpacing > 0 || paragraphStyle.lineSpacing > 0 {
+      paragraphStyle.paragraphSpacing > 0 || paragraphStyle.lineSpacing > 0
+    {
       // there is paragraph spacing, in that case we opt for a fixed size caret
       guard let font = textView.font else { return result }
 
@@ -565,7 +609,9 @@ private class CaretAndSelectionRectsAdjuster {
     return result
   }
 
-  static func adjustSelectionRects(_ originalRects: [UITextSelectionRect], for range: UITextRange, in textView: UITextView) -> [UITextSelectionRect] {
+  static func adjustSelectionRects(
+    _ originalRects: [UITextSelectionRect], for range: UITextRange, in textView: UITextView
+  ) -> [UITextSelectionRect] {
     // Create a modified array of selection rects with adjusted heights
     let modifiedRects = originalRects.map { originalRect -> UITextSelectionRect in
       let rect = originalRect.rect
@@ -588,28 +634,28 @@ private class CaretAndSelectionRectsAdjuster {
 
 // Custom UITextSelectionRect subclass for modified rects
 private class CustomSelectionRect: UITextSelectionRect {
-    private let baseRect: UITextSelectionRect
-    private let customRect: CGRect
+  private let baseRect: UITextSelectionRect
+  private let customRect: CGRect
 
-    init(baseRect: UITextSelectionRect, adjustedRect: CGRect) {
-        self.baseRect = baseRect
-        self.customRect = adjustedRect
-        super.init()
-    }
+  init(baseRect: UITextSelectionRect, adjustedRect: CGRect) {
+    self.baseRect = baseRect
+    self.customRect = adjustedRect
+    super.init()
+  }
 
-    override var rect: CGRect {
-        return customRect
-    }
+  override var rect: CGRect {
+    return customRect
+  }
 
-    override var containsStart: Bool {
-        return baseRect.containsStart
-    }
+  override var containsStart: Bool {
+    return baseRect.containsStart
+  }
 
-    override var containsEnd: Bool {
-        return baseRect.containsEnd
-    }
+  override var containsEnd: Bool {
+    return baseRect.containsEnd
+  }
 
-    override var isVertical: Bool {
-        return baseRect.isVertical
-    }
+  override var isVertical: Bool {
+    return baseRect.isVertical
+  }
 }

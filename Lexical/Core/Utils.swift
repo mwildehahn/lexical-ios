@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 public func getNodeByKey<N: Node>(key: NodeKey) -> N? {
   guard let editorState = getActiveEditorState(), let node = editorState.nodeMap[key] else {
     return nil
@@ -15,6 +16,7 @@ public func getNodeByKey<N: Node>(key: NodeKey) -> N? {
   return node as? N
 }
 
+@MainActor
 private func uniqueKey(from candidate: UInt64, in editorState: EditorState) -> UInt64 {
   if editorState.nodeMap[String(candidate)] != nil {
     return uniqueKey(from: candidate + 1, in: editorState)
@@ -22,8 +24,11 @@ private func uniqueKey(from candidate: UInt64, in editorState: EditorState) -> U
   return candidate
 }
 
+@MainActor
 @discardableResult
-public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws -> NodeKey? {
+public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil)
+  throws -> NodeKey?
+{
   try errorOnReadOnly()
 
   guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
@@ -33,7 +38,7 @@ public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parent
   let candidateKey: UInt64
   var withMultiplier = false
   // Support generating keys for nodes with ranges reserved for specific depths
-  if let keyMultiplier = editor.keyMultiplier,let depth, let index {
+  if let keyMultiplier = editor.keyMultiplier, let depth, let index {
     withMultiplier = true
     var baseIndex: UInt64 = 0
 
@@ -48,7 +53,9 @@ public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parent
     // The root node has a depth of -1 to ensure that it's children don't have a
     // multiplier applied since we know there is only a single root. This max(0,
     // depth) ensures we never use that negative number here.
-    candidateKey = (UInt64(max(0, depth)) * keyMultiplier.multiplier * keyMultiplier.depthBlockSize) + (UInt64(parentIndex ?? 0) * keyMultiplier.multiplier) + baseIndex + UInt64(index)
+    candidateKey =
+      (UInt64(max(0, depth)) * keyMultiplier.multiplier * keyMultiplier.depthBlockSize)
+      + (UInt64(parentIndex ?? 0) * keyMultiplier.multiplier) + baseIndex + UInt64(index)
   } else {
     candidateKey = UInt64(editor.keyCounter)
   }
@@ -67,10 +74,13 @@ public func generateKey(node: Node, depth: Int? = nil, index: Int? = nil, parent
   return stringKey
 }
 
-private func internallyMarkChildrenAsDirty(  element: ElementNode,
-                                             nodeMap: [NodeKey: Node],
-                                             editor: Editor,
-                                             status: DirtyStatusCause = .editorInitiated) {
+@MainActor
+private func internallyMarkChildrenAsDirty(
+  element: ElementNode,
+  nodeMap: [NodeKey: Node],
+  editor: Editor,
+  status: DirtyStatusCause = .editorInitiated
+) {
   for childKey in element.children {
     editor.dirtyNodes[childKey] = status
     if let childElement = nodeMap[childKey] as? ElementNode {
@@ -79,11 +89,13 @@ private func internallyMarkChildrenAsDirty(  element: ElementNode,
   }
 }
 
+@MainActor
 private func internallyMarkParentElementsAsDirty(
   parentKey: NodeKey,
   nodeMap: [NodeKey: Node],
   editor: Editor,
-  status: DirtyStatusCause = .editorInitiated) {
+  status: DirtyStatusCause = .editorInitiated
+) {
   var nextParentKey: NodeKey? = parentKey
 
   while let unwrappedParentKey = nextParentKey {
@@ -100,9 +112,10 @@ private func internallyMarkParentElementsAsDirty(
     editor.dirtyNodes[unwrappedParentKey] = status
     nextParentKey = node?.parent
   }
-} // Never use this function directly! It will break
+}  // Never use this function directly! It will break
 // the cloning heuristic. Instead use node.getWritable().
 
+@MainActor
 internal func internallyMarkNodeAsDirty(node: Node, cause: DirtyStatusCause = .editorInitiated) {
   let latest = node.getLatest()
   guard
@@ -125,7 +138,9 @@ internal func internallyMarkNodeAsDirty(node: Node, cause: DirtyStatusCause = .e
   editor.dirtyNodes[latest.key] = cause
 }
 
-internal func internallyMarkSiblingsAsDirty(node: Node, status: DirtyStatusCause = .editorInitiated) {
+@MainActor
+internal func internallyMarkSiblingsAsDirty(node: Node, status: DirtyStatusCause = .editorInitiated)
+{
   if let previousNode = node.getPreviousSibling() {
     internallyMarkNodeAsDirty(node: previousNode, cause: status)
   }
@@ -134,39 +149,50 @@ internal func internallyMarkSiblingsAsDirty(node: Node, status: DirtyStatusCause
   }
 }
 
+@MainActor
 public func getCompositionKey() -> NodeKey? {
   return getActiveEditor()?.compositionKey
 }
 
+@MainActor
 public func createTextNode(text: String?) -> TextNode {
   TextNode(text: text ?? "", key: nil)
 }
 
+@MainActor
 public func createParagraphNode() -> ParagraphNode {
   ParagraphNode()
 }
 
+@MainActor
 public func createHeadingNode(headingTag: HeadingTagType) -> HeadingNode {
   HeadingNode(tag: headingTag)
 }
 
+@MainActor
 public func createQuoteNode() -> QuoteNode {
   QuoteNode()
 }
 
+@MainActor
 public func createLineBreakNode() -> LineBreakNode {
   LineBreakNode()
 }
 
+@MainActor
 public func createCodeNode(language: String = "") -> CodeNode {
   CodeNode(language: language)
 }
 
+@MainActor
 public func createCodeHighlightNode(text: String, highlightType: String?) -> CodeHighlightNode {
   CodeHighlightNode(text: text, highlightType: highlightType)
 }
 
-public func toggleTextFormatType(format: TextFormat, type: TextFormatType, alignWithFormat: TextFormat?) -> TextFormat {
+@MainActor
+public func toggleTextFormatType(
+  format: TextFormat, type: TextFormatType, alignWithFormat: TextFormat?
+) -> TextFormat {
   var activeFormat = format
   let isStateFlagPresent = format.isTypeSet(type: type)
   var flag = false
@@ -234,6 +260,7 @@ public func isDecoratorNode(_ node: Node?) -> Bool {
   node is DecoratorNode
 }
 
+@MainActor
 public func isDecoratorBlockNode(_ node: Node?) -> Bool {
   if let decoratorNode = node as? DecoratorNode {
     return !decoratorNode.isInline()
@@ -246,29 +273,34 @@ public func isLeafNode(_ node: Node?) -> Bool {
   node is TextNode || node is LineBreakNode
 }
 
+@MainActor
 public func isTokenOrInert(_ node: TextNode?) -> Bool {
   guard let node else { return false }
   return node.isToken() || node.isInert()
 }
 
+@MainActor
 public func isTokenOrInertOrSegmented(_ node: TextNode?) -> Bool {
   guard let node else { return false }
   return isTokenOrInert(node) || node.isSegmented()
 }
 
+@MainActor
 public func isTokenOrSegmented(_ node: TextNode?) -> Bool {
   guard let node else { return false }
   return node.isToken() || node.isSegmented()
 }
 
+@MainActor
 public func getRoot() -> RootNode? {
   guard let editorState = getActiveEditorState(),
-        let rootNode = editorState.nodeMap[kRootNodeKey] as? RootNode
+    let rootNode = editorState.nodeMap[kRootNodeKey] as? RootNode
   else { return nil }
 
   return rootNode
 }
 
+@MainActor
 func getEditorStateTextContent(editorState: EditorState) throws -> String {
   var textContent: String = ""
 
@@ -281,6 +313,7 @@ func getEditorStateTextContent(editorState: EditorState) throws -> String {
   return textContent
 }
 
+@MainActor
 public func getNodeHierarchy(editorState: EditorState?) throws -> String {
   var hierarchyString = ""
   var cacheString = ""
@@ -309,24 +342,29 @@ public func getNodeHierarchy(editorState: EditorState?) throws -> String {
         } else {
           formatString = ""
         }
-        description.append("\(indentation)(\(node.key)) \(node.type.rawValue) \"\(textNode.getTextPart())\" \(formatString)")
+        description.append(
+          "\(indentation)(\(node.key)) \(node.type.rawValue) \"\(textNode.getTextPart())\" \(formatString)"
+        )
       } else {
         description.append("\(indentation)(\(node.key)) \(node.type.rawValue)")
       }
 
       if let elementNode = node as? ElementNode {
-        let childNodes = elementNode.children.map({ (getNodeByKey(key: $0) ?? Node(), depth + 1) }).reversed()
+        let childNodes = elementNode.children.map({ (getNodeByKey(key: $0) ?? Node(), depth + 1) })
+          .reversed()
         currentNodes.append(contentsOf: childNodes)
       }
     } while !currentNodes.isEmpty
 
     hierarchyString = description.joined(separator: "\n")
-    cacheString = sortedNodeMap.map({ node in "\(node.key): \(node.value.type)" }).joined(separator: ", ")
+    cacheString = sortedNodeMap.map({ node in "\(node.key): \(node.value.type)" }).joined(
+      separator: ", ")
   }
 
   return "Tree:\n\(hierarchyString)\nCache:\n\(cacheString)"
 }
 
+@MainActor
 public func getSelectionData(editorState: EditorState?) throws -> String {
   var selectionString = "selection: range\n"
 
@@ -339,6 +377,7 @@ public func getSelectionData(editorState: EditorState?) throws -> String {
   return selectionString
 }
 
+@MainActor
 public func removeParentEmptyElements(startingNode: ElementNode?) throws {
   guard var node = startingNode else { return }
 
@@ -355,13 +394,19 @@ public func removeParentEmptyElements(startingNode: ElementNode?) throws {
   }
 }
 
+@MainActor
 func checkSelectionIsOnlyLinebreak(selection: RangeSelection) throws -> Bool {
   let nodes = try selection.getNodes()
   return nodes.count == 1 && nodes.contains(where: { $0 is LineBreakNode })
 }
 
-public func sliceSelectedTextNodeContent(selection: BaseSelection, textNode: TextNode) throws -> TextNode {
-  if try textNode.isSelected(), !textNode.isSegmented(), !textNode.isToken(), let selection = selection as? RangeSelection {
+@MainActor
+public func sliceSelectedTextNodeContent(selection: BaseSelection, textNode: TextNode) throws
+  -> TextNode
+{
+  if try textNode.isSelected(), !textNode.isSegmented(), !textNode.isToken(),
+    let selection = selection as? RangeSelection
+  {
     // && ($isRangeSelection(selection) || $isGridSelection(selection)){
     let anchorNode = try selection.anchor.getNode()
     let focusNode = try selection.focus.getNode()
@@ -402,6 +447,7 @@ public func sliceSelectedTextNodeContent(selection: BaseSelection, textNode: Tex
   return textNode
 }
 
+@MainActor
 public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UIView? {
   guard let editor = getActiveEditor() else {
     return nil
@@ -415,7 +461,8 @@ public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UIVie
   switch cacheItem {
   case .needsCreation:
     guard let node = getNodeByKey(key: key) as? DecoratorNode else {
-      editor.log(.editor, .warning, "Requested decorator view for a node that is not a decorator node")
+      editor.log(
+        .editor, .warning, "Requested decorator view for a node that is not a decorator node")
       return nil
     }
     let newView = node.createView()
@@ -435,6 +482,7 @@ public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UIVie
   }
 }
 
+@MainActor
 internal func destroyCachedDecoratorView(forKey key: NodeKey) {
   guard let editor = getActiveEditor() else {
     return
@@ -446,6 +494,7 @@ public typealias FindFunction = (
   _ node: Node
 ) -> Bool
 
+@MainActor
 public func findMatchingParent(startingNode: Node?, findFn: FindFunction) -> Node? {
   var currentNode: Node? = startingNode
 
@@ -460,11 +509,10 @@ public func findMatchingParent(startingNode: Node?, findFn: FindFunction) -> Nod
   return nil
 }
 
-/**
- *Returns the element node of the nearest ancestor, otherwise throws an error.
- * @param startNode - The starting node of the search
- * @returns The ancestor node found
- */
+/// *Returns the element node of the nearest ancestor, otherwise throws an error.
+/// * @param startNode - The starting node of the search
+/// * @returns The ancestor node found
+@MainActor
 public func getNearestBlockElementAncestorOrThrow(startNode: Node) throws -> ElementNode {
   let blockNode = findMatchingParent(startingNode: startNode) { node in
     if let elementNode = node as? ElementNode {
@@ -487,13 +535,12 @@ public func applyNodeReplacement<N: Node>(
   return node as N
 }
 
-/**
- * Takes a node and traverses up its ancestors (toward the root node)
- * in order to find a specific type of node.
- * @param node - the node to begin searching.
- * @param klass - an instance of the type of node to look for.
- * @returns the node of type klass that was passed, or null if none exist.
- */
+/// Takes a node and traverses up its ancestors (toward the root node)
+/// in order to find a specific type of node.
+/// @param node - the node to begin searching.
+/// @param klass - an instance of the type of node to look for.
+/// @returns the node of type klass that was passed, or null if none exist.
+@MainActor
 public func getNearestNodeOfType<T: ElementNode>(
   node: Node,
   type: NodeType
@@ -511,6 +558,7 @@ public func getNearestNodeOfType<T: ElementNode>(
   return nil
 }
 
+@MainActor
 public func hasAncestor(
   child: Node,
   targetNode: Node
@@ -525,6 +573,7 @@ public func hasAncestor(
   return false
 }
 
+@MainActor
 public func maybeMoveChildrenSelectionToParent(
   parentNode: Node,
   offset: Int = 0
@@ -533,7 +582,8 @@ public func maybeMoveChildrenSelectionToParent(
     throw LexicalError.invariantViolation("TODO")
   }
   let selection = try getSelection()
-  guard let selection = selection as? RangeSelection, let parentNode = parentNode as? ElementNode else {
+  guard let selection = selection as? RangeSelection, let parentNode = parentNode as? ElementNode
+  else {
     // Only works on range selection
     return selection
   }
@@ -548,6 +598,7 @@ public func maybeMoveChildrenSelectionToParent(
   return selection
 }
 
+@MainActor
 public func getAttributedStringFromFrontend() throws -> NSAttributedString {
   // @alexmattice - replace this with a version driven off a depth first search
   guard let editor = getActiveEditor() else { return NSAttributedString(string: "") }
@@ -561,6 +612,7 @@ public func getAttributedStringFromFrontend() throws -> NSAttributedString {
   }
 }
 
+@MainActor
 public func removeFromParent(node: Node) throws {
   guard let writableParent = try node.getParent()?.getWritable() else {
     return
@@ -575,6 +627,7 @@ public func removeFromParent(node: Node) throws {
   internallyMarkNodeAsDirty(node: writableParent)
 }
 
+@MainActor
 private func resolveElement(
   element: ElementNode,
   isBackward: Bool,
@@ -587,7 +640,9 @@ private func resolveElement(
     if isBackward, focusOffset == 0, let indexWithinParent = block.getIndexWithinParent() {
       offset = indexWithinParent
       block = parent
-    } else if !isBackward, focusOffset == block.getChildrenSize(), let indexWithinParent = block.getIndexWithinParent() {
+    } else if !isBackward, focusOffset == block.getChildrenSize(),
+      let indexWithinParent = block.getIndexWithinParent()
+    {
       offset = indexWithinParent + 1
       block = parent
     }
@@ -595,6 +650,7 @@ private func resolveElement(
   return block.getChildAtIndex(index: isBackward ? offset - 1 : offset)
 }
 
+@MainActor
 public func getAdjacentNode(
   focus: Point,
   isBackward: Bool
@@ -604,10 +660,11 @@ public func getAdjacentNode(
     return resolveElement(element: focusElement, isBackward: isBackward, focusOffset: focusOffset)
   } else {
     let focusNode = try focus.getNode()
-    if
-      (isBackward && focusOffset == 0) ||
-        (!isBackward && focusOffset == focusNode.getTextContentSize()) {
-      let possibleNode = isBackward
+    if (isBackward && focusOffset == 0)
+      || (!isBackward && focusOffset == focusNode.getTextContentSize())
+    {
+      let possibleNode =
+        isBackward
         ? focusNode.getPreviousSibling()
         : focusNode.getNextSibling()
 
@@ -624,6 +681,7 @@ public func getAdjacentNode(
   return nil
 }
 
+@MainActor
 public func setSelection(_ selection: BaseSelection?) throws {
   try errorOnReadOnly()
   let editorState = getActiveEditorState()

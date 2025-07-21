@@ -12,6 +12,7 @@ func createPoint(key: NodeKey, offset: Int, type: SelectionType) -> Point {
   Point(key: key, offset: offset, type: type)
 }
 
+@MainActor
 func selectPointOnNode(point: Point, node: Node) {
   var updatedOffset = point.offset
 
@@ -32,6 +33,7 @@ func selectPointOnNode(point: Point, node: Node) {
 ///   the current selection does not refer to valid positions in valid nodes. However, there are some
 ///   situations, such as if you're getting the selection when preparing to modify it to be valid using your
 ///   own validity rules, when you just want to fetch the current selection whatever it is.
+@MainActor
 public func getSelection(allowInvalidPositions: Bool = false) throws -> BaseSelection? {
   let editorState = getActiveEditorState()
   let selection = editorState?.selection
@@ -61,6 +63,7 @@ public func getSelection(allowInvalidPositions: Bool = false) throws -> BaseSele
   throw LexicalError.invariantViolation("called getSelection() without an active editor")
 }
 
+@MainActor
 private func sanityCheckSelection(_ selection: BaseSelection) -> Bool {
   guard let selection = selection as? RangeSelection else {
     // no sanity checking on other selection types yet
@@ -77,6 +80,7 @@ private func sanityCheckSelection(_ selection: BaseSelection) -> Bool {
   return false
 }
 
+@MainActor
 private func sanityCheckPoint(_ point: Point) -> Bool {
   guard let node = getNodeByKey(key: point.key) else {
     return false
@@ -99,16 +103,19 @@ private func sanityCheckPoint(_ point: Point) -> Bool {
     }
     return true
   }
-  getActiveEditor()?.log(.other, .error, "Points that are not text or element have not yet been implemented")
+  getActiveEditor()?.log(
+    .other, .error, "Points that are not text or element have not yet been implemented")
   return false
 }
 
+@MainActor
 func adjustPointOffsetForMergedSibling(
   point: Point,
   isBefore: Bool,
   key: NodeKey,
   target: TextNode,
-  textLength: Int) {
+  textLength: Int
+) {
   if point.type == .text {
     point.key = key
     if !isBefore {
@@ -119,10 +126,12 @@ func adjustPointOffsetForMergedSibling(
   }
 }
 
+@MainActor
 func moveSelectionPointToSibling(
   point: Point,
   node: Node,
-  parent: ElementNode) {
+  parent: ElementNode
+) {
   var siblingKey: NodeKey?
   var offset = 0
   var type: SelectionType?
@@ -158,6 +167,7 @@ func moveSelectionPointToSibling(
   }
 }
 
+@MainActor
 func editorStateHasDirtySelection(pendingEditorState: EditorState, editor: Editor) -> Bool {
   let currentSelection = editor.getEditorState().selection
   let pendingSelection = pendingEditorState.selection
@@ -177,6 +187,7 @@ func editorStateHasDirtySelection(pendingEditorState: EditorState, editor: Edito
   return false
 }
 
+@MainActor
 func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   let rangeCache = editor.rangeCache
 
@@ -209,7 +220,10 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   }
 }
 
-public func createNativeSelection(from selection: RangeSelection, editor: Editor) throws -> NativeSelection {
+@MainActor
+public func createNativeSelection(from selection: RangeSelection, editor: Editor) throws
+  -> NativeSelection
+{
   let isBefore = try selection.anchor.isBefore(point: selection.focus)
   var affinity: UITextStorageDirection = isBefore ? .forward : .backward
 
@@ -218,7 +232,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
   }
 
   guard let anchorLocation = try stringLocationForPoint(selection.anchor, editor: editor),
-        let focusLocation = try stringLocationForPoint(selection.focus, editor: editor)
+    let focusLocation = try stringLocationForPoint(selection.focus, editor: editor)
   else {
     return NativeSelection()
   }
@@ -230,6 +244,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
     affinity: affinity)
 }
 
+@MainActor
 func createEmptyRangeSelection() -> RangeSelection {
   let anchor = Point(key: kRootNodeKey, offset: 0, type: .element)
   let focus = Point(key: kRootNodeKey, offset: 0, type: .element)
@@ -243,6 +258,7 @@ func createEmptyRangeSelection() -> RangeSelection {
 /// If a selection gets changed, and requires a update to native iOS selection, it gets marked as "dirty".
 /// If the selection changes, but matches with the existing native selection, then we only need to sync it.
 /// Otherwise, we generally bail out of doing an update to selection during reconciliation unless there are dirty nodes that need reconciling.
+@MainActor
 func createSelection(editor: Editor) throws -> BaseSelection? {
   let currentEditorState = editor.getEditorState()
   let lastSelection = currentEditorState.selection
@@ -257,8 +273,12 @@ func createSelection(editor: Editor) throws -> BaseSelection? {
 
     let range = nativeSelection.range ?? NSRange(location: 0, length: 0)
 
-    if let anchor = try pointAtStringLocation(range.location, searchDirection: nativeSelection.affinity, rangeCache: editor.rangeCache),
-       let focus = try pointAtStringLocation(range.location + range.length, searchDirection: nativeSelection.affinity, rangeCache: editor.rangeCache) {
+    if let anchor = try pointAtStringLocation(
+      range.location, searchDirection: nativeSelection.affinity, rangeCache: editor.rangeCache),
+      let focus = try pointAtStringLocation(
+        range.location + range.length, searchDirection: nativeSelection.affinity,
+        rangeCache: editor.rangeCache)
+    {
       return RangeSelection(anchor: anchor, focus: focus, format: TextFormat())
     }
 
@@ -271,13 +291,15 @@ func createSelection(editor: Editor) throws -> BaseSelection? {
 
 /// This is used to make a selection when the existing selection is null or should be replaced,
 /// i.e. forcing selection on the editor when it current exists outside the editor.
+@MainActor
 func makeRangeSelection(
   anchorKey: NodeKey,
   anchorOffset: Int,
   focusKey: NodeKey,
   focusOffset: Int,
   anchorType: SelectionType,
-  focusType: SelectionType) throws -> RangeSelection {
+  focusType: SelectionType
+) throws -> RangeSelection {
   guard let editorState = getActiveEditorState() else {
     throw LexicalError.internal("Editor state is nil")
   }
@@ -293,10 +315,13 @@ func makeRangeSelection(
   return selection
 }
 
-func updateElementSelectionOnCreateDeleteNode(selection: RangeSelection,
-                                              parentNode: Node,
-                                              nodeOffset: Int,
-                                              times: Int = 1) throws {
+@MainActor
+func updateElementSelectionOnCreateDeleteNode(
+  selection: RangeSelection,
+  parentNode: Node,
+  nodeOffset: Int,
+  times: Int = 1
+) throws {
   let anchor = selection.anchor
   let focus = selection.focus
   let anchorNode = try anchor.getNode()
@@ -328,7 +353,8 @@ func updateElementSelectionOnCreateDeleteNode(selection: RangeSelection,
   if parentNode == firstPointNode {
     let firstPointOffset = firstPoint.offset
     if nodeOffset <= firstPointOffset {
-      firstPoint.updatePoint(key: parentKey, offset: max(0, firstPointOffset + times), type: .element)
+      firstPoint.updatePoint(
+        key: parentKey, offset: max(0, firstPointOffset + times), type: .element)
     }
   }
 
@@ -342,6 +368,7 @@ func updateElementSelectionOnCreateDeleteNode(selection: RangeSelection,
   try updateSelectionResolveTextNodes(selection: selection)
 }
 
+@MainActor
 func updateSelectionResolveTextNodes(selection: RangeSelection) throws {
   let anchor = selection.anchor
   let anchorOffset = anchor.offset
@@ -357,9 +384,11 @@ func updateSelectionResolveTextNodes(selection: RangeSelection) throws {
 
     guard let childSize = anchorNode?.getChildrenSize() else { return }
     let anchorOffsetAtEnd = anchorOffset >= childSize
-    guard let child = anchorOffsetAtEnd
-            ? anchorNode?.getChildAtIndex(index: childSize - 1)
-            : anchorNode?.getChildAtIndex(index: anchorOffset) else {
+    guard
+      let child = anchorOffsetAtEnd
+        ? anchorNode?.getChildAtIndex(index: childSize - 1)
+        : anchorNode?.getChildAtIndex(index: anchorOffset)
+    else {
       return
     }
 
@@ -380,9 +409,10 @@ func updateSelectionResolveTextNodes(selection: RangeSelection) throws {
 
     let anchorOffsetAtEnd = anchorOffset >= childSize
 
-    guard let child = anchorOffsetAtEnd
-            ? anchorNode?.getChildAtIndex(index: childSize - 1)
-            : anchorNode?.getChildAtIndex(index: anchorOffset)
+    guard
+      let child = anchorOffsetAtEnd
+        ? anchorNode?.getChildAtIndex(index: childSize - 1)
+        : anchorNode?.getChildAtIndex(index: anchorOffset)
     else {
       return
     }
@@ -401,9 +431,11 @@ func updateSelectionResolveTextNodes(selection: RangeSelection) throws {
     guard let childSize = focusNode?.getChildrenSize() else { return }
 
     let focusOffsetAtEnd = focusOffset >= childSize
-    guard let child = focusOffsetAtEnd
-            ? focusNode?.getChildAtIndex(index: childSize - 1)
-            : focusNode?.getChildAtIndex(index: focusOffset) else {
+    guard
+      let child = focusOffsetAtEnd
+        ? focusNode?.getChildAtIndex(index: childSize - 1)
+        : focusNode?.getChildAtIndex(index: focusOffset)
+    else {
       return
     }
 
@@ -418,6 +450,7 @@ func updateSelectionResolveTextNodes(selection: RangeSelection) throws {
   }
 }
 
+@MainActor
 func moveSelectionPointToEnd(point: Point, node: Node) {
   if let node = node as? ElementNode {
     let lastNode = node.getLastDescendant()
@@ -434,7 +467,10 @@ func moveSelectionPointToEnd(point: Point, node: Node) {
   }
 }
 
-func transferStartingElementPointToTextPoint(start: Point, end: Point, format: TextFormat, style: String) throws {
+@MainActor
+func transferStartingElementPointToTextPoint(
+  start: Point, end: Point, format: TextFormat, style: String
+) throws {
   guard let element = try start.getNode() as? ElementNode else { return }
 
   let placementNode = element.getChildAtIndex(index: start.offset)
@@ -473,10 +509,12 @@ func transferStartingElementPointToTextPoint(start: Point, end: Point, format: T
   start.updatePoint(key: textNode.getKey(), offset: 0, type: .text)
 }
 
+@MainActor
 func removeSegment(node: TextNode, isBackward: Bool, offset: Int) throws {
   let textNode = node
   let textContent = textNode.getTextContent(includeInert: false, includeDirectionless: true)
-  var split: [String] = textContent
+  var split: [String] =
+    textContent
     .split(separator: " ")
     .enumerated()
     .map { String($0 > 0 ? " \($1)" : $1) }
@@ -498,7 +536,8 @@ func removeSegment(node: TextNode, isBackward: Bool, offset: Int) throws {
     }
   }
 
-  let nextTextContent = split
+  let nextTextContent =
+    split
     .joined(separator: "")
     .trimmingCharacters(in: .whitespaces)
 
@@ -510,6 +549,7 @@ func removeSegment(node: TextNode, isBackward: Bool, offset: Int) throws {
   }
 }
 
+@MainActor
 public func setBlocksType(
   selection: RangeSelection,
   createElement: () -> ElementNode
@@ -551,6 +591,7 @@ public func setBlocksType(
   }
 }
 
+@MainActor
 private func isBlock(_ node: Node) -> Bool {
   guard let node = node as? ElementNode, !isRootNode(node: node) else {
     return !node.isInline() && !isRootNode(node: node)
@@ -558,11 +599,13 @@ private func isBlock(_ node: Node) -> Bool {
 
   let firstChild = node.getFirstChild()
   let isLeafElement =
-    firstChild == nil || isTextNode(firstChild) || ((firstChild as? ElementNode)?.isInline() ?? false)
+    firstChild == nil || isTextNode(firstChild)
+    || ((firstChild as? ElementNode)?.isInline() ?? false)
 
   return !node.isInline() && node.canBeEmpty() != false && isLeafElement
 }
 
+@MainActor
 private func resolveSelectionPointOnBoundary(
   point: Point,
   isBackward: Bool,
@@ -576,10 +619,10 @@ private func resolveSelectionPointOnBoundary(
     let parent = node.getParent()
 
     if !isBackward {
-      if
-        let prevSibling = prevSibling as? ElementNode,
+      if let prevSibling = prevSibling as? ElementNode,
         !isCollapsed,
-        prevSibling.isInline() {
+        prevSibling.isInline()
+      {
         point.key = prevSibling.key
         point.offset = prevSibling.getChildrenSize()
         point.type = .element
@@ -587,11 +630,11 @@ private func resolveSelectionPointOnBoundary(
         point.key = prevSibling.key
         point.offset = prevSibling.getTextContent().lengthAsNSString()
       }
-    } else if
-      isCollapsed || !isBackward,
+    } else if isCollapsed || !isBackward,
       prevSibling == nil,
       let parent,
-      parent.isInline() {
+      parent.isInline()
+    {
       let parentSibling = parent.getPreviousSibling()
       if let parentSibling = parentSibling as? TextNode {
         point.key = parentSibling.key
@@ -606,12 +649,12 @@ private func resolveSelectionPointOnBoundary(
       point.key = nextSibling.key
       point.offset = 0
       point.type = .element
-    } else if
-      isCollapsed || isBackward,
+    } else if isCollapsed || isBackward,
       nextSibling == nil,
       let parent,
       parent.isInline(),
-      !parent.canInsertTextAfter() {
+      !parent.canInsertTextAfter()
+    {
       let parentSibling = parent.getNextSibling()
       if let parentSibling = parentSibling as? TextNode {
         point.key = parentSibling.key
@@ -621,6 +664,7 @@ private func resolveSelectionPointOnBoundary(
   }
 }
 
+@MainActor
 internal func normalizeSelectionPointsForBoundaries(
   anchor: Point,
   focus: Point,
@@ -632,8 +676,10 @@ internal func normalizeSelectionPointsForBoundaries(
 
     // Attempt to normalize the offset to the previous sibling if we're at the
     // start of a text node and the sibling is a text node or inline element.
-    try resolveSelectionPointOnBoundary(point: anchor, isBackward: isBackward, isCollapsed: isCollapsed)
-    try resolveSelectionPointOnBoundary(point: focus, isBackward: !isBackward, isCollapsed: isCollapsed)
+    try resolveSelectionPointOnBoundary(
+      point: anchor, isBackward: isBackward, isCollapsed: isCollapsed)
+    try resolveSelectionPointOnBoundary(
+      point: focus, isBackward: !isBackward, isCollapsed: isCollapsed)
 
     if isCollapsed {
       focus.key = anchor.key
@@ -644,10 +690,10 @@ internal func normalizeSelectionPointsForBoundaries(
       throw LexicalError.invariantViolation("no editor")
     }
 
-    if
-      editor.isComposing(),
+    if editor.isComposing(),
       editor.compositionKey != anchor.key,
-      let lastSelection = lastSelection as? RangeSelection {
+      let lastSelection = lastSelection as? RangeSelection
+    {
       let lastAnchor = lastSelection.anchor
       let lastFocus = lastSelection.focus
       anchor.key = lastAnchor.key
@@ -660,7 +706,10 @@ internal func normalizeSelectionPointsForBoundaries(
   }
 }
 
-func validatePosition(textView: UITextView, position: UITextPosition, direction: UITextStorageDirection) -> UITextPosition {
+@MainActor
+func validatePosition(
+  textView: UITextView, position: UITextPosition, direction: UITextStorageDirection
+) -> UITextPosition {
   var currentPosition = position
   let nsText = textView.text as NSString
   let textLength = nsText.length
@@ -669,8 +718,7 @@ func validatePosition(textView: UITextView, position: UITextPosition, direction:
     let offset = textView.offset(from: textView.beginningOfDocument, to: currentPosition)
 
     // Check if we've reached text boundaries
-    if (direction == .forward && offset >= textLength) ||
-        (direction == .backward && offset <= 0) {
+    if (direction == .forward && offset >= textLength) || (direction == .backward && offset <= 0) {
       break
     }
 
@@ -679,7 +727,8 @@ func validatePosition(textView: UITextView, position: UITextPosition, direction:
     let substring = nsText.substring(with: charRange)
 
     // Check for zero-width characters
-    if substring.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "\u{200B}").contains($0) }) {
+    if substring.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "\u{200B}").contains($0) })
+    {
       let adjustment = direction == .forward ? charRange.length : -charRange.length
       if let newPosition = textView.position(from: currentPosition, offset: adjustment) {
         currentPosition = newPosition

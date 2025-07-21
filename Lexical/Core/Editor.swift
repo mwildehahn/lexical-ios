@@ -17,13 +17,11 @@ import UIKit
   }
 }
 
-/**
- Used to initialize an Editor with a Theme and some Plugins.
-
- Note that you shouldn't use an EditorConfig to initialize multiple Editors, because each instantiated ``Plugin`` maintains state
- about the editor it is attached to. In the future we will hopefully improve this API, possibly replacing the Plugins array
- with a closure to build new Plugin objects, which would let us remove this restriction.
- */
+/// Used to initialize an Editor with a Theme and some Plugins.
+///
+/// Note that you shouldn't use an EditorConfig to initialize multiple Editors, because each instantiated ``Plugin`` maintains state
+/// about the editor it is attached to. In the future we will hopefully improve this API, possibly replacing the Plugins array
+/// with a closure to build new Plugin objects, which would let us remove this restriction.
 @objc public class EditorConfig: NSObject {
   public let theme: Theme
   public let plugins: [Plugin]
@@ -31,7 +29,10 @@ import UIKit
   public let nodeKeyMultiplier: NodeKeyMultiplier?
   public let keyCommands: [UIKeyCommand]?
 
-  @objc public init(theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1, nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil) {
+  @objc public init(
+    theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil
+  ) {
     self.theme = theme
     self.plugins = plugins
     self.editorStateVersion = editorStateVersion
@@ -64,6 +65,7 @@ internal enum DecoratorCacheItem {
 ///
 /// The Editor is your entry point to everything Lexical can do. In order to make any changes to
 /// an ``EditorState`` (aka Lexical's data model), you must go through the Editor's ``update(_:)`` method.
+@MainActor
 public class Editor: NSObject {
   internal static var maxUpdateCount = 99
 
@@ -81,7 +83,8 @@ public class Editor: NSObject {
       if pendingEditorState != nil {
         if let textStorage {
           textStorage.mode = .controllerMode
-          textStorage.replaceCharacters(in: NSRange(location: 0, length: textStorage.string.lengthAsNSString()), with: "")
+          textStorage.replaceCharacters(
+            in: NSRange(location: 0, length: textStorage.string.lengthAsNSString()), with: "")
           textStorage.mode = .none
         }
         try? beginUpdate({}, mode: UpdateBehaviourModificationMode(), reason: .initialization)
@@ -93,7 +96,7 @@ public class Editor: NSObject {
   // keyCounter is the next available node key to be used.
   internal var keyCounter: Int = 0
   // The optional multiplier to use when generating node keys
-  internal(set) var keyMultiplier: NodeKeyMultiplier?
+  internal var keyMultiplier: NodeKeyMultiplier?
 
   // Transforms are defined as functions that operate on nodes. In the JS code, functions are
   // equatable but Swift for a variety of reasons does not support this. To keep track of transforms
@@ -109,13 +112,17 @@ public class Editor: NSObject {
 
   // Used for deserialization and registration of nodes. Lexical's built-in nodes are registered
   // by default.
-  internal var registeredNodes: [NodeType: Node.Type] = [.root: RootNode.self, .text: TextNode.self, .element: ElementNode.self, .heading: HeadingNode.self, .paragraph: ParagraphNode.self, .quote: QuoteNode.self, .linebreak: LineBreakNode.self, .placeholder: PlaceholderNode.self]
+  internal var registeredNodes: [NodeType: Node.Type] = [
+    .root: RootNode.self, .text: TextNode.self, .element: ElementNode.self,
+    .heading: HeadingNode.self, .paragraph: ParagraphNode.self, .quote: QuoteNode.self,
+    .linebreak: LineBreakNode.self, .placeholder: PlaceholderNode.self,
+  ]
 
   internal var nodeTransforms: [NodeType: [(Int, NodeTransform)]] = [:]
 
   // Used to help co-ordinate selection and events
   internal var compositionKey: NodeKey?
-  public var dirtyType: DirtyType = .noDirtyNodes // TODO: I made this public to work around an issue in playground. @amyworrall
+  public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
   internal var featureFlags: FeatureFlags = FeatureFlags()
 
   // Used for storing editor listener events
@@ -156,9 +163,15 @@ public class Editor: NSObject {
     initializePlugins(plugins)
 
     // registering custom drawing for built in nodes
-    try? registerCustomDrawing(customAttribute: .inlineCodeBackgroundColor, layer: .background, granularity: .characterRuns, handler: TextNode.inlineCodeBackgroundDrawing)
-    try? registerCustomDrawing(customAttribute: .codeBlockCustomDrawing, layer: .background, granularity: .contiguousParagraphs, handler: CodeNode.codeBlockBackgroundDrawing)
-    try? registerCustomDrawing(customAttribute: .quoteCustomDrawing, layer: .background, granularity: .contiguousParagraphs, handler: QuoteNode.quoteBackgroundDrawing)
+    try? registerCustomDrawing(
+      customAttribute: .inlineCodeBackgroundColor, layer: .background, granularity: .characterRuns,
+      handler: TextNode.inlineCodeBackgroundDrawing)
+    try? registerCustomDrawing(
+      customAttribute: .codeBlockCustomDrawing, layer: .background,
+      granularity: .contiguousParagraphs, handler: CodeNode.codeBlockBackgroundDrawing)
+    try? registerCustomDrawing(
+      customAttribute: .quoteCustomDrawing, layer: .background, granularity: .contiguousParagraphs,
+      handler: QuoteNode.quoteBackgroundDrawing)
 
     resetEditor()
   }
@@ -175,7 +188,7 @@ public class Editor: NSObject {
 
   /**
    Create a new editor in Headless mode.
-
+  
    Headless mode is a version of Lexical that does not reconcile or produce output. It is
    useful for quickly manipulating a Lexical data model.
    */
@@ -191,7 +204,7 @@ public class Editor: NSObject {
     }
   }
 
-  deinit {
+  public func tearDown() {
     plugins.forEach { plugin in
       plugin.tearDown()
     }
@@ -284,7 +297,8 @@ public class Editor: NSObject {
   /// Registers a closure to be run whenever the reconciled text content changes.
   /// - Parameter listener: The code to run when the text content changes
   /// - Returns: A closure to remove the text content listener
-  public func registerTextContentListener(listener: @escaping TextContentListener) -> RemovalHandler {
+  public func registerTextContentListener(listener: @escaping TextContentListener) -> RemovalHandler
+  {
     let uuid = UUID()
 
     self.listeners.textContent[uuid] = listener
@@ -301,7 +315,10 @@ public class Editor: NSObject {
   ///   - listener: The code to run when the command is dispatched.
   ///   - priority: The priority for your handler. Higher priority handlers run before lower priority handlers.
   /// - Returns: A closure to remove the command handler.
-  public func registerCommand(type: CommandType, listener: @escaping CommandListener, priority: CommandPriority = CommandPriority.Editor, shouldWrapInUpdateBlock: Bool = true) -> RemovalHandler {
+  public func registerCommand(
+    type: CommandType, listener: @escaping CommandListener,
+    priority: CommandPriority = CommandPriority.Editor, shouldWrapInUpdateBlock: Bool = true
+  ) -> RemovalHandler {
     let uuid = UUID()
 
     if self.commands[type] == nil {
@@ -311,13 +328,14 @@ public class Editor: NSObject {
           CommandPriority.Low: [:],
           CommandPriority.Normal: [:],
           CommandPriority.High: [:],
-          CommandPriority.Critical: [:]
+          CommandPriority.Critical: [:],
         ],
         forKey: type
       )
     }
 
-    let wrapper = CommandListenerWithMetadata(listener: listener, shouldWrapInUpdateBlock: shouldWrapInUpdateBlock)
+    let wrapper = CommandListenerWithMetadata(
+      listener: listener, shouldWrapInUpdateBlock: shouldWrapInUpdateBlock)
 
     self.commands[type]?[priority]?[uuid] = wrapper
 
@@ -354,12 +372,17 @@ public class Editor: NSObject {
   internal var customDrawingBackground: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
   internal var customDrawingText: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
 
-  public func registerCustomDrawing(customAttribute: NSAttributedString.Key, layer: CustomDrawingLayer, granularity: CustomDrawingGranularity, handler: @escaping CustomDrawingHandler) throws {
+  public func registerCustomDrawing(
+    customAttribute: NSAttributedString.Key, layer: CustomDrawingLayer,
+    granularity: CustomDrawingGranularity, handler: @escaping CustomDrawingHandler
+  ) throws {
     switch layer {
     case .text:
-      customDrawingText[customAttribute] = CustomDrawingHandlerInfo(customDrawingHandler: handler, granularity: granularity)
+      customDrawingText[customAttribute] = CustomDrawingHandlerInfo(
+        customDrawingHandler: handler, granularity: granularity)
     case .background:
-      customDrawingBackground[customAttribute] = CustomDrawingHandlerInfo(customDrawingHandler: handler, granularity: granularity)
+      customDrawingBackground[customAttribute] = CustomDrawingHandlerInfo(
+        customDrawingHandler: handler, granularity: granularity)
     }
   }
 
@@ -423,10 +446,18 @@ public class Editor: NSObject {
       for (_, node) in pendingEditorState.nodeMap {
         node.didMoveTo(newEditor: self)
       }
-      try? updateWithCustomBehaviour(mode: UpdateBehaviourModificationMode(suppressReconcilingSelection: false, suppressSanityCheck: true, markedTextOperation: nil, skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .reset) {}
+      try? updateWithCustomBehaviour(
+        mode: UpdateBehaviourModificationMode(
+          suppressReconcilingSelection: false, suppressSanityCheck: true, markedTextOperation: nil,
+          skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .reset
+      ) {}
     } else {
       // create a default paragraph node here
-      try? updateWithCustomBehaviour(mode: UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil, skipTransforms: true, allowUpdateWithoutTextStorage: true), reason: .reset) {
+      try? updateWithCustomBehaviour(
+        mode: UpdateBehaviourModificationMode(
+          suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil,
+          skipTransforms: true, allowUpdateWithoutTextStorage: true), reason: .reset
+      ) {
         guard let root = getRoot() else { return }
         if root.getFirstChild() == nil {
           let paragraph = createParagraphNode()
@@ -479,7 +510,10 @@ public class Editor: NSObject {
     return frontend?.nativeSelection ?? NativeSelection()
   }
 
-  internal func moveNativeSelection(type: NativeSelectionModificationType, direction: UITextStorageDirection, granularity: UITextGranularity) {
+  internal func moveNativeSelection(
+    type: NativeSelectionModificationType, direction: UITextStorageDirection,
+    granularity: UITextGranularity
+  ) {
     frontend?.moveNativeSelection(type: type, direction: direction, granularity: granularity)
   }
 
@@ -563,30 +597,42 @@ public class Editor: NSObject {
       for (nodeKey, decoratorCacheItem) in decoratorCache {
         switch decoratorCacheItem {
         case .needsCreation:
-          guard let view = decoratorView(forKey: nodeKey, createIfNecessary: true), let node = getNodeByKey(key: nodeKey) as? DecoratorNode else {
+          guard let view = decoratorView(forKey: nodeKey, createIfNecessary: true),
+            let node = getNodeByKey(key: nodeKey) as? DecoratorNode
+          else {
             break
           }
-          view.isHidden = true // decorators will be hidden until they are layed out by TextKit
+          view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
           superview.addSubview(view)
           node.decoratorWillAppear(view: view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
           if node.hasDynamicSize(), let rangeCacheItem = rangeCache[nodeKey] {
-            frontend?.layoutManager.invalidateLayout(forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            frontend?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
           }
 
-          self.log(.editor, .verbose, "needsCreation -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))")
+          self.log(
+            .editor, .verbose,
+            "needsCreation -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
         case .cachedView(let view):
           // This shouldn't be needed if our appear/disappear logic is perfect, but it turns out we do currently need this.
           superview.addSubview(view)
-          self.log(.editor, .verbose, "no-op, already cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))")
+          self.log(
+            .editor, .verbose,
+            "no-op, already cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
         case .unmountedCachedView(let view):
-          view.isHidden = true // decorators will be hidden until they are layed out by TextKit
+          view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
           superview.addSubview(view)
           if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
             node.decoratorWillAppear(view: view)
           }
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
-          self.log(.editor, .verbose, "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))")
+          self.log(
+            .editor, .verbose,
+            "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
         case .needsDecorating(let view):
           superview.addSubview(view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
@@ -595,7 +641,8 @@ public class Editor: NSObject {
           }
           if let rangeCacheItem = rangeCache[nodeKey] {
             // required so that TextKit does the new size calculation, and correctly hides or unhides the view
-            frontend?.layoutManager.invalidateLayout(forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            frontend?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
           }
         }
       }
@@ -634,7 +681,10 @@ public class Editor: NSObject {
   // MARK: - Manipulating the editor state
 
   var isUpdating = false
-  private func beginUpdate(_ closure: () throws -> Void, mode: UpdateBehaviourModificationMode, reason: EditorUpdateReason = .update) throws {
+  private func beginUpdate(
+    _ closure: () throws -> Void, mode: UpdateBehaviourModificationMode,
+    reason: EditorUpdateReason = .update
+  ) throws {
     var editorStateWasCloned = false
 
     if pendingEditorState == nil {
@@ -659,7 +709,10 @@ public class Editor: NSObject {
     let previousEditorStateForListeners = editorState
     var dirtyNodesForListeners = dirtyNodes
 
-    try runWithStateLexicalScopeProperties(activeEditor: self, activeEditorState: pendingEditorState, readOnlyMode: false, editorUpdateReason: reason) {
+    try runWithStateLexicalScopeProperties(
+      activeEditor: self, activeEditorState: pendingEditorState, readOnlyMode: false,
+      editorUpdateReason: reason
+    ) {
       let previouslyUpdating = self.isUpdating
       self.isUpdating = true
 
@@ -696,10 +749,14 @@ public class Editor: NSObject {
         }
 
         if !headless {
-          try Reconciler.updateEditorState(currentEditorState: editorState, pendingEditorState: pendingEditorState, editor: self, shouldReconcileSelection: !mode.suppressReconcilingSelection, markedTextOperation: mode.markedTextOperation)
+          try Reconciler.updateEditorState(
+            currentEditorState: editorState, pendingEditorState: pendingEditorState, editor: self,
+            shouldReconcileSelection: !mode.suppressReconcilingSelection,
+            markedTextOperation: mode.markedTextOperation)
         }
         self.isUpdating = previouslyUpdating
-        garbageCollectDetachedNodes(prevEditorState: editorState, editorState: pendingEditorState, dirtyLeaves: dirtyNodes)
+        garbageCollectDetachedNodes(
+          prevEditorState: editorState, editorState: pendingEditorState, dirtyLeaves: dirtyNodes)
       } catch {
         triggerErrorListeners(
           activeEditor: self,
@@ -719,9 +776,9 @@ public class Editor: NSObject {
         if anchor == nil || focus == nil {
           let errorString =
             """
-        updateEditor: selection has been lost because the previously selected nodes have been removed and
-        selection wasn't moved to another node. Ensure selection changes after removing/replacing a selected node.
-        """
+            updateEditor: selection has been lost because the previously selected nodes have been removed and
+            selection wasn't moved to another node. Ensure selection changes after removing/replacing a selected node.
+            """
           throw LexicalError.invariantViolation(errorString)
         }
       } else if let pendingSelection = pendingEditorState.selection as? NodeSelection {
@@ -747,18 +804,33 @@ public class Editor: NSObject {
     // These have to be outside of the above runWithStateLexicalScopeProperties{} closure, because: if any update block is triggered from inside that
     // closure, it counts as a nested update. But listeners, which happen after we've run the reconciler, should not count as nested for this purpose;
     // if an update is triggered from within an update listener, it needs to run the reconciler a second time.
-    try runWithStateLexicalScopeProperties(activeEditor: self, activeEditorState: pendingEditorState, readOnlyMode: true, editorUpdateReason: reason) {
-      triggerUpdateListeners(activeEditor: self, activeEditorState: pendingEditorState, previousEditorState: previousEditorStateForListeners, dirtyNodes: dirtyNodesForListeners)
-      try triggerTextContentListeners(activeEditor: self, activeEditorState: pendingEditorState, previousEditorState: previousEditorStateForListeners)
+    try runWithStateLexicalScopeProperties(
+      activeEditor: self, activeEditorState: pendingEditorState, readOnlyMode: true,
+      editorUpdateReason: reason
+    ) {
+      triggerUpdateListeners(
+        activeEditor: self, activeEditorState: pendingEditorState,
+        previousEditorState: previousEditorStateForListeners, dirtyNodes: dirtyNodesForListeners)
+      try triggerTextContentListeners(
+        activeEditor: self, activeEditorState: pendingEditorState,
+        previousEditorState: previousEditorStateForListeners)
     }
 
     frontend?.isUpdatingNativeSelection = false
 
-    if featureFlags.reconcilerSanityCheck && !mode.suppressSanityCheck && compositionKey == nil, let frontend {
+    if featureFlags.reconcilerSanityCheck && !mode.suppressSanityCheck && compositionKey == nil,
+      let frontend
+    {
       do {
         try performReconcilerSanityCheck(editor: self, expectedOutput: frontend.textStorage)
-      } catch LexicalError.sanityCheck(errorMessage: let errorMessage, textViewText: let textViewText, fullReconcileText: let fullReconcileText) {
-        frontend.presentDeveloperFacingError(message: "\(errorMessage)\n\nIn text view:\n```\n\(textViewText)\n```\n\nFull reconcile:\n```\n\(fullReconcileText)\n```")
+      } catch LexicalError.sanityCheck(
+        errorMessage: let errorMessage, textViewText: let textViewText,
+        fullReconcileText: let fullReconcileText)
+      {
+        frontend.presentDeveloperFacingError(
+          message:
+            "\(errorMessage)\n\nIn text view:\n```\n\(textViewText)\n```\n\nFull reconcile:\n```\n\(fullReconcileText)\n```"
+        )
         if !isRecoveringFromError {
           isRecoveringFromError = true
           resetReconciler(pendingEditorState: pendingEditorState)
@@ -771,14 +843,18 @@ public class Editor: NSObject {
   }
 
   private func beginRead(_ closure: () throws -> Void) throws {
-    try runWithStateLexicalScopeProperties(activeEditor: self, activeEditorState: getActiveEditorState() ?? editorState, readOnlyMode: true, editorUpdateReason: nil, closure: closure)
+    try runWithStateLexicalScopeProperties(
+      activeEditor: self, activeEditorState: getActiveEditorState() ?? editorState,
+      readOnlyMode: true, editorUpdateReason: nil, closure: closure)
   }
 
   // There are some cases (mainly related to non-controlled mode and/or UIKit's selection handling) where we
   // want to run an update but not to do everything that is done within an update block. This is definitely for
   // internal Lexical use only, and should only be done if safety can be guaranteed, i.e. the caller of
   // such an update must guarantee that the EditorState will not be left in an inconsistent state when they are finished.
-  internal func updateWithCustomBehaviour(mode: UpdateBehaviourModificationMode, reason: EditorUpdateReason, _ closure: () throws -> Void) throws {
+  internal func updateWithCustomBehaviour(
+    mode: UpdateBehaviourModificationMode, reason: EditorUpdateReason, _ closure: () throws -> Void
+  ) throws {
     try beginUpdate(closure, mode: mode, reason: reason)
   }
 
@@ -793,7 +869,8 @@ public class Editor: NSObject {
       }
 
       guard activeEditorState.nodeMap[nodeKey] != nil else {
-        throw LexicalError.invariantViolation("TextNode \(nodeKey) was not in active editor state during text normalization")
+        throw LexicalError.invariantViolation(
+          "TextNode \(nodeKey) was not in active editor state during text normalization")
       }
 
       if let textNode = node as? TextNode, textNode.isSimpleText() && !textNode.isUnmergeable() {
@@ -828,7 +905,8 @@ public class Editor: NSObject {
 
     while !dirtyNodes.isEmpty {
       if infiniteUpdateLoopCount >= Editor.maxUpdateCount {
-        throw LexicalError.invariantViolation("Update loop exceeded maximum of \(Editor.maxUpdateCount)")
+        throw LexicalError.invariantViolation(
+          "Update loop exceeded maximum of \(Editor.maxUpdateCount)")
       }
 
       let nodesToProcess = dirtyNodes.keys
@@ -872,7 +950,8 @@ public class Editor: NSObject {
         }
 
         if isTextNode(node) {
-          if let textNode = node as? TextNode, textNode.isSimpleText() && !textNode.isUnmergeable() {
+          if let textNode = node as? TextNode, textNode.isSimpleText() && !textNode.isUnmergeable()
+          {
             try TextNode.normalizeTextNode(textNode: textNode)
           }
         }
@@ -906,7 +985,8 @@ public class Editor: NSObject {
   /// followed by an update. This is highly discouraged as it triggers an additional reconciliation pass. Additionally, each
   /// cycle creates a brand new EditorState object which can interfere with plugins like HistoryPlugin (undo-redo)
   /// if not handled correctly.
-  public func addNodeTransform(nodeType: NodeType, transform: @escaping NodeTransform) -> () -> Void {
+  public func addNodeTransform(nodeType: NodeType, transform: @escaping NodeTransform) -> () -> Void
+  {
     // NB: In the web code, closures can be compared for identity but in Swift, closures are
     //     by design not Equatable. Therefore, we generate a tag for each closure passed in
     //     and use that for our removal/cleanup logic.
@@ -933,7 +1013,9 @@ public class Editor: NSObject {
     }
   }
 
-  internal func parseEditorState(json: Data, migrations: [EditorStateMigration] = []) throws -> EditorState {
+  internal func parseEditorState(json: Data, migrations: [EditorStateMigration] = []) throws
+    -> EditorState
+  {
     let previousActiveEditorState = self.editorState
     let previousPendingEditorState = self.pendingEditorState
     let previousDirtyNodes = self.dirtyNodes
@@ -966,30 +1048,39 @@ public class Editor: NSObject {
       self.headless = previousHeadless
     }
 
-    try self.beginUpdate({
-      let serializedEditorState = try JSONDecoder().decode(SerializedEditorState.self, from: json)
-      guard let editor = getActiveEditor() else {
-        throw LexicalError.invariantViolation("Editor is unexpectedly nil")
-      }
-      editor.setEditorStateVersion(serializedEditorState.version)
-
-      guard let serializedRootNode = serializedEditorState.rootNode, let rootNode = getRoot() else {
-        throw LexicalError.internal("Failed to decode RootNode")
-      }
-
-      try rootNode.append(serializedRootNode.getChildren())
-      try rootNode.setDirection(direction: serializedRootNode.direction)
-    }, mode: UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil, skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .parseState)
-
-    for migration in migrations where self.editorState.version == migration.fromVersion {
-      try self.beginUpdate({
-        guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
+    try self.beginUpdate(
+      {
+        let serializedEditorState = try JSONDecoder().decode(SerializedEditorState.self, from: json)
+        guard let editor = getActiveEditor() else {
           throw LexicalError.invariantViolation("Editor is unexpectedly nil")
         }
+        editor.setEditorStateVersion(serializedEditorState.version)
 
-        try migration.handler(editorState)
-        editor.setEditorStateVersion(migration.toVersion)
-      }, mode: UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil, skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .migrateState)
+        guard let serializedRootNode = serializedEditorState.rootNode, let rootNode = getRoot()
+        else {
+          throw LexicalError.internal("Failed to decode RootNode")
+        }
+
+        try rootNode.append(serializedRootNode.getChildren())
+        try rootNode.setDirection(direction: serializedRootNode.direction)
+      },
+      mode: UpdateBehaviourModificationMode(
+        suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil,
+        skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .parseState)
+
+    for migration in migrations where self.editorState.version == migration.fromVersion {
+      try self.beginUpdate(
+        {
+          guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
+            throw LexicalError.invariantViolation("Editor is unexpectedly nil")
+          }
+
+          try migration.handler(editorState)
+          editor.setEditorStateVersion(migration.toVersion)
+        },
+        mode: UpdateBehaviourModificationMode(
+          suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil,
+          skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .migrateState)
     }
 
     return self.editorState
@@ -1008,11 +1099,13 @@ internal struct UpdateBehaviourModificationMode {
   let suppressSanityCheck: Bool
   let allowUpdateWithoutTextStorage: Bool
 
-  internal init(suppressReconcilingSelection: Bool = false,
-                suppressSanityCheck: Bool = false,
-                markedTextOperation: MarkedTextOperation? = nil,
-                skipTransforms: Bool = false,
-                allowUpdateWithoutTextStorage: Bool = false) {
+  internal init(
+    suppressReconcilingSelection: Bool = false,
+    suppressSanityCheck: Bool = false,
+    markedTextOperation: MarkedTextOperation? = nil,
+    skipTransforms: Bool = false,
+    allowUpdateWithoutTextStorage: Bool = false
+  ) {
     self.suppressReconcilingSelection = suppressReconcilingSelection
     self.suppressSanityCheck = suppressSanityCheck
     self.markedTextOperation = markedTextOperation

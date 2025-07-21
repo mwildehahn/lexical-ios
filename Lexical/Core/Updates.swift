@@ -11,49 +11,62 @@ import Foundation
  * not inside a read or update block (and will return nil in that case).
  */
 
+@MainActor
 public func getActiveEditor() -> Editor? {
-  return Thread.current.threadDictionary[activeEditorThreadDictionaryKey] as? Editor
+  return EditorContext.getActiveEditor()
 }
 
+@MainActor
 public func getActiveEditorState() -> EditorState? {
-  return Thread.current.threadDictionary[activeEditorStateThreadDictionaryKey] as? EditorState
+  return EditorContext.getActiveEditorState()
 }
 
+@MainActor
 public func isReadOnlyMode() -> Bool {
-  if let readOnlyMode = Thread.current.threadDictionary[readOnlyModeThreadDictionaryKey] as? Bool {
-    return readOnlyMode
-  }
-  return true
+  return EditorContext.isReadOnlyMode()
 }
 
+@MainActor
 public func getEditorUpdateReason() -> EditorUpdateReason? {
-  return Thread.current.threadDictionary[editorUpdateReasonThreadDictionaryKey] as? EditorUpdateReason
+  return EditorContext.getUpdateReason()
 }
 
+@MainActor
 internal func isEditorPresentInUpdateStack(_ editor: Editor) -> Bool {
-  let updateEditors: [Editor] = Thread.current.threadDictionary[previousParentUpdateBlocksThreadDictionaryKey] as? [Editor] ?? []
-  return updateEditors.contains(editor)
+  return EditorContext.isEditorInUpdateStack(editor)
 }
 
+@MainActor
 public func errorOnReadOnly() throws {
   if isReadOnlyMode() {
     throw LexicalError.invariantViolation("Editor should be in writeable state")
   }
 }
 
-public func triggerUpdateListeners(activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState, dirtyNodes: DirtyNodeMap) {
+@MainActor
+public func triggerUpdateListeners(
+  activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState,
+  dirtyNodes: DirtyNodeMap
+) {
   for listener in activeEditor.listeners.update.values {
     listener(activeEditorState, previousEditorState, dirtyNodes)
   }
 }
 
-func triggerErrorListeners(activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState, error: Error) {
+@MainActor
+func triggerErrorListeners(
+  activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState,
+  error: Error
+) {
   for listener in activeEditor.listeners.errors.values {
     listener(activeEditorState, previousEditorState, error)
   }
 }
 
-public func triggerTextContentListeners(activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState) throws {
+@MainActor
+public func triggerTextContentListeners(
+  activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState
+) throws {
   let activeTextContent = try getEditorStateTextContent(editorState: activeEditorState)
   let previousTextContent = try getEditorStateTextContent(editorState: previousEditorState)
 
@@ -64,7 +77,9 @@ public func triggerTextContentListeners(activeEditor: Editor, activeEditorState:
   }
 }
 
-public func triggerCommandListeners(activeEditor: Editor, type: CommandType, payload: Any?) -> Bool {
+@MainActor
+public func triggerCommandListeners(activeEditor: Editor, type: CommandType, payload: Any?) -> Bool
+{
   let listenersInPriorityOrder = activeEditor.commands[type]
 
   var handled = false
@@ -124,37 +139,24 @@ public func triggerCommandListeners(activeEditor: Editor, type: CommandType, pay
 
 // MARK: - Private implementation
 
-private let activeEditorThreadDictionaryKey = "kActiveEditor"
-private let activeEditorStateThreadDictionaryKey = "kActiveEditorState"
-private let readOnlyModeThreadDictionaryKey = "kReadOnlyMode"
-private let previousParentUpdateBlocksThreadDictionaryKey = "kpreviousParentUpdateBlocks"
-private let editorUpdateReasonThreadDictionaryKey = "kEditorUpdateReason"
+// These constants are no longer needed as we use EditorContext
+// private let activeEditorThreadDictionaryKey = "kActiveEditor"
+// private let activeEditorStateThreadDictionaryKey = "kActiveEditorState"
+// private let readOnlyModeThreadDictionaryKey = "kReadOnlyMode"
+// private let previousParentUpdateBlocksThreadDictionaryKey = "kpreviousParentUpdateBlocks"
+// private let editorUpdateReasonThreadDictionaryKey = "kEditorUpdateReason"
 
-internal func runWithStateLexicalScopeProperties(activeEditor: Editor?, activeEditorState: EditorState?, readOnlyMode: Bool, editorUpdateReason: EditorUpdateReason?, closure: () throws -> Void) throws {
-  let previousActiveEditor = Thread.current.threadDictionary[activeEditorThreadDictionaryKey]
-  let previousActiveEditorState = Thread.current.threadDictionary[activeEditorStateThreadDictionaryKey]
-  let previousEditorUpdateReason = Thread.current.threadDictionary[editorUpdateReasonThreadDictionaryKey]
-  let previousReadOnly = Thread.current.threadDictionary[readOnlyModeThreadDictionaryKey]
-  let previousParentUpdateBlocks: [Editor] = Thread.current.threadDictionary[previousParentUpdateBlocksThreadDictionaryKey] as? [Editor] ?? []
-
-  Thread.current.threadDictionary[activeEditorThreadDictionaryKey] = activeEditor
-  Thread.current.threadDictionary[activeEditorStateThreadDictionaryKey] = activeEditorState
-  Thread.current.threadDictionary[readOnlyModeThreadDictionaryKey] = readOnlyMode
-  Thread.current.threadDictionary[editorUpdateReasonThreadDictionaryKey] = editorUpdateReason
-
-  defer {
-    Thread.current.threadDictionary[activeEditorThreadDictionaryKey] = previousActiveEditor
-    Thread.current.threadDictionary[activeEditorStateThreadDictionaryKey] = previousActiveEditorState
-    Thread.current.threadDictionary[readOnlyModeThreadDictionaryKey] = previousReadOnly
-    Thread.current.threadDictionary[previousParentUpdateBlocksThreadDictionaryKey] = previousParentUpdateBlocks
-    Thread.current.threadDictionary[editorUpdateReasonThreadDictionaryKey] = previousEditorUpdateReason
+@MainActor
+internal func runWithStateLexicalScopeProperties(
+  activeEditor: Editor?, activeEditorState: EditorState?, readOnlyMode: Bool,
+  editorUpdateReason: EditorUpdateReason?, closure: () throws -> Void
+) throws {
+  try EditorContext.withContext(
+    editor: activeEditor,
+    editorState: activeEditorState,
+    readOnlyMode: readOnlyMode,
+    updateReason: editorUpdateReason
+  ) {
+    try closure()
   }
-
-  if let activeEditor, readOnlyMode == false {
-    var newParentUpdateBlocks = previousParentUpdateBlocks
-    newParentUpdateBlocks.append(activeEditor)
-    Thread.current.threadDictionary[previousParentUpdateBlocksThreadDictionaryKey] = newParentUpdateBlocks
-  }
-
-  try closure()
 }

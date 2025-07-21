@@ -10,6 +10,7 @@ import MobileCoreServices
 import UIKit
 import UniformTypeIdentifiers
 
+@MainActor
 internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) throws {
   guard let editor = getActiveEditor() else {
     throw LexicalError.invariantViolation("Could not get editor")
@@ -20,7 +21,8 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
   guard let jsonString = String(data: encodedData, encoding: .utf8) else { return }
 
   let itemProvider = NSItemProvider()
-  itemProvider.registerItem(forTypeIdentifier: LexicalConstants.pasteboardIdentifier) { completionHandler, expectedValueClass, options in
+  itemProvider.registerItem(forTypeIdentifier: LexicalConstants.pasteboardIdentifier) {
+    completionHandler, expectedValueClass, options in
     let data = NSData(data: jsonString.data(using: .utf8) ?? Data())
     completionHandler?(data, nil)
   }
@@ -28,10 +30,12 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
   if #available(iOS 14.0, *) {
     pasteboard.items =
       [
-        [(UTType.rtf.identifier ): try getAttributedStringFromFrontend().data(
-          from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
-          documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])],
-        [LexicalConstants.pasteboardIdentifier: encodedData]
+        [
+          (UTType.rtf.identifier): try getAttributedStringFromFrontend().data(
+            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+        ],
+        [LexicalConstants.pasteboardIdentifier: encodedData],
       ]
     if ProcessInfo.processInfo.isMacCatalystApp {
       // added this to enable copy/paste in the mac catalyst app
@@ -44,22 +48,27 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
   } else {
     pasteboard.items =
       [
-        [(kUTTypeRTF as String): try getAttributedStringFromFrontend().data(
-          from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
-          documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])],
-        [LexicalConstants.pasteboardIdentifier: encodedData]
+        [
+          (kUTTypeRTF as String): try getAttributedStringFromFrontend().data(
+            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+        ],
+        [LexicalConstants.pasteboardIdentifier: encodedData],
       ]
   }
 }
 
-internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: UIPasteboard) throws {
+@MainActor
+internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: UIPasteboard)
+  throws
+{
   let itemSet: IndexSet?
   if #available(iOS 14.0, *) {
     itemSet = pasteboard.itemSet(
       withPasteboardTypes: [
         (UTType.utf8PlainText.identifier),
         (UTType.url.identifier),
-        LexicalConstants.pasteboardIdentifier
+        LexicalConstants.pasteboardIdentifier,
       ]
     )
   } else {
@@ -67,26 +76,29 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
       withPasteboardTypes: [
         (kUTTypeUTF8PlainText as String),
         (kUTTypeURL as String),
-        LexicalConstants.pasteboardIdentifier
+        LexicalConstants.pasteboardIdentifier,
       ]
     )
   }
 
   if let pasteboardData = pasteboard.data(
-      forPasteboardType: LexicalConstants.pasteboardIdentifier,
-      inItemSet: itemSet)?.last {
+    forPasteboardType: LexicalConstants.pasteboardIdentifier,
+    inItemSet: itemSet)?.last
+  {
     let deserializedNodes = try JSONDecoder().decode(SerializedNodeArray.self, from: pasteboardData)
 
     guard let editor = getActiveEditor() else { return }
 
-    _ = try insertGeneratedNodes(editor: editor, nodes: deserializedNodes.nodeArray, selection: selection)
+    _ = try insertGeneratedNodes(
+      editor: editor, nodes: deserializedNodes.nodeArray, selection: selection)
     return
   }
 
   if #available(iOS 14.0, *) {
     if let pasteboardRTFData = pasteboard.data(
-        forPasteboardType: (UTType.rtf.identifier),
-        inItemSet: itemSet)?.last {
+      forPasteboardType: (UTType.rtf.identifier),
+      inItemSet: itemSet)?.last
+    {
       let attributedString = try NSAttributedString(
         data: pasteboardRTFData,
         options: [.documentType: NSAttributedString.DocumentType.rtf],
@@ -97,8 +109,9 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
     }
   } else {
     if let pasteboardRTFData = pasteboard.data(
-        forPasteboardType: (kUTTypeRTF as String),
-        inItemSet: itemSet)?.last {
+      forPasteboardType: (kUTTypeRTF as String),
+      inItemSet: itemSet)?.last
+    {
       let attributedString = try NSAttributedString(
         data: pasteboardRTFData,
         options: [.documentType: NSAttributedString.DocumentType.rtf],
@@ -112,16 +125,20 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
 
   if #available(iOS 14.0, *) {
     if let pasteboardStringData = pasteboard.data(
-        forPasteboardType: (UTType.utf8PlainText.identifier),
-        inItemSet: itemSet)?.last {
-      try insertPlainText(selection: selection, text: String(decoding: pasteboardStringData, as: UTF8.self))
+      forPasteboardType: (UTType.utf8PlainText.identifier),
+      inItemSet: itemSet)?.last
+    {
+      try insertPlainText(
+        selection: selection, text: String(decoding: pasteboardStringData, as: UTF8.self))
       return
     }
   } else {
     if let pasteboardStringData = pasteboard.data(
-        forPasteboardType: (kUTTypeUTF8PlainText as String),
-        inItemSet: itemSet)?.last {
-      try insertPlainText(selection: selection, text: String(decoding: pasteboardStringData, as: UTF8.self))
+      forPasteboardType: (kUTTypeUTF8PlainText as String),
+      inItemSet: itemSet)?.last
+    {
+      try insertPlainText(
+        selection: selection, text: String(decoding: pasteboardStringData, as: UTF8.self))
       return
     }
   }
@@ -133,6 +150,7 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
   }
 }
 
+@MainActor
 internal func insertPlainText(selection: RangeSelection, text: String) throws {
   var stringArray: [String] = []
   let range = text.startIndex..<text.endIndex
@@ -161,6 +179,7 @@ internal func insertPlainText(selection: RangeSelection, text: String) throws {
   }
 }
 
+@MainActor
 internal func insertRTF(selection: RangeSelection, attributedString: NSAttributedString) throws {
   let paragraphs = attributedString.splitByNewlines()
 
@@ -169,7 +188,8 @@ internal func insertRTF(selection: RangeSelection, attributedString: NSAttribute
 
   for paragraph in paragraphs {
     var extractedAttributes = [(attributes: [NSAttributedString.Key: Any], range: NSRange)]()
-    paragraph.enumerateAttributes(in: NSRange(location: 0, length: paragraph.length)) { (dict, range, stopEnumerating) in
+    paragraph.enumerateAttributes(in: NSRange(location: 0, length: paragraph.length)) {
+      (dict, range, stopEnumerating) in
       extractedAttributes.append((attributes: dict, range: range))
     }
 
@@ -179,12 +199,14 @@ internal func insertRTF(selection: RangeSelection, attributedString: NSAttribute
       let textNode = createTextNode(text: text)
 
       if (attribute.attributes.first(where: { $0.key == .font })?.value as? UIFont)?
-          .fontDescriptor.symbolicTraits.contains(.traitBold) ?? false {
+        .fontDescriptor.symbolicTraits.contains(.traitBold) ?? false
+      {
         textNode.format.bold = true
       }
 
       if (attribute.attributes.first(where: { $0.key == .font })?.value as? UIFont)?
-          .fontDescriptor.symbolicTraits.contains(.traitItalic) ?? false {
+        .fontDescriptor.symbolicTraits.contains(.traitItalic) ?? false
+      {
         textNode.format.italic = true
       }
 
@@ -216,10 +238,12 @@ internal func insertRTF(selection: RangeSelection, attributedString: NSAttribute
   _ = try selection.insertNodes(nodes: nodes, selectStart: false)
 }
 
+@MainActor
 public func insertGeneratedNodes(editor: Editor, nodes: [Node], selection: RangeSelection) throws {
   return try basicInsertStrategy(nodes: nodes, selection: selection)
 }
 
+@MainActor
 func basicInsertStrategy(nodes: [Node], selection: RangeSelection) throws {
   var topLevelBlocks = [Node]()
   var currentBlock: ElementNode?
@@ -243,11 +267,13 @@ func basicInsertStrategy(nodes: [Node], selection: RangeSelection) throws {
   _ = try selection.insertNodes(nodes: topLevelBlocks, selectStart: false)
 }
 
+@MainActor
 func appendNodesToArray(
   editor: Editor,
   selection: BaseSelection?,
   currentNode: Node,
-  targetArray: [Node] = []) throws -> (shouldInclude: Bool, outArray: [Node]) {
+  targetArray: [Node] = []
+) throws -> (shouldInclude: Bool, outArray: [Node]) {
   var array = targetArray
   var shouldInclude = selection != nil ? try currentNode.isSelected() : true
   let shouldExclude = (currentNode as? ElementNode)?.excludeFromCopy() ?? false
@@ -278,8 +304,10 @@ func appendNodesToArray(
       targetArray: internalCloneChildren
     )
 
-    if !shouldInclude && shouldIncludeChild.shouldInclude &&
-        ((currentNode as? ElementNode)?.extractWithChild(child: childNode, selection: selection, destination: .clone) ?? false) {
+    if !shouldInclude && shouldIncludeChild.shouldInclude
+      && ((currentNode as? ElementNode)?.extractWithChild(
+        child: childNode, selection: selection, destination: .clone) ?? false)
+    {
       shouldInclude = true
     }
 
@@ -303,16 +331,20 @@ func appendNodesToArray(
   return (shouldInclude, array)
 }
 
+@MainActor
 public func generateArrayFromSelectedNodes(editor: Editor, selection: BaseSelection?) throws -> (
   namespace: String,
-  nodes: [Node]) {
+  nodes: [Node]
+) {
   var nodes: [Node] = []
   guard let root = getRoot() else {
     return ("", [])
   }
   for topLevelNode in root.getChildren() {
     var nodeArray: [Node] = []
-    nodeArray = try appendNodesToArray(editor: editor, selection: selection, currentNode: topLevelNode, targetArray: nodeArray).outArray
+    nodeArray = try appendNodesToArray(
+      editor: editor, selection: selection, currentNode: topLevelNode, targetArray: nodeArray
+    ).outArray
     nodes.append(contentsOf: nodeArray)
   }
   return (
@@ -330,7 +362,8 @@ extension NSAttributedString {
 
     (string as NSString).enumerateSubstrings(
       in: NSRange(location: 0, length: (string as NSString).length),
-      options: .byParagraphs) { subString, subStringRange, enclosingRange, stop in
+      options: .byParagraphs
+    ) { subString, subStringRange, enclosingRange, stop in
       rangeArray.append(subStringRange)
     }
 

@@ -15,20 +15,19 @@ import UIKit
 // 5. Component state for collapsed vs not
 // 6. Have I got the textContainerInsets calculation wrong? Used plus instead of minus?
 
+@MainActor
 public class TextContainer: NSTextContainer {
 
   internal var readOnlySizeCache: LexicalReadOnlySizeCache?
 
   override open var isSimpleRectangularTextContainer: Bool {
-    get {
-      guard let readOnlySizeCache else { return true }
+    guard let readOnlySizeCache else { return true }
 
-      // if we're limiting height, AND there's a custom truncation string, then we're maybe not rectangular. Otherwise we definitely are.
-      if readOnlySizeCache.requiredHeight != nil {
-        return (readOnlySizeCache.customTruncationString == nil)
-      }
-      return true
+    // if we're limiting height, AND there's a custom truncation string, then we're maybe not rectangular. Otherwise we definitely are.
+    if readOnlySizeCache.requiredHeight != nil {
+      return (readOnlySizeCache.customTruncationString == nil)
     }
+    return true
   }
 
   override public func lineFragmentRect(
@@ -37,17 +36,18 @@ public class TextContainer: NSTextContainer {
     writingDirection baseWritingDirection: NSWritingDirection,
     remaining remainingRect: UnsafeMutablePointer<CGRect>?
   ) -> CGRect {
-    var lineFragmentRect = super.lineFragmentRect(forProposedRect: proposedRect,
-                                                  at: characterIndex,
-                                                  writingDirection: baseWritingDirection,
-                                                  remaining: remainingRect)
+    var lineFragmentRect = super.lineFragmentRect(
+      forProposedRect: proposedRect,
+      at: characterIndex,
+      writingDirection: baseWritingDirection,
+      remaining: remainingRect)
 
     guard let readOnlySizeCache,
-          let characterRange = readOnlySizeCache.characterRangeForLastLineFragmentBeforeTruncation,
-          let glyphRange = readOnlySizeCache.glyphRangeForLastLineFragmentBeforeTruncation,
-          let cutPoint = readOnlySizeCache.glyphIndexAtTruncationIndicatorCutPoint,
-          NSLocationInRange(characterIndex, characterRange),
-          let sizeForTruncationString = readOnlySizeCache.sizeForTruncationString
+      let characterRange = readOnlySizeCache.characterRangeForLastLineFragmentBeforeTruncation,
+      let glyphRange = readOnlySizeCache.glyphRangeForLastLineFragmentBeforeTruncation,
+      let cutPoint = readOnlySizeCache.glyphIndexAtTruncationIndicatorCutPoint,
+      NSLocationInRange(characterIndex, characterRange),
+      let sizeForTruncationString = readOnlySizeCache.sizeForTruncationString
     else {
       return lineFragmentRect
     }
@@ -59,7 +59,10 @@ public class TextContainer: NSTextContainer {
       readOnlySizeCache.textContainerDidShrinkLastLine = false
     } else {
       // display indicator inline
-      lineFragmentRect.size.width = min(lineFragmentRect.width, self.size.width - (sizeForTruncationString.width + readOnlySizeCache.gapBeforeTruncationString))
+      lineFragmentRect.size.width = min(
+        lineFragmentRect.width,
+        self.size.width
+          - (sizeForTruncationString.width + readOnlySizeCache.gapBeforeTruncationString))
       readOnlySizeCache.textContainerDidShrinkLastLine = true
     }
 

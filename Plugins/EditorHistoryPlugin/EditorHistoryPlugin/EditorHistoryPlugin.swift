@@ -9,6 +9,7 @@ import Foundation
 import Lexical
 import UIKit
 
+@MainActor
 open class EditorHistoryPlugin: Plugin {
   public init() {}
 
@@ -44,21 +45,17 @@ open class EditorHistoryPlugin: Plugin {
   }
 
   public var canUndo: Bool {
-    get {
-      guard let historyState else {
-        return false
-      }
-      return historyState.undoStackCount() > 0
+    guard let historyState else {
+      return false
     }
+    return historyState.undoStackCount() > 0
   }
 
   public var canRedo: Bool {
-    get {
-      guard let historyState else {
-        return false
-      }
-      return historyState.redoStackCount() > 0
+    guard let historyState else {
+      return false
     }
+    return historyState.redoStackCount() > 0
   }
 
   private var removeUndoListener: Editor.RemovalHandler?
@@ -71,25 +68,38 @@ open class EditorHistoryPlugin: Plugin {
       return
     }
 
-    removeUndoListener = editor.registerCommand(type: .undo, listener: { [weak self] payload in
-      guard let strongSelf = self, let editorHistory = strongSelf.editorHistory else { return false }
-      editorHistory.applyCommand(type: .undo)
-      return true
-    })
+    removeUndoListener = editor.registerCommand(
+      type: .undo,
+      listener: { [weak self] payload in
+        guard let strongSelf = self, let editorHistory = strongSelf.editorHistory else {
+          return false
+        }
+        editorHistory.applyCommand(type: .undo)
+        return true
+      })
 
-    removeRedoListener = editor.registerCommand(type: .redo, listener: { [weak self] payload in
-      guard let strongSelf = self, let editorHistory = strongSelf.editorHistory else { return false }
-      editorHistory.applyCommand(type: .redo)
-      return true
-    })
+    removeRedoListener = editor.registerCommand(
+      type: .redo,
+      listener: { [weak self] payload in
+        guard let strongSelf = self, let editorHistory = strongSelf.editorHistory else {
+          return false
+        }
+        editorHistory.applyCommand(type: .redo)
+        return true
+      })
 
-    removeClearEditorListener = editor.registerCommand(type: .clearEditor, listener: { [weak self] payload in
-      guard let strongSelf = self, let editorHistory = strongSelf.editorHistory else { return false }
-      editorHistory.applyCommand(type: .clearEditor)
-      return false
-    })
+    removeClearEditorListener = editor.registerCommand(
+      type: .clearEditor,
+      listener: { [weak self] payload in
+        guard let strongSelf = self, let editorHistory = strongSelf.editorHistory else {
+          return false
+        }
+        editorHistory.applyCommand(type: .clearEditor)
+        return false
+      })
 
-    removeUpdateListener = editor.registerUpdateListener(listener: { [weak self] (activeEditorState, previousEditorState, dirtyNodes) in
+    removeUpdateListener = editor.registerUpdateListener(listener: {
+      [weak self] (activeEditorState, previousEditorState, dirtyNodes) in
       guard let strongSelf = self, let editorHistory = strongSelf.editorHistory else { return }
 
       editorHistory.applyChange(

@@ -18,6 +18,7 @@ import UIKit
 ///
 /// In the future it will be possible to use Lexical without a Frontend, in Headless mode (allowing editing
 /// an EditorState but providing no conversion to NSAttributedString).
+@MainActor
 internal protocol Frontend: AnyObject {
   var textStorage: TextStorage { get }
   var layoutManager: LayoutManager { get }

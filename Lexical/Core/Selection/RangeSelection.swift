@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 public class RangeSelection: BaseSelection {
 
   public class InsertNewAfterResult {
@@ -16,7 +17,10 @@ public class RangeSelection: BaseSelection {
     public let skipSelectStart: Bool
     public let abort: Bool
 
-    public init(element: ElementNode? = nil, skipLineBreak: Bool = false, skipSelectStart: Bool = false, abort: Bool = false) {
+    public init(
+      element: ElementNode? = nil, skipLineBreak: Bool = false, skipSelectStart: Bool = false,
+      abort: Bool = false
+    ) {
       self.element = element
       self.skipLineBreak = skipLineBreak
       self.skipSelectStart = skipSelectStart
@@ -28,7 +32,7 @@ public class RangeSelection: BaseSelection {
   public var focus: Point
   public var dirty: Bool
   public var format: TextFormat
-  public var style: String // TODO: add style support to iOS
+  public var style: String  // TODO: add style support to iOS
 
   // MARK: - Init
 
@@ -60,13 +64,15 @@ public class RangeSelection: BaseSelection {
   public func getCharacterOffsets(selection: RangeSelection) -> (Int, Int) {
     let anchor = selection.anchor
     let focus = selection.focus
-    if anchor.type == .element && focus.type == .element &&
-        anchor.key == focus.key && anchor.offset == focus.offset {
+    if anchor.type == .element && focus.type == .element && anchor.key == focus.key
+      && anchor.offset == focus.offset
+    {
       return (0, 0)
     }
     return (anchor.getCharacterOffset(), focus.getCharacterOffset())
   }
 
+  @MainActor
   public func getNodes() throws -> [Node] {
     let isBefore = try anchor.isBefore(point: focus)
     let firstPoint = isBefore ? anchor : focus
@@ -76,7 +82,9 @@ public class RangeSelection: BaseSelection {
     let startOffset = firstPoint.offset
     let endOffset = lastPoint.offset
 
-    if let elementNode = firstNode as? ElementNode, let descendent = elementNode.getDescendantByIndex(index: startOffset) {
+    if let elementNode = firstNode as? ElementNode,
+      let descendent = elementNode.getDescendantByIndex(index: startOffset)
+    {
       firstNode = descendent
     }
     if let lastNodeUnwrapped = lastNode as? ElementNode {
@@ -84,8 +92,9 @@ public class RangeSelection: BaseSelection {
       // We don't want to over-select, as node selection infers the child before
       // the last descendant, not including that descendant.
       if let lastNodeDescendantUnwrapped = lastNodeDescendant,
-         lastNodeDescendantUnwrapped != firstNode,
-         lastNodeUnwrapped.getChildAtIndex(index: endOffset) == lastNodeDescendantUnwrapped {
+        lastNodeDescendantUnwrapped != firstNode,
+        lastNodeUnwrapped.getChildAtIndex(index: endOffset) == lastNodeDescendantUnwrapped
+      {
         lastNodeDescendant = lastNodeDescendantUnwrapped.getPreviousSibling()
       }
       lastNode = lastNodeDescendant ?? lastNodeUnwrapped
@@ -100,19 +109,24 @@ public class RangeSelection: BaseSelection {
   }
 
   public func clone() -> BaseSelection {
-    let selectionAnchor = createPoint(key: anchor.key,
-                                      offset: anchor.offset,
-                                      type: anchor.type)
-    let selectionFocus = createPoint(key: focus.key,
-                                     offset: focus.offset,
-                                     type: focus.type)
+    let selectionAnchor = createPoint(
+      key: anchor.key,
+      offset: anchor.offset,
+      type: anchor.type)
+    let selectionFocus = createPoint(
+      key: focus.key,
+      offset: focus.offset,
+      type: focus.type)
     return RangeSelection(anchor: selectionAnchor, focus: selectionFocus, format: format)
   }
 
-  public func setTextNodeRange(anchorNode: TextNode,
-                               anchorOffset: Int,
-                               focusNode: TextNode,
-                               focusOffset: Int) {
+  @MainActor
+  public func setTextNodeRange(
+    anchorNode: TextNode,
+    anchorOffset: Int,
+    focusNode: TextNode,
+    focusOffset: Int
+  ) {
     anchor.updatePoint(key: anchorNode.key, offset: anchorOffset, type: .text)
     focus.updatePoint(key: focusNode.key, offset: focusOffset, type: .text)
     dirty = true
@@ -134,9 +148,10 @@ public class RangeSelection: BaseSelection {
       let startOffset = anchorOffset > focusOffset ? focusOffset : anchorOffset
       let endOffset = anchorOffset > focusOffset ? anchorOffset : focusOffset
       let splitNodes = try firstNode.splitText(splitOffsets: [startOffset, endOffset])
-      guard let node = startOffset == 0
-              ? (splitNodes.count > 0 ? splitNodes.first : nil)
-              : (splitNodes.count > 1 ? splitNodes[1] : nil)
+      guard
+        let node = startOffset == 0
+          ? (splitNodes.count > 0 ? splitNodes.first : nil)
+          : (splitNodes.count > 1 ? splitNodes[1] : nil)
       else { return [] }
       return [node]
     }
@@ -168,6 +183,7 @@ public class RangeSelection: BaseSelection {
     return selectedNodes
   }
 
+  @MainActor
   public func insertRawText(text: String) throws {
     let parts = text.split { $0 == "\n" || $0 == "\r\n" }.map(String.init)
     if parts.count == 1 {
@@ -221,7 +237,8 @@ public class RangeSelection: BaseSelection {
           if node == firstNode {
             if node == lastNode {
               if anchorOffset < focusOffset {
-                let anchorRange = NSRange(location: anchorOffset, length: focusOffset - anchorOffset)
+                let anchorRange = NSRange(
+                  location: anchorOffset, length: focusOffset - anchorOffset)
                 textSliceAnchor = (text as NSString).substring(with: anchorRange)
               } else {
                 let focusRange = NSRange(location: focusOffset, length: anchorOffset - focusOffset)
@@ -249,7 +266,9 @@ public class RangeSelection: BaseSelection {
           }
 
           textContent += text
-        } else if (isDecoratorNode(node) || isLineBreakNode(node)) && (node != lastNode || !isCollapsed()) {
+        } else if (isDecoratorNode(node) || isLineBreakNode(node))
+          && (node != lastNode || !isCollapsed())
+        {
           textContent += node.getTextContent()
         }
       }
@@ -258,6 +277,7 @@ public class RangeSelection: BaseSelection {
     return textContent
   }
 
+  @MainActor
   public func insertText(_ text: String) throws {
     let anchor = anchor
     let focus = focus
@@ -267,9 +287,11 @@ public class RangeSelection: BaseSelection {
     let style = style
 
     if isBefore && anchor.type == .element {
-      try transferStartingElementPointToTextPoint(start: anchor, end: focus, format: format, style: style)
+      try transferStartingElementPointToTextPoint(
+        start: anchor, end: focus, format: format, style: style)
     } else if !isBefore && focus.type == .element {
-      try transferStartingElementPointToTextPoint(start: focus, end: anchor, format: format, style: style)
+      try transferStartingElementPointToTextPoint(
+        start: focus, end: anchor, format: format, style: style)
     }
 
     let selectedNodes = try getNodes()
@@ -287,16 +309,14 @@ public class RangeSelection: BaseSelection {
     let firstNodeParent = try firstNode.getParentOrThrow()
     var lastNode = selectedNodes.last
 
-    if isCollapsed() &&
-        startOffset == firstNodeTextLength &&
-        (firstNode.isSegmented() ||
-          firstNode.isToken() ||
-          !firstNode.canInsertTextAfter() ||
-          (!firstNodeParent.canInsertTextAfter() && firstNode.getNextSibling() == nil)) {
+    if isCollapsed() && startOffset == firstNodeTextLength
+      && (firstNode.isSegmented() || firstNode.isToken() || !firstNode.canInsertTextAfter()
+        || (!firstNodeParent.canInsertTextAfter() && firstNode.getNextSibling() == nil))
+    {
       var nextSibling = firstNode.getNextSibling() as? TextNode
-      if nextSibling == nil ||
-          !(nextSibling?.canInsertTextBefore() ?? true) ||
-          isTokenOrSegmented(nextSibling) {
+      if nextSibling == nil || !(nextSibling?.canInsertTextBefore() ?? true)
+        || isTokenOrSegmented(nextSibling)
+      {
         nextSibling = TextNode()
         if let nextSibling {
           try nextSibling.setFormat(format: format)
@@ -315,12 +335,10 @@ public class RangeSelection: BaseSelection {
         try insertText(text)
         return
       }
-    } else if isCollapsed() &&
-                startOffset == 0 &&
-                (firstNode.isSegmented() ||
-                  firstNode.isToken() ||
-                  !firstNode.canInsertTextBefore() ||
-                  (!firstNodeParent.canInsertTextBefore() && firstNode.getPreviousSibling() == nil)) {
+    } else if isCollapsed() && startOffset == 0
+      && (firstNode.isSegmented() || firstNode.isToken() || !firstNode.canInsertTextBefore()
+        || (!firstNodeParent.canInsertTextBefore() && firstNode.getPreviousSibling() == nil))
+    {
       var prevSibling = firstNode.getPreviousSibling() as? TextNode
       if prevSibling == nil || isTokenOrSegmented(prevSibling) {
         prevSibling = TextNode()
@@ -353,13 +371,14 @@ public class RangeSelection: BaseSelection {
       // the new content.
       let lastNodeParent = lastNode?.getParent()
 
-      if !firstNodeParent.canInsertTextBefore() ||
-          !firstNodeParent.canInsertTextAfter() ||
-          (lastNodeParent != nil &&
-            (!(lastNodeParent?.canInsertTextBefore() ?? true) ||
-              !(lastNodeParent?.canInsertTextAfter() ?? true))) {
+      if !firstNodeParent.canInsertTextBefore() || !firstNodeParent.canInsertTextAfter()
+        || (lastNodeParent != nil
+          && (!(lastNodeParent?.canInsertTextBefore() ?? true)
+            || !(lastNodeParent?.canInsertTextAfter() ?? true)))
+      {
         try insertText("")
-        try normalizeSelectionPointsForBoundaries(anchor: self.anchor, focus: self.focus, lastSelection: nil)
+        try normalizeSelectionPointsForBoundaries(
+          anchor: self.anchor, focus: self.focus, lastSelection: nil)
         try insertText(text)
         return
       }
@@ -417,7 +436,8 @@ public class RangeSelection: BaseSelection {
       }
       let delCount = endOffset - startOffset
 
-      firstNode = try firstNode.spliceText(offset: startOffset, delCount: delCount, newText: text, moveSelection: true)
+      firstNode = try firstNode.spliceText(
+        offset: startOffset, delCount: delCount, newText: text, moveSelection: true)
       if firstNode.getTextPart().lengthAsNSString() == 0 {
         try firstNode.remove()
       } else if self.anchor.type == .text {
@@ -431,12 +451,14 @@ public class RangeSelection: BaseSelection {
         }
       }
     } else {
-      var markedNodeKeysForKeep = Set(firstNode.getParentKeys()).union(lastNode?.getParentKeys() ?? [])
+      var markedNodeKeysForKeep = Set(firstNode.getParentKeys()).union(
+        lastNode?.getParentKeys() ?? [])
 
       // We have to get the parent elements before the next section,
       // as in that section we might mutate the lastNode.
       let firstElement = try firstNode.getParentOrThrow()
-      var lastElement: ElementNode? = lastNode is ElementNode ? lastNode as? ElementNode : try lastNode?.getParentOrThrow()
+      var lastElement: ElementNode? =
+        lastNode is ElementNode ? lastNode as? ElementNode : try lastNode?.getParentOrThrow()
       var lastElementChild = lastNode
 
       // If the last element is inline, we should instead look at getting
@@ -461,15 +483,17 @@ public class RangeSelection: BaseSelection {
 
       if (shouldModifyTextNode || shouldModifyElementNode) && shouldModifyDecoratorNode {
         if let lastNodeAsTextNode = lastNode as? TextNode,
-           !lastNodeAsTextNode.isToken(),
-           endOffset != lastNodeAsTextNode.getTextContentSize() {
+          !lastNodeAsTextNode.isToken(),
+          endOffset != lastNodeAsTextNode.getTextContentSize()
+        {
           if lastNodeAsTextNode.isSegmented() {
             let textNode = TextNode(text: lastNodeAsTextNode.getTextPart())
             try lastNodeAsTextNode.replace(replaceWith: textNode)
             lastNode = textNode
           }
           if let lastNodeAsTextNode = lastNode as? TextNode {
-            lastNode = try lastNodeAsTextNode.spliceText(offset: 0, delCount: endOffset, newText: "")
+            lastNode = try lastNodeAsTextNode.spliceText(
+              offset: 0, delCount: endOffset, newText: "")
             if let lastNode {
               markedNodeKeysForKeep.insert(lastNode.key)
             }
@@ -477,8 +501,9 @@ public class RangeSelection: BaseSelection {
         } else {
           let lastNodeParent = try lastNode?.getParentOrThrow()
           if let lastNodeParent,
-             !lastNodeParent.canBeEmpty(),
-             lastNodeParent.getChildrenSize() == 1 {
+            !lastNodeParent.canBeEmpty(),
+            lastNodeParent.getChildrenSize() == 1
+          {
             try lastNodeParent.remove()
           } else {
             try lastNode?.remove()
@@ -551,7 +576,9 @@ public class RangeSelection: BaseSelection {
       // Ensure we do splicing after moving of nodes, as splicing
       // can have side-effects (in the case of hashtags).
       if !firstNode.isToken() {
-        firstNode = try firstNode.spliceText(offset: startOffset, delCount: firstNodeTextLength - startOffset, newText: text, moveSelection: true)
+        firstNode = try firstNode.spliceText(
+          offset: startOffset, delCount: firstNodeTextLength - startOffset, newText: text,
+          moveSelection: true)
         if firstNode.getTextContent().lengthAsNSString() == 0 {
           try firstNode.remove()
         } else if firstNode.isComposing() && self.anchor.type == .text {
@@ -576,6 +603,7 @@ public class RangeSelection: BaseSelection {
     }
   }
 
+  @MainActor
   @discardableResult
   public func insertNodes(nodes: [Node], selectStart: Bool = false) throws -> Bool {
     if !isCollapsed() {
@@ -640,8 +668,8 @@ public class RangeSelection: BaseSelection {
       if let node = node as? ElementNode {
         if node == firstNode {
           if let unwrappedTarget = target as? ElementNode,
-             unwrappedTarget.isEmpty() &&
-              unwrappedTarget.canReplaceWith(replacement: node) {
+            unwrappedTarget.isEmpty() && unwrappedTarget.canReplaceWith(replacement: node)
+          {
             try target.replace(replaceWith: node)
             target = node
             didReplaceOrMerge = true
@@ -688,8 +716,8 @@ public class RangeSelection: BaseSelection {
       } else if isDecoratorBlockNode(node) {
         if node == firstNode {
           if let unwrappedTarget = target as? ElementNode,
-             unwrappedTarget.isEmpty() &&
-              unwrappedTarget.canReplaceWith(replacement: node) {
+            unwrappedTarget.isEmpty() && unwrappedTarget.canReplaceWith(replacement: node)
+          {
             try target.replace(replaceWith: node)
             target = node
             didReplaceOrMerge = true
@@ -700,8 +728,10 @@ public class RangeSelection: BaseSelection {
         if isTextNode(target) {
           target = topLevelElement
         }
-      } else if didReplaceOrMerge && !isDecoratorNode(node) && isRootNode(node: target.getParent()) {
-        throw LexicalError.invariantViolation("insertNodes: cannot insert a non-element into a root node")
+      } else if didReplaceOrMerge && !isDecoratorNode(node) && isRootNode(node: target.getParent())
+      {
+        throw LexicalError.invariantViolation(
+          "insertNodes: cannot insert a non-element into a root node")
       }
 
       didReplaceOrMerge = false
@@ -756,7 +786,9 @@ public class RangeSelection: BaseSelection {
             try unwrappedTarget.append([sibling])
             target = sibling
           } else {
-            if let elementSibling = sibling as? ElementNode, !elementSibling.canInsertAfter(node: target) {
+            if let elementSibling = sibling as? ElementNode,
+              !elementSibling.canInsertAfter(node: target)
+            {
               let prevParentClone = prevParent.clone()
 
               try prevParentClone.append([elementSibling])
@@ -814,6 +846,7 @@ public class RangeSelection: BaseSelection {
     return try insertNodeIntoTarget(node: node, target: try target.getParentOrThrow())
   }
 
+  @MainActor
   public func getPlaintext() throws -> String {
     // @alexmattice - replace this with a version driven off a depth first search
     guard let editor = getActiveEditor() else {
@@ -831,6 +864,7 @@ public class RangeSelection: BaseSelection {
 
   // MARK: - Internal
 
+  @MainActor
   public func insertParagraph() throws {
     if !isCollapsed() {
       try removeText()
@@ -847,7 +881,8 @@ public class RangeSelection: BaseSelection {
       nodesToMove = anchorNode.getNextSiblings().reversed()
       currentElement = try anchorNode.getParentOrThrow()
       let isInline = currentElement.isInline()
-      let textContentLength = isInline ? currentElement.getTextContentSize() : anchorNode.getTextContentSize()
+      let textContentLength =
+        isInline ? currentElement.getTextContentSize() : anchorNode.getTextContentSize()
 
       if anchorOffset == 0 {
         nodesToMove.append(anchorNode)
@@ -925,7 +960,9 @@ public class RangeSelection: BaseSelection {
       // If we're at the beginning of the current element, move the new element to be before the current element
       let currentElementFirstChild = currentElement.getFirstChild()
       let anchorNode = try anchor.getNode()
-      let isBeginning = anchorOffset == 0 && (currentElement == anchorNode || (currentElementFirstChild == anchorNode))
+      let isBeginning =
+        anchorOffset == 0
+        && (currentElement == anchorNode || (currentElementFirstChild == anchorNode))
       if isBeginning && nodesToMoveLength > 0 {
         try currentElement.insertBefore(nodeToInsert: newElement)
         return
@@ -964,6 +1001,7 @@ public class RangeSelection: BaseSelection {
   }
 
   // Note that "line break" is different to "paragraph", and pressing return/enter does the latter.
+  @MainActor
   public func insertLineBreak(selectStart: Bool) throws {
     let lineBreakNode = createLineBreakNode()
 
@@ -982,6 +1020,7 @@ public class RangeSelection: BaseSelection {
     }
   }
 
+  @MainActor
   public func deleteCharacter(isBackwards: Bool) throws {
     let wasCollapsed = isCollapsed()
     if isCollapsed() {
@@ -990,14 +1029,17 @@ public class RangeSelection: BaseSelection {
       var anchorNode: Node? = try anchor.getNode()
       if !isBackwards {
         if let anchorNode = anchorNode as? ElementNode,
-           anchor.type == .element,
-           anchor.offset == anchorNode.getChildrenSize() {
+          anchor.type == .element,
+          anchor.offset == anchorNode.getChildrenSize()
+        {
           let parent = anchorNode.getParent()
           let nextSibling = anchorNode.getNextSibling() ?? parent?.getNextSibling()
           if let nextSibling = nextSibling as? ElementNode, nextSibling.isShadowRoot() {
             return
           }
-        } else if let anchorNode = anchorNode as? ElementNode, anchor.type == .text && anchor.offset == anchorNode.getTextContentSize() {
+        } else if let anchorNode = anchorNode as? ElementNode,
+          anchor.type == .text && anchor.offset == anchorNode.getTextContentSize()
+        {
           // repeating the code in the previous condition, as porting the JS code with a typecast in the 'if' statement was difficult in Swift
           let parent = anchorNode.getParent()
           let nextSibling = anchorNode.getNextSibling() ?? parent?.getNextSibling()
@@ -1014,8 +1056,9 @@ public class RangeSelection: BaseSelection {
           // Make it possible to move selection from range selection to
           // node selection on the node.
           if /* possibleNode.isKeyboardSelectable() && */
-            let anchorNode = anchorNode as? ElementNode,
-            anchorNode.isEmpty() {
+          let anchorNode = anchorNode as? ElementNode,
+            anchorNode.isEmpty()
+          {
             try anchorNode.remove()
             let nodeSelection = NodeSelection(nodes: Set([adjacentNode.key]))
             try setSelection(nodeSelection)
@@ -1042,9 +1085,10 @@ public class RangeSelection: BaseSelection {
 
         return
       } else if isRootNode(node: anchorNode),
-                let adjacentNode = adjacentNode as? ElementNode,
-                let adjacentNodeSibling = adjacentNode.getNextSibling() as? DecoratorNode,
-                !adjacentNodeSibling.isInline() {
+        let adjacentNode = adjacentNode as? ElementNode,
+        let adjacentNodeSibling = adjacentNode.getNextSibling() as? DecoratorNode,
+        !adjacentNodeSibling.isInline()
+      {
         // A decorator block node's selection is represented as an index within
         // the root node. We need to handle the case where the cursor is at the
         // start of a decorator block node and you hit backspace. In this case,
@@ -1060,7 +1104,9 @@ public class RangeSelection: BaseSelection {
         }
 
         return
-      } else if !isBackwards, let possibleNode = adjacentNode as? ElementNode, let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
+      } else if !isBackwards, let possibleNode = adjacentNode as? ElementNode,
+        let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty()
+      {
         try anchorNode.remove()
         try possibleNode.selectStart()
         return
@@ -1074,14 +1120,20 @@ public class RangeSelection: BaseSelection {
         if let focusNode = focusNode as? TextNode, focusNode.isSegmented() {
           let offset = focus.getOffset()
           let textContentSize = focusNode.getTextContentSize()
-          if let anchorNode, focusNode.isSameNode(anchorNode) || (isBackwards && offset != textContentSize) || (!isBackwards && offset != 0) {
+          if let anchorNode,
+            focusNode.isSameNode(anchorNode) || (isBackwards && offset != textContentSize)
+              || (!isBackwards && offset != 0)
+          {
             try removeSegment(node: focusNode, isBackward: isBackwards, offset: offset)
             return
           }
         } else if let anchorNode = anchorNode as? TextNode, anchorNode.isSegmented() {
           let offset = anchor.getOffset()
           let textContentSize = anchorNode.getTextContentSize()
-          if let focusNode, anchorNode.isSameNode(focusNode) || (isBackwards && offset != 0) || (!isBackwards && offset != textContentSize) {
+          if let focusNode,
+            anchorNode.isSameNode(focusNode) || (isBackwards && offset != 0)
+              || (!isBackwards && offset != textContentSize)
+          {
             try removeSegment(node: anchorNode, isBackward: isBackwards, offset: offset)
             return
           }
@@ -1090,7 +1142,8 @@ public class RangeSelection: BaseSelection {
         // since our modify() accurately accounts for unicode boundaries
       } else if isBackwards && anchor.offset == 0 {
         // Special handling around rich text nodes
-        let element = anchor.type == .element ? try anchor.getNode() : try anchor.getNode().getParentOrThrow()
+        let element =
+          anchor.type == .element ? try anchor.getNode() : try anchor.getNode().getParentOrThrow()
         if let element = element as? ElementNode, try element.collapseAtStart(selection: self) {
           return
         }
@@ -1099,16 +1152,20 @@ public class RangeSelection: BaseSelection {
 
     try removeText()
 
-    if isBackwards && !wasCollapsed && isCollapsed() && self.anchor.type == .element && self.anchor.offset == 0 {
+    if isBackwards && !wasCollapsed && isCollapsed() && self.anchor.type == .element
+      && self.anchor.offset == 0
+    {
       if let anchorNode = try self.anchor.getNode() as? ElementNode,
-         anchorNode.isEmpty(),
-         isRootNode(node: anchorNode.getParent()),
-         anchorNode.getIndexWithinParent() == 0 {
+        anchorNode.isEmpty(),
+        isRootNode(node: anchorNode.getParent()),
+        anchorNode.getIndexWithinParent() == 0
+      {
         try anchorNode.collapseAtStart(selection: self)
       }
     }
   }
 
+  @MainActor
   public func deleteWord(isBackwards: Bool) throws {
     if isCollapsed() {
       try modify(alter: .extend, isBackward: isBackwards, granularity: .word)
@@ -1116,6 +1173,7 @@ public class RangeSelection: BaseSelection {
     try removeText()
   }
 
+  @MainActor
   public func deleteLine(isBackwards: Bool) throws {
     if isCollapsed() {
       try modify(alter: .extend, isBackward: isBackwards, granularity: .line)
@@ -1123,11 +1181,15 @@ public class RangeSelection: BaseSelection {
     try removeText()
   }
 
+  @MainActor
   internal func removeText() throws {
     try insertText("")
   }
 
-  internal func modify(alter: NativeSelectionModificationType, isBackward: Bool, granularity: UITextGranularity) throws {
+  @MainActor
+  internal func modify(
+    alter: NativeSelectionModificationType, isBackward: Bool, granularity: UITextGranularity
+  ) throws {
     let collapse = alter == .move
 
     guard let editor = getActiveEditor() else {
@@ -1157,11 +1219,14 @@ public class RangeSelection: BaseSelection {
   }
 
   // This method is the equivalent of applyDOMRange()
+  @MainActor
   public func applyNativeSelection(_ nativeSelection: NativeSelection) throws {
     guard let range = nativeSelection.range else { return }
-    try applySelectionRange(range, affinity: range.length == 0 ? .backward : nativeSelection.affinity)
+    try applySelectionRange(
+      range, affinity: range.length == 0 ? .backward : nativeSelection.affinity)
   }
 
+  @MainActor
   internal func applySelectionRange(_ range: NSRange, affinity: UITextStorageDirection) throws {
     guard let editor = getActiveEditor() else {
       throw LexicalError.invariantViolation("Calling applyNativeSelection when no active editor")
@@ -1170,22 +1235,32 @@ public class RangeSelection: BaseSelection {
     let anchorOffset = affinity == .forward ? range.location : range.location + range.length
     let focusOffset = affinity == .forward ? range.location + range.length : range.location
 
-    if let anchor = try pointAtStringLocation(anchorOffset, searchDirection: affinity, rangeCache: editor.rangeCache),
-       let focus = try pointAtStringLocation(focusOffset, searchDirection: affinity, rangeCache: editor.rangeCache) {
+    if let anchor = try pointAtStringLocation(
+      anchorOffset, searchDirection: affinity, rangeCache: editor.rangeCache),
+      let focus = try pointAtStringLocation(
+        focusOffset, searchDirection: affinity, rangeCache: editor.rangeCache)
+    {
       self.anchor = anchor
       self.focus = focus
     }
   }
 
+  @MainActor
   init?(nativeSelection: NativeSelection) {
-    guard let range = nativeSelection.range, let editor = getActiveEditor(), !nativeSelection.selectionIsNodeOrObject else { return nil }
+    guard let range = nativeSelection.range, let editor = getActiveEditor(),
+      !nativeSelection.selectionIsNodeOrObject
+    else { return nil }
     let affinity = range.length == 0 ? .backward : nativeSelection.affinity
 
     let anchorOffset = affinity == .forward ? range.location : range.location + range.length
     let focusOffset = affinity == .forward ? range.location + range.length : range.location
 
-    guard let anchor = try? pointAtStringLocation(anchorOffset, searchDirection: affinity, rangeCache: editor.rangeCache),
-          let focus = try? pointAtStringLocation(focusOffset, searchDirection: affinity, rangeCache: editor.rangeCache) else {
+    guard
+      let anchor = try? pointAtStringLocation(
+        anchorOffset, searchDirection: affinity, rangeCache: editor.rangeCache),
+      let focus = try? pointAtStringLocation(
+        focusOffset, searchDirection: affinity, rangeCache: editor.rangeCache)
+    else {
       return nil
     }
 
@@ -1196,6 +1271,7 @@ public class RangeSelection: BaseSelection {
     self.style = ""
   }
 
+  @MainActor
   internal func formatText(formatType: TextFormatType) throws {
     if isCollapsed() {
       toggleFormat(type: formatType)
@@ -1265,7 +1341,8 @@ public class RangeSelection: BaseSelection {
           let splitNodes = try textNode.splitText(splitOffsets: [startOffset, endOffset])
           let replacement = startOffset == 0 ? splitNodes[0] : splitNodes[1]
           try replacement.setFormat(format: firstNextFormat)
-          let newSelection = try replacement.select(anchorOffset: 0, focusOffset: endOffset - startOffset)
+          let newSelection = try replacement.select(
+            anchorOffset: 0, focusOffset: endOffset - startOffset)
           updateSelection(
             anchor: newSelection.anchor,
             focus: newSelection.focus,
@@ -1330,9 +1407,11 @@ public class RangeSelection: BaseSelection {
         let selectedNodeKey = selectedNode.getKey()
 
         if let textNode = selectedNode as? TextNode,
-           selectedNodeKey != firstNode.getKey(),
-           selectedNodeKey != lastNode.getKey() {
-          let selectedNextFormat = textNode.getFormatFlags(type: formatType, alignWithFormat: lastNextFormat)
+          selectedNodeKey != firstNode.getKey(),
+          selectedNodeKey != lastNode.getKey()
+        {
+          let selectedNextFormat = textNode.getFormatFlags(
+            type: formatType, alignWithFormat: lastNextFormat)
           try textNode.setFormat(format: selectedNextFormat)
         }
       }
@@ -1345,6 +1424,7 @@ public class RangeSelection: BaseSelection {
 
   // MARK: - Private
 
+  @MainActor
   private func updateSelection(anchor: Point, focus: Point, format: TextFormat, isDirty: Bool) {
     self.anchor.updatePoint(key: anchor.key, offset: anchor.offset, type: anchor.type)
     self.focus.updatePoint(key: focus.key, offset: focus.offset, type: focus.type)
@@ -1371,6 +1451,7 @@ public class RangeSelection: BaseSelection {
     focus.type = anchorType
   }
 
+  @MainActor
   public func insertRawText(_ text: String) throws {
     let parts = text.split(whereSeparator: \.isNewline)
     if parts.count == 1 {
@@ -1397,15 +1478,13 @@ public class RangeSelection: BaseSelection {
   }
 }
 
-extension RangeSelection: Equatable {
+extension RangeSelection: @preconcurrency Equatable {
   public static func == (lhs: RangeSelection, rhs: RangeSelection) -> Bool {
-    return lhs.anchor == rhs.anchor &&
-      lhs.focus == rhs.focus &&
-      lhs.format == rhs.format
+    return lhs.anchor == rhs.anchor && lhs.focus == rhs.focus && lhs.format == rhs.format
   }
 }
 
-extension RangeSelection: CustomDebugStringConvertible {
+extension RangeSelection: @preconcurrency CustomDebugStringConvertible {
   public var debugDescription: String {
     return "\tanchor { \(anchor)\n\tfocus { \(focus)"
   }

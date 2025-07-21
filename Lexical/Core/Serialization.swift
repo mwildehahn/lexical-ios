@@ -43,7 +43,7 @@ public struct SerializedEditorState: Codable {
   }
 }
 
-public struct SerializedNodeArray: Decodable {
+public struct SerializedNodeArray: @preconcurrency Decodable {
   enum PartialCodingKeys: String, CodingKey {
     case type
   }
@@ -54,6 +54,7 @@ public struct SerializedNodeArray: Decodable {
     self.nodeArray = nodeArray
   }
 
+  @MainActor
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     var nodeArray = [Node]()
@@ -83,7 +84,7 @@ public struct SerializedNodeArray: Decodable {
   }
 }
 
-public typealias DeserializationConstructor = (Decoder) throws -> Node
+public typealias DeserializationConstructor = @MainActor (Decoder) throws -> Node
 typealias DeserializationMapping = [NodeType: DeserializationConstructor]
 
 // MARK: - Utilities
@@ -92,12 +93,12 @@ typealias DeserializationMapping = [NodeType: DeserializationConstructor]
 let sharedDecoder = JSONDecoder()
 
 let defaultDeserializationMapping: DeserializationMapping = [
-  NodeType.root: { decoder in try RootNode(from: decoder) },
-  NodeType.text: { decoder in try TextNode(from: decoder) },
-  NodeType.element: { decoder in try ElementNode(from: decoder) },
-  NodeType.heading: { decoder in try HeadingNode(from: decoder) },
-  NodeType.paragraph: { decoder in try ParagraphNode(from: decoder) },
-  NodeType.quote: { decoder in try QuoteNode(from: decoder) },
+  NodeType.root: { @MainActor decoder in try RootNode(from: decoder) },
+  NodeType.text: { @MainActor decoder in try TextNode(from: decoder) },
+  NodeType.element: { @MainActor decoder in try ElementNode(from: decoder) },
+  NodeType.heading: { @MainActor decoder in try HeadingNode(from: decoder) },
+  NodeType.paragraph: { @MainActor decoder in try ParagraphNode(from: decoder) },
+  NodeType.quote: { @MainActor decoder in try QuoteNode(from: decoder) },
 ]
 
 func makeDeserializationMap() -> DeserializationMapping {

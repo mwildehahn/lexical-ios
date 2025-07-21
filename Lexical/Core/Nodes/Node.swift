@@ -14,7 +14,8 @@ public typealias NodeKey = String
 /// This class provides various methods for reading and manipulating the node tree, as well as node lifecycle support.
 ///
 /// If you're creating your own node class, typically you would inherit from ``TextNode``, ``DecoratorNode`` or ``ElementNode``, rather than directly inheriting from ``Node``.
-open class Node: Codable {
+@MainActor
+open class Node: @preconcurrency Codable {
   enum CodingKeys: String, CodingKey {
     case type
     case version
@@ -810,13 +811,13 @@ open class Node: Codable {
   }
 }
 
-extension Node: Hashable {
+extension Node: @preconcurrency Hashable {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(ObjectIdentifier(self))
   }
 }
 
-extension Node: Equatable {
+extension Node: @preconcurrency Equatable {
   public static func == (lhs: Node, rhs: Node) -> Bool {
     //    return ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
     return lhs.isSameKey(rhs)
