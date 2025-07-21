@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 internal func isRootTextContentEmpty(isEditorComposing: Bool, trim: Bool = true) -> Bool {
   if isEditorComposing {
     return false

@@ -43,7 +43,7 @@ public struct SerializedEditorState: Codable {
   }
 }
 
-public struct SerializedNodeArray: Decodable {
+public struct SerializedNodeArray: @preconcurrency Decodable {
   enum PartialCodingKeys: String, CodingKey {
     case type
   }

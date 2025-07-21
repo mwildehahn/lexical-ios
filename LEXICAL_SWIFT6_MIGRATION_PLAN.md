@@ -46,7 +46,7 @@ Maintain synchronous API by leveraging MainActor isolation.
 @MainActor
 final class EditorContext {
     private static var current: ContextStack?
-    
+
     struct ContextStack {
         let editor: Editor?
         let editorState: EditorState?
@@ -55,7 +55,7 @@ final class EditorContext {
         let previous: ContextStack?
         let updateStack: [Editor]
     }
-    
+
     static func withContext<T>(
         editor: Editor?,
         editorState: EditorState?,
@@ -66,7 +66,7 @@ final class EditorContext {
         let previous = current
         let updateStack = previous?.updateStack ?? []
         let newStack = (editor != nil && !readOnlyMode) ? updateStack + [editor!] : updateStack
-        
+
         current = ContextStack(
             editor: editor,
             editorState: editorState,
@@ -75,11 +75,11 @@ final class EditorContext {
             previous: previous,
             updateStack: newStack
         )
-        
+
         defer { current = previous }
         return try operation()
     }
-    
+
     static func getActiveEditor() -> Editor? { current?.editor }
     static func getActiveEditorState() -> EditorState? { current?.editorState }
     static func isReadOnlyMode() -> Bool { current?.readOnlyMode ?? true }
@@ -246,6 +246,8 @@ grep -rn "Task {" Lexical/ Plugins/
 ## Migration Command Reference
 
 ```bash
+# NOTE: when running these build commands, let's think about being efficient with the token output for processing so use ` |head` with a limit so we can work our way through the errors in a context efficient way.
+
 # Build for iOS Simulator
 swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
   -Xswiftc "-target" -Xswiftc "x86_64-apple-ios13.0-simulator"

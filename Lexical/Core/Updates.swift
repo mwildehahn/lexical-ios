@@ -36,12 +36,14 @@ internal func isEditorPresentInUpdateStack(_ editor: Editor) -> Bool {
   return EditorContext.isEditorInUpdateStack(editor)
 }
 
+@MainActor
 public func errorOnReadOnly() throws {
   if isReadOnlyMode() {
     throw LexicalError.invariantViolation("Editor should be in writeable state")
   }
 }
 
+@MainActor
 public func triggerUpdateListeners(
   activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState,
   dirtyNodes: DirtyNodeMap
@@ -51,6 +53,7 @@ public func triggerUpdateListeners(
   }
 }
 
+@MainActor
 func triggerErrorListeners(
   activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState,
   error: Error
@@ -60,11 +63,12 @@ func triggerErrorListeners(
   }
 }
 
+@MainActor
 public func triggerTextContentListeners(
   activeEditor: Editor, activeEditorState: EditorState, previousEditorState: EditorState
 ) throws {
-  let activeTextContent = try getEditorStateTextContent(editorState: activeEditorState)
-  let previousTextContent = try getEditorStateTextContent(editorState: previousEditorState)
+  let activeTextContent = activeEditorState.getTextContent()
+  let previousTextContent = previousEditorState.getTextContent()
 
   if activeTextContent != previousTextContent {
     for listener in activeEditor.listeners.textContent.values {
@@ -73,6 +77,7 @@ public func triggerTextContentListeners(
   }
 }
 
+@MainActor
 public func triggerCommandListeners(activeEditor: Editor, type: CommandType, payload: Any?) -> Bool
 {
   let listenersInPriorityOrder = activeEditor.commands[type]
