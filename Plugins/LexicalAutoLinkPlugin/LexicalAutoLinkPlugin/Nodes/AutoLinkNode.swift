@@ -13,6 +13,7 @@ extension NodeType {
   public static let autoLink = NodeType(rawValue: "autoLink")
 }
 
+@MainActor
 protocol AutoLinkNodeVisitor {
   func visitAutoLinkNode(_ node: AutoLinkNode) throws
 }
@@ -34,7 +35,9 @@ public class AutoLinkNode: LinkNode {
     .autoLink
   }
 
-  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+  public required init(
+    from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
+  ) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
@@ -51,7 +54,9 @@ public class AutoLinkNode: LinkNode {
     Self(url: url, key: key)
   }
 
-  override open func insertNewAfter(selection: RangeSelection?) throws -> RangeSelection.InsertNewAfterResult {
+  override open func insertNewAfter(selection: RangeSelection?) throws
+    -> RangeSelection.InsertNewAfterResult
+  {
     if let element = try getParentOrThrow().insertNewAfter(selection: selection) as? ElementNode {
       let linkNode = AutoLinkNode(url: url, key: nil)
       try element.append([linkNode])

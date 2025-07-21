@@ -12,6 +12,7 @@ extension NodeType {
   public static let link = NodeType(rawValue: "link")
 }
 
+@MainActor
 public protocol LinkNodeVisitor {
   func visitLinkNode(_ node: LinkNode) throws
 }
@@ -36,7 +37,9 @@ open class LinkNode: ElementNode {
     try self.init(from: decoder, depth: nil, index: nil)
   }
 
-  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+  public required init(
+    from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
+  ) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
 
@@ -83,7 +86,8 @@ open class LinkNode: ElementNode {
     Self(url: url, key: key)
   }
 
-  override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
+  override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any]
+  {
     if url.isEmpty {
       return [:]
     }
@@ -93,8 +97,12 @@ open class LinkNode: ElementNode {
     return attribs
   }
 
-  override open func insertNewAfter(selection: RangeSelection?) throws -> RangeSelection.InsertNewAfterResult {
-    if let element = try getParentOrThrow().insertNewAfter(selection: selection).element as? ElementNode {
+  override open func insertNewAfter(selection: RangeSelection?) throws
+    -> RangeSelection.InsertNewAfterResult
+  {
+    if let element = try getParentOrThrow().insertNewAfter(selection: selection).element
+      as? ElementNode
+    {
       let linkNode = LinkNode(url: url, key: nil)
       try element.append([linkNode])
       return .init(element: linkNode)
@@ -103,7 +111,7 @@ open class LinkNode: ElementNode {
     return .init()
   }
 
-  open override func accept<V>(visitor: V) throws where V : NodeVisitor {
+  open override func accept<V>(visitor: V) throws where V: NodeVisitor {
     if let visitor = visitor as? LinkNodeVisitor {
       try visitor.visitLinkNode(self)
     }

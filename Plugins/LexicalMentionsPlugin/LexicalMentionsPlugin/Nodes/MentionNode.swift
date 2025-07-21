@@ -13,6 +13,7 @@ extension NodeType {
   static let mention = NodeType(rawValue: "mention")
 }
 
+@MainActor
 protocol MentionNodeVisitor {
   func visitMentionNode(_ node: MentionNode) throws
 }
@@ -33,7 +34,9 @@ public class MentionNode: TextNode {
     .mention
   }
 
-  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+  public required init(
+    from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
+  ) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
     self.mention = try container.decode(String.self, forKey: .mention)
@@ -58,7 +61,8 @@ public class MentionNode: TextNode {
     Self(mention: mention, text: getText_dangerousPropertyAccess(), key: key)
   }
 
-  override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
+  override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any]
+  {
     var attributeDictionary = super.getAttributedStringAttributes(theme: theme)
     attributeDictionary[.backgroundColor] = UIColor.lightGray
     return attributeDictionary
