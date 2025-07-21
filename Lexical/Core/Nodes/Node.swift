@@ -43,12 +43,12 @@ open class Node: Codable {
     }
   }
 
-  public required convenience init(from decoder: Decoder) throws {
+  nonisolated public required convenience init(from decoder: Decoder) throws {
     try self.init(from: decoder, depth: nil, index: nil)
   }
 
   /// Used when initialising node from JSON
-  public required init(
+  nonisolated public required init(
     from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
   ) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)

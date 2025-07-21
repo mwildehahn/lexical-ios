@@ -8,6 +8,7 @@
 import Foundation
 
 // Leaving commented code for later when these properties/nodes are implemented
+@MainActor
 public func cloneWithProperties<T: Node>(node: T) throws -> Node {
   let latest = node.getLatest()
   let clone = latest.clone()
@@ -35,6 +36,7 @@ public func cloneWithProperties<T: Node>(node: T) throws -> Node {
   return clone
 }
 
+@MainActor
 func getIndexFromPossibleClone(
   node: Node,
   parent: ElementNode,
@@ -48,6 +50,7 @@ func getIndexFromPossibleClone(
 }
 
 // Only node that is excluded in JS currently is "LexicalOverflowNode"›
+@MainActor
 func getParentAvoidingExcludedElements(node: Node) -> ElementNode? {
   var parent = node.getParent()
   while let unwrappedParent = parent, unwrappedParent.excludeFromCopy() {
@@ -57,6 +60,7 @@ func getParentAvoidingExcludedElements(node: Node) -> ElementNode? {
   return parent
 }
 
+@MainActor
 func copyLeafNodeBranchToRoot(
   leaf: Node,
   startingOffset: Int,

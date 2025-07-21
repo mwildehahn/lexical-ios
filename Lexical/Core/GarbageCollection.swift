@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 
+@MainActor
 internal func garbageCollectDetachedDeepChildNodes(
   node: ElementNode,
   parentKey: NodeKey,

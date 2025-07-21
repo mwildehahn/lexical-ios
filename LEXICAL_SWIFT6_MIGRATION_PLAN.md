@@ -5,8 +5,9 @@ Migrate Lexical iOS from thread dictionary pattern to MainActor for Swift 6 comp
 
 ## Quick Status Summary (December 2024)
 - **Phase 1**: ✅ COMPLETED - Core migration done (EditorContext, Updates, Editor, EditorState)
-- **Phase 2**: 🚧 IN PROGRESS - 19 files need @MainActor annotations
-- **Next Steps**: Work through the file list in "Files Requiring Updates - Detailed Instructions" section
+- **Phase 2**: 🚧 IN PROGRESS - Marking classes with @MainActor (preferred over individual methods)
+- **Strategy Update**: Mark entire classes we own with @MainActor instead of individual methods
+- **Next Steps**: Run build to identify remaining compilation errors
 - **Build Command**: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "x86_64-apple-ios13.0-simulator"`
 
 ## Current State Summary
@@ -36,7 +37,7 @@ public func getActiveEditor() -> Editor? {
 ## Migration Strategy
 
 ### Phase 1: MainActor Annotation
-Mark Editor and related classes as @MainActor since they already run on main thread in practice. Prefer to mark classes we own in the library with @MainActor vs adding it to each individual mehtod.
+Mark Editor and related classes as @MainActor since they already run on main thread in practice. Prefer to mark classes we own in the library with @MainActor vs adding it to each individual method.
 
 ### Phase 2: Context Storage Replacement
 Replace thread dictionary with a MainActor-isolated context manager.
@@ -221,6 +222,30 @@ grep -rn "Task {" Lexical/ Plugins/
 - `DispatchQueue`: Only in ImageNode classes
 - No `Task {` usage found
 
+## Classes Marked with @MainActor (December 2024)
+
+### Core Classes
+- **Node** - Base class for all nodes (all subclasses inherit MainActor isolation)
+- **Editor** - Main editor class (marked in Phase 1)
+- **EditorState** - Editor state management (marked in Phase 1)
+
+### UI/Frontend Classes  
+- **TextView** - UITextView subclass
+- **TextViewDelegate** - UITextViewDelegate implementation
+- **LexicalView** - Main view component
+- **ResponderForNodeSelection** - UIResponder for node selection
+
+### TextKit Classes
+- **LayoutManager** - NSLayoutManager subclass
+- **LayoutManagerDelegate** - NSLayoutManagerDelegate
+- **TextStorage** - NSTextStorage subclass
+- **TextContainer** - NSTextContainer subclass
+- **TextAttachment** - NSTextAttachment subclass
+
+### Other Classes
+- **InputDelegateProxy** - UITextInputDelegate proxy
+- **LexicalReadOnlyTextKitContext** - Read-only rendering context
+
 ## Progress Tracking
 
 ### Phase 1: Core Migration - COMPLETED ✅
@@ -234,34 +259,40 @@ grep -rn "Task {" Lexical/ Plugins/
 - [x] Update Utils.swift
 - [x] Update Reconciler.swift (partial)
 - [x] Update Serialization.swift (partial)
-- [ ] **Fix remaining compilation errors** (19 files identified)
+- [x] **NEW STRATEGY**: Mark entire classes with @MainActor instead of individual methods
+- [x] Marked Node class as @MainActor (all subclasses inherit this)
+- [x] Marked UI/TextKit classes as @MainActor
+- [x] Fixed Plugin.swift (installedInstance method)
+- [x] Fixed GarbageCollection.swift
+- [x] Fixed Events.swift event handlers
+- [ ] **Fix remaining compilation errors** (run build to identify)
 - [ ] Update all plugins
 - [ ] Update tests
 - [ ] Update documentation
 
-### Phase 2.1: Remaining File Updates (For Sub-Agent)
-**Priority 1 - Simple @MainActor additions (5 min each):**
-- [ ] Plugin.swift - Add @MainActor to installedInstance()
-- [ ] GarbageCollection.swift - Add @MainActor to garbageCollectDetachedNodes
-- [ ] Events.swift - Add @MainActor to event handlers
+### Phase 2.1: Completed Updates (December 2024)
+**Classes marked with @MainActor:**
+- [x] Node.swift - Entire class marked (all node subclasses inherit)
+- [x] Editor.swift - Already marked in Phase 1
+- [x] EditorState.swift - Already marked in Phase 1
+- [x] TextView.swift & TextViewDelegate
+- [x] LexicalView.swift
+- [x] LayoutManager.swift
+- [x] TextStorage.swift
+- [x] TextContainer.swift
+- [x] TextAttachment.swift
+- [x] LayoutManagerDelegate.swift
+- [x] InputDelegateProxy.swift
+- [x] ResponderForNodeSelection.swift
 
-**Priority 2 - Node classes (10 min each):**
-- [ ] CodeNode.swift - Add @MainActor to setLanguage, insertNewAfter
-- [ ] ElementNode.swift - Add @MainActor to text-related methods
-- [ ] Node.swift - Add @MainActor to getWritable and related methods
-- [ ] TextNode.swift - Add @MainActor to text manipulation methods
-- [ ] DecoratorNode.swift - Add @MainActor to state access methods
-- [ ] DecoratorContainerNode.swift - Add @MainActor to state access methods
-
-**Priority 3 - Helper/Utility files (10 min each):**
-- [ ] AttributesUtils.swift - Add @MainActor to attribute creation functions
-- [ ] CopyPasteHelpers.swift - Add @MainActor to paste handling functions
-
-**Priority 4 - TextKit integration (15 min each):**
-- [ ] LayoutManager.swift - Add @MainActor where needed
-- [ ] RangeCache.swift - Add @MainActor where needed
-- [ ] TextAttachment.swift - Add @MainActor where needed
-- [ ] TextStorage.swift - Add @MainActor where needed
+**Individual method/function updates:**
+- [x] Plugin.swift - installedInstance()
+- [x] GarbageCollection.swift - garbageCollectDetachedNodes(), garbageCollectDetachedDeepChildNodes()
+- [x] Events.swift - shouldInsertTextAfterOrBeforeTextNode()
+- [x] SelectionHelpers.swift - cloneWithProperties(), getIndexFromPossibleClone(), getParentAvoidingExcludedElements(), copyLeafNodeBranchToRoot()
+- [x] Serialization.swift - Updated DeserializationConstructor typealias and defaultDeserializationMapping
+- [x] Node.swift - Added nonisolated to init(from:) methods for Decodable conformance
+- [x] ElementNode/CodeNode - Removed individual annotations after marking Node class
 
 ### Phase 3: Cleanup
 - [ ] Remove old thread dictionary code
@@ -298,61 +329,6 @@ swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
   -Xswiftc -strict-concurrency=complete
 ```
 
-## Progress Update - December 2024
-
-### Completed Work
-
-#### Phase 1: Core Migration - COMPLETED
-- [x] Created `EditorContext.swift` with MainActor-isolated context manager
-- [x] Updated `Updates.swift` to use EditorContext instead of thread dictionary
-- [x] Added @MainActor to `Editor` class
-- [x] Added @MainActor to `EditorState` class
-
-#### Phase 2: Method Updates - IN PROGRESS
-The following files have been updated with @MainActor annotations:
-
-1. **Core/Updates.swift**
-   - All public functions now use EditorContext
-   - Removed thread dictionary implementation
-
-2. **Core/Editor.swift**
-   - Editor class marked as @MainActor
-   - beginRead and beginUpdate methods work with new context
-
-3. **Core/EditorState.swift**
-   - EditorState class marked as @MainActor
-
-4. **Core/Utils.swift**
-   - Updated: getNodeByKey, generateKey, getCompositionKey, getRoot
-   - Updated: decoratorView, getAttributedStringFromFrontend, setSelection
-
-5. **Core/Selection/Point.swift**
-   - Updated: updatePoint, getNode methods
-
-6. **Core/Selection/RangeSelection.swift**
-   - Updated: getPlaintext, insertParagraph, deleteCharacter, modify
-   - Updated: applySelectionRange, init?(nativeSelection:), setTextNodeRange
-   - Updated: insertText, insertLineBreak, deleteWord, deleteLine
-   - Updated: applyNativeSelection, formatText, updateSelection
-
-7. **Core/Selection/NodeSelection.swift**
-   - Updated: getNodes, insertParagraph
-
-8. **Core/Selection/SelectionUtils.swift**
-   - Updated: getSelection, sanityCheckPoint, editorStateHasDirtySelection
-   - Updated: stringLocationForPoint, createSelection, makeRangeSelection
-   - Updated: normalizeSelectionPointsForBoundaries, selectPointOnNode
-   - Updated: sanityCheckSelection, moveSelectionPointToSibling
-   - Updated: createNativeSelection, updateElementSelectionOnCreateDeleteNode
-   - Updated: updateSelectionResolveTextNodes, transferStartingElementPointToTextPoint
-   - Updated: setBlocksType
-
-9. **Core/Reconciler.swift**
-   - Updated: reconcileSelection method
-
-10. **Core/Serialization.swift**
-    - Updated: SerializedNodeArray init(from decoder:)
-
 ### Next Steps
 
 When resuming this migration:
@@ -382,6 +358,24 @@ When resuming this migration:
    - Remove any remaining thread dictionary code
    - Update Package.swift to Swift 6
    - Update documentation
+
+## Strategy Change (December 2024)
+
+### Old Approach
+- Adding @MainActor to individual methods that showed compilation errors
+- Time-consuming and creates inconsistent API surface
+
+### New Approach  
+- Mark entire classes we own with @MainActor
+- All methods in the class automatically become MainActor-isolated
+- Cleaner, more consistent, and easier to maintain
+- Node class marked as @MainActor means ALL node subclasses inherit this
+
+### Benefits
+1. **Consistency**: All methods in a class have the same isolation
+2. **Simplicity**: No need to annotate each method individually  
+3. **Inheritance**: Subclasses automatically inherit MainActor isolation
+4. **Maintenance**: Easier to understand and maintain the codebase
 
 ### Known Issues to Address
 

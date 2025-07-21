@@ -149,6 +149,7 @@ internal func onPasteFromUITextView(editor: Editor, pasteboard: UIPasteboard) th
   editor.frontend?.showPlaceholderText()
 }
 
+@MainActor
 public func shouldInsertTextAfterOrBeforeTextNode(selection: RangeSelection, node: TextNode) -> Bool
 {
   var shouldInsertTextBefore = false
