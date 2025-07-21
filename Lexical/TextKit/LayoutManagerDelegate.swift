@@ -8,7 +8,7 @@
 import UIKit
 
 @MainActor
-class LayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
+class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {
   func layoutManager(
     _ layoutManager: NSLayoutManager,
     shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,

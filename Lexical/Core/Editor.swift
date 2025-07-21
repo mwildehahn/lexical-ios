@@ -96,7 +96,7 @@ public class Editor: NSObject {
   // keyCounter is the next available node key to be used.
   internal var keyCounter: Int = 0
   // The optional multiplier to use when generating node keys
-  internal(set) var keyMultiplier: NodeKeyMultiplier?
+  internal var keyMultiplier: NodeKeyMultiplier?
 
   // Transforms are defined as functions that operate on nodes. In the JS code, functions are
   // equatable but Swift for a variety of reasons does not support this. To keep track of transforms

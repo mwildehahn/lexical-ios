@@ -9,6 +9,7 @@ import MobileCoreServices
 import UIKit
 import UniformTypeIdentifiers
 
+@MainActor
 protocol LexicalTextViewDelegate: NSObjectProtocol {
   func textViewDidBeginEditing(textView: TextView)
   func textViewDidEndEditing(textView: TextView)
