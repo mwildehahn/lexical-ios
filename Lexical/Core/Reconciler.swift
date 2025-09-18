@@ -140,10 +140,11 @@ private struct TextStorageDeltaApplier {
         return nil
       }
 
-      let replacement = Reconciler.attributedStringFromInsertion(
-        insertion,
-        state: pendingEditorState,
-        theme: theme)
+      let existingAttributes = textStorage.attributes(at: anchorRange.location, effectiveRange: nil)
+      let replacement = NSAttributedString(string: expectedAnchor, attributes: existingAttributes)
+      if replacement.length != anchorRange.length {
+        return nil
+      }
       replacements.append((range: anchorRange, attributedString: replacement))
     }
 
