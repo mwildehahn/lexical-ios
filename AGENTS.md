@@ -5,7 +5,14 @@ Lexical's Swift Package is declared in `Package.swift` and maps directly to the 
 
 ## Build, Test, and Development Commands
 - `swift build`: Compile all package targets for debugging; run from the repo root.
-- `swift test`: Execute the XCTest suites defined in `LexicalTests/` and plugin test targets.
+- Run tests with:
+
+  ```sh
+  xcodebuild \
+      -scheme Lexical-Package \
+      -destination "platform=iOS Simulator,name=iPhone 17,OS=26.0" \
+      test
+  ```
 - `open Playground/LexicalPlayground.xcodeproj`: Launch the playground app in Xcode for manual verification of UI changes.
 
 ## Coding Style & Naming Conventions
@@ -16,4 +23,3 @@ XCTest is the standard; add coverage beside the code under test (`LexicalTests/T
 
 ## Commit & Pull Request Guidelines
 Commit summaries are short, present-tense statements (e.g. `Mark visitor protocols as MainActor`) and may reference issues using `(#123)`. Group related changes into a single commit when practical. Pull requests should describe the motivation, outline code-level changes, and call out any API shifts. Link to GitHub issues or tasks, attach screenshots for UI-impacting edits (notably in the playground), and confirm that `swift test` passes. Update documentation or changelog entries when APIs move or new modules are added.
-
