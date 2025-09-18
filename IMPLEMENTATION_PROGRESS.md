@@ -21,11 +21,12 @@ Track tasks, testing, and rollout steps for introducing anchor-driven reconcilia
 - [x] Store anchor metadata (node key hash, marker ids) on `RangeCacheItem` for quick lookup.
   - **Tests:** Add targeted checks in `LexicalTests/Tests/RangeCacheTests.swift` ensuring cache stores anchor info only when flag set. Run `swift test --filter RangeCacheTests`.
 
+- [ ] Update `RangeCache` adjustments to use local offsets (Fenwick tree or equivalent) after delta operations.
 ### 3. TextStorage Delta Applier
-- [ ] Implement `TextStorageDeltaApplier` utility that locates anchors and applies scoped mutations to `NSTextStorage`.
-  - **Tests:** New XCTest suite under `LexicalTests/Tests/TextStorageDeltaApplierTests.swift` mocking `NSTextStorage` to assert minimal edits; run `swift test --filter TextStorageDeltaApplierTests`.
-- [ ] Integrate delta applier into reconciler when anchor flag is active; maintain legacy delete/insert otherwise.
-  - **Tests:** Dual-path tests in `LexicalTests/Tests/ReconcilerTests.swift` comparing anchor vs legacy output for targeted edits (insert at top, mid, bottom). Run `swift test --filter ReconcilerTests`.
+- [x] Implement `TextStorageDeltaApplier` utility that locates anchors and applies scoped mutations to `NSTextStorage`.
+  - **Tests:** `LexicalTests/Tests/ReconcilerDeltaTests.swift` validates anchor-only mutations alongside `xcodebuild -scheme Lexical-Package -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" test -only-testing:LexicalTests/ReconcilerDeltaTests`.
+- [x] Integrate delta applier into reconciler when anchor flag is active; maintain legacy delete/insert otherwise.
+  - **Tests:** Full assurance via `xcodebuild -scheme Lexical-Package -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" test`.
 - [ ] Update `RangeCache` adjustments to use local offsets (Fenwick tree or equivalent) after delta operations.
   - **Tests:** Add regression case in `LexicalTests/Tests/RangeCacheTests.swift` verifying downstream node locations adjust logarithmically (assert minimal touched nodes). Run `swift test --filter RangeCacheTests/testUpdatesOffsetsWithFenwick`.
 

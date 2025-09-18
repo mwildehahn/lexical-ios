@@ -75,7 +75,91 @@ private struct TextStorageDeltaApplier {
     markedTextOperation: MarkedTextOperation?,
     markedTextPointForAddition: Point?
   ) -> NSAttributedString? {
-    // TODO: Implement anchor-aware targeted updates. Currently return nil to trigger legacy fallback.
+    guard !state.rangesToAdd.isEmpty,
+      state.rangesToAdd.count == state.rangesToDelete.count,
+      let textStorageNSString = textStorage.string as NSString?
+    else {
+      return nil
+    }
+
+    var replacements: [(range: NSRange, attributedString: NSAttributedString)] = []
+
+    for (index, insertion) in state.rangesToAdd.enumerated() {
+      let deletionRange = state.rangesToDelete[index]
+
+      guard
+        let cacheItem = state.nextRangeCache[insertion.nodeKey],
+        let node = pendingEditorState.nodeMap[insertion.nodeKey]
+      else {
+        return nil
+      }
+
+      let anchorRange: NSRange
+      let expectedAnchor: String
+
+      switch insertion.part {
+      case .preamble:
+        guard
+          let element = node as? ElementNode,
+          let startAnchor = element.anchorStartString,
+          cacheItem.startAnchorLength == startAnchor.lengthAsNSString()
+        else {
+          return nil
+        }
+        anchorRange = NSRange(location: cacheItem.location, length: cacheItem.startAnchorLength)
+        expectedAnchor = startAnchor
+      case .postamble:
+        guard
+          let element = node as? ElementNode,
+          let endAnchor = element.anchorEndString,
+          cacheItem.endAnchorLength == endAnchor.lengthAsNSString()
+        else {
+          return nil
+        }
+        anchorRange = NSRange(
+          location: cacheItem.location
+            + cacheItem.preambleLength
+            + cacheItem.childrenLength
+            + cacheItem.textLength,
+          length: cacheItem.endAnchorLength)
+        expectedAnchor = endAnchor
+      case .text:
+        return nil
+      }
+
+      guard anchorRange == deletionRange else {
+        return nil
+      }
+
+      guard anchorRange.location + anchorRange.length <= textStorageNSString.length else {
+        return nil
+      }
+
+      let currentAnchor = textStorageNSString.substring(with: anchorRange)
+      guard currentAnchor == expectedAnchor else {
+        return nil
+      }
+
+      let replacement = Reconciler.attributedStringFromInsertion(
+        insertion,
+        state: pendingEditorState,
+        theme: theme)
+      replacements.append((range: anchorRange, attributedString: replacement))
+    }
+
+    guard !replacements.isEmpty else {
+      return nil
+    }
+
+    for replacement in replacements.reversed() {
+      textStorage.replaceCharacters(in: replacement.range, with: replacement.attributedString)
+    }
+
+    for replacement in replacements {
+      let fixRange = NSRange(location: replacement.range.location, length: replacement.attributedString.length)
+      textStorage.fixAttributes(in: fixRange)
+    }
+
     return nil
   }
 }
