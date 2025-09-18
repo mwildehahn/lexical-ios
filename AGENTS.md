@@ -5,12 +5,13 @@ Lexical's Swift Package is declared in `Package.swift` and maps directly to the 
 
 ## Build, Test, and Development Commands
 - `swift build`: Compile all package targets for debugging; run from the repo root.
-- Run tests with:
+- Prefer the XcodeBuild MCP commands when available (for example `XcodeBuildMCP__build_run_sim`); fall back to the equivalent CLI (`xcodebuild`) if the MCP tools are not exposed in the environment.
+- Run all test suites on the iOS 26.0 iPhone 17 Pro simulator:
 
   ```sh
   xcodebuild \
       -scheme Lexical-Package \
-      -destination "platform=iOS Simulator,name=iPhone 17,OS=26.0" \
+      -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" \
       test
   ```
 - `open Playground/LexicalPlayground.xcodeproj`: Launch the playground app in Xcode for manual verification of UI changes.

@@ -310,41 +310,42 @@ open class ElementNode: Node {
   }
 
   override open func getPreamble() -> String {
+    var preamble = ""
     if self.isInline() {
-      return ""
+      preamble = ""
+    } else {
+      guard let prevSibling = getPreviousSibling() else {
+        preamble = ""
+        return anchorMarker(kind: .start) + preamble
+      }
+
+      if !(prevSibling is ElementNode) {
+        preamble = "\n"
+      }
     }
 
-    guard let prevSibling = getPreviousSibling() else {
-      return ""
-    }
-
-    guard prevSibling is ElementNode else {
-      // Since prev is inline but not an element node, and we're not inline, return a newline
-      return "\n"
-    }
-
-    // note that if prev is an element node (inline or not), it'll handle the newline.
-    return ""
+    return anchorMarker(kind: .start) + preamble
   }
 
   override open func getPostamble() -> String {
+    let basePostamble: String
+
     let nextSibling = getNextSibling()
 
     if nextSibling == nil {
-      // we have no next sibling, return "" no matter whether we're inline or not
-      return ""
+      basePostamble = ""
     } else if isInline() {
       if let nextSibling, !nextSibling.isInline() {
-        // we're inline but the next sibling is not inline
-        return "\n"
+        basePostamble = "\n"
       } else {
-        // we're inline, next sibling is either a text node or inline
-        return ""
+        basePostamble = ""
       }
     } else {
-      // we're not inline
-      return "\n"
+      basePostamble = "\n"
     }
+
+    let endMarker = anchorMarker(kind: .end)
+    return endMarker + basePostamble
   }
 
   public func getAllTextNodes(includeInert: Bool = false) -> [TextNode] {

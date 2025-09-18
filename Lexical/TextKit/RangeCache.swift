@@ -22,6 +22,8 @@ struct RangeCacheItem {
   var childrenLength: Int = 0
   var textLength: Int = 0
   var postambleLength: Int = 0
+  var startAnchorLength: Int = 0
+  var endAnchorLength: Int = 0
 
   var range: NSRange {
     NSRange(

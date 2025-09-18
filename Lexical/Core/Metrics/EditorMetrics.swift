@@ -18,19 +18,28 @@ public struct ReconcilerMetric {
   public let rangesAdded: Int
   public let rangesDeleted: Int
   public let treatedAllNodesAsDirty: Bool
+  public let nodesVisited: Int
+  public let insertedCharacters: Int
+  public let deletedCharacters: Int
 
   public init(
     duration: TimeInterval,
     dirtyNodes: Int,
     rangesAdded: Int,
     rangesDeleted: Int,
-    treatedAllNodesAsDirty: Bool
+    treatedAllNodesAsDirty: Bool,
+    nodesVisited: Int,
+    insertedCharacters: Int,
+    deletedCharacters: Int
   ) {
     self.duration = duration
     self.dirtyNodes = dirtyNodes
     self.rangesAdded = rangesAdded
     self.rangesDeleted = rangesDeleted
     self.treatedAllNodesAsDirty = treatedAllNodesAsDirty
+    self.nodesVisited = nodesVisited
+    self.insertedCharacters = insertedCharacters
+    self.deletedCharacters = deletedCharacters
   }
 }
 

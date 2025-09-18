@@ -8,7 +8,54 @@
 @testable import Lexical
 import XCTest
 
+@MainActor
 class RangeCacheTests: XCTestCase {
+
+  @MainActor
+  func testRangeCacheStoresAnchorLengths() throws {
+    let context = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(reconcilerAnchors: true)
+    )
+    let editor = context.editor
+
+    var paragraphKeys: [NodeKey] = []
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else {
+        XCTFail("Missing root node")
+        return
+      }
+
+      let firstParagraph = ParagraphNode()
+      let firstTextNode = TextNode(text: "Alpha", key: nil)
+      try firstParagraph.append([firstTextNode])
+      try rootNode.append([firstParagraph])
+      paragraphKeys.append(firstParagraph.key)
+
+      let secondParagraph = ParagraphNode()
+      let secondTextNode = TextNode(text: "Beta", key: nil)
+      try secondParagraph.append([secondTextNode])
+      try rootNode.append([secondParagraph])
+      paragraphKeys.append(secondParagraph.key)
+    }
+
+    try editor.read {
+      for key in paragraphKeys {
+        guard let cacheItem = editor.rangeCache[key] else {
+          XCTFail("Missing cache entry for \(key)")
+          continue
+        }
+        let expectedStartLength = AnchorMarkers.make(kind: .start, key: key).lengthAsNSString()
+        let expectedEndLength = AnchorMarkers.make(kind: .end, key: key).lengthAsNSString()
+
+        XCTAssertEqual(cacheItem.startAnchorLength, expectedStartLength)
+        XCTAssertEqual(cacheItem.endAnchorLength, expectedEndLength)
+        XCTAssertGreaterThanOrEqual(cacheItem.preambleLength, cacheItem.startAnchorLength)
+        XCTAssertGreaterThanOrEqual(cacheItem.postambleLength, cacheItem.endAnchorLength)
+      }
+    }
+  }
 
   func testSearchRangeCacheForPoints() throws {
     let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())

@@ -10,10 +10,16 @@ import Foundation
 @objc public class FeatureFlags: NSObject {
   let reconcilerSanityCheck: Bool
   let proxyTextViewInputDelegate: Bool
+  let reconcilerAnchors: Bool
 
-  @objc public init(reconcilerSanityCheck: Bool = false, proxyTextViewInputDelegate: Bool = false) {
+  @objc public init(
+    reconcilerSanityCheck: Bool = false,
+    proxyTextViewInputDelegate: Bool = false,
+    reconcilerAnchors: Bool = false
+  ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
+    self.reconcilerAnchors = reconcilerAnchors
     super.init()
   }
 }

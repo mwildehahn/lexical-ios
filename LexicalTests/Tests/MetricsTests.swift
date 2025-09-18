@@ -42,6 +42,32 @@ final class MetricsTests: XCTestCase {
     XCTAssertGreaterThan(metric.dirtyNodes, 0)
     XCTAssertGreaterThan(metric.rangesAdded, 0)
     XCTAssertGreaterThanOrEqual(metric.rangesDeleted, 0)
+    XCTAssertGreaterThan(metric.nodesVisited, 0)
+    XCTAssertGreaterThan(metric.insertedCharacters, 0)
+    XCTAssertGreaterThanOrEqual(metric.deletedCharacters, 0)
+  }
+
+  func testResetClearsRecordedMetrics() throws {
+    let metrics = TestMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: FeatureFlags())
+    let editor = textKitContext.editor
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else {
+        XCTFail("No root node")
+        return
+      }
+      let paragraph = ParagraphNode()
+      let textNode = TextNode(text: "hello", key: nil)
+      try paragraph.append([textNode])
+      try rootNode.append([paragraph])
+    }
+
+    XCTAssertFalse(metrics.reconcilerRuns.isEmpty)
+
+    metrics.resetMetrics()
+    XCTAssertTrue(metrics.reconcilerRuns.isEmpty)
   }
 }
 

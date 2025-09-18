@@ -8,7 +8,91 @@
 @testable import Lexical
 import XCTest
 
+@MainActor
 class ParagraphNodeTests: XCTestCase {
+  @MainActor
+  func testParagraphAnchorsDisabledByDefault() throws {
+    let context = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags()
+    )
+    let editor = context.editor
+
+    try editor.update {
+      guard
+        let rootNode = getActiveEditorState()?.getRootNode()
+      else {
+        XCTFail("No root node")
+        return
+      }
+
+      _ = try? rootNode.clear()
+
+      let paragraph = ParagraphNode()
+      let textNode = TextNode(text: "Hello", key: nil)
+      try paragraph.append([textNode])
+      try rootNode.append([paragraph])
+    }
+
+    try editor.read {
+      guard
+        let rootNode = getActiveEditorState()?.getRootNode(),
+        let paragraph = rootNode.getFirstChild() as? ParagraphNode
+      else {
+        XCTFail("Missing paragraph")
+        return
+      }
+
+      XCTAssertFalse(paragraph.shouldEmitAnchorMarkers)
+      XCTAssertEqual(paragraph.getPreamble(), "")
+      XCTAssertEqual(paragraph.getPostamble(), "")
+      XCTAssertEqual(rootNode.getTextContent(), "Hello")
+    }
+  }
+
+  @MainActor
+  func testParagraphAnchorsEnabledWrapText() throws {
+    let context = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(reconcilerAnchors: true)
+    )
+    let editor = context.editor
+
+    try editor.update {
+      guard
+        let rootNode = getActiveEditorState()?.getRootNode()
+      else {
+        XCTFail("No root node")
+        return
+      }
+
+      _ = try? rootNode.clear()
+
+      let paragraph = ParagraphNode()
+      let textNode = TextNode(text: "Hello", key: nil)
+      try paragraph.append([textNode])
+      try rootNode.append([paragraph])
+    }
+
+    try editor.read {
+      guard
+        let rootNode = getActiveEditorState()?.getRootNode(),
+        let paragraph = rootNode.getFirstChild() as? ParagraphNode
+      else {
+        XCTFail("Missing paragraph")
+        return
+      }
+
+      XCTAssertTrue(paragraph.shouldEmitAnchorMarkers)
+      let expectedStart = AnchorMarkers.make(kind: .start, key: paragraph.key)
+      let expectedEnd = AnchorMarkers.make(kind: .end, key: paragraph.key)
+
+      XCTAssertEqual(paragraph.getPreamble(), expectedStart)
+      XCTAssertEqual(paragraph.getPostamble(), expectedEnd)
+      XCTAssertEqual(rootNode.getTextContent(), expectedStart + "Hello" + expectedEnd)
+    }
+  }
+
   func testinsertNewAfter() throws {
     let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
     let editor = view.editor

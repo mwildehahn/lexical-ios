@@ -42,6 +42,9 @@ private class ReconcilerState {
     self.possibleDecoratorsToRemove = []
     self.decoratorsToAdd = []
     self.decoratorsToDecorate = []
+    self.visitedNodes = 0
+    self.insertedCharacterCount = 0
+    self.deletedCharacterCount = 0
   }
 
   let prevEditorState: EditorState
@@ -57,6 +60,9 @@ private class ReconcilerState {
   var possibleDecoratorsToRemove: [NodeKey]
   var decoratorsToAdd: [NodeKey]
   var decoratorsToDecorate: [NodeKey]
+  var visitedNodes: Int
+  var insertedCharacterCount: Int
+  var deletedCharacterCount: Int
 }
 
 /* Marked text is a difficult operation because it depends on us being in sync with some private state that
@@ -92,7 +98,10 @@ internal enum Reconciler {
           dirtyNodes: state.dirtyNodes.count,
           rangesAdded: state.rangesToAdd.count,
           rangesDeleted: state.rangesToDelete.count,
-          treatedAllNodesAsDirty: state.treatAllNodesAsDirty
+          treatedAllNodesAsDirty: state.treatAllNodesAsDirty,
+          nodesVisited: state.visitedNodes,
+          insertedCharacters: state.insertedCharacterCount,
+          deletedCharacters: state.deletedCharacterCount
         )
         editor.metricsContainer?.record(.reconcilerRun(metric))
       }
@@ -316,6 +325,8 @@ internal enum Reconciler {
 
   @MainActor
   private static func reconcileNode(key: NodeKey, reconcilerState: ReconcilerState) throws {
+    reconcilerState.visitedNodes += 1
+
     guard let prevNode = reconcilerState.prevEditorState.nodeMap[key],
       let nextNode = reconcilerState.nextEditorState.nodeMap[key]
     else {
@@ -348,7 +359,8 @@ internal enum Reconciler {
     var nextRangeCacheItem = RangeCacheItem()
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
-    let nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
+    let nextPreambleString = nextNode.getPreamble()
+    let nextPreambleLength = nextPreambleString.lengthAsNSString()
     createAddRemoveRanges(
       key: key,
       prevLocation: prevRange.location,
@@ -358,8 +370,13 @@ internal enum Reconciler {
       part: .preamble
     )
     nextRangeCacheItem.preambleLength = nextPreambleLength
-    nextRangeCacheItem.preambleSpecialCharacterLength = nextNode.getPreamble().lengthAsNSString(
+    nextRangeCacheItem.preambleSpecialCharacterLength = nextPreambleString.lengthAsNSString(
       includingCharacters: ["\u{200B}"])
+    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorStartString {
+      nextRangeCacheItem.startAnchorLength = anchor.lengthAsNSString()
+    } else {
+      nextRangeCacheItem.startAnchorLength = 0
+    }
 
     // right, now we have finished the preamble, and the cursor is in the right place. Time for children.
     if nextNode is ElementNode {
@@ -390,7 +407,8 @@ internal enum Reconciler {
     )
     nextRangeCacheItem.textLength = nextTextLength
 
-    let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
+    let nextPostambleString = nextNode.getPostamble()
+    let nextPostambleLength = nextPostambleString.lengthAsNSString()
     createAddRemoveRanges(
       key: key,
       prevLocation: prevRange.location + prevRange.preambleLength + prevRange.childrenLength
@@ -401,6 +419,11 @@ internal enum Reconciler {
       part: .postamble
     )
     nextRangeCacheItem.postambleLength = nextPostambleLength
+    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorEndString {
+      nextRangeCacheItem.endAnchorLength = anchor.lengthAsNSString()
+    } else {
+      nextRangeCacheItem.endAnchorLength = 0
+    }
 
     reconcilerState.nextRangeCache[key] = nextRangeCacheItem
   }
@@ -417,17 +440,20 @@ internal enum Reconciler {
     if prevLength > 0 {
       let prevRange = NSRange(location: prevLocation, length: prevLength)
       reconcilerState.rangesToDelete.append(prevRange)
+      reconcilerState.deletedCharacterCount += prevLength
     }
     if nextLength > 0 {
       let insertion = ReconcilerInsertion(
         location: reconcilerState.locationCursor, nodeKey: key, part: part)
       reconcilerState.rangesToAdd.append(insertion)
+      reconcilerState.insertedCharacterCount += nextLength
     }
     reconcilerState.locationCursor += nextLength
   }
 
   @MainActor
   private static func createNode(key: NodeKey, reconcilerState: ReconcilerState) {
+    reconcilerState.visitedNodes += 1
     guard let nextNode = reconcilerState.nextEditorState.nodeMap[key] else {
       return
     }
@@ -435,14 +461,21 @@ internal enum Reconciler {
     var nextRangeCacheItem = RangeCacheItem()
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
-    let nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
+    let nextPreambleString = nextNode.getPreamble()
+    let nextPreambleLength = nextPreambleString.lengthAsNSString()
     let preambleInsertion = ReconcilerInsertion(
       location: reconcilerState.locationCursor, nodeKey: key, part: .preamble)
     reconcilerState.rangesToAdd.append(preambleInsertion)
     reconcilerState.locationCursor += nextPreambleLength
     nextRangeCacheItem.preambleLength = nextPreambleLength
-    nextRangeCacheItem.preambleSpecialCharacterLength = nextNode.getPreamble().lengthAsNSString(
+    nextRangeCacheItem.preambleSpecialCharacterLength = nextPreambleString.lengthAsNSString(
       includingCharacters: ["\u{200B}"])
+    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorStartString {
+      nextRangeCacheItem.startAnchorLength = anchor.lengthAsNSString()
+    } else {
+      nextRangeCacheItem.startAnchorLength = 0
+    }
+    reconcilerState.insertedCharacterCount += nextPreambleLength
 
     if let nextNode = nextNode as? ElementNode, nextNode.children.count > 0 {
       let cursorBeforeChildren = reconcilerState.locationCursor
@@ -459,19 +492,28 @@ internal enum Reconciler {
     reconcilerState.rangesToAdd.append(textInsertion)
     reconcilerState.locationCursor += nextTextLength
     nextRangeCacheItem.textLength = nextTextLength
+    reconcilerState.insertedCharacterCount += nextTextLength
 
-    let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
+    let nextPostambleString = nextNode.getPostamble()
+    let nextPostambleLength = nextPostambleString.lengthAsNSString()
     let postambleInsertion = ReconcilerInsertion(
       location: reconcilerState.locationCursor, nodeKey: key, part: .postamble)
     reconcilerState.rangesToAdd.append(postambleInsertion)
     reconcilerState.locationCursor += nextPostambleLength
     nextRangeCacheItem.postambleLength = nextPostambleLength
+    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorEndString {
+      nextRangeCacheItem.endAnchorLength = anchor.lengthAsNSString()
+    } else {
+      nextRangeCacheItem.endAnchorLength = 0
+    }
+    reconcilerState.insertedCharacterCount += nextPostambleLength
 
     reconcilerState.nextRangeCache[key] = nextRangeCacheItem
   }
 
   @MainActor
   private static func destroyNode(key: NodeKey, reconcilerState: ReconcilerState) {
+    reconcilerState.visitedNodes += 1
     guard let prevNode = reconcilerState.prevEditorState.nodeMap[key],
       let prevRangeCacheItem = reconcilerState.prevRangeCache[key]
     else {
@@ -481,6 +523,7 @@ internal enum Reconciler {
     let prevPreambleRange = NSRange(
       location: prevRangeCacheItem.location, length: prevRangeCacheItem.preambleLength)
     reconcilerState.rangesToDelete.append(prevPreambleRange)
+    reconcilerState.deletedCharacterCount += prevRangeCacheItem.preambleLength
 
     if let prevNode = prevNode as? ElementNode, prevNode.children.count > 0 {
       destroyChildren(
@@ -493,12 +536,14 @@ internal enum Reconciler {
       location: prevRangeCacheItem.location + prevRangeCacheItem.preambleLength
         + prevRangeCacheItem.childrenLength, length: prevRangeCacheItem.textLength)
     reconcilerState.rangesToDelete.append(prevTextRange)
+    reconcilerState.deletedCharacterCount += prevRangeCacheItem.textLength
 
     let prevPostambleRange = NSRange(
       location: prevRangeCacheItem.location + prevRangeCacheItem.preambleLength
         + prevRangeCacheItem.childrenLength + prevRangeCacheItem.textLength,
       length: prevRangeCacheItem.postambleLength)
     reconcilerState.rangesToDelete.append(prevPostambleRange)
+    reconcilerState.deletedCharacterCount += prevRangeCacheItem.postambleLength
 
     if reconcilerState.nextEditorState.nodeMap[key] == nil {
       reconcilerState.nextRangeCache.removeValue(forKey: key)
@@ -614,6 +659,7 @@ internal enum Reconciler {
       // expected range cache entry to already exist
       return
     }
+    reconcilerState.visitedNodes += 1
     nextRangeCacheItem.location = reconcilerState.locationCursor
     reconcilerState.nextRangeCache[key] = nextRangeCacheItem
 
