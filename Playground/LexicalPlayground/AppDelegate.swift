@@ -15,8 +15,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow()
     guard let window else { return false }
     window.makeKeyAndVisible()
-    let viewController = ViewController()
-    let navigationController = UINavigationController(rootViewController: viewController)
+    let testHub = TestHubViewController()
+    let navigationController = UINavigationController(rootViewController: testHub)
     window.rootViewController = navigationController
     return true
   }
@@ -26,10 +26,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   func persistEditorState() {
-    guard let viewController = window?.rootViewController as? ViewController else {
+    guard let navigationController = window?.rootViewController as? UINavigationController else {
       return
     }
 
-    viewController.persistEditorState()
+    if let editorController = navigationController.topViewController as? ViewController {
+      editorController.persistEditorState()
+    }
   }
 }

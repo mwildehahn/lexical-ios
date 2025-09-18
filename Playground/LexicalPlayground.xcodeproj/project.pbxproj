@@ -14,6 +14,13 @@
 		0656CF8529D1E439009CA08F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0656CF8329D1E439009CA08F /* LaunchScreen.storyboard */; };
 		0656CF9029D1ED8F009CA08F /* ToolbarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0656CF8F29D1ED8F009CA08F /* ToolbarPlugin.swift */; };
 		0656CF9929D23743009CA08F /* Lexical in Frameworks */ = {isa = PBXBuildFile; productRef = 0656CF9829D23743009CA08F /* Lexical */; };
+		06A0A2102C45E7F400123456 /* AnchorDiagnosticsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2042C45E7F400123456 /* AnchorDiagnosticsViewController.swift */; };
+		06A0A2112C45E7F400123456 /* RangeCacheExplorerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2052C45E7F400123456 /* RangeCacheExplorerViewController.swift */; };
+		06A0A2122C45E7F400123456 /* ReconcilerFallbackDemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2062C45E7F400123456 /* ReconcilerFallbackDemoViewController.swift */; };
+		06A0A2132C45E7F400123456 /* CopyPasteDiagnosticsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2072C45E7F400123456 /* CopyPasteDiagnosticsViewController.swift */; };
+		06A0A2142C45E7F400123456 /* TestHubViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2082C45E7F400123456 /* TestHubViewController.swift */; };
+		06A0A2152C45E7F400123456 /* ReconcilerTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2092C45E7F400123456 /* ReconcilerTestHelpers.swift */; };
+		06A0A2172C45F63800123456 /* InfoOverlayViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2162C45F63800123456 /* InfoOverlayViewController.swift */; };
 		0656CFA229D48391009CA08F /* LexicalListPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 0656CFA129D48391009CA08F /* LexicalListPlugin */; };
 		065B5C862A22291C003A38DB /* SelectableDecoratorNode in Frameworks */ = {isa = PBXBuildFile; productRef = 065B5C852A22291C003A38DB /* SelectableDecoratorNode */; };
 		065F9DF72A5EC1D600C95087 /* EditorHistoryPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 065F9DF62A5EC1D600C95087 /* EditorHistoryPlugin */; };
@@ -38,6 +45,13 @@
 		069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportOutputViewController.swift; sourceTree = "<group>"; };
 		06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeHierarchyViewPlugin.swift; sourceTree = "<group>"; };
 		06F7CF952A545C7C0024CD5A /* lexical-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "lexical-logo.png"; sourceTree = "<group>"; };
+		06A0A2042C45E7F400123456 /* AnchorDiagnosticsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnchorDiagnosticsViewController.swift; sourceTree = "<group>"; };
+		06A0A2052C45E7F400123456 /* RangeCacheExplorerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RangeCacheExplorerViewController.swift; sourceTree = "<group>"; };
+		06A0A2062C45E7F400123456 /* ReconcilerFallbackDemoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconcilerFallbackDemoViewController.swift; sourceTree = "<group>"; };
+		06A0A2072C45E7F400123456 /* CopyPasteDiagnosticsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyPasteDiagnosticsViewController.swift; sourceTree = "<group>"; };
+		06A0A2082C45E7F400123456 /* TestHubViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHubViewController.swift; sourceTree = "<group>"; };
+		06A0A2092C45E7F400123456 /* ReconcilerTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconcilerTestHelpers.swift; sourceTree = "<group>"; };
+		06A0A2162C45F63800123456 /* InfoOverlayViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoOverlayViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,7 +96,14 @@
 			isa = PBXGroup;
 			children = (
 				0656CF7829D1E438009CA08F /* AppDelegate.swift */,
+				06A0A2082C45E7F400123456 /* TestHubViewController.swift */,
 				0656CF7C29D1E438009CA08F /* ViewController.swift */,
+				06A0A2042C45E7F400123456 /* AnchorDiagnosticsViewController.swift */,
+				06A0A2052C45E7F400123456 /* RangeCacheExplorerViewController.swift */,
+				06A0A2062C45E7F400123456 /* ReconcilerFallbackDemoViewController.swift */,
+				06A0A2072C45E7F400123456 /* CopyPasteDiagnosticsViewController.swift */,
+				06A0A2092C45E7F400123456 /* ReconcilerTestHelpers.swift */,
+				06A0A2162C45F63800123456 /* InfoOverlayViewController.swift */,
 				069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */,
 				0656CF8F29D1ED8F009CA08F /* ToolbarPlugin.swift */,
 				06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */,
@@ -194,6 +215,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				06A0A2142C45E7F400123456 /* TestHubViewController.swift in Sources */,
+				06A0A2102C45E7F400123456 /* AnchorDiagnosticsViewController.swift in Sources */,
+				06A0A2112C45E7F400123456 /* RangeCacheExplorerViewController.swift in Sources */,
+				06A0A2122C45E7F400123456 /* ReconcilerFallbackDemoViewController.swift in Sources */,
+				06A0A2132C45E7F400123456 /* CopyPasteDiagnosticsViewController.swift in Sources */,
+				06A0A2152C45E7F400123456 /* ReconcilerTestHelpers.swift in Sources */,
+				06A0A2172C45F63800123456 /* InfoOverlayViewController.swift in Sources */,
 				0656CF7D29D1E438009CA08F /* ViewController.swift in Sources */,
 				0656CF7929D1E438009CA08F /* AppDelegate.swift in Sources */,
 				0656CF9029D1ED8F009CA08F /* ToolbarPlugin.swift in Sources */,
