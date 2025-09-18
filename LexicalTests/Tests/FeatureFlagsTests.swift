@@ -30,4 +30,20 @@ final class FeatureFlagsTests: XCTestCase {
     XCTAssertTrue(flags.proxyTextViewInputDelegate)
     XCTAssertTrue(flags.reconcilerAnchors)
   }
+
+  func testEditorUpdatesFeatureFlagsAtRuntime() {
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [])
+    let editor = Editor(editorConfig: editorConfig)
+
+    XCTAssertFalse(editor.activeFeatureFlags.reconcilerAnchors)
+
+    editor.setReconcilerAnchorsEnabled(true)
+    XCTAssertTrue(editor.activeFeatureFlags.reconcilerAnchors)
+
+    let newFlags = FeatureFlags(reconcilerSanityCheck: true, proxyTextViewInputDelegate: false, reconcilerAnchors: false)
+    editor.updateFeatureFlags(newFlags)
+
+    XCTAssertFalse(editor.activeFeatureFlags.reconcilerAnchors)
+    XCTAssertTrue(editor.activeFeatureFlags.reconcilerSanityCheck)
+  }
 }

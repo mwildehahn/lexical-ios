@@ -17,8 +17,13 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
   }
   let nodes = try generateArrayFromSelectedNodes(editor: editor, selection: selection).nodes
   let text = try selection.getTextContent()
+  let sanitizedPlainText = AnchorMarkers.stripAnchors(from: text)
   let encodedData = try JSONEncoder().encode(nodes)
   guard let jsonString = String(data: encodedData, encoding: .utf8) else { return }
+
+  let frontendAttributedString = try getAttributedStringFromFrontend()
+  let sanitizedAttributedString = AnchorMarkers.stripAnchors(from: frontendAttributedString)
+  let fullRange = NSRange(location: 0, length: sanitizedAttributedString.length)
 
   let itemProvider = NSItemProvider()
   itemProvider.registerItem(forTypeIdentifier: LexicalConstants.pasteboardIdentifier) {
@@ -31,8 +36,8 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
     pasteboard.items =
       [
         [
-          (UTType.rtf.identifier): try getAttributedStringFromFrontend().data(
-            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+          (UTType.rtf.identifier): try sanitizedAttributedString.data(
+            from: fullRange,
             documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
         ],
         [LexicalConstants.pasteboardIdentifier: encodedData],
@@ -43,18 +48,22 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
       // after copy on iOS pasteboard.hasStrings returns true but on Mac it returns false for some reason
       // setting this string here will make it return true, pasting will take serialized nodes from the pasteboard
       // anyhow so this should not have any adverse effect
-      pasteboard.string = text
+      pasteboard.string = sanitizedPlainText
     }
   } else {
     pasteboard.items =
       [
         [
-          (kUTTypeRTF as String): try getAttributedStringFromFrontend().data(
-            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+          (kUTTypeRTF as String): try sanitizedAttributedString.data(
+            from: fullRange,
             documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
         ],
         [LexicalConstants.pasteboardIdentifier: encodedData],
       ]
+  }
+
+  if pasteboard.string != sanitizedPlainText {
+    pasteboard.string = sanitizedPlainText
   }
 }
 
@@ -152,14 +161,15 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
 
 @MainActor
 internal func insertPlainText(selection: RangeSelection, text: String) throws {
+  let sanitizedText = AnchorMarkers.stripAnchors(from: text)
   var stringArray: [String] = []
-  let range = text.startIndex..<text.endIndex
-  text.enumerateSubstrings(in: range, options: .byParagraphs) { subString, _, _, _ in
+  let range = sanitizedText.startIndex..<sanitizedText.endIndex
+  sanitizedText.enumerateSubstrings(in: range, options: .byParagraphs) { subString, _, _, _ in
     stringArray.append(subString ?? "")
   }
 
   if stringArray.count == 1 {
-    try selection.insertText(text)
+    try selection.insertText(sanitizedText)
   } else {
     var nodes: [Node] = []
     var i = 0
@@ -181,7 +191,8 @@ internal func insertPlainText(selection: RangeSelection, text: String) throws {
 
 @MainActor
 internal func insertRTF(selection: RangeSelection, attributedString: NSAttributedString) throws {
-  let paragraphs = attributedString.splitByNewlines()
+  let sanitizedAttributedString = AnchorMarkers.stripAnchors(from: attributedString)
+  let paragraphs = sanitizedAttributedString.splitByNewlines()
 
   var nodes: [Node] = []
   var i = 0

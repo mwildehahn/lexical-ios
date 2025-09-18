@@ -20,6 +20,10 @@ private struct ReconcilerInsertion {
   var part: NodePart
 }
 
+internal enum AnchorSanityTestHooks {
+  static var forceMismatch = false
+}
+
 private class ReconcilerState {
   internal init(
     currentEditorState: EditorState,
@@ -45,6 +49,7 @@ private class ReconcilerState {
     self.visitedNodes = 0
     self.insertedCharacterCount = 0
     self.deletedCharacterCount = 0
+    self.fallbackReason = nil
   }
 
   let prevEditorState: EditorState
@@ -63,23 +68,46 @@ private class ReconcilerState {
   var visitedNodes: Int
   var insertedCharacterCount: Int
   var deletedCharacterCount: Int
+  var fallbackReason: ReconcilerFallbackReason?
+
+  func registerFallbackReason(_ reason: ReconcilerFallbackReason) {
+    if fallbackReason == nil {
+      fallbackReason = reason
+    }
+  }
 }
 
 @MainActor
 private struct TextStorageDeltaApplier {
+  enum AnchorDeltaOutcome {
+    case applied(NSAttributedString?)
+    case fallback
+  }
+
   static func applyAnchorAwareDelta(
     state: ReconcilerState,
     textStorage: TextStorage,
     theme: Theme,
     pendingEditorState: EditorState,
     markedTextOperation: MarkedTextOperation?,
-    markedTextPointForAddition: Point?
-  ) -> NSAttributedString? {
+    markedTextPointForAddition: Point?,
+    editor: Editor
+  ) -> AnchorDeltaOutcome {
+    if AnchorSanityTestHooks.forceMismatch {
+      state.fallbackReason = .sanityCheckFailed
+      AnchorSanityTestHooks.forceMismatch = false
+      return .fallback
+    }
     guard !state.rangesToAdd.isEmpty,
       state.rangesToAdd.count == state.rangesToDelete.count,
       let textStorageNSString = textStorage.string as NSString?
     else {
-      return nil
+      state.registerFallbackReason(.unsupportedDelta)
+      if AnchorSanityTestHooks.forceMismatch {
+        state.fallbackReason = .sanityCheckFailed
+      }
+      AnchorSanityTestHooks.forceMismatch = false
+      return .fallback
     }
 
     var replacements: [(range: NSRange, attributedString: NSAttributedString)] = []
@@ -88,11 +116,20 @@ private struct TextStorageDeltaApplier {
       let deletionRange = state.rangesToDelete[index]
 
       guard
-        let cacheItem = state.nextRangeCache[insertion.nodeKey],
+        let nextCacheItem = state.nextRangeCache[insertion.nodeKey],
+        let previousCacheItem = state.prevRangeCache[insertion.nodeKey],
         let node = pendingEditorState.nodeMap[insertion.nodeKey]
       else {
-        return nil
+        state.registerFallbackReason(.unsupportedDelta)
+        if AnchorSanityTestHooks.forceMismatch {
+          state.fallbackReason = .sanityCheckFailed
+        }
+        AnchorSanityTestHooks.forceMismatch = false
+        return .fallback
       }
+
+      let resolvedPreviousCacheItem = previousCacheItem.resolvingLocation(
+        using: editor.rangeCacheLocationIndex, key: insertion.nodeKey)
 
       let anchorRange: NSRange
       let expectedAnchor: String
@@ -102,54 +139,83 @@ private struct TextStorageDeltaApplier {
         guard
           let element = node as? ElementNode,
           let startAnchor = element.anchorStartString,
-          cacheItem.startAnchorLength == startAnchor.lengthAsNSString()
+          nextCacheItem.startAnchorLength == startAnchor.lengthAsNSString()
         else {
-          return nil
+          state.registerFallbackReason(.unsupportedDelta)
+          return .fallback
         }
-        anchorRange = NSRange(location: cacheItem.location, length: cacheItem.startAnchorLength)
+        anchorRange = NSRange(
+          location: resolvedPreviousCacheItem.location,
+          length: resolvedPreviousCacheItem.startAnchorLength)
         expectedAnchor = startAnchor
       case .postamble:
         guard
           let element = node as? ElementNode,
           let endAnchor = element.anchorEndString,
-          cacheItem.endAnchorLength == endAnchor.lengthAsNSString()
+          nextCacheItem.endAnchorLength == endAnchor.lengthAsNSString()
         else {
-          return nil
+          state.registerFallbackReason(.unsupportedDelta)
+          if AnchorSanityTestHooks.forceMismatch {
+            state.fallbackReason = .sanityCheckFailed
+          }
+          AnchorSanityTestHooks.forceMismatch = false
+          return .fallback
         }
         anchorRange = NSRange(
-          location: cacheItem.location
-            + cacheItem.preambleLength
-            + cacheItem.childrenLength
-            + cacheItem.textLength,
-          length: cacheItem.endAnchorLength)
+          location: resolvedPreviousCacheItem.location
+            + resolvedPreviousCacheItem.preambleLength
+            + resolvedPreviousCacheItem.childrenLength
+            + resolvedPreviousCacheItem.textLength,
+          length: resolvedPreviousCacheItem.endAnchorLength)
         expectedAnchor = endAnchor
       case .text:
-        return nil
-      }
+          state.registerFallbackReason(.unsupportedDelta)
+          if AnchorSanityTestHooks.forceMismatch {
+            state.fallbackReason = .sanityCheckFailed
+          }
+          AnchorSanityTestHooks.forceMismatch = false
+          return .fallback
+        }
 
       guard anchorRange == deletionRange else {
-        return nil
+        state.registerFallbackReason(.unsupportedDelta)
+        if AnchorSanityTestHooks.forceMismatch {
+          state.fallbackReason = .sanityCheckFailed
+        }
+        AnchorSanityTestHooks.forceMismatch = false
+        return .fallback
       }
 
       guard anchorRange.location + anchorRange.length <= textStorageNSString.length else {
-        return nil
+        state.registerFallbackReason(.unsupportedDelta)
+        AnchorSanityTestHooks.forceMismatch = false
+        return .fallback
       }
 
       let currentAnchor = textStorageNSString.substring(with: anchorRange)
       guard currentAnchor == expectedAnchor else {
-        return nil
+        state.registerFallbackReason(.unsupportedDelta)
+        AnchorSanityTestHooks.forceMismatch = false
+        return .fallback
       }
 
       let existingAttributes = textStorage.attributes(at: anchorRange.location, effectiveRange: nil)
       let replacement = NSAttributedString(string: expectedAnchor, attributes: existingAttributes)
       if replacement.length != anchorRange.length {
-        return nil
+        state.registerFallbackReason(.unsupportedDelta)
+        AnchorSanityTestHooks.forceMismatch = false
+        return .fallback
       }
       replacements.append((range: anchorRange, attributedString: replacement))
     }
 
     guard !replacements.isEmpty else {
-      return nil
+      state.registerFallbackReason(.unsupportedDelta)
+      if AnchorSanityTestHooks.forceMismatch {
+        state.fallbackReason = .sanityCheckFailed
+      }
+      AnchorSanityTestHooks.forceMismatch = false
+      return .fallback
     }
 
     for replacement in replacements.reversed() {
@@ -161,7 +227,12 @@ private struct TextStorageDeltaApplier {
       textStorage.fixAttributes(in: fixRange)
     }
 
-    return nil
+    if AnchorSanityTestHooks.forceMismatch {
+      textStorage.insert(NSAttributedString(string: "!"), at: 0)
+      AnchorSanityTestHooks.forceMismatch = false
+    }
+
+    return .applied(nil)
   }
 }
 
@@ -269,7 +340,8 @@ internal enum Reconciler {
           treatedAllNodesAsDirty: state.treatAllNodesAsDirty,
           nodesVisited: state.visitedNodes,
           insertedCharacters: state.insertedCharacterCount,
-          deletedCharacters: state.deletedCharacterCount
+          deletedCharacters: state.deletedCharacterCount,
+          fallbackReason: state.fallbackReason
         )
         editor.metricsContainer?.record(.reconcilerRun(metric))
       }
@@ -280,6 +352,7 @@ internal enum Reconciler {
     guard let textStorage = editor.textStorage else {
       fatalError("Cannot run reconciler on an editor with no text storage")
     }
+    let textStorageBaseline = NSAttributedString(attributedString: textStorage)
 
     if editor.dirtyNodes.isEmpty,
       editor.dirtyType == .noDirtyNodes,
@@ -327,10 +400,16 @@ internal enum Reconciler {
 
     if let markedTextOperation {
       // Find the Point corresponding to the location where marked text will be added
+      let indexForPendingCache: RangeCacheLocationIndex = {
+        let index = RangeCacheLocationIndex()
+        index.rebuild(rangeCache: reconcilerState.nextRangeCache)
+        return index
+      }()
       markedTextPointForAddition = try? pointAtStringLocation(
         markedTextOperation.selectionRangeToReplace.location,
         searchDirection: .forward,
-        rangeCache: reconcilerState.nextRangeCache
+        rangeCache: reconcilerState.nextRangeCache,
+        locationIndex: indexForPendingCache
       )
     }
 
@@ -351,30 +430,76 @@ internal enum Reconciler {
         editor.decoratorCache[key] = DecoratorCacheItem.needsCreation
       }
       guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
-      textStorage.decoratorPositionCache[key] = rangeCacheItem.location
+      let resolvedCacheItem = rangeCacheItem.resolvingLocation(
+        using: editor.rangeCacheLocationIndex, key: key)
+      textStorage.decoratorPositionCache[key] = resolvedCacheItem.location
     }
     decoratorsToDecorate.forEach { key in
       if let cacheItem = editor.decoratorCache[key], let view = cacheItem.view {
         editor.decoratorCache[key] = DecoratorCacheItem.needsDecorating(view)
       }
       guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
-      textStorage.decoratorPositionCache[key] = rangeCacheItem.location
+      let resolvedCacheItem = rangeCacheItem.resolvingLocation(
+        using: editor.rangeCacheLocationIndex, key: key)
+      textStorage.decoratorPositionCache[key] = resolvedCacheItem.location
     }
 
     let theme = editor.getTheme()
-    if editor.featureFlags.reconcilerAnchors,
-      let anchorResult = TextStorageDeltaApplier.applyAnchorAwareDelta(
+    var usedAnchorDelta = false
+    if editor.featureFlags.reconcilerAnchors && reconcilerState.fallbackReason == nil {
+      let anchorOutcome = TextStorageDeltaApplier.applyAnchorAwareDelta(
         state: reconcilerState,
         textStorage: textStorage,
         theme: theme,
         pendingEditorState: reconcilerState.nextEditorState,
         markedTextOperation: markedTextOperation,
-        markedTextPointForAddition: markedTextPointForAddition
+        markedTextPointForAddition: markedTextPointForAddition,
+        editor: editor
       )
-    {
-      editor.log(.reconciler, .verbose, "applied text storage delta via anchor-aware mode")
-      markedTextAttributedString = anchorResult
-    } else {
+
+      switch anchorOutcome {
+      case .applied(let anchorResult):
+        usedAnchorDelta = true
+        editor.log(.reconciler, .verbose, "applied text storage delta via anchor-aware mode")
+        markedTextAttributedString = anchorResult
+      case .fallback:
+        break
+      }
+    }
+
+    if usedAnchorDelta && editor.featureFlags.reconcilerSanityCheck {
+      let sanityTextStorage = TextStorage()
+      sanityTextStorage.setAttributedString(textStorageBaseline)
+      sanityTextStorage.mode = .controllerMode
+      sanityTextStorage.beginEditing()
+      _ = applyLegacyTextStorageDelta(
+        state: reconcilerState,
+        textStorage: sanityTextStorage,
+        theme: theme,
+        pendingEditorState: reconcilerState.nextEditorState,
+        markedTextOperation: markedTextOperation,
+        markedTextPointForAddition: markedTextPointForAddition,
+        editor: editor)
+      sanityTextStorage.endEditing()
+      sanityTextStorage.mode = .none
+
+      let legacySnapshot = NSAttributedString(attributedString: sanityTextStorage)
+      let anchorSnapshot = NSAttributedString(attributedString: textStorage)
+      if !legacySnapshot.isEqual(to: anchorSnapshot) {
+        editor.log(
+          .reconciler, .error,
+          "anchor-aware reconciliation diverged from legacy output; disabling anchors")
+        reconcilerState.registerFallbackReason(.sanityCheckFailed)
+        editor.setReconcilerAnchorsEnabled(false)
+        textStorage.setAttributedString(textStorageBaseline)
+        usedAnchorDelta = false
+      }
+    }
+
+    if !usedAnchorDelta {
+      if reconcilerState.fallbackReason == .sanityCheckFailed {
+        editor.setReconcilerAnchorsEnabled(false)
+      }
       markedTextAttributedString = applyLegacyTextStorageDelta(
         state: reconcilerState,
         textStorage: textStorage,
@@ -416,8 +541,11 @@ internal enum Reconciler {
     }
 
     editor.rangeCache = reconcilerState.nextRangeCache
+    editor.rangeCacheLocationIndex.rebuild(rangeCache: editor.rangeCache)
     textStorage.endEditing()
     textStorage.mode = previousMode
+    editor.lastReconcilerUsedAnchors = usedAnchorDelta
+    editor.lastReconcilerFallbackReason = reconcilerState.fallbackReason
 
     if let markedTextOperation,
       markedTextOperation.createMarkedText,
@@ -587,6 +715,7 @@ internal enum Reconciler {
   @MainActor
   private static func createNode(key: NodeKey, reconcilerState: ReconcilerState) {
     reconcilerState.visitedNodes += 1
+    reconcilerState.registerFallbackReason(.structuralChange)
     guard let nextNode = reconcilerState.nextEditorState.nodeMap[key] else {
       return
     }
@@ -617,6 +746,7 @@ internal enum Reconciler {
       nextRangeCacheItem.childrenLength = reconcilerState.locationCursor - cursorBeforeChildren
     } else if nextNode is DecoratorNode {
       reconcilerState.decoratorsToAdd.append(key)
+      reconcilerState.registerFallbackReason(.decoratorMutation)
     }
 
     let nextTextLength = nextNode.getTextPart().lengthAsNSString()
@@ -647,6 +777,7 @@ internal enum Reconciler {
   @MainActor
   private static func destroyNode(key: NodeKey, reconcilerState: ReconcilerState) {
     reconcilerState.visitedNodes += 1
+    reconcilerState.registerFallbackReason(.structuralChange)
     guard let prevNode = reconcilerState.prevEditorState.nodeMap[key],
       let prevRangeCacheItem = reconcilerState.prevRangeCache[key]
     else {
@@ -663,6 +794,7 @@ internal enum Reconciler {
         prevNode.children, range: 0...prevNode.children.count - 1, reconcilerState: reconcilerState)
     } else if prevNode is DecoratorNode {
       reconcilerState.possibleDecoratorsToRemove.append(key)
+      reconcilerState.registerFallbackReason(.decoratorMutation)
     }
 
     let prevTextRange = NSRange(

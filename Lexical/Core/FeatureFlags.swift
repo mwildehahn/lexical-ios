@@ -8,9 +8,9 @@
 import Foundation
 
 @objc public class FeatureFlags: NSObject {
-  let reconcilerSanityCheck: Bool
-  let proxyTextViewInputDelegate: Bool
-  let reconcilerAnchors: Bool
+  public let reconcilerSanityCheck: Bool
+  public let proxyTextViewInputDelegate: Bool
+  public let reconcilerAnchors: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,

@@ -147,6 +147,37 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     return CaretAndSelectionRectsAdjuster.adjustSelectionRects(originalRects, for: range, in: self)
   }
 
+  override public var accessibilityValue: String? {
+    get {
+      let baseValue = super.accessibilityValue ?? text
+      guard let value = baseValue else { return nil }
+      return AnchorMarkers.stripAnchors(from: value)
+    }
+    set {
+      if let newValue {
+        super.accessibilityValue = AnchorMarkers.stripAnchors(from: newValue)
+      } else {
+        super.accessibilityValue = nil
+      }
+    }
+  }
+
+  @available(iOS 11.0, macCatalyst 13.0, *)
+  override public var accessibilityAttributedValue: NSAttributedString? {
+    get {
+      let baseValue = super.accessibilityAttributedValue ?? attributedText
+      guard let value = baseValue else { return nil }
+      return AnchorMarkers.stripAnchors(from: value)
+    }
+    set {
+      if let newValue {
+        super.accessibilityAttributedValue = AnchorMarkers.stripAnchors(from: newValue)
+      } else {
+        super.accessibilityAttributedValue = nil
+      }
+    }
+  }
+
   // MARK: - Incoming events
 
   override public func deleteBackward() {

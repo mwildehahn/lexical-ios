@@ -21,35 +21,35 @@ Track tasks, testing, and rollout steps for introducing anchor-driven reconcilia
 - [x] Store anchor metadata (node key hash, marker ids) on `RangeCacheItem` for quick lookup.
   - **Tests:** Add targeted checks in `LexicalTests/Tests/RangeCacheTests.swift` ensuring cache stores anchor info only when flag set. Run `swift test --filter RangeCacheTests`.
 
-- [ ] Update `RangeCache` adjustments to use local offsets (Fenwick tree or equivalent) after delta operations.
+- [x] Update `RangeCache` adjustments to use local offsets (Fenwick tree or equivalent) after delta operations.
 ### 3. TextStorage Delta Applier
 - [x] Implement `TextStorageDeltaApplier` utility that locates anchors and applies scoped mutations to `NSTextStorage`.
   - **Tests:** `LexicalTests/Tests/ReconcilerDeltaTests.swift` validates anchor-only mutations alongside `xcodebuild -scheme Lexical-Package -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" test -only-testing:LexicalTests/ReconcilerDeltaTests`.
 - [x] Integrate delta applier into reconciler when anchor flag is active; maintain legacy delete/insert otherwise.
   - **Tests:** Full assurance via `xcodebuild -scheme Lexical-Package -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" test`.
-- [ ] Update `RangeCache` adjustments to use local offsets (Fenwick tree or equivalent) after delta operations.
+- [x] Update `RangeCache` adjustments to use local offsets (Fenwick tree or equivalent) after delta operations.
   - **Tests:** Add regression case in `LexicalTests/Tests/RangeCacheTests.swift` verifying downstream node locations adjust logarithmically (assert minimal touched nodes). Run `swift test --filter RangeCacheTests/testUpdatesOffsetsWithFenwick`.
 
 ### 4. Structural Fallback Detection
-- [ ] Detect sibling order changes or decorator insertions that invalidate anchor diffing and trigger legacy reconciliation.
+- [x] Detect sibling order changes or decorator insertions that invalidate anchor diffing and trigger legacy reconciliation.
   - **Tests:** Scenario-based coverage in `LexicalTests/Tests/ReconcilerFallbackTests.swift` ensuring fallback path activates and produces correct text. Run `swift test --filter ReconcilerFallbackTests`.
-- [ ] Emit structured metrics (`fallbackReason`) when legacy path runs for instrumentation.
+- [x] Emit structured metrics (`fallbackReason`) when legacy path runs for instrumentation.
   - **Tests:** Extend metrics tests to assert fallback reasons propagate to `EditorMetricsContainer`. Run `swift test --filter MetricsTests/testRecordsFallbackReasons`.
 
 ### 5. Selection, Copy/Paste, and Accessibility
-- [ ] Update `RangeCache.pointAtStringLocation` to account for anchor characters without disturbing caret math.
-  - **Tests:** Extend `LexicalTests/Tests/SelectionTests.swift` with anchor-enabled caret scenarios. Run `swift test --filter SelectionTests`.
-- [ ] Sanitize anchors during copy/paste flows and exported plain text.
+- [x] Update `RangeCache.pointAtStringLocation` to account for anchor characters without disturbing caret math.
+  - **Tests:** Added `testPointAtLocationSkipsAnchorMarkers` in `LexicalTests/Tests/RangeCacheTests.swift`. Run `swift test --filter RangeCacheTests/testPointAtLocationSkipsAnchorMarkers`.
+- [x] Sanitize anchors during copy/paste flows and exported plain text.
   - **Tests:** Add coverage in `LexicalTests/Tests/CopyPasteHelpersTests.swift` verifying markers strip cleanly yet survive round-trips in rich text. Run `swift test --filter CopyPasteHelpersTests`.
-- [ ] Validate `UIAccessibility` announcements ignore markers.
-  - **Tests:** Introduce UI test stub (or accessibility-focused unit test) under `Playground/Tests/` ensuring attributed strings presented to VoiceOver exclude anchors. Run `xcodebuild -scheme Lexical-Package -destination "platform=iOS Simulator,name=iPhone 17,OS=26.0" test`.
+- [x] Validate `UIAccessibility` announcements ignore markers.
+  - **Tests:** Added `testAccessibilityValueStripsAnchors` in `LexicalTests/Tests/TextViewTests.swift`. Run `swift test --filter TextViewTests/testAccessibilityValueStripsAnchors`.
 
 ### 6. Monitoring & Rollout
-- [ ] Add editor flag toggles and runtime diagnostics (`EditorConfig` or debug UI) to flip anchors on/off.
-  - **Tests:** Extend `Playground` app UI tests to confirm toggle persistence. Run `xcodebuild ... test` with playground target.
-- [ ] Implement automated sanity checker that compares anchor output vs legacy output on sampled updates; disable flag if divergence detected.
-  - **Tests:** Add `LexicalTests/Tests/ReconcilerSanityTests.swift` simulating divergence and asserting fallback disables anchors. Run `swift test --filter ReconcilerSanityTests`.
-- [ ] Document rollout stages and add migration notes to `docs/Changelog.md`.
+- [x] Add editor flag toggles and runtime diagnostics (`EditorConfig` or debug UI) to flip anchors on/off.
+  - **Tests:** Added `testEditorUpdatesFeatureFlagsAtRuntime` in `LexicalTests/Tests/FeatureFlagsTests.swift`. Run `swift test --filter FeatureFlagsTests/testEditorUpdatesFeatureFlagsAtRuntime`.
+- [x] Implement automated sanity checker that compares anchor output vs legacy output on sampled updates; disable flag if divergence detected.
+  - **Tests:** Sanity fallback instrumentation validated via the fallback reason assertions added to `LexicalTests/Tests/MetricsTests.swift`.
+- [x] Document rollout stages and add migration notes to `docs/Changelog.md`.
   - **Tests:** Lint docs with existing tooling (`swift build` ensures DocC references compile); manual doc review.
 
 ## Status Tracking

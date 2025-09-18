@@ -21,6 +21,8 @@ class RangeCacheTests: XCTestCase {
 
     var paragraphKeys: [NodeKey] = []
 
+    var textNodeKey: NodeKey = ""
+
     try editor.update {
       guard let rootNode = getActiveEditorState()?.getRootNode() else {
         XCTFail("Missing root node")
@@ -152,6 +154,88 @@ class RangeCacheTests: XCTestCase {
       } else {
         XCTFail("Failed to add new text node to yetAnotherParagraph")
       }
+    }
+  }
+
+  func testUpdatesOffsetsWithFenwick() {
+    var rangeCache: [NodeKey: RangeCacheItem] = [:]
+    var first = RangeCacheItem()
+    first.location = 0
+    first.preambleLength = 0
+    rangeCache["A"] = first
+
+    var second = RangeCacheItem()
+    second.location = 10
+    rangeCache["B"] = second
+
+    var third = RangeCacheItem()
+    third.location = 20
+    rangeCache["C"] = third
+
+    let index = RangeCacheLocationIndex()
+    index.rebuild(rangeCache: rangeCache)
+
+    index.shiftNodes(startingAt: 15, delta: 5)
+
+    let resolvedSecond = rangeCache["B"]!.resolvingLocation(using: index, key: "B")
+    let resolvedThird = rangeCache["C"]!.resolvingLocation(using: index, key: "C")
+
+    XCTAssertEqual(resolvedSecond.location, 10)
+    XCTAssertEqual(resolvedThird.location, 25)
+  }
+
+  func testPointAtLocationSkipsAnchorMarkers() throws {
+    let view = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(reconcilerAnchors: true)
+    )
+    let editor = view.editor
+
+    var paragraphKey: NodeKey = ""
+    var textNodeKey: NodeKey = ""
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else {
+        XCTFail("Missing root node")
+        return
+      }
+
+      let paragraph = ParagraphNode()
+      let textNode = TextNode(text: "Anchor", key: nil)
+      try paragraph.append([textNode])
+      try rootNode.append([paragraph])
+      paragraphKey = paragraph.key
+      textNodeKey = textNode.key
+      try paragraph.select(anchorOffset: nil, focusOffset: nil)
+    }
+
+    let injectedAnchorLength = AnchorMarkers.make(kind: .start, key: paragraphKey).lengthAsNSString()
+    guard var cacheItemOverride = editor.rangeCache[paragraphKey] else {
+      XCTFail("Missing cache item")
+      return
+    }
+    let originalPreamble = cacheItemOverride.preambleLength
+    cacheItemOverride.startAnchorLength = injectedAnchorLength
+    cacheItemOverride.preambleLength = originalPreamble + injectedAnchorLength
+    cacheItemOverride.preambleSpecialCharacterLength += injectedAnchorLength
+    editor.rangeCache[paragraphKey] = cacheItemOverride
+
+    if var textItem = editor.rangeCache[textNodeKey] {
+      textItem.location = cacheItemOverride.location + cacheItemOverride.preambleLength
+      editor.rangeCache[textNodeKey] = textItem
+    }
+
+    editor.rangeCacheLocationIndex.rebuild(rangeCache: editor.rangeCache)
+
+    try editor.read {
+      guard let cacheItem = editor.rangeCache[paragraphKey] else {
+        XCTFail("Missing cache item")
+        return
+      }
+
+      let textPoint = Point(key: textNodeKey, offset: 0, type: .text)
+      let stringLocation = try stringLocationForPoint(textPoint, editor: editor)
+      XCTAssertEqual(stringLocation, cacheItem.location + cacheItem.preambleLength)
+      XCTAssertEqual(cacheItem.startAnchorLength, injectedAnchorLength)
     }
   }
 }

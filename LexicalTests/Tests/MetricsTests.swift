@@ -45,6 +45,7 @@ final class MetricsTests: XCTestCase {
     XCTAssertGreaterThan(metric.nodesVisited, 0)
     XCTAssertGreaterThan(metric.insertedCharacters, 0)
     XCTAssertGreaterThanOrEqual(metric.deletedCharacters, 0)
+    XCTAssertEqual(metric.fallbackReason, .structuralChange)
   }
 
   func testResetClearsRecordedMetrics() throws {

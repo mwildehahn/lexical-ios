@@ -123,6 +123,7 @@ public class Editor: NSObject {
 
   // See description in RangeCache.swift.
   internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
+  internal let rangeCacheLocationIndex = RangeCacheLocationIndex()
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
   internal var normalizedNodes: Set<NodeKey> = Set()
@@ -141,6 +142,8 @@ public class Editor: NSObject {
   internal var compositionKey: NodeKey?
   public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
   internal var featureFlags: FeatureFlags = FeatureFlags()
+  public internal(set) var lastReconcilerFallbackReason: ReconcilerFallbackReason?
+  public internal(set) var lastReconcilerUsedAnchors: Bool = false
 
   // Used for storing editor listener events
   internal var listeners = Listeners()
@@ -176,6 +179,7 @@ public class Editor: NSObject {
       fatalError("Expected root node key when creating new editor state")
     }
     rangeCache[rootNodeKey] = RangeCacheItem()
+    rangeCacheLocationIndex.rebuild(rangeCache: rangeCache)
     theme = editorConfig.theme
     plugins = editorConfig.plugins
     super.init()
@@ -439,6 +443,7 @@ public class Editor: NSObject {
 
     rangeCache = [:]
     rangeCache[kRootNodeKey] = RangeCacheItem()
+    rangeCacheLocationIndex.rebuild(rangeCache: rangeCache)
 
     if let textStorage = frontend?.textStorage {
       let oldMode = textStorage.mode
@@ -492,6 +497,27 @@ public class Editor: NSObject {
       }
     }
     frontend?.showPlaceholderText()
+  }
+
+  /// Updates the runtime feature flags used by the editor.
+  /// - Parameter featureFlags: The new feature flag configuration to apply.
+  public func updateFeatureFlags(_ featureFlags: FeatureFlags) {
+    self.featureFlags = featureFlags
+  }
+
+  /// Toggles the reconciler anchor optimisation at runtime without affecting other feature flags.
+  /// - Parameter isEnabled: Indicates whether anchor-based reconciliation should be enabled.
+  public func setReconcilerAnchorsEnabled(_ isEnabled: Bool) {
+    featureFlags = FeatureFlags(
+      reconcilerSanityCheck: featureFlags.reconcilerSanityCheck,
+      proxyTextViewInputDelegate: featureFlags.proxyTextViewInputDelegate,
+      reconcilerAnchors: isEnabled
+    )
+  }
+
+  /// Provides the active feature flag configuration for diagnostics.
+  public var activeFeatureFlags: FeatureFlags {
+    featureFlags
   }
 
   internal func resetReconciler(pendingEditorState: EditorState) {

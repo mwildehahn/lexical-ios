@@ -466,4 +466,22 @@ class TextViewTests: XCTestCase {
     let paragraphStyle = typingAttributesAfterDeletion[.paragraphStyle] as? NSParagraphStyle
     XCTAssertNil(paragraphStyle, "Paragraph style has been cleared")
   }
+
+  func testAccessibilityValueStripsAnchors() {
+    let view = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(reconcilerAnchors: true)
+    )
+    let textView = view.textView
+
+    let start = AnchorMarkers.make(kind: .start, key: "P1")
+    let end = AnchorMarkers.make(kind: .end, key: "P1")
+    textView.text = start + "Accessible" + end
+
+    XCTAssertEqual(textView.accessibilityValue, "Accessible")
+
+    if #available(iOS 11.0, macCatalyst 13.0, *) {
+      XCTAssertEqual(textView.accessibilityAttributedValue?.string, "Accessible")
+    }
+  }
 }

@@ -49,9 +49,12 @@ internal func handleTextMutation(textStorage: TextStorage, rangeOfChange: NSRang
     throw LexicalError.invariantViolation("Failed to find node")
   }
 
+  let resolvedRangeCacheItem = rangeCacheItem.resolvingLocation(
+    using: editor.rangeCacheLocationIndex, key: nodeKey)
+
   editor.log(.other, .verbose, "Before setting text: dirty nodes count \(editor.dirtyNodes.count)")
 
-  let oldRange = rangeCacheItem.textRange()
+  let oldRange = resolvedRangeCacheItem.textRange()
   let newRange = NSRange(location: oldRange.location, length: oldRange.length + lengthDelta)
 
   if newRange.location + newRange.length <= textStorage.length {

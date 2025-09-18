@@ -12,6 +12,13 @@ public protocol EditorMetricsContainer: AnyObject {
   func resetMetrics()
 }
 
+public enum ReconcilerFallbackReason: String {
+  case structuralChange
+  case decoratorMutation
+  case unsupportedDelta
+  case sanityCheckFailed
+}
+
 public struct ReconcilerMetric {
   public let duration: TimeInterval
   public let dirtyNodes: Int
@@ -21,6 +28,7 @@ public struct ReconcilerMetric {
   public let nodesVisited: Int
   public let insertedCharacters: Int
   public let deletedCharacters: Int
+  public let fallbackReason: ReconcilerFallbackReason?
 
   public init(
     duration: TimeInterval,
@@ -30,7 +38,8 @@ public struct ReconcilerMetric {
     treatedAllNodesAsDirty: Bool,
     nodesVisited: Int,
     insertedCharacters: Int,
-    deletedCharacters: Int
+    deletedCharacters: Int,
+    fallbackReason: ReconcilerFallbackReason?
   ) {
     self.duration = duration
     self.dirtyNodes = dirtyNodes
@@ -40,6 +49,7 @@ public struct ReconcilerMetric {
     self.nodesVisited = nodesVisited
     self.insertedCharacters = insertedCharacters
     self.deletedCharacters = deletedCharacters
+    self.fallbackReason = fallbackReason
   }
 }
 

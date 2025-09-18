@@ -192,10 +192,12 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   let rangeCache = editor.rangeCache
 
   guard let rangeCacheItem = rangeCache[point.key] else { return nil }
+  let resolvedRangeCacheItem = rangeCacheItem.resolvingLocation(
+    using: editor.rangeCacheLocationIndex, key: point.key)
 
   switch point.type {
   case .text:
-    return rangeCacheItem.location + rangeCacheItem.preambleLength + point.offset
+    return resolvedRangeCacheItem.location + resolvedRangeCacheItem.preambleLength + point.offset
   case .element:
     guard let node = getNodeByKey(key: point.key) as? ElementNode else { return nil }
 
@@ -205,12 +207,15 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
     }
 
     if point.offset == childrenKeys.count {
-      return rangeCacheItem.location + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
+      return resolvedRangeCacheItem.location + resolvedRangeCacheItem.preambleLength
+        + resolvedRangeCacheItem.childrenLength
     }
 
     guard let childRangeCacheItem = rangeCache[childrenKeys[point.offset]] else { return nil }
+    let resolvedChild = childRangeCacheItem.resolvingLocation(
+      using: editor.rangeCacheLocationIndex, key: childrenKeys[point.offset])
 
-    return childRangeCacheItem.location
+    return resolvedChild.location
   case .range:
     throw LexicalError.invariantViolation("Need range selection")
   case .node:

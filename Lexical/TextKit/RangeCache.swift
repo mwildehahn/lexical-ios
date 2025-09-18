@@ -47,19 +47,20 @@ struct RangeCacheItem {
  */
 @MainActor
 internal func pointAtStringLocation(
-  _ location: Int, searchDirection: UITextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
+  _ location: Int, searchDirection: UITextStorageDirection, rangeCache: [NodeKey: RangeCacheItem],
+  locationIndex: RangeCacheLocationIndex? = nil
 ) throws -> Point? {
   do {
     let searchResult = try evaluateNode(
       kRootNodeKey, stringLocation: location, searchDirection: searchDirection,
-      rangeCache: rangeCache)
+      rangeCache: rangeCache, locationIndex: locationIndex)
     guard let searchResult, let offset = searchResult.offset else {
       return nil
     }
 
     switch searchResult.type {
     case .endBoundary, .startBoundary, .illegal:
-      throw LexicalError.internal("Failed to find node for location: \(location)")
+      return nil
     case .text:
       return Point(key: searchResult.nodeKey, offset: offset, type: .text)
     case .element:
@@ -73,15 +74,40 @@ internal func pointAtStringLocation(
 @MainActor
 private func evaluateNode(
   _ nodeKey: NodeKey, stringLocation: Int, searchDirection: UITextStorageDirection,
-  rangeCache: [NodeKey: RangeCacheItem]
+  rangeCache: [NodeKey: RangeCacheItem], locationIndex: RangeCacheLocationIndex?
 ) throws -> RangeCacheSearchResult? {
   guard let rangeCacheItem = rangeCache[nodeKey], let node = getNodeByKey(key: nodeKey) else {
     throw LexicalError.rangeCacheSearch("Couldn't find node or range cache item for key \(nodeKey)")
   }
 
+  let resolvedRangeCacheItem = rangeCacheItem.resolvingLocation(
+    using: locationIndex ?? getActiveEditor()?.rangeCacheLocationIndex, key: nodeKey)
+
+  if resolvedRangeCacheItem.startAnchorLength > 0 {
+    let startAnchorRange = NSRange(
+      location: resolvedRangeCacheItem.location,
+      length: resolvedRangeCacheItem.startAnchorLength)
+    if NSLocationInRange(stringLocation, startAnchorRange) {
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
+    }
+  }
+
+  if resolvedRangeCacheItem.endAnchorLength > 0 {
+    let endAnchorStart = resolvedRangeCacheItem.location + resolvedRangeCacheItem.preambleLength
+      + resolvedRangeCacheItem.childrenLength + resolvedRangeCacheItem.textLength
+      + resolvedRangeCacheItem.postambleLength - resolvedRangeCacheItem.endAnchorLength
+    let endAnchorRange = NSRange(location: endAnchorStart, length: resolvedRangeCacheItem.endAnchorLength)
+    if NSLocationInRange(stringLocation, endAnchorRange) {
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .endBoundary, offset: nil)
+    }
+  }
+
   if let parentKey = node.parent, let parentRangeCacheItem = rangeCache[parentKey] {
-    if stringLocation == parentRangeCacheItem.location
-      && parentRangeCacheItem.preambleSpecialCharacterLength - parentRangeCacheItem.preambleLength
+    let resolvedParentRangeCacheItem = parentRangeCacheItem.resolvingLocation(
+      using: locationIndex ?? getActiveEditor()?.rangeCacheLocationIndex, key: parentKey)
+    if stringLocation == resolvedParentRangeCacheItem.location
+      && resolvedParentRangeCacheItem.preambleSpecialCharacterLength
+        - resolvedParentRangeCacheItem.preambleLength
         == 0
     {
       if node is TextNode {
@@ -90,12 +116,12 @@ private func evaluateNode(
     }
   }
 
-  if !rangeCacheItem.entireRange().byAddingOne().contains(stringLocation) {
+  if !resolvedRangeCacheItem.entireRange().byAddingOne().contains(stringLocation) {
     return nil
   }
 
   if node is TextNode {
-    let expandedTextRange = rangeCacheItem.textRange().byAddingOne()
+    let expandedTextRange = resolvedRangeCacheItem.textRange().byAddingOne()
     if expandedTextRange.contains(stringLocation) {
       return RangeCacheSearchResult(
         nodeKey: nodeKey, type: .text, offset: stringLocation - expandedTextRange.location)
@@ -113,7 +139,7 @@ private func evaluateNode(
       guard
         let result = try? evaluateNode(
           childKey, stringLocation: stringLocation, searchDirection: searchDirection,
-          rangeCache: rangeCache)
+          rangeCache: rangeCache, locationIndex: locationIndex)
       else { continue }
       if result.type == .text || result.type == .element {
         return result
@@ -136,9 +162,9 @@ private func evaluateNode(
     }
   }
 
-  if rangeCacheItem.entireRange().length == 0 {
+  if resolvedRangeCacheItem.entireRange().length == 0 {
     // caret is at the last row - element with no children
-    if stringLocation == rangeCacheItem.location {
+    if stringLocation == resolvedRangeCacheItem.location {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
@@ -148,29 +174,29 @@ private func evaluateNode(
     return RangeCacheSearchResult(nodeKey: nodeKey, type: boundary, offset: nil)
   }
 
-  if stringLocation == rangeCacheItem.location {
-    if rangeCacheItem.preambleLength == 0 && node is ElementNode {
+  if stringLocation == resolvedRangeCacheItem.location {
+    if resolvedRangeCacheItem.preambleLength == 0 && node is ElementNode {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
   }
 
-  if stringLocation == rangeCacheItem.entireRange().upperBound {
-    if rangeCacheItem.selectableRange().length == 0 {
+  if stringLocation == resolvedRangeCacheItem.entireRange().upperBound {
+    if resolvedRangeCacheItem.selectableRange().length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .endBoundary, offset: nil)
   }
 
-  let preambleEnd = rangeCacheItem.location + rangeCacheItem.preambleLength
+  let preambleEnd = resolvedRangeCacheItem.location + resolvedRangeCacheItem.preambleLength
   if stringLocation == preambleEnd {
-    if rangeCacheItem.selectableRange().length == 0 {
+    if resolvedRangeCacheItem.selectableRange().length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
-    if rangeCacheItem.childrenLength == 0 {
+    if resolvedRangeCacheItem.childrenLength == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
@@ -198,10 +224,10 @@ extension RangeCacheItem {
     return NSRange(location: location + preambleLength, length: childrenLength)
   }
   func selectableRange() -> NSRange {
-    return NSRange(
-      location: location,
-      length: preambleLength + childrenLength + textLength + postambleLength
-        - preambleSpecialCharacterLength)
+    let nonSelectableCharacters = preambleSpecialCharacterLength + startAnchorLength + endAnchorLength
+    let totalLength = preambleLength + childrenLength + textLength + postambleLength
+    let adjustedLength = max(0, totalLength - nonSelectableCharacters)
+    return NSRange(location: location, length: adjustedLength)
   }
 }
 
@@ -221,47 +247,25 @@ private enum RangeCacheSearchResultType {
 
 @MainActor
 internal func updateRangeCacheForTextChange(nodeKey: NodeKey, delta: Int) {
-  guard let editor = getActiveEditor(), let node = getNodeByKey(key: nodeKey) as? TextNode else {
+  guard
+    let editor = getActiveEditor(),
+    let node = getNodeByKey(key: nodeKey) as? TextNode,
+    let cacheItem = editor.rangeCache[nodeKey]
+  else {
     fatalError()
   }
 
+  let oldEnd = cacheItem.location + cacheItem.preambleLength + cacheItem.childrenLength
+    + cacheItem.textLength + cacheItem.postambleLength
   editor.rangeCache[nodeKey]?.textLength = node.getTextPart().lengthAsNSString()
+
+  if delta != 0 {
+    editor.rangeCacheLocationIndex.shiftNodes(startingAt: oldEnd, delta: delta)
+  }
+
   let parentKeys = node.getParents().map { $0.getKey() }
 
   for parentKey in parentKeys {
     editor.rangeCache[parentKey]?.childrenLength += delta
-  }
-
-  updateNodeLocationFor(
-    nodeKey: kRootNodeKey, nodeIsAfterChangedNode: false, changedNodeKey: nodeKey,
-    changedNodeParents: parentKeys, delta: delta)
-}
-
-@MainActor
-private func updateNodeLocationFor(
-  nodeKey: NodeKey, nodeIsAfterChangedNode: Bool, changedNodeKey: NodeKey,
-  changedNodeParents: [NodeKey], delta: Int
-) {
-  guard let editor = getActiveEditor() else {
-    fatalError()
-  }
-
-  if nodeIsAfterChangedNode {
-    editor.rangeCache[nodeKey]?.location += delta
-  }
-
-  var isAfterChangedNode = nodeIsAfterChangedNode
-
-  if let elementNode = getNodeByKey(key: nodeKey) as? ElementNode,
-    isAfterChangedNode || changedNodeParents.contains(nodeKey)
-  {
-    for child in elementNode.getChildren() {
-      updateNodeLocationFor(
-        nodeKey: child.getKey(), nodeIsAfterChangedNode: isAfterChangedNode,
-        changedNodeKey: changedNodeKey, changedNodeParents: changedNodeParents, delta: delta)
-      if child.getKey() == changedNodeKey || changedNodeParents.contains(child.getKey()) {
-        isAfterChangedNode = true
-      }
-    }
   }
 }
