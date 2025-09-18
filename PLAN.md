@@ -28,6 +28,8 @@
 ## Next Steps TODO
 - Benchmark current reconciler on long documents to capture baseline costs.
 - Prototype feature-flagged anchor emission and validate through copy/paste and accessibility flows.
+- Evaluate copy/paste behaviour as we explore marker strategies to confirm user-facing semantics remain unchanged.
+- Ensure selection handling remains correct when markers are active so caret and range interactions stay predictable.
 - Design and document the delta-application algorithm, including range cache update rules and fallback triggers.
 - Implement instrumentation hooks to compare legacy vs targeted reconciliation for correctness/performance.
 - Draft rollout plan covering staged enablement, toggles, and regression tests for list/newline edge cases.
