@@ -10,6 +10,7 @@ import Foundation
 @testable import LexicalHTML
 import XCTest
 
+@MainActor
 class LexicalHTMLTests: XCTestCase {
 
   var lexicalView: LexicalView?

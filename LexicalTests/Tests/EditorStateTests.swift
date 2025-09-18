@@ -9,6 +9,7 @@ import XCTest
 
 @testable import Lexical
 
+@MainActor
 class EditorStateTests: XCTestCase {
 
   func testReadReturnsCorrectState() throws {
@@ -105,16 +106,20 @@ class EditorStateTests: XCTestCase {
 
     let migrations: [EditorStateMigration] = [
       EditorStateMigration(fromVersion: 1, toVersion: 2, handler: { editorState in
-        for (_, node) in editorState.getNodeMap() {
-          if node.getTextPart() == "world" {
-            try node.remove()
+        try! MainActor.assumeIsolated {
+          for (_, node) in editorState.getNodeMap() {
+            if node.getTextPart() == "world" {
+              try node.remove()
+            }
           }
         }
       }),
       EditorStateMigration(fromVersion: 2, toVersion: 3, handler: { editorState in
-        for (_, node) in editorState.getNodeMap() {
-          if node.getTextPart().starts(with: "Third") {
-            try node.remove()
+        try! MainActor.assumeIsolated {
+          for (_, node) in editorState.getNodeMap() {
+            if node.getTextPart().starts(with: "Third") {
+              try node.remove()
+            }
           }
         }
       })

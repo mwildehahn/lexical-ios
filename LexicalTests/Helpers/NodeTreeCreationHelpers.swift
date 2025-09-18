@@ -18,6 +18,7 @@ import XCTest
  * \n
  * Third para.
  */
+@MainActor
 func createExampleNodeTree() {
   guard let editorState = getActiveEditorState(), let rootNode = editorState.getRootNode() else {
     XCTFail("should have editor state")

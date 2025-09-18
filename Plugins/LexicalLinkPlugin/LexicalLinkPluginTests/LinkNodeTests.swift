@@ -9,6 +9,7 @@
 @testable import LexicalLinkPlugin
 import XCTest
 
+@MainActor
 class LinkNodeTests: XCTestCase {
 
   func testLinkAttributeLengthForAccessibility() throws {

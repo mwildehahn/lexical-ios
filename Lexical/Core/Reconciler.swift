@@ -81,6 +81,23 @@ internal enum Reconciler {
     shouldReconcileSelection: Bool,  // the situations where we would want to not do this include handling non-controlled mode
     markedTextOperation: MarkedTextOperation?
   ) throws {
+    let metricsStart = CFAbsoluteTimeGetCurrent()
+    var metricsShouldRecord = false
+    var metricsState: ReconcilerState?
+    defer {
+      if metricsShouldRecord, let state = metricsState {
+        let duration = CFAbsoluteTimeGetCurrent() - metricsStart
+        let metric = ReconcilerMetric(
+          duration: duration,
+          dirtyNodes: state.dirtyNodes.count,
+          rangesAdded: state.rangesToAdd.count,
+          rangesDeleted: state.rangesToDelete.count,
+          treatedAllNodesAsDirty: state.treatAllNodesAsDirty
+        )
+        editor.metricsContainer?.record(.reconcilerRun(metric))
+      }
+    }
+
     editor.log(.reconciler, .verbose)
 
     guard let textStorage = editor.textStorage else {
@@ -119,6 +136,8 @@ internal enum Reconciler {
       dirtyNodes: editor.dirtyNodes,
       treatAllNodesAsDirty: editor.dirtyType == .fullReconcile,
       markedTextOperation: markedTextOperation)
+    metricsShouldRecord = true
+    metricsState = reconcilerState
 
     try reconcileNode(key: kRootNodeKey, reconcilerState: reconcilerState)
 

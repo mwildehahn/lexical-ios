@@ -11,6 +11,7 @@ import Foundation
 @testable import LexicalMarkdown
 import XCTest
 
+@MainActor
 class LexicalMarkdownTests: XCTestCase {
   var lexicalView: LexicalView?
   var editor: Editor? {

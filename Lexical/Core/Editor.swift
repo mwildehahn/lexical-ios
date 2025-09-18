@@ -28,16 +28,33 @@ import UIKit
   public let editorStateVersion: Int
   public let nodeKeyMultiplier: NodeKeyMultiplier?
   public let keyCommands: [UIKeyCommand]?
+  public let metricsContainer: EditorMetricsContainer?
 
-  @objc public init(
+  public init(
     theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
-    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil,
+    metricsContainer: EditorMetricsContainer? = nil
   ) {
     self.theme = theme
     self.plugins = plugins
     self.editorStateVersion = editorStateVersion
     self.nodeKeyMultiplier = nodeKeyMultiplier
     self.keyCommands = keyCommands
+    self.metricsContainer = metricsContainer
+  }
+
+  @objc public convenience init(
+    theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil
+  ) {
+    self.init(
+      theme: theme,
+      plugins: plugins,
+      editorStateVersion: editorStateVersion,
+      nodeKeyMultiplier: nodeKeyMultiplier,
+      keyCommands: keyCommands,
+      metricsContainer: nil
+    )
   }
 }
 
@@ -132,6 +149,7 @@ public class Editor: NSObject {
   internal var commands: Commands = [:]
 
   internal var plugins: [Plugin]
+  internal let metricsContainer: EditorMetricsContainer?
 
   // Used to cache decorators
   internal var decoratorCache: [NodeKey: DecoratorCacheItem] = [:]
@@ -153,6 +171,7 @@ public class Editor: NSObject {
     editorStateVersion = editorConfig.editorStateVersion
     keyMultiplier = editorConfig.nodeKeyMultiplier
     editorState = EditorState(version: editorConfig.editorStateVersion)
+    metricsContainer = editorConfig.metricsContainer
     guard let rootNodeKey = editorState.getRootNode()?.key else {
       fatalError("Expected root node key when creating new editor state")
     }
