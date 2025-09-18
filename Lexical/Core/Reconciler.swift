@@ -65,6 +65,89 @@ private class ReconcilerState {
   var deletedCharacterCount: Int
 }
 
+@MainActor
+private struct TextStorageDeltaApplier {
+  static func applyAnchorAwareDelta(
+    state: ReconcilerState,
+    textStorage: TextStorage,
+    theme: Theme,
+    pendingEditorState: EditorState,
+    markedTextOperation: MarkedTextOperation?,
+    markedTextPointForAddition: Point?
+  ) -> NSAttributedString? {
+    // TODO: Implement anchor-aware targeted updates. Currently return nil to trigger legacy fallback.
+    return nil
+  }
+}
+
+@MainActor
+private func applyLegacyTextStorageDelta(
+  state: ReconcilerState,
+  textStorage: TextStorage,
+  theme: Theme,
+  pendingEditorState: EditorState,
+  markedTextOperation: MarkedTextOperation?,
+  markedTextPointForAddition: Point?,
+  editor: Editor
+) -> NSAttributedString? {
+  editor.log(
+    .reconciler, .verbose,
+    "about to do rangesToDelete: total \(state.rangesToDelete.count)")
+
+  var nonEmptyDeletionsCount = 0
+  for deletionRange in state.rangesToDelete.reversed() {
+    if deletionRange.length > 0 {
+      nonEmptyDeletionsCount += 1
+      editor.log(
+        .reconciler, .verboseIncludingUserContent,
+        "deleting range \(NSStringFromRange(deletionRange)) `\((textStorage.string as NSString).substring(with: deletionRange))`"
+      )
+      textStorage.deleteCharacters(in: deletionRange)
+    }
+  }
+  editor.log(.reconciler, .verbose, "did rangesToDelete: non-empty \(nonEmptyDeletionsCount)")
+
+  editor.log(
+    .reconciler, .verbose, "about to do rangesToAdd: total \(state.rangesToAdd.count)")
+
+  var markedTextAttributedString: NSAttributedString?
+  var nonEmptyRangesToAddCount = 0
+  var rangesInserted: [NSRange] = []
+  for insertion in state.rangesToAdd {
+    let attributedString = Reconciler.attributedStringFromInsertion(
+      insertion,
+      state: pendingEditorState,
+      theme: theme)
+    if attributedString.length > 0 {
+      nonEmptyRangesToAddCount += 1
+      editor.log(
+        .reconciler, .verboseIncludingUserContent,
+        "inserting at \(insertion.location), `\(attributedString.string)`")
+      textStorage.insert(attributedString, at: insertion.location)
+      rangesInserted.append(
+        NSRange(location: insertion.location, length: attributedString.length))
+
+      if let pointForAddition = markedTextPointForAddition,
+        let length = markedTextOperation?.markedTextString.lengthAsNSString()
+      {
+        if insertion.part == .text && pointForAddition.key == insertion.nodeKey
+          && pointForAddition.offset + length <= attributedString.length
+        {
+          markedTextAttributedString = attributedString
+        }
+      }
+    }
+  }
+
+  for range in rangesInserted {
+    textStorage.fixAttributes(in: range)
+  }
+
+  editor.log(.reconciler, .verbose, "did rangesToAdd: non-empty \(nonEmptyRangesToAddCount)")
+
+  return markedTextAttributedString
+}
+
 /* Marked text is a difficult operation because it depends on us being in sync with some private state that
  * is held by the iOS keyboard. We can't set or read that state, so we have to make sure we do the things
  * that the keyboard is expecting.
@@ -154,24 +237,6 @@ internal enum Reconciler {
     textStorage.mode = .controllerMode
     textStorage.beginEditing()
 
-    editor.log(
-      .reconciler, .verbose,
-      "about to do rangesToDelete: total \(reconcilerState.rangesToDelete.count)")
-    var nonEmptyDeletionsCount = 0
-
-    for deletionRange in reconcilerState.rangesToDelete.reversed() {
-      if deletionRange.length > 0 {
-        nonEmptyDeletionsCount += 1
-        editor.log(
-          .reconciler, .verboseIncludingUserContent,
-          "deleting range \(NSStringFromRange(deletionRange)) `\((textStorage.string as NSString).substring(with: deletionRange))`"
-        )
-        textStorage.deleteCharacters(in: deletionRange)
-      }
-    }
-
-    editor.log(.reconciler, .verbose, "did rangesToDelete: non-empty \(nonEmptyDeletionsCount)")
-
     var markedTextAttributedString: NSAttributedString?
     var markedTextPointForAddition: Point?
 
@@ -211,49 +276,32 @@ internal enum Reconciler {
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
     }
 
-    editor.log(
-      .reconciler, .verbose, "about to do rangesToAdd: total \(reconcilerState.rangesToAdd.count)")
-
-    var nonEmptyRangesToAddCount = 0
-    var rangesInserted: [NSRange] = []
-    for insertion in reconcilerState.rangesToAdd {
-      let attributedString = attributedStringFromInsertion(
-        insertion,
-        state: reconcilerState.nextEditorState,
-        theme: editor.getTheme())
-      if attributedString.length > 0 {
-        nonEmptyRangesToAddCount += 1
-        editor.log(
-          .reconciler, .verboseIncludingUserContent,
-          "inserting at \(insertion.location), `\(attributedString.string)`")
-        textStorage.insert(attributedString, at: insertion.location)
-        rangesInserted.append(
-          NSRange(location: insertion.location, length: attributedString.length))
-
-        // If this insertion corresponds to the marked text location, keep hold of the attributed string.
-        if let pointForAddition = markedTextPointForAddition,
-          let length = markedTextOperation?.markedTextString.lengthAsNSString()
-        {
-          if insertion.part == .text && pointForAddition.key == insertion.nodeKey
-            && pointForAddition.offset + length <= attributedString.length
-          {
-            markedTextAttributedString = attributedString
-          }
-        }
-      }
+    let theme = editor.getTheme()
+    if editor.featureFlags.reconcilerAnchors,
+      let anchorResult = TextStorageDeltaApplier.applyAnchorAwareDelta(
+        state: reconcilerState,
+        textStorage: textStorage,
+        theme: theme,
+        pendingEditorState: reconcilerState.nextEditorState,
+        markedTextOperation: markedTextOperation,
+        markedTextPointForAddition: markedTextPointForAddition
+      )
+    {
+      editor.log(.reconciler, .verbose, "applied text storage delta via anchor-aware mode")
+      markedTextAttributedString = anchorResult
+    } else {
+      markedTextAttributedString = applyLegacyTextStorageDelta(
+        state: reconcilerState,
+        textStorage: textStorage,
+        theme: theme,
+        pendingEditorState: reconcilerState.nextEditorState,
+        markedTextOperation: markedTextOperation,
+        markedTextPointForAddition: markedTextPointForAddition,
+        editor: editor)
     }
-
-    // Fix up all attributes afterwards. Doing the fix during the insertion loop above will cause incorrect normalisation of NSParagraphStyles.
-    for range in rangesInserted {
-      textStorage.fixAttributes(in: range)
-    }
-
-    editor.log(.reconciler, .verbose, "did rangesToAdd: non-empty \(nonEmptyRangesToAddCount)")
-
-    // BLOCK LEVEL ATTRIBUTES
 
     let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(
-      theme: editor.getTheme())
+      theme: theme)
 
     // TODO: this iteration applies the attributes in an arbitrary order. If we are to handle nesting nodes with these block level attributes
     // we may want to apply them in a deterministic order, and also make them nest additively (i.e. for when two blocks start at the same paragraph)
@@ -274,7 +322,7 @@ internal enum Reconciler {
       guard let node = getNodeByKey(key: nodeKey),
         node.isAttached(),
         let cacheItem = rangeCache[nodeKey],
-        let attributes = node.getBlockLevelAttributes(theme: editor.getTheme())
+        let attributes = node.getBlockLevelAttributes(theme: theme)
       else { continue }
 
       AttributeUtils.applyBlockLevelAttributes(
@@ -676,7 +724,7 @@ internal enum Reconciler {
   }
 
   @MainActor
-  private static func attributedStringFromInsertion(
+fileprivate static func attributedStringFromInsertion(
     _ insertion: ReconcilerInsertion,
     state: EditorState,
     theme: Theme
