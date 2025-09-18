@@ -32,6 +32,12 @@ final class AnchorDiagnosticsViewController: UIViewController {
   }()
 
   private let actionStack = UIStackView()
+  private static let timestampFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .none
+    formatter.timeStyle = .medium
+    return formatter
+  }()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -111,20 +117,33 @@ final class AnchorDiagnosticsViewController: UIViewController {
 
   @objc private func applyMutation() {
     try? lexicalView.editor.update {
-      guard let selection = try getSelection() as? RangeSelection,
-        let node = try selection.anchor.getNode() as? TextNode
-      else { return }
-      let newValue = node.getTextPart() + " (mutated at \(DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)))"
+      guard let node = try Self.resolveEditableTextNode() else { return }
+      let stamp = Self.timestampFormatter.string(from: Date())
+      let newValue = node.getTextPart() + " (mutated at \(stamp))"
       try node.setText(newValue)
     }
   }
 
   @objc private func logSelection() {
-    if let selection = try? getSelection() {
-      let alert = UIAlertController(title: "Selection", message: "\(selection)", preferredStyle: .alert)
-      alert.addAction(UIAlertAction(title: "OK", style: .default))
-      present(alert, animated: true)
+    var description = "Selection unavailable"
+
+    try? lexicalView.editor.update {
+      if (try getSelection() as? RangeSelection) == nil,
+        let node = try Self.resolveEditableTextNode()
+      {
+        try node.select(anchorOffset: 0, focusOffset: node.getTextPart().lengthAsNSString())
+      }
     }
+
+    try? lexicalView.editor.read {
+      if let selection = try getSelection() {
+        description = "\(selection)"
+      }
+    }
+
+    let alert = UIAlertController(title: "Selection", message: description, preferredStyle: .alert)
+    alert.addAction(UIAlertAction(title: "OK", style: .default))
+    present(alert, animated: true)
   }
 
   private func render(metric: ReconcilerMetric?) {
@@ -161,6 +180,31 @@ Use this screen to compare reconciler runs before/after mutations and confirm th
 """
     let info = InfoOverlayViewController(title: "Anchor Diagnostics", message: message)
     present(info, animated: true)
+  }
+}
+
+@MainActor
+private extension AnchorDiagnosticsViewController {
+  static func resolveEditableTextNode() throws -> TextNode? {
+    if let rangeSelection = try getSelection() as? RangeSelection {
+      if let directTextNode = try rangeSelection.anchor.getNode() as? TextNode {
+        return directTextNode
+      }
+      if let elementNode = try rangeSelection.anchor.getNode() as? ElementNode,
+        let textNode = elementNode.getFirstChild() as? TextNode
+      {
+        return textNode
+      }
+    }
+
+    if let root = getRoot(),
+      let paragraph = root.getFirstChild() as? ParagraphNode,
+      let textNode = paragraph.getFirstChild() as? TextNode
+    {
+      return textNode
+    }
+
+    return nil
   }
 }
 
