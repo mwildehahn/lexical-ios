@@ -14,6 +14,7 @@ Lexical's Swift Package is declared in `Package.swift` and maps directly to the 
       -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" \
       test
   ```
+- Accompany every change with comprehensive automated tests. Update or add unit/integration coverage to exercise new code paths, edge conditions, and regressions, and ensure the required `xcodebuild` invocation above passes before landing.
 - `open Playground/LexicalPlayground.xcodeproj`: Launch the playground app in Xcode for manual verification of UI changes.
 
 ## Coding Style & Naming Conventions
