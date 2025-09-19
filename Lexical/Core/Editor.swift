@@ -124,9 +124,11 @@ public class Editor: NSObject {
   // See description in RangeCache.swift.
   internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
   internal let rangeCacheLocationIndex = RangeCacheLocationIndex()
+  internal let anchorIndex = AnchorIndex()  // For O(1) node lookup
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
   internal var normalizedNodes: Set<NodeKey> = Set()
+  internal var preMutationTextCache: [NodeKey: String] = [:]
 
   // Used for deserialization and registration of nodes. Lexical's built-in nodes are registered
   // by default.
@@ -513,6 +515,20 @@ public class Editor: NSObject {
       proxyTextViewInputDelegate: featureFlags.proxyTextViewInputDelegate,
       reconcilerAnchors: isEnabled
     )
+  }
+
+  internal func recordPreMutationText(_ text: String, for key: NodeKey) {
+    if preMutationTextCache[key] == nil {
+      preMutationTextCache[key] = text
+    }
+  }
+
+  internal func consumePreMutationText(for key: NodeKey) -> String? {
+    if let stored = preMutationTextCache.removeValue(forKey: key) {
+      return stored
+    } else {
+      return nil
+    }
   }
 
   /// Provides the active feature flag configuration for diagnostics.

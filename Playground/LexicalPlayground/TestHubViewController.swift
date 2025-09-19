@@ -36,6 +36,10 @@ final class TestHubViewController: UITableViewController {
       title: "Copy & Accessibility",
       subtitle: "Verify anchor sanitisation for copy/paste and accessibility value reporting.",
       builder: { CopyPasteDiagnosticsViewController() }),
+    TestEntry(
+      title: "Performance Stress Test",
+      subtitle: "Benchmark reconciliation latency on large documents with anchors on/off.",
+      builder: { PerformanceStressTestViewController() }),
   ]
 
   override func viewDidLoad() {
@@ -83,6 +87,7 @@ This hub links to focused scenarios for the reconciler optimisation plan:
 • Range Cache Explorer – watch Fenwick-based location adjustments in real time.
 • Fallback Playground – trigger structural edits and confirm fallback metrics.
 • Copy & Accessibility – ensure anchors are transparent to end users.
+• Performance Stress Test – measure reconciliation time on large documents with anchors enabled/disabled.
 • Standard Editor – preserved for baseline editing flows.
 
 Use the buttons within each scenario to reproduce the tasks tracked in Plan.md and Implementation Progress.

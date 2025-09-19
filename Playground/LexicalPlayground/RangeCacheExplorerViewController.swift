@@ -19,6 +19,15 @@ final class RangeCacheExplorerViewController: UIViewController, UITableViewDataS
 
   private let tableView = UITableView(frame: .zero, style: .insetGrouped)
   private var cachedEntries: [RangeCacheDebugEntry] = []
+  private var highlightedKeys: Set<NodeKey> = []
+  private let statusLabel: UILabel = {
+    let label = UILabel()
+    label.numberOfLines = 0
+    label.font = UIFont.preferredFont(forTextStyle: .footnote)
+    label.textColor = .secondaryLabel
+    label.text = "Reload the sample to reset. Mutations highlight rows whose range cache entries changed."
+    return label
+  }()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -31,7 +40,7 @@ final class RangeCacheExplorerViewController: UIViewController, UITableViewDataS
       action: #selector(showInfo))
 
     configureLayout()
-    reloadCacheSnapshot()
+    reloadCacheSnapshot(highlighting: [])
   }
 
   private func configureLayout() {
@@ -51,11 +60,9 @@ final class RangeCacheExplorerViewController: UIViewController, UITableViewDataS
     textButton.setTitle("Append child", for: .normal)
     textButton.addTarget(self, action: #selector(appendChildNode), for: .touchUpInside)
 
-    [regenerateButton, mutateButton, textButton].forEach { button in
-      buttonStack.addArrangedSubview(button)
-    }
+    [regenerateButton, mutateButton, textButton].forEach { buttonStack.addArrangedSubview($0) }
 
-    [lexicalView, buttonStack, tableView].forEach { subview in
+    [statusLabel, lexicalView, buttonStack, tableView].forEach { subview in
       subview.translatesAutoresizingMaskIntoConstraints = false
       view.addSubview(subview)
     }
@@ -64,7 +71,11 @@ final class RangeCacheExplorerViewController: UIViewController, UITableViewDataS
     tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cacheCell")
 
     NSLayoutConstraint.activate([
-      buttonStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+      statusLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+      statusLabel.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+      statusLabel.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+
+      buttonStack.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 12),
       buttonStack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
       buttonStack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
 
@@ -82,33 +93,37 @@ final class RangeCacheExplorerViewController: UIViewController, UITableViewDataS
     reloadSampleDocument()
   }
 
-  private func reloadCacheSnapshot() {
+  private func reloadCacheSnapshot(highlighting keys: Set<NodeKey>) {
     cachedEntries = lexicalView.editor.debugRangeCacheEntries()
+    highlightedKeys = keys
     tableView.reloadData()
   }
 
   @objc private func reloadSampleDocument() {
     ReconcilerPlaygroundFixtures.loadStandardDocument(into: lexicalView.editor)
-    reloadCacheSnapshot()
+    reloadCacheSnapshot(highlighting: [])
+    statusLabel.text = "Sample document loaded. Edits will highlight the affected range cache entries."
   }
 
   @objc private func applyLocalMutation() {
+    let before = lexicalView.editor.debugRangeCacheEntries()
     try? lexicalView.editor.update {
       guard let node = getRoot()?.getLastChild() as? ParagraphNode else { return }
       let text = TextNode(text: "Injected quick mutation at \(Date())", key: nil)
       try node.append([text])
     }
-    reloadCacheSnapshot()
+    highlightChanges(since: before, context: "Appended sentence to last paragraph")
   }
 
   @objc private func appendChildNode() {
+    let before = lexicalView.editor.debugRangeCacheEntries()
     try? lexicalView.editor.update {
       guard let root = getRoot() else { return }
       let paragraph = ParagraphNode()
       try paragraph.append([TextNode(text: "Trailing child inserted", key: nil)])
       try root.append([paragraph])
     }
-    reloadCacheSnapshot()
+    highlightChanges(since: before, context: "Appended new paragraph to root")
   }
 
   // MARK: - UITableViewDataSource
@@ -128,6 +143,9 @@ final class RangeCacheExplorerViewController: UIViewController, UITableViewDataS
     config.secondaryText = "loc=\(item.location) pre=\(item.preambleLength)/start=\(item.startAnchorLength) text=\(item.textLength) children=\(item.childrenLength)"
     config.secondaryTextProperties.font = UIFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
     cell.contentConfiguration = config
+    cell.contentView.backgroundColor = highlightedKeys.contains(item.key)
+      ? UIColor.systemYellow.withAlphaComponent(0.2)
+      : .clear
     return cell
   }
 
@@ -140,11 +158,42 @@ This explorer surfaces the range cache backing the reconciler:
 
 ✅ Checkpoints:
 • Table rows show `location`, `preambleLength`, and anchor lengths per node.
-• After mutations, affected nodes should shift while untouched items remain stable—confirming partial updates work.
+• After mutations, highlighted rows indicate which cache entries changed—confirm partial updates work.
 • Use alongside Anchor Diagnostics to compare reconciler metrics when anchors toggle on/off.
 
 Use this to debug selection bugs or verify arbitrary mutations update the cache as described in Plan.md.
 """
     present(InfoOverlayViewController(title: "Range Cache Explorer", message: message), animated: true)
+  }
+
+  private func highlightChanges(since previous: [RangeCacheDebugEntry], context: String) {
+    let previousMap = Dictionary(uniqueKeysWithValues: previous.map { ($0.key, $0) })
+    let current = lexicalView.editor.debugRangeCacheEntries()
+    cachedEntries = current
+
+    var changedKeys = Set<NodeKey>()
+    for entry in current {
+      if let old = previousMap[entry.key] {
+        if old.location != entry.location
+          || old.preambleLength != entry.preambleLength
+          || old.childrenLength != entry.childrenLength
+          || old.textLength != entry.textLength
+          || old.postambleLength != entry.postambleLength
+          || old.startAnchorLength != entry.startAnchorLength
+          || old.endAnchorLength != entry.endAnchorLength
+        {
+          changedKeys.insert(entry.key)
+        }
+      } else {
+        changedKeys.insert(entry.key)
+      }
+    }
+
+    highlightedKeys = changedKeys
+    tableView.reloadData()
+    let descriptions = changedKeys.sorted()
+    statusLabel.text = changedKeys.isEmpty
+      ? "No range cache entries changed for: \(context)."
+      : "Affected nodes for \(context): \(descriptions.joined(separator: ", "))"
   }
 }

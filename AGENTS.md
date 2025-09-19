@@ -23,5 +23,31 @@ Swift files use two-space indentation with braces on the same line as declaratio
 ## Testing Guidelines
 XCTest is the standard; add coverage beside the code under test (`LexicalTests/Tests/FeatureNameTests.swift` or the matching plugin directory). Prefer descriptive method names such as `testEditorAppliesTransforms`. When adding new behavior, include regression tests and run `swift test` locally before submitting.
 
+### Performance Testing with XcodeBuildMCP
+For reconciler performance testing, use XCTests instead of manual UI testing:
+
+```bash
+# Run all reconciler performance tests
+xcodebuild -scheme Lexical-Package \
+  -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" \
+  test -only-testing:LexicalTests/ReconcilerPerformanceTests
+
+# Run specific test (e.g., anchor vs legacy comparison)
+xcodebuild -scheme Lexical-Package \
+  -destination "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0" \
+  test -only-testing:LexicalTests/ReconcilerPerformanceTests/testAnchorPerformanceVsLegacy
+```
+
+### Using Apple Documentation
+When working with TextKit, NSTextStorage, or other Apple frameworks, use the apple-docs MCP tool to search for best practices and performance optimizations:
+
+```
+mcp__apple-docs__search_apple_docs({
+  query: "NSTextStorage batch editing performance"
+})
+```
+
+This is especially useful for understanding TextKit internals, batch operations, and performance characteristics.
+
 ## Commit & Pull Request Guidelines
 Commit summaries are short, present-tense statements (e.g. `Mark visitor protocols as MainActor`) and may reference issues using `(#123)`. Group related changes into a single commit when practical. Pull requests should describe the motivation, outline code-level changes, and call out any API shifts. Link to GitHub issues or tasks, attach screenshots for UI-impacting edits (notably in the playground), and confirm that `swift test` passes. Update documentation or changelog entries when APIs move or new modules are added.

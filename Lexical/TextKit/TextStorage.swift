@@ -23,6 +23,10 @@ public class TextStorage: NSTextStorage {
     super.init()
   }
 
+  override public var fixesAttributesLazily: Bool {
+    true
+  }
+
   convenience init(editor: Editor) {
     self.init()
     self.editor = editor

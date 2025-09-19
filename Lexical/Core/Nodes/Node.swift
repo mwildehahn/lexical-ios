@@ -183,6 +183,43 @@ open class Node: @preconcurrency Codable {
     return mutableNode
   }
 
+  /// Returns a mutable version of the node for text-only changes. Only marks this node as dirty, not parents.
+  internal func getWritableForTextMutation() throws -> Self {
+    try errorOnReadOnly()
+
+    guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
+      throw LexicalError.invariantViolation(
+        "LexicalNode: Could not get active editor for \(String(describing: self)).")
+    }
+
+    let latestNode = getLatest()
+
+    if editor.cloneNotNeeded.contains(key) {
+      // Only mark this node dirty, not parents
+      editor.dirtyType = .hasDirtyNodes
+      editor.dirtyNodes[key] = .userInitiated
+      return latestNode
+    }
+
+    let mutableNode = getLatest().clone()
+
+    mutableNode.parent = latestNode.parent
+    if let latestNode = latestNode as? TextNode, let mutableNode = mutableNode as? TextNode {
+      mutableNode.format = latestNode.format
+      mutableNode.mode = latestNode.mode
+    }
+
+    editor.cloneNotNeeded.insert(key)
+    mutableNode.key = key
+
+    // Only mark this node dirty, not parents
+    editor.dirtyType = .hasDirtyNodes
+    editor.dirtyNodes[key] = .userInitiated
+
+    editorState.nodeMap[key] = mutableNode
+    return mutableNode
+  }
+
   /// Returns the zero-based index of this node within the parent.
   public func getIndexWithinParent() -> Int? {
     guard let parent = self.getParent() else {

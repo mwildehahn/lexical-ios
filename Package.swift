@@ -10,7 +10,7 @@ import PackageDescription
 
 let package = Package(
   name: "Lexical",
-  platforms: [.iOS(.v13)],
+  platforms: [.iOS("18.0")],
   products: [
     .library(
       name: "Lexical",
@@ -41,7 +41,7 @@ let package = Package(
       targets: ["LexicalMarkdown"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
+    .package(url: "https://github.com/scinfu/SwiftSoup.git", branch: "master"),
     .package(url: "https://github.com/apple/swift-markdown.git", branch: "main"),
   ],
   targets: [

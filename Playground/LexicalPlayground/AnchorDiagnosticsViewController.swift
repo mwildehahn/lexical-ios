@@ -32,6 +32,14 @@ final class AnchorDiagnosticsViewController: UIViewController {
   }()
 
   private let actionStack = UIStackView()
+  private let statusLabel: UILabel = {
+    let label = UILabel()
+    label.numberOfLines = 0
+    label.font = UIFont.preferredFont(forTextStyle: .footnote)
+    label.textColor = .secondaryLabel
+    label.text = "Load the sample document, then tap \"Append timestamp\" to mutate the focused paragraph. Metrics should update with fallback = none."
+    return label
+  }()
   private static let timestampFormatter: DateFormatter = {
     let formatter = DateFormatter()
     formatter.dateStyle = .none
@@ -84,6 +92,7 @@ final class AnchorDiagnosticsViewController: UIViewController {
     actionStack.addArrangedSubview(loadButton)
     actionStack.addArrangedSubview(mutateButton)
     actionStack.addArrangedSubview(selectionButton)
+    actionStack.addArrangedSubview(statusLabel)
     actionStack.addArrangedSubview(metricsLabel)
 
     anchorSwitch.addTarget(self, action: #selector(toggleAnchors), for: .valueChanged)
@@ -107,25 +116,36 @@ final class AnchorDiagnosticsViewController: UIViewController {
 
   @objc private func toggleAnchors() {
     lexicalView.editor.enableAnchors(anchorSwitch.isOn)
+    statusLabel.text = "Anchors are now \(anchorSwitch.isOn ? "enabled" : "disabled"). Perform an edit to observe metrics."
   }
 
   @objc private func loadDocument() {
     metricsContainer.resetMetrics()
     render(metric: nil)
     ReconcilerPlaygroundFixtures.loadStandardDocument(into: lexicalView.editor)
+    statusLabel.text = "Sample document loaded. Append a timestamp to inspect targeted reconciliation metrics."
   }
 
   @objc private func applyMutation() {
     try? lexicalView.editor.update {
-      guard let node = try Self.resolveEditableTextNode() else { return }
+      guard let node = try Self.resolveEditableTextNode() else {
+        statusLabel.text = "Could not find a writable TextNode. Place the caret in a paragraph and try again."
+        return
+      }
       let stamp = Self.timestampFormatter.string(from: Date())
       let newValue = node.getTextPart() + " (mutated at \(stamp))"
       try node.setText(newValue)
     }
+
+    if let metric = metricsContainer.lastReconcilerMetric {
+      statusLabel.text = "Mutated paragraph (inserted +\(metric.insertedCharacters) chars). Fallback: \(metric.fallbackReason?.rawValue ?? "none")."
+    } else {
+      statusLabel.text = "Mutation applied. Awaiting reconciler metrics…"
+    }
   }
 
   @objc private func logSelection() {
-    var description = "Selection unavailable"
+    var message = "Selection unavailable"
 
     try? lexicalView.editor.update {
       if (try getSelection() as? RangeSelection) == nil,
@@ -137,11 +157,13 @@ final class AnchorDiagnosticsViewController: UIViewController {
 
     try? lexicalView.editor.read {
       if let selection = try getSelection() {
-        description = "\(selection)"
+        message = "\(selection)"
       }
     }
 
-    let alert = UIAlertController(title: "Selection", message: description, preferredStyle: .alert)
+    statusLabel.text = "Current selection: \(message)"
+
+    let alert = UIAlertController(title: "Selection", message: message, preferredStyle: .alert)
     alert.addAction(UIAlertAction(title: "OK", style: .default))
     present(alert, animated: true)
   }

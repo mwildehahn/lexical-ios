@@ -254,7 +254,12 @@ open class TextNode: Node {
 
   public func setText(_ text: String) throws {
     try errorOnReadOnly()
-    try getWritable().text = text
+    if let editor = getActiveEditor() {
+      let current = getTextPart()
+      editor.recordPreMutationText(current, for: key)
+    }
+    // Use optimized path that only marks this node dirty for text mutations
+    try getWritableForTextMutation().text = text
   }
 
   public func setText_dangerousPropertyAccess(_ text: String) {

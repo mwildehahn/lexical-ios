@@ -130,9 +130,12 @@ internal func internallyMarkNodeAsDirty(node: Node, cause: DirtyStatusCause = .e
   if let parent = latest.parent {
     internallyMarkParentElementsAsDirty(parentKey: parent, nodeMap: nodeMap, editor: editor)
   }
-  if let elementNode = node as? ElementNode {
-    internallyMarkChildrenAsDirty(element: elementNode, nodeMap: nodeMap, editor: editor)
-  }
+  // PERFORMANCE FIX: Don't mark children as dirty when parent changes!
+  // Children will be marked dirty individually if they actually change.
+  // This prevents the entire document from being marked dirty on structural changes.
+  // if let elementNode = node as? ElementNode {
+  //   internallyMarkChildrenAsDirty(element: elementNode, nodeMap: nodeMap, editor: editor)
+  // }
 
   editor.dirtyType = .hasDirtyNodes
   editor.dirtyNodes[latest.key] = cause

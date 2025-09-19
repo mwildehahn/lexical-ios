@@ -17,6 +17,10 @@ internal final class RangeCacheLocationIndex {
 
   internal init() {}
 
+  var isEmpty: Bool {
+    orderedKeys.isEmpty
+  }
+
   func rebuild(rangeCache: [NodeKey: RangeCacheItem]) {
     if rangeCache.isEmpty {
       orderedKeys = []

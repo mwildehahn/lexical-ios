@@ -88,6 +88,7 @@ internal class LexicalReadOnlySizeCache {
     layoutManager = LayoutManager()
     layoutManagerDelegate = LayoutManagerDelegate()
     layoutManager.delegate = layoutManagerDelegate
+    layoutManager.allowsNonContiguousLayout = true
     textStorage = TextStorage()
     textStorage.addLayoutManager(layoutManager)
     textContainer = TextContainer()

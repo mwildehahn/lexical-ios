@@ -20,6 +20,14 @@ final class CopyPasteDiagnosticsViewController: UIViewController {
   private let plainLabel = UILabel()
   private let attributedLabel = UILabel()
   private let accessibilityLabelView = UILabel()
+  private let statusLabel: UILabel = {
+    let label = UILabel()
+    label.font = UIFont.preferredFont(forTextStyle: .footnote)
+    label.numberOfLines = 0
+    label.textColor = .secondaryLabel
+    label.text = "Select text, copy it, then inspect the pasteboard. Sanitised outputs appear below."
+    return label
+  }()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -60,6 +68,8 @@ final class CopyPasteDiagnosticsViewController: UIViewController {
     let textStack = UIStackView(arrangedSubviews: [plainLabel, attributedLabel, accessibilityLabelView])
     textStack.axis = .vertical
     textStack.spacing = 8
+
+    textStack.insertArrangedSubview(statusLabel, at: 0)
 
     [lexicalView, buttonStack, textStack].forEach { subview in
       subview.translatesAutoresizingMaskIntoConstraints = false
@@ -123,6 +133,7 @@ final class CopyPasteDiagnosticsViewController: UIViewController {
     pasteboardItems.append([UTType.utf8PlainText.identifier: sanitizedAttributed.string])
     UIPasteboard.general.items = pasteboardItems
     refreshSanitisedOutputs()
+    statusLabel.text = "Copied sanitised text to UIPasteboard." 
   }
 
   @objc private func inspectPasteboard() {
@@ -131,6 +142,7 @@ final class CopyPasteDiagnosticsViewController: UIViewController {
     let alert = UIAlertController(title: "UIPasteboard", message: plain, preferredStyle: .alert)
     alert.addAction(UIAlertAction(title: "OK", style: .default))
     present(alert, animated: true)
+    statusLabel.text = "Pasteboard currently holds: \(plain)"
   }
 
   private func showAlert(title: String, message: String) {

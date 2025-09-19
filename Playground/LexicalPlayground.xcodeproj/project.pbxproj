@@ -21,6 +21,7 @@
 		06A0A2142C45E7F400123456 /* TestHubViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2082C45E7F400123456 /* TestHubViewController.swift */; };
 		06A0A2152C45E7F400123456 /* ReconcilerTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2092C45E7F400123456 /* ReconcilerTestHelpers.swift */; };
 		06A0A2172C45F63800123456 /* InfoOverlayViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2162C45F63800123456 /* InfoOverlayViewController.swift */; };
+		06A0A2192C46065900123456 /* PerformanceStressTestViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06A0A2182C46065900123456 /* PerformanceStressTestViewController.swift */; };
 		0656CFA229D48391009CA08F /* LexicalListPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 0656CFA129D48391009CA08F /* LexicalListPlugin */; };
 		065B5C862A22291C003A38DB /* SelectableDecoratorNode in Frameworks */ = {isa = PBXBuildFile; productRef = 065B5C852A22291C003A38DB /* SelectableDecoratorNode */; };
 		065F9DF72A5EC1D600C95087 /* EditorHistoryPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 065F9DF62A5EC1D600C95087 /* EditorHistoryPlugin */; };
@@ -52,6 +53,7 @@
 		06A0A2082C45E7F400123456 /* TestHubViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHubViewController.swift; sourceTree = "<group>"; };
 		06A0A2092C45E7F400123456 /* ReconcilerTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconcilerTestHelpers.swift; sourceTree = "<group>"; };
 		06A0A2162C45F63800123456 /* InfoOverlayViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoOverlayViewController.swift; sourceTree = "<group>"; };
+		06A0A2182C46065900123456 /* PerformanceStressTestViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceStressTestViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -104,6 +106,7 @@
 				06A0A2072C45E7F400123456 /* CopyPasteDiagnosticsViewController.swift */,
 				06A0A2092C45E7F400123456 /* ReconcilerTestHelpers.swift */,
 				06A0A2162C45F63800123456 /* InfoOverlayViewController.swift */,
+				06A0A2182C46065900123456 /* PerformanceStressTestViewController.swift */,
 				069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */,
 				0656CF8F29D1ED8F009CA08F /* ToolbarPlugin.swift */,
 				06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */,
@@ -222,6 +225,7 @@
 				06A0A2132C45E7F400123456 /* CopyPasteDiagnosticsViewController.swift in Sources */,
 				06A0A2152C45E7F400123456 /* ReconcilerTestHelpers.swift in Sources */,
 				06A0A2172C45F63800123456 /* InfoOverlayViewController.swift in Sources */,
+				06A0A2192C46065900123456 /* PerformanceStressTestViewController.swift in Sources */,
 				0656CF7D29D1E438009CA08F /* ViewController.swift in Sources */,
 				0656CF7929D1E438009CA08F /* AppDelegate.swift in Sources */,
 				0656CF9029D1ED8F009CA08F /* ToolbarPlugin.swift in Sources */,
@@ -301,7 +305,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -355,7 +359,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;

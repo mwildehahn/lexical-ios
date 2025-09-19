@@ -11,19 +11,39 @@ import UIKit
 @MainActor
 final class PlaygroundMetricsContainer: EditorMetricsContainer {
   private(set) var lastReconcilerMetric: ReconcilerMetric?
+  private(set) var metricsHistory: [ReconcilerMetric] = []
   var onMetricRecorded: ((ReconcilerMetric) -> Void)?
+  private var metricContinuations: [CheckedContinuation<ReconcilerMetric?, Never>] = []
 
   nonisolated func record(_ metric: EditorMetric) {
     Task { @MainActor [weak self] in
       guard case .reconcilerRun(let data) = metric else { return }
       self?.lastReconcilerMetric = data
+      self?.metricsHistory.append(data)
       self?.onMetricRecorded?(data)
+      if let continuation = self?.metricContinuations.first {
+        self?.metricContinuations.removeFirst()
+        continuation.resume(returning: data)
+      }
     }
   }
 
   nonisolated func resetMetrics() {
     Task { @MainActor [weak self] in
       self?.lastReconcilerMetric = nil
+      self?.metricsHistory.removeAll()
+      self?.metricContinuations.forEach { $0.resume(returning: nil) }
+      self?.metricContinuations.removeAll()
+    }
+  }
+
+  func waitForNextMetric() async -> ReconcilerMetric? {
+    if let metric = metricsHistory.last {
+      return metric
+    }
+
+    return await withCheckedContinuation { continuation in
+      metricContinuations.append(continuation)
     }
   }
 }
@@ -106,6 +126,32 @@ enum ReconcilerPlaygroundFixtures {
         try firstChild.insertBefore(nodeToInsert: sibling)
       } else {
         try parent.append([sibling])
+      }
+    }
+  }
+
+  @MainActor
+  static func loadStressDocument(into editor: Editor, paragraphCount: Int = 400, sentencesPerParagraph: Int = 6) {
+    try? editor.update {
+      guard let root = getRoot() else { return }
+      try removeAllChildren(from: root)
+
+      for paragraphIndex in 0..<paragraphCount {
+        let paragraph = ParagraphNode()
+        var sentences: [TextNode] = []
+        for sentenceIndex in 0..<sentencesPerParagraph {
+          let sentence = TextNode(
+            text: "Paragraph \(paragraphIndex) sentence \(sentenceIndex): Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus pulvinar lectus sit amet arcu mollis placerat.",
+            key: nil
+          )
+          sentences.append(sentence)
+        }
+        try paragraph.append(sentences)
+        try root.append([paragraph])
+      }
+
+      if let first = root.getFirstChild() as? ParagraphNode {
+        try first.select(anchorOffset: 0, focusOffset: 0)
       }
     }
   }
