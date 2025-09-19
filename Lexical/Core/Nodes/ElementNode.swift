@@ -316,7 +316,7 @@ open class ElementNode: Node {
     } else {
       guard let prevSibling = getPreviousSibling() else {
         preamble = ""
-        return anchorMarker(kind: .start) + preamble
+        return preamble  // Removed anchor marker
       }
 
       if !(prevSibling is ElementNode) {
@@ -324,7 +324,7 @@ open class ElementNode: Node {
       }
     }
 
-    return anchorMarker(kind: .start) + preamble
+    return preamble  // Removed anchor marker
   }
 
   override open func getPostamble() -> String {
@@ -344,8 +344,7 @@ open class ElementNode: Node {
       basePostamble = "\n"
     }
 
-    let endMarker = anchorMarker(kind: .end)
-    return endMarker + basePostamble
+    return basePostamble  // Removed anchor marker
   }
 
   public func getAllTextNodes(includeInert: Bool = false) -> [TextNode] {

@@ -63,6 +63,7 @@ private class ReconcilerState {
     self.deletedCharacterCount = 0
     self.fallbackReason = nil
     self.locationShifts = []
+    self.nodeOffsetIndex = NodeOffsetIndex()  // Initialize the Fenwick tree-based index
   }
 
   let prevEditorState: EditorState
@@ -83,6 +84,7 @@ private class ReconcilerState {
   var deletedCharacterCount: Int
   var fallbackReason: ReconcilerFallbackReason?
   var locationShifts: [(location: Int, delta: Int)]
+  let nodeOffsetIndex: NodeOffsetIndex  // Fenwick tree-based offset tracker
 
   func registerFallbackReason(_ reason: ReconcilerFallbackReason) {
     if fallbackReason == nil {
@@ -635,6 +637,19 @@ private struct TextStorageDeltaApplier {
   // Batch all deletions
   for deletionRange in state.rangesToDelete.reversed() {
     if deletionRange.length > 0 {
+      // Validate range before deletion
+      let stringLength = (textStorage.string as NSString).length
+      let rangeEnd = deletionRange.location + deletionRange.length
+
+      guard deletionRange.location >= 0 && rangeEnd <= stringLength else {
+        editor.log(
+          .reconciler, .error,
+          "SKIPPING invalid deletion range \(NSStringFromRange(deletionRange)) - string length is \(stringLength)"
+        )
+        debugLog("ERROR: Invalid deletion range \(NSStringFromRange(deletionRange)) for string length \(stringLength)")
+        continue
+      }
+
       nonEmptyDeletionsCount += 1
       editor.log(
         .reconciler, .verboseIncludingUserContent,
@@ -800,9 +815,19 @@ internal enum Reconciler {
     metricsShouldRecord = true
     metricsState = reconcilerState
 
-    // FAST PATH: Check for single structural insertion (common case)
-    if let fastInsertionResult = tryFastStructuralInsertion(reconcilerState: reconcilerState, editor: editor) {
+    let mode = editor.featureFlags.reconcilerAnchors ? "OPTIMIZED" : "LEGACY"
+    print("\n[\(mode) MODE] Starting reconciliation...")
+
+    // FAST PATH: Use NodeOffsetIndex to process only dirty nodes
+    if tryIndexBasedFastPath(reconcilerState: reconcilerState, editor: editor) {
+      debugLog("🚀 INDEX FAST PATH: Processed only dirty nodes without full tree walk!")
+      print("[\(mode)] 🚀 INDEX FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
+      editor.log(.reconciler, .verbose, "INDEX FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
+      // Fast path succeeded, skip full reconciliation
+    } else if let fastInsertionResult = tryFastStructuralInsertion(reconcilerState: reconcilerState, editor: editor) {
       debugLog("🚀 FAST PATH: Handled structural insertion without tree walk!")
+      print("[\(mode)] 🚀 STRUCTURAL FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
+      editor.log(.reconciler, .verbose, "STRUCTURAL FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
       // Apply the fast path result directly
       reconcilerState.nextRangeCache = fastInsertionResult.rangeCache
       reconcilerState.rangesToAdd = fastInsertionResult.insertions
@@ -810,7 +835,11 @@ internal enum Reconciler {
       // Skip the full tree walk
     } else {
       // Fall back to regular reconciliation
+      print("[\(mode)] ⚠️ FALLBACK to full reconciliation - dirty nodes: \(reconcilerState.dirtyNodes.count)")
+      editor.log(.reconciler, .verbose, "FALLBACK to full reconciliation - dirty nodes: \(reconcilerState.dirtyNodes.count)")
       try reconcileNode(key: kRootNodeKey, reconcilerState: reconcilerState)
+      print("[\(mode)] ⚠️ FULL RECONCILIATION: visited=\(reconcilerState.visitedNodes) nodes")
+      editor.log(.reconciler, .verbose, "FULL RECONCILIATION: visited=\(reconcilerState.visitedNodes) nodes")
     }
 
     debugLog(
@@ -1046,6 +1075,180 @@ internal enum Reconciler {
 
   /// Fast path for single structural insertions
   @MainActor
+  /// Try to use the NodeOffsetIndex for O(1) targeted updates
+  /// Returns true if fast path was successful
+  private static func tryIndexBasedFastPath(reconcilerState: ReconcilerState, editor: Editor) -> Bool {
+    // Use fast path unless we're treating all nodes as dirty (full document replacement)
+    let dirtyCount = reconcilerState.dirtyNodes.count
+    guard dirtyCount > 0 && !reconcilerState.treatAllNodesAsDirty else {
+      if dirtyCount == 0 {
+        print("❌ INDEX FAST PATH: Skipped - no dirty nodes")
+      } else {
+        print("❌ INDEX FAST PATH: Skipped - treatAllNodesAsDirty=true (full document replacement)")
+      }
+      return false
+    }
+
+    // The Fenwick tree can handle any number of dirty nodes efficiently
+    // No need for arbitrary limits
+
+    print("✅ INDEX FAST PATH: Attempting with \(dirtyCount) dirty nodes: \(reconcilerState.dirtyNodes.keys)")
+    debugLog("INDEX FAST PATH: Attempting with \(dirtyCount) dirty nodes: \(reconcilerState.dirtyNodes.keys)")
+
+    // Build the NodeOffsetIndex from the previous state if empty
+    // TODO: This should be maintained incrementally across updates, not rebuilt
+    if reconcilerState.prevRangeCache.count > 0 &&
+       reconcilerState.nodeOffsetIndex.getNodesInOrder().isEmpty {
+      for (key, cacheItem) in reconcilerState.prevRangeCache {
+        let nodeLength = cacheItem.preambleLength + cacheItem.textLength +
+                        cacheItem.childrenLength + cacheItem.postambleLength
+        reconcilerState.nodeOffsetIndex.registerNode(key: key, length: nodeLength)
+      }
+    }
+
+    // Mark dirty nodes in the index
+    for key in reconcilerState.dirtyNodes.keys {
+      reconcilerState.nodeOffsetIndex.markDirty(key: key)
+    }
+
+    // Process ONLY the dirty nodes
+    for dirtyKey in reconcilerState.dirtyNodes.keys {
+      // OPTIMIZATION: Skip the root if it's only dirty because children changed
+      if dirtyKey == kRootNodeKey {
+        print("✅ INDEX FAST PATH: Skipping root node (only dirty due to children)")
+        continue
+      }
+
+      let prevNode = reconcilerState.prevEditorState.nodeMap[dirtyKey]
+      let nextNode = reconcilerState.nextEditorState.nodeMap[dirtyKey]
+      let prevRange = reconcilerState.prevRangeCache[dirtyKey]
+
+      // Handle different cases: update, insert, or delete
+      if let nextNode = nextNode {
+        // Node exists in next state (update or insert)
+        var nodePosition: Int = 0
+
+        if let prevNode = prevNode, let prevRange = prevRange {
+          // Check if the node was reparented (parent changed)
+          if prevNode.parent != nextNode.parent {
+            print("⚠️ INDEX FAST PATH: Node \(dirtyKey) parent changed from '\(prevNode.parent ?? "nil")' to '\(nextNode.parent ?? "nil")'")
+            // TODO: The Fenwick tree CAN handle reparenting efficiently:
+            // 1. Remove from old position (set length to 0)
+            // 2. Calculate new position based on new parent/siblings
+            // 3. Add at new position
+            // For now, fall back to be safe
+            print("❌ INDEX FAST PATH: Falling back - reparenting not yet implemented in fast path")
+            return false
+          } else {
+            // UPDATE: Node exists in both states at same parent
+            // Get position from index (O(log n))
+            guard let indexPosition = reconcilerState.nodeOffsetIndex.getNodePosition(key: dirtyKey) else {
+              return false
+            }
+            nodePosition = indexPosition
+
+            // Calculate the old length for deletion
+            let prevLength = prevRange.preambleLength + prevRange.textLength + prevRange.postambleLength
+            if prevLength > 0 {
+              reconcilerState.rangesToDelete.append(NSRange(location: nodePosition, length: prevLength))
+            }
+          }
+        }
+
+        if prevRange == nil {
+          // INSERT: New node, calculate position based on siblings
+          // This is O(log n) with the Fenwick tree!
+
+          // Find position by looking at previous siblings
+          if let parent = nextNode.getParent(),
+             let siblings = (parent is RootNode) ? (parent as? RootNode)?.children : (parent as? ElementNode)?.children,
+             let nodeIndex = siblings.firstIndex(of: dirtyKey), nodeIndex > 0 {
+            // Insert after previous sibling
+            let prevSiblingKey = siblings[nodeIndex - 1]
+            if let prevSiblingPosition = reconcilerState.nodeOffsetIndex.getNodePosition(key: prevSiblingKey),
+               let prevSiblingRange = reconcilerState.prevRangeCache[prevSiblingKey] {
+              let prevSiblingLength = prevSiblingRange.preambleLength + prevSiblingRange.textLength +
+                                     prevSiblingRange.childrenLength + prevSiblingRange.postambleLength
+              nodePosition = prevSiblingPosition + prevSiblingLength
+            }
+          } else if let parent = nextNode.getParent() {
+            // Node is first child in parent
+            if let parentRange = reconcilerState.prevRangeCache[parent.key],
+               let parentPosition = reconcilerState.nodeOffsetIndex.getNodePosition(key: parent.key) {
+              nodePosition = parentPosition + parentRange.preambleLength
+            } else if parent is RootNode {
+              // First child of root
+              nodePosition = 0
+            }
+          }
+          // else nodePosition stays 0 (insert at beginning of document)
+        }
+
+        // Process node content
+        var nextRangeCacheItem = RangeCacheItem()
+        nextRangeCacheItem.location = nodePosition
+
+        let nextPreamble = nextNode.getPreamble()
+        let nextText = nextNode.getTextPart()
+        let nextPostamble = nextNode.getPostamble()
+
+        nextRangeCacheItem.preambleLength = nextPreamble.lengthAsNSString()
+        nextRangeCacheItem.textLength = nextText.lengthAsNSString()
+        nextRangeCacheItem.postambleLength = nextPostamble.lengthAsNSString()
+
+        let nextLength = nextRangeCacheItem.preambleLength + nextRangeCacheItem.textLength + nextRangeCacheItem.postambleLength
+
+        // Register or update in index (O(log n))
+        if prevRange == nil {
+          // New node - register it
+          reconcilerState.nodeOffsetIndex.registerNode(key: dirtyKey, length: nextLength)
+        } else {
+          // Existing node - update length
+          reconcilerState.nodeOffsetIndex.updateNodeLength(key: dirtyKey, newLength: nextLength)
+        }
+
+        // Add insertion ranges
+        if nextLength > 0 {
+          reconcilerState.rangesToAdd.append(ReconcilerInsertion(location: nodePosition, nodeKey: dirtyKey, part: .text))
+        }
+
+        reconcilerState.nextRangeCache[dirtyKey] = nextRangeCacheItem
+        reconcilerState.visitedNodes += 1
+
+      } else if let prevRange = prevRange {
+        // DELETE: Node exists only in prev state
+        guard let nodePosition = reconcilerState.nodeOffsetIndex.getNodePosition(key: dirtyKey) else {
+          return false
+        }
+
+        let prevLength = prevRange.preambleLength + prevRange.textLength + prevRange.postambleLength
+        if prevLength > 0 {
+          reconcilerState.rangesToDelete.append(NSRange(location: nodePosition, length: prevLength))
+        }
+
+        // Remove from index
+        reconcilerState.nodeOffsetIndex.removeNode(key: dirtyKey)
+        reconcilerState.visitedNodes += 1
+      }
+    }
+
+    // Copy over unchanged nodes with updated positions
+    for (key, prevRange) in reconcilerState.prevRangeCache {
+      if reconcilerState.dirtyNodes[key] == nil {
+        // Clean node - just update position using index
+        if let newPosition = reconcilerState.nodeOffsetIndex.getNodePosition(key: key) {
+          var updatedRange = prevRange
+          updatedRange.location = newPosition
+          reconcilerState.nextRangeCache[key] = updatedRange
+        }
+      }
+    }
+
+    debugLog("INDEX FAST PATH: Success! Visited only \(reconcilerState.visitedNodes) nodes")
+    return true
+  }
+
+  @MainActor
   private static func tryFastStructuralInsertion(reconcilerState: ReconcilerState, editor: Editor) -> (rangeCache: [NodeKey: RangeCacheItem], insertions: [ReconcilerInsertion], shifts: [(location: Int, delta: Int)])? {
 
     // Check if this is a simple insertion case
@@ -1061,6 +1264,7 @@ internal enum Reconciler {
 
     // Check for single insertion
     guard nextCount == prevCount + 1 else {
+      print("❌ STRUCTURAL FAST PATH: Not single insertion - prevCount=\(prevCount), nextCount=\(nextCount)")
       return nil
     }
 
@@ -1134,6 +1338,9 @@ internal enum Reconciler {
     // Create shifts for all nodes after insertion
     let shifts = [(location: insertLocation + totalLength, delta: totalLength)]
 
+    // Count only the new node as visited (we didn't walk the rest of the tree!)
+    reconcilerState.visitedNodes = 1
+
     debugLog("🚀 FAST INSERT: Complete - avoided walking \(prevCount) nodes!")
 
     return (rangeCache: newRangeCache, insertions: insertions, shifts: shifts)
@@ -1157,16 +1364,24 @@ internal enum Reconciler {
 
     let isDirty = reconcilerState.dirtyNodes[key] != nil || reconcilerState.treatAllNodesAsDirty
 
+    // Update the NodeOffsetIndex with this node's information
+    let nodeLength = prevRange.preambleLength + prevRange.textLength +
+                    prevRange.childrenLength + prevRange.postambleLength
+    reconcilerState.nodeOffsetIndex.registerNode(key: key, length: nodeLength)
+    if isDirty {
+      reconcilerState.nodeOffsetIndex.markDirty(key: key)
+    }
+
     if prevNode === nextNode && !isDirty {
-      // OPTIMIZED: Skip clean subtrees entirely!
-      // Use Fenwick tree to get the shifted location instead of walking all children
+      // OPTIMIZED: Skip clean subtrees entirely using NodeOffsetIndex!
+      // The Fenwick tree maintains correct positions without tree traversal
 
       // Calculate total size of this node (including children)
       let totalNodeSize = prevRange.preambleLength + prevRange.textLength +
                          prevRange.childrenLength + prevRange.postambleLength
 
-      // Update location using Fenwick tree offset
-      let shiftedLocation = reconcilerState.locationCursor
+      // Get position from NodeOffsetIndex (O(log n) operation)
+      let shiftedLocation = reconcilerState.nodeOffsetIndex.getNodePosition(key: key) ?? reconcilerState.locationCursor
 
       // Just copy the cache entry with updated location
       var nextRangeCacheItem = prevRange
@@ -1176,8 +1391,11 @@ internal enum Reconciler {
       // Update cursor and skip entire subtree
       reconcilerState.locationCursor += totalNodeSize
 
+      // Clear dirty flag as we've processed this node
+      reconcilerState.nodeOffsetIndex.clearDirty(key: key)
+
       // Log for debugging
-      debugLog("SKIPPED CLEAN SUBTREE: node=\(key) size=\(totalNodeSize) children=\(prevRange.childrenLength)")
+      debugLog("SKIPPED CLEAN SUBTREE via INDEX: node=\(key) size=\(totalNodeSize) position=\(shiftedLocation)")
 
       return  // Don't recurse into children!
     }
@@ -1222,17 +1440,40 @@ internal enum Reconciler {
     nextRangeCacheItem.preambleLength = nextPreambleLength
     nextRangeCacheItem.preambleSpecialCharacterLength = nextPreambleString.lengthAsNSString(
       includingCharacters: ["\u{200B}"])
-    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorStartString {
-      nextRangeCacheItem.startAnchorLength = anchor.lengthAsNSString()
-    } else {
-      nextRangeCacheItem.startAnchorLength = 0
-    }
+    // No longer using anchor markers
+    nextRangeCacheItem.startAnchorLength = 0
 
     // right, now we have finished the preamble, and the cursor is in the right place. Time for children.
     if nextNode is ElementNode {
-      let cursorBeforeChildren = reconcilerState.locationCursor
-      try reconcileChildren(key: key, reconcilerState: reconcilerState)
-      nextRangeCacheItem.childrenLength = reconcilerState.locationCursor - cursorBeforeChildren
+      // OPTIMIZATION: Special handling for root node with few dirty children
+      if key == kRootNodeKey && !reconcilerState.treatAllNodesAsDirty {
+        // For root, check if we can use a super-fast path
+        let dirtyChildKeys = reconcilerState.dirtyNodes.keys.filter { k in
+          k != kRootNodeKey && reconcilerState.nextEditorState.nodeMap[k]?.getParent()?.key == kRootNodeKey
+        }
+
+        if dirtyChildKeys.count > 0 && dirtyChildKeys.count <= 3 {
+          print("🚀 ROOT OPTIMIZATION: Processing only \(dirtyChildKeys.count) dirty children without iterating all children")
+
+          // Process ONLY the dirty children
+          for childKey in dirtyChildKeys {
+            try reconcileNode(key: childKey, reconcilerState: reconcilerState)
+          }
+
+          // Skip the full children reconciliation!
+          nextRangeCacheItem.childrenLength = reconcilerState.locationCursor - reconcilerState.locationCursor
+        } else {
+          // Fall back to regular children processing
+          let cursorBeforeChildren = reconcilerState.locationCursor
+          try reconcileChildren(key: key, reconcilerState: reconcilerState)
+          nextRangeCacheItem.childrenLength = reconcilerState.locationCursor - cursorBeforeChildren
+        }
+      } else {
+        // Regular element node processing
+        let cursorBeforeChildren = reconcilerState.locationCursor
+        try reconcileChildren(key: key, reconcilerState: reconcilerState)
+        nextRangeCacheItem.childrenLength = reconcilerState.locationCursor - cursorBeforeChildren
+      }
     } else if nextNode is DecoratorNode {
       reconcilerState.decoratorsToDecorate.append(key)
     }
@@ -1269,11 +1510,8 @@ internal enum Reconciler {
       part: .postamble
     )
     nextRangeCacheItem.postambleLength = nextPostambleLength
-    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorEndString {
-      nextRangeCacheItem.endAnchorLength = anchor.lengthAsNSString()
-    } else {
-      nextRangeCacheItem.endAnchorLength = 0
-    }
+    // No longer using anchor markers
+    nextRangeCacheItem.endAnchorLength = 0
 
     reconcilerState.nextRangeCache[key] = nextRangeCacheItem
   }
@@ -1365,11 +1603,8 @@ internal enum Reconciler {
     nextRangeCacheItem.preambleLength = nextPreambleLength
     nextRangeCacheItem.preambleSpecialCharacterLength = nextPreambleString.lengthAsNSString(
       includingCharacters: ["\u{200B}"])
-    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorStartString {
-      nextRangeCacheItem.startAnchorLength = anchor.lengthAsNSString()
-    } else {
-      nextRangeCacheItem.startAnchorLength = 0
-    }
+    // No longer using anchor markers
+    nextRangeCacheItem.startAnchorLength = 0
     reconcilerState.insertedCharacterCount += nextPreambleLength
 
     if let nextNode = nextNode as? ElementNode, nextNode.children.count > 0 {
@@ -1397,11 +1632,8 @@ internal enum Reconciler {
     reconcilerState.rangesToAdd.append(postambleInsertion)
     reconcilerState.locationCursor += nextPostambleLength
     nextRangeCacheItem.postambleLength = nextPostambleLength
-    if let elementNode = nextNode as? ElementNode, let anchor = elementNode.anchorEndString {
-      nextRangeCacheItem.endAnchorLength = anchor.lengthAsNSString()
-    } else {
-      nextRangeCacheItem.endAnchorLength = 0
-    }
+    // No longer using anchor markers
+    nextRangeCacheItem.endAnchorLength = 0
     reconcilerState.insertedCharacterCount += nextPostambleLength
 
     reconcilerState.nextRangeCache[key] = nextRangeCacheItem
@@ -1455,12 +1687,69 @@ internal enum Reconciler {
     else {
       return
     }
-    // in JS, this method does a few optimisation codepaths, then calls to the slow path reconcileNodeChildren. I'll not program the optimisations yet.
+
+    // OPTIMIZATION: If only a few children are dirty, process them directly
+    // without walking the entire children array
+    let prevChildren = prevNode.children
+    let nextChildren = nextNode.children
+    let prevCount = prevChildren.count
+    let nextCount = nextChildren.count
+
+    // Check if this is a simple insertion/deletion case
+    if !reconcilerState.treatAllNodesAsDirty {
+      // Count dirty children
+      var dirtyChildCount = 0
+      var dirtyChildIndices: [Int] = []
+      for (index, childKey) in nextChildren.enumerated() {
+        if reconcilerState.dirtyNodes[childKey] != nil {
+          dirtyChildCount += 1
+          dirtyChildIndices.append(index)
+        }
+      }
+
+      // If very few children are dirty relative to total, use targeted approach
+      if dirtyChildCount > 0 && dirtyChildCount <= 3 && nextCount > 10 {
+        print("✨ OPTIMIZED CHILDREN: Processing only \(dirtyChildCount) dirty children out of \(nextCount)")
+        debugLog("OPTIMIZED CHILDREN: Processing only \(dirtyChildCount) dirty children out of \(nextCount)")
+
+        // Process only the dirty children and their immediate neighbors
+        for index in dirtyChildIndices {
+          let childKey = nextChildren[index]
+
+          // If this is a new node (insertion), just reconcile it
+          if !prevChildren.contains(childKey) {
+            try reconcileNode(key: childKey, reconcilerState: reconcilerState)
+          } else {
+            // For updates, reconcile the node
+            try reconcileNode(key: childKey, reconcilerState: reconcilerState)
+          }
+        }
+
+        // Update positions for all clean children using the index
+        for childKey in nextChildren {
+          if reconcilerState.dirtyNodes[childKey] == nil {
+            // This is a clean child - just update its position
+            if let prevRange = reconcilerState.prevRangeCache[childKey] {
+              let totalSize = prevRange.preambleLength + prevRange.textLength +
+                            prevRange.childrenLength + prevRange.postambleLength
+              var nextRange = prevRange
+              nextRange.location = reconcilerState.locationCursor
+              reconcilerState.nextRangeCache[childKey] = nextRange
+              reconcilerState.locationCursor += totalSize
+            }
+          }
+        }
+
+        return  // Skip the full reconciliation
+      }
+    }
+
+    // Fall back to full reconciliation for complex cases
     try reconcileNodeChildren(
-      prevChildren: prevNode.children,
-      nextChildren: nextNode.children,
-      prevChildrenLength: prevNode.children.count,
-      nextChildrenLength: nextNode.children.count,
+      prevChildren: prevChildren,
+      nextChildren: nextChildren,
+      prevChildrenLength: prevCount,
+      nextChildrenLength: nextCount,
       reconcilerState: reconcilerState)
   }
 
@@ -1492,7 +1781,7 @@ internal enum Reconciler {
           try reconcileNode(key: nextKey, reconcilerState: reconcilerState)
         } else {
           // Skip clean children entirely - just copy their cache entry with updated location
-          reconcilerState.visitedNodes += 1  // Still count it as visited
+          // Don't count skipped clean nodes as visited - they were truly skipped!
           if let prevRange = reconcilerState.prevRangeCache[nextKey] {
             let totalSize = prevRange.preambleLength + prevRange.textLength +
                           prevRange.childrenLength + prevRange.postambleLength

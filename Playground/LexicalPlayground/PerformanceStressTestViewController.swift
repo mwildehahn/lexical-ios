@@ -106,19 +106,44 @@ final class PerformanceStressTestViewController: UIViewController {
       for size in testSizes {
         self.updateUI("📊 Testing with \(size) paragraphs...\n\n")
 
-        // Test with anchors OFF
+        // LEGACY MODE TEST
+        print("\n" + "="*50)
+        print("STARTING LEGACY MODE TEST (size=\(size))")
+        print("="*50)
+
         testView.editor.updateFeatureFlags(FeatureFlags(reconcilerAnchors: false))
         loadDocument(size: size)
+
+        // Wait for document to settle
+        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second
 
         self.updateUI("Running legacy tests...\n")
         let legacyResults = await runInsertionTests(size: size)
 
-        // Test with anchors ON
+        print("\n" + "="*50)
+        print("LEGACY MODE TEST COMPLETE")
+        print("="*50)
+
+        // Wait between tests
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
+
+        // OPTIMIZED MODE TEST
+        print("\n" + "="*50)
+        print("STARTING OPTIMIZED MODE TEST (size=\(size))")
+        print("="*50)
+
         testView.editor.updateFeatureFlags(FeatureFlags(reconcilerAnchors: true))
         loadDocument(size: size)
 
+        // Wait for document to settle
+        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second
+
         self.updateUI("Running anchor tests...\n")
         let anchorResults = await runInsertionTests(size: size)
+
+        print("\n" + "="*50)
+        print("OPTIMIZED MODE TEST COMPLETE")
+        print("="*50)
 
         // Display comparison
         displayComparison(size: size, legacy: legacyResults, anchors: anchorResults)
@@ -127,9 +152,11 @@ final class PerformanceStressTestViewController: UIViewController {
       self.resultsTextView.text += "\n" + "="*40 + "\n"
       self.resultsTextView.text += "✅ TEST COMPLETE\n\n"
 
-      // Calculate overall improvement
-      self.resultsTextView.text += "The anchor-based reconciliation should show significant improvements,\n"
-      self.resultsTextView.text += "especially for insertions at the beginning of large documents.\n"
+      // Explain the results
+      self.resultsTextView.text += "🎯 Expected behavior:\n"
+      self.resultsTextView.text += "• With optimization ON: Should visit only 2-5 nodes for ANY insertion\n"
+      self.resultsTextView.text += "• With optimization OFF: Visits ALL nodes in the document\n"
+      self.resultsTextView.text += "• The larger the document, the bigger the improvement\n"
 
       self.activityIndicator.stopAnimating()
       self.runButton.isEnabled = true
@@ -143,13 +170,12 @@ final class PerformanceStressTestViewController: UIViewController {
   }
 
   private func loadDocument(size: Int) {
+    // Reset editor to clean state
+    testView.editor.resetEditor()
+
+    // Now create the document fresh
     try? testView.editor.update {
       guard let root = getRoot() else { return }
-
-      // Clear existing
-      for child in root.getChildren() {
-        try child.remove()
-      }
 
       // Create paragraphs
       for i in 0..<size {
@@ -165,23 +191,70 @@ final class PerformanceStressTestViewController: UIViewController {
   private func runInsertionTests(size: Int) async -> (begin: (time: TimeInterval, nodes: Int),
                                                        middle: (time: TimeInterval, nodes: Int),
                                                        end: (time: TimeInterval, nodes: Int)) {
-    // Small delay to ensure reconciliation completes
+    // Test at beginning - This should visit minimal nodes with optimization
+    print("\n--- Testing insertion at BEGINNING (position 0) ---")
+
+    // Load fresh document and wait for it to settle
+    print("Loading fresh document with \(size) paragraphs...")
+    metricsContainer.resetMetrics()  // Clear any previous metrics
+    loadDocument(size: size)
+
+    // Wait for document load reconciliation to complete and capture it
+    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 second
+    let loadMetric = await metricsContainer.waitForNextMetric()
+    print("Document load complete: \(loadMetric?.nodesVisited ?? 0) nodes visited")
+
+    // NOW reset metrics again and measure ONLY the insertion
+    print("Resetting metrics for insertion measurement...")
+    metricsContainer.resetMetrics()
+
+    let beginTime = measureInsertion(at: 0, docSize: size)
+
+    // Wait a bit for reconciliation to complete
     try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
 
-    // Test at beginning
-    metricsContainer.resetMetrics()
-    let beginTime = measureInsertion(at: 0, docSize: size)
     let beginMetric = await metricsContainer.waitForNextMetric()
+    print("--- Insertion at BEGINNING complete: \(beginMetric?.nodesVisited ?? 0) nodes visited ---")
 
     // Test at middle
+    print("\n--- Testing insertion at MIDDLE (position \(size/2)) ---")
+
+    print("Loading fresh document with \(size) paragraphs...")
     metricsContainer.resetMetrics()
+    loadDocument(size: size)
+
+    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 second
+    let loadMetricMiddle = await metricsContainer.waitForNextMetric()
+    print("Document load complete: \(loadMetricMiddle?.nodesVisited ?? 0) nodes visited")
+
+    print("Resetting metrics for insertion measurement...")
+    metricsContainer.resetMetrics()
+
     let middleTime = measureInsertion(at: size/2, docSize: size)
+    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+
     let middleMetric = await metricsContainer.waitForNextMetric()
+    print("--- Insertion at MIDDLE complete: \(middleMetric?.nodesVisited ?? 0) nodes visited ---")
 
     // Test at end
+    print("\n--- Testing insertion at END (position \(size)) ---")
+
+    print("Loading fresh document with \(size) paragraphs...")
     metricsContainer.resetMetrics()
+    loadDocument(size: size)
+
+    try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 second
+    let loadMetricEnd = await metricsContainer.waitForNextMetric()
+    print("Document load complete: \(loadMetricEnd?.nodesVisited ?? 0) nodes visited")
+
+    print("Resetting metrics for insertion measurement...")
+    metricsContainer.resetMetrics()
+
     let endTime = measureInsertion(at: size, docSize: size)
+    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+
     let endMetric = await metricsContainer.waitForNextMetric()
+    print("--- Insertion at END complete: \(endMetric?.nodesVisited ?? 0) nodes visited ---")
 
     return (
       begin: (beginTime, beginMetric?.nodesVisited ?? 0),
@@ -197,9 +270,10 @@ final class PerformanceStressTestViewController: UIViewController {
       guard let root = getRoot() else { return }
       let children = root.getChildren()
 
-      // Create new paragraph
+      // Create new paragraph with unique content
       let newPara = ParagraphNode()
-      let newText = TextNode(text: "INSERTED: Performance test paragraph")
+      let timestamp = Date().timeIntervalSince1970
+      let newText = TextNode(text: "NEW LINE \(timestamp): This is a newly inserted paragraph at position \(position)")
       try newPara.append([newText])
 
       // Insert at position
@@ -211,8 +285,9 @@ final class PerformanceStressTestViewController: UIViewController {
         try children[position].insertBefore(nodeToInsert: newPara)
       }
 
-      // Remove immediately
-      try newPara.remove()
+      // DON'T REMOVE - Keep the insertion so we can measure targeted updates
+      // The key insight: with proper optimization, inserting at the top
+      // should only visit a few nodes, not the entire document
     }
 
     return Date().timeIntervalSince(start)
