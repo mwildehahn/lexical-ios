@@ -125,6 +125,7 @@ public class Editor: NSObject {
   internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
   internal let rangeCacheLocationIndex = RangeCacheLocationIndex()
   internal let anchorIndex = AnchorIndex()  // For O(1) node lookup
+  internal var reconcilerNodeOffsetIndex: NodeOffsetIndex?  // FenwickTree-based offset tracking
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
   internal var normalizedNodes: Set<NodeKey> = Set()

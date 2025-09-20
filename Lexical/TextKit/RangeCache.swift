@@ -50,6 +50,18 @@ internal func pointAtStringLocation(
   _ location: Int, searchDirection: UITextStorageDirection, rangeCache: [NodeKey: RangeCacheItem],
   locationIndex: RangeCacheLocationIndex? = nil
 ) throws -> Point? {
+  // Check if we should use FenwickTree mode
+  if let editor = getActiveEditor(),
+     editor.featureFlags.useFenwickTreeOffsets,
+     let nodeOffsetIndex = editor.reconcilerNodeOffsetIndex {
+    return pointAtStringLocationUsingFenwickTree(
+      location,
+      searchDirection: searchDirection,
+      nodeOffsetIndex: nodeOffsetIndex
+    )
+  }
+
+  // Original RangeCache implementation
   do {
     let searchResult = try evaluateNode(
       kRootNodeKey, stringLocation: location, searchDirection: searchDirection,
@@ -69,6 +81,34 @@ internal func pointAtStringLocation(
   } catch LexicalError.rangeCacheSearch {
     return nil
   }
+}
+
+@MainActor
+private func pointAtStringLocationUsingFenwickTree(
+  _ location: Int,
+  searchDirection: UITextStorageDirection,
+  nodeOffsetIndex: NodeOffsetIndex
+) -> Point? {
+  // Find the node at the given location using O(n) search (could be optimized with binary search)
+  guard let nodeKey = nodeOffsetIndex.findNodeAt(position: location) else {
+    return nil
+  }
+
+  guard let node = getNodeByKey(key: nodeKey),
+        let nodePosition = nodeOffsetIndex.getNodePosition(key: nodeKey) else {
+    return nil
+  }
+
+  // Calculate offset within the node
+  let offsetInNode = location - nodePosition
+
+  if node is TextNode {
+    return Point(key: nodeKey, offset: offsetInNode, type: .text)
+  } else if node is ElementNode {
+    return Point(key: nodeKey, offset: offsetInNode, type: .element)
+  }
+
+  return nil
 }
 
 @MainActor

@@ -11,15 +11,18 @@ import Foundation
   public let reconcilerSanityCheck: Bool
   public let proxyTextViewInputDelegate: Bool
   public let reconcilerAnchors: Bool
+  public let useFenwickTreeOffsets: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
     proxyTextViewInputDelegate: Bool = false,
-    reconcilerAnchors: Bool = false
+    reconcilerAnchors: Bool = false,
+    useFenwickTreeOffsets: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
     self.reconcilerAnchors = reconcilerAnchors
+    self.useFenwickTreeOffsets = useFenwickTreeOffsets
     super.init()
   }
 }

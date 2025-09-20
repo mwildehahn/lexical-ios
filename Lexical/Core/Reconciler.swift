@@ -213,8 +213,7 @@ private struct TextStorageDeltaApplier {
     // FAST PATH: Single node change (90% of edits)
     if state.dirtyNodes.count == 1 && !state.treatAllNodesAsDirty {
       let nodeKey = state.dirtyNodes.keys.first!
-      debugLog("FAST PATH: Single dirty node \(nodeKey)")
-      // Fast path triggered for single dirty node
+      debugLog("Single dirty node optimization for \(nodeKey)")
 
       // ULTRA OPTIMIZATION: Merge all parts into single operation
       guard let prevCacheItem = state.prevRangeCache[nodeKey],
@@ -815,23 +814,37 @@ internal enum Reconciler {
     metricsShouldRecord = true
     metricsState = reconcilerState
 
-    let mode = editor.featureFlags.reconcilerAnchors ? "OPTIMIZED" : "LEGACY"
+    // Choose mode based on feature flags
+    let useFenwickTree = editor.featureFlags.useFenwickTreeOffsets
+    let mode = useFenwickTree ? "FENWICK" : (editor.featureFlags.reconcilerAnchors ? "OPTIMIZED" : "LEGACY")
     print("\n[\(mode) MODE] Starting reconciliation...")
 
-    // FAST PATH: Use NodeOffsetIndex to process only dirty nodes
-    if tryIndexBasedFastPath(reconcilerState: reconcilerState, editor: editor) {
+    // Initialize NodeOffsetIndex if using FenwickTree mode
+    if useFenwickTree {
+      initializeNodeOffsetIndex(reconcilerState: reconcilerState, editorState: currentEditorState)
+      // Store the index reference in the editor for use by pointAtStringLocation
+      editor.reconcilerNodeOffsetIndex = reconcilerState.nodeOffsetIndex
+    }
+
+    // FAST PATH: Use FenwickTree if enabled, otherwise try index-based fast path
+    if useFenwickTree && tryFenwickTreeFastPath(reconcilerState: reconcilerState, editor: editor) {
+      debugLog("🌲 FENWICK TREE FAST PATH: Processed using O(log n) offset updates!")
+      print("[\(mode)] 🌲 FENWICK TREE: visited=\(reconcilerState.visitedNodes) nodes")
+      editor.log(.reconciler, .verbose, "FENWICK TREE: visited=\(reconcilerState.visitedNodes) nodes")
+      // Fast path succeeded, skip full reconciliation
+    } else if tryIndexBasedFastPath(reconcilerState: reconcilerState, editor: editor) {
       debugLog("🚀 INDEX FAST PATH: Processed only dirty nodes without full tree walk!")
       print("[\(mode)] 🚀 INDEX FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
       editor.log(.reconciler, .verbose, "INDEX FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
       // Fast path succeeded, skip full reconciliation
-    } else if let fastInsertionResult = tryFastStructuralInsertion(reconcilerState: reconcilerState, editor: editor) {
+    } else if let structuralInsertionResult = tryStructuralInsertion(reconcilerState: reconcilerState, editor: editor) {
       debugLog("🚀 FAST PATH: Handled structural insertion without tree walk!")
       print("[\(mode)] 🚀 STRUCTURAL FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
       editor.log(.reconciler, .verbose, "STRUCTURAL FAST PATH: visited=\(reconcilerState.visitedNodes) nodes")
-      // Apply the fast path result directly
-      reconcilerState.nextRangeCache = fastInsertionResult.rangeCache
-      reconcilerState.rangesToAdd = fastInsertionResult.insertions
-      reconcilerState.locationShifts = fastInsertionResult.shifts
+      // Apply the structural insertion result
+      reconcilerState.nextRangeCache = structuralInsertionResult.rangeCache
+      reconcilerState.rangesToAdd = structuralInsertionResult.insertions
+      reconcilerState.locationShifts = structuralInsertionResult.shifts
       // Skip the full tree walk
     } else {
       // Fall back to regular reconciliation
@@ -1073,6 +1086,62 @@ internal enum Reconciler {
     }
   }
 
+  // MARK: - FenwickTree Integration
+
+  @MainActor
+  private static func initializeNodeOffsetIndex(reconcilerState: ReconcilerState, editorState: EditorState) {
+    // Initialize the NodeOffsetIndex with all nodes from the current state
+    guard let root = editorState.getRootNode() else { return }
+
+    func registerNodeRecursively(_ node: Node) {
+      let nodeLength = calculateNodeLength(node)
+      reconcilerState.nodeOffsetIndex.registerNode(key: node.key, length: nodeLength)
+
+      if let elementNode = node as? ElementNode {
+        for childKey in elementNode.getChildrenKeys() {
+          if let childNode = editorState.nodeMap[childKey] {
+            registerNodeRecursively(childNode)
+          }
+        }
+      }
+    }
+
+    registerNodeRecursively(root)
+  }
+
+  @MainActor
+  private static func calculateNodeLength(_ node: Node) -> Int {
+    let preamble = node.getPreamble()
+    let text = node.getTextPart()
+    let postamble = node.getPostamble()
+
+    var totalLength = preamble.lengthAsNSString() + text.lengthAsNSString() + postamble.lengthAsNSString()
+
+    if let elementNode = node as? ElementNode {
+      // Add children lengths
+      for childKey in elementNode.getChildrenKeys() {
+        if let childNode = getNodeByKey(key: childKey) {
+          totalLength += calculateNodeLength(childNode)
+        }
+      }
+    }
+
+    return totalLength
+  }
+
+  @MainActor
+  private static func tryFenwickTreeFastPath(reconcilerState: ReconcilerState, editor: Editor) -> Bool {
+    // FenwickTree fast path is not yet fully implemented
+    // For now, return false to use the regular reconciliation path
+    // This ensures correctness while we complete the implementation
+    return false
+
+    // TODO: Complete FenwickTree fast path implementation
+    // The challenge is that FenwickTree tracks positions efficiently,
+    // but we still need to handle the actual text content updates
+    // and maintain compatibility with the existing reconciler logic
+  }
+
   /// Fast path for single structural insertions
   @MainActor
   /// Try to use the NodeOffsetIndex for O(1) targeted updates
@@ -1137,7 +1206,7 @@ internal enum Reconciler {
             // 2. Calculate new position based on new parent/siblings
             // 3. Add at new position
             // For now, fall back to be safe
-            print("❌ INDEX FAST PATH: Falling back - reparenting not yet implemented in fast path")
+            debugLog("Falling back - reparenting not yet implemented in optimization")
             return false
           } else {
             // UPDATE: Node exists in both states at same parent
@@ -1249,7 +1318,7 @@ internal enum Reconciler {
   }
 
   @MainActor
-  private static func tryFastStructuralInsertion(reconcilerState: ReconcilerState, editor: Editor) -> (rangeCache: [NodeKey: RangeCacheItem], insertions: [ReconcilerInsertion], shifts: [(location: Int, delta: Int)])? {
+  private static func tryStructuralInsertion(reconcilerState: ReconcilerState, editor: Editor) -> (rangeCache: [NodeKey: RangeCacheItem], insertions: [ReconcilerInsertion], shifts: [(location: Int, delta: Int)])? {
 
     // Check if this is a simple insertion case
     guard let root = reconcilerState.nextEditorState.nodeMap[kRootNodeKey] as? RootNode,
