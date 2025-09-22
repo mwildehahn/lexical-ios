@@ -50,7 +50,7 @@ final class PerformanceMetricsContainer: EditorMetricsContainer {
 class PerformanceTestViewController: UIViewController {
 
   // MARK: - Constants
-  private static let benchmarkParagraphCount = 100 // Number of paragraphs for performance tests
+  private static let benchmarkParagraphCount = 200 // Number of paragraphs for performance tests
 
   // MARK: - UI Elements
   private weak var legacyView: LexicalView?
