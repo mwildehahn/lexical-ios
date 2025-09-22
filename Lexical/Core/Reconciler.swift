@@ -27,7 +27,8 @@ private class ReconcilerState {
     rangeCache: [NodeKey: RangeCacheItem],
     dirtyNodes: DirtyNodeMap,
     treatAllNodesAsDirty: Bool,
-    markedTextOperation: MarkedTextOperation?
+    markedTextOperation: MarkedTextOperation?,
+    editor: Editor
   ) {
     self.prevEditorState = currentEditorState
     self.nextEditorState = pendingEditorState
@@ -42,6 +43,7 @@ private class ReconcilerState {
     self.possibleDecoratorsToRemove = []
     self.decoratorsToAdd = []
     self.decoratorsToDecorate = []
+    self.editor = editor
   }
 
   let prevEditorState: EditorState
@@ -57,6 +59,7 @@ private class ReconcilerState {
   var possibleDecoratorsToRemove: [NodeKey]
   var decoratorsToAdd: [NodeKey]
   var decoratorsToDecorate: [NodeKey]
+  let editor: Editor
 }
 
 /* Marked text is a difficult operation because it depends on us being in sync with some private state that
@@ -135,7 +138,8 @@ internal enum Reconciler {
       rangeCache: editor.rangeCache,
       dirtyNodes: editor.dirtyNodes,
       treatAllNodesAsDirty: editor.dirtyType == .fullReconcile,
-      markedTextOperation: markedTextOperation)
+      markedTextOperation: markedTextOperation,
+      editor: editor)
     metricsShouldRecord = true
     metricsState = reconcilerState
 
@@ -211,7 +215,8 @@ internal enum Reconciler {
       let attributedString = attributedStringFromInsertion(
         insertion,
         state: reconcilerState.nextEditorState,
-        theme: editor.getTheme())
+        theme: editor.getTheme(),
+        editor: editor)
       if attributedString.length > 0 {
         nonEmptyRangesToAddCount += 1
         editor.log(
@@ -348,7 +353,13 @@ internal enum Reconciler {
     var nextRangeCacheItem = RangeCacheItem()
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
-    let nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
+    // Calculate preamble length including anchor if enabled
+    var nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
+    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
+      // Add 1 for the anchor character
+      nextPreambleLength += 1
+    }
+
     createAddRemoveRanges(
       key: key,
       prevLocation: prevRange.location,
@@ -390,7 +401,13 @@ internal enum Reconciler {
     )
     nextRangeCacheItem.textLength = nextTextLength
 
-    let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
+    // Calculate postamble length including anchor if enabled
+    var nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
+    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
+      // Add 1 for the anchor character
+      nextPostambleLength += 1
+    }
+
     createAddRemoveRanges(
       key: key,
       prevLocation: prevRange.location + prevRange.preambleLength + prevRange.childrenLength
@@ -435,7 +452,13 @@ internal enum Reconciler {
     var nextRangeCacheItem = RangeCacheItem()
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
-    let nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
+    // Calculate preamble length including anchor if enabled
+    var nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
+    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
+      // Add 1 for the anchor character
+      nextPreambleLength += 1
+    }
+
     let preambleInsertion = ReconcilerInsertion(
       location: reconcilerState.locationCursor, nodeKey: key, part: .preamble)
     reconcilerState.rangesToAdd.append(preambleInsertion)
@@ -460,7 +483,13 @@ internal enum Reconciler {
     reconcilerState.locationCursor += nextTextLength
     nextRangeCacheItem.textLength = nextTextLength
 
-    let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
+    // Calculate postamble length including anchor if enabled
+    var nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
+    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
+      // Add 1 for the anchor character
+      nextPostambleLength += 1
+    }
+
     let postambleInsertion = ReconcilerInsertion(
       location: reconcilerState.locationCursor, nodeKey: key, part: .postamble)
     reconcilerState.rangesToAdd.append(postambleInsertion)
@@ -633,7 +662,8 @@ internal enum Reconciler {
   private static func attributedStringFromInsertion(
     _ insertion: ReconcilerInsertion,
     state: EditorState,
-    theme: Theme
+    theme: Theme,
+    editor: Editor
   ) -> NSAttributedString {
     guard let node = state.nodeMap[insertion.nodeKey] else {
       return NSAttributedString()
@@ -641,13 +671,60 @@ internal enum Reconciler {
 
     var attributedString: NSAttributedString
 
-    switch insertion.part {
-    case .text:
-      attributedString = NSAttributedString(string: node.getTextPart())
-    case .preamble:
-      attributedString = NSAttributedString(string: node.getPreamble())
-    case .postamble:
-      attributedString = NSAttributedString(string: node.getPostamble())
+    // Check if we should use anchor-based reconciliation
+    if editor.featureFlags.anchorBasedReconciliation {
+      let anchorManager = editor.anchorManager
+
+      switch insertion.part {
+      case .text:
+        attributedString = NSAttributedString(string: node.getTextPart())
+      case .preamble:
+        // Generate preamble with anchor
+        let preambleString = node.getPreamble()
+        let mutableString = NSMutableAttributedString()
+
+        // Add anchor before preamble content
+        if let anchor = anchorManager.generateAnchorAttributedString(
+          for: insertion.nodeKey,
+          type: .preamble,
+          theme: theme
+        ) {
+          mutableString.append(anchor)
+        }
+
+        // Add the actual preamble content
+        mutableString.append(NSAttributedString(string: preambleString))
+
+        attributedString = mutableString
+      case .postamble:
+        // Generate postamble with anchor
+        let postambleString = node.getPostamble()
+        let mutableString = NSMutableAttributedString()
+
+        // Add the actual postamble content
+        mutableString.append(NSAttributedString(string: postambleString))
+
+        // Add anchor after postamble content
+        if let anchor = anchorManager.generateAnchorAttributedString(
+          for: insertion.nodeKey,
+          type: .postamble,
+          theme: theme
+        ) {
+          mutableString.append(anchor)
+        }
+
+        attributedString = mutableString
+      }
+    } else {
+      // Legacy path without anchors
+      switch insertion.part {
+      case .text:
+        attributedString = NSAttributedString(string: node.getTextPart())
+      case .preamble:
+        attributedString = NSAttributedString(string: node.getPreamble())
+      case .postamble:
+        attributedString = NSAttributedString(string: node.getPostamble())
+      }
     }
 
     attributedString = AttributeUtils.attributedStringByAddingStyles(

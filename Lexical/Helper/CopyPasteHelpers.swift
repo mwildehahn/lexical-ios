@@ -28,11 +28,15 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
   }
 
   if #available(iOS 14.0, *) {
+    // Strip anchors from attributed string before putting on pasteboard
+    let attributedString = try getAttributedStringFromFrontend()
+    let strippedString = AnchorManager.stripAnchors(from: attributedString)
+
     pasteboard.items =
       [
         [
-          (UTType.rtf.identifier): try getAttributedStringFromFrontend().data(
-            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+          (UTType.rtf.identifier): try strippedString.data(
+            from: NSRange(location: 0, length: strippedString.length),
             documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
         ],
         [LexicalConstants.pasteboardIdentifier: encodedData],
@@ -46,11 +50,15 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
       pasteboard.string = text
     }
   } else {
+    // Strip anchors from attributed string before putting on pasteboard
+    let attributedString = try getAttributedStringFromFrontend()
+    let strippedString = AnchorManager.stripAnchors(from: attributedString)
+
     pasteboard.items =
       [
         [
-          (kUTTypeRTF as String): try getAttributedStringFromFrontend().data(
-            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+          (kUTTypeRTF as String): try strippedString.data(
+            from: NSRange(location: 0, length: strippedString.length),
             documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
         ],
         [LexicalConstants.pasteboardIdentifier: encodedData],

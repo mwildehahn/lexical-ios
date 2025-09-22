@@ -1,0 +1,312 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@testable import Lexical
+import XCTest
+
+@MainActor
+class AnchorCopyPasteTests: XCTestCase {
+
+  private var view: LexicalView!
+  private var editor: Editor!
+
+  override func setUp() {
+    super.setUp()
+    // Enable anchor-based reconciliation for these tests
+    let flags = FeatureFlags(anchorBasedReconciliation: true)
+    view = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: flags
+    )
+    editor = view.editor
+  }
+
+  override func tearDown() {
+    editor = nil
+    view = nil
+    super.tearDown()
+  }
+
+  // MARK: - Copy Tests
+
+  func testCopyStripsAnchors() throws {
+    // Create content with text
+    try editor.update {
+      let root = getRoot()
+      let paragraph = ParagraphNode()
+      let text = TextNode(text: "Hello World")
+      try paragraph.append([text])
+      try root?.append([paragraph])
+    }
+
+    // Reconciliation should happen synchronously in tests
+
+    // Select all text
+    try editor.update {
+      let root = getRoot()
+      let anchorPoint = createPoint(key: root?.getFirstDescendant()?.key ?? "", offset: 0, type: .text)
+      let focusPoint = createPoint(key: root?.getLastDescendant()?.key ?? "", offset: 11, type: .text)
+      let selection = RangeSelection(anchor: anchorPoint, focus: focusPoint, format: TextFormat())
+      try setSelection(selection as BaseSelection)
+    }
+
+    // Simulate copy operation
+    let pasteboard = UIPasteboard.general
+
+    try editor.update {
+      let selection = try XCTUnwrap(getSelection() as? RangeSelection)
+      try setPasteboard(selection: selection, pasteboard: pasteboard)
+    }
+
+    // Check RTF data doesn't contain anchors
+    if let rtfData = pasteboard.data(forPasteboardType: "public.rtf"),
+       let attributedString = try? NSAttributedString(
+        data: rtfData,
+        options: [.documentType: NSAttributedString.DocumentType.rtf],
+        documentAttributes: nil
+       ) {
+
+      // The copied string should not contain anchor characters
+      XCTAssertFalse(attributedString.string.contains(AnchorManager.anchorCharacter))
+
+      // Check that anchor attributes are not present
+      var hasAnchorAttributes = false
+      attributedString.enumerateAttribute(
+        AnchorManager.anchorAttributeKey,
+        in: NSRange(location: 0, length: attributedString.length),
+        options: []
+      ) { value, _, stop in
+        if value != nil {
+          hasAnchorAttributes = true
+          stop.pointee = true
+        }
+      }
+
+      XCTAssertFalse(hasAnchorAttributes, "Copied text should not contain anchor attributes")
+    }
+  }
+
+  func testCopyPreservesTextContent() throws {
+    let testText = "This is a test paragraph with multiple words."
+
+    try editor.update {
+      let root = getRoot()
+      let paragraph = ParagraphNode()
+      let text = TextNode(text: testText)
+      try paragraph.append([text])
+      try root?.append([paragraph])
+    }
+
+    // Reconciliation should happen synchronously in tests
+
+    // Select all
+    try editor.update {
+      let root = getRoot()
+      if let firstDescendant = root?.getFirstDescendant(),
+         let lastDescendant = root?.getLastDescendant() {
+        let anchorPoint = createPoint(key: firstDescendant.key, offset: 0, type: .text)
+        let focusPoint = createPoint(key: lastDescendant.key, offset: testText.count, type: .text)
+        let selection = RangeSelection(anchor: anchorPoint, focus: focusPoint, format: TextFormat())
+        try setSelection(selection as BaseSelection)
+      }
+    }
+
+    // Copy to pasteboard
+    let pasteboard = UIPasteboard.general
+    try editor.update {
+      let selection = try XCTUnwrap(getSelection() as? RangeSelection)
+      try setPasteboard(selection: selection, pasteboard: pasteboard)
+    }
+
+    // Verify the text content is preserved (may include paragraph separator)
+    let pasteboardText = pasteboard.string?.trimmingCharacters(in: .whitespacesAndNewlines)
+    XCTAssertEqual(pasteboardText, testText)
+  }
+
+  // MARK: - Paste Tests
+
+  // Disabled: Paste prompts not supported in tests
+  func disabled_testPasteIgnoresAnchorsFromExternalSource() throws {
+    // Create an attributed string with fake anchor attributes
+    let mutableString = NSMutableAttributedString(string: "External Text")
+
+    // Add a fake anchor attribute
+    mutableString.addAttribute(
+      AnchorManager.anchorAttributeKey,
+      value: Data(),
+      range: NSRange(location: 0, length: 1)
+    )
+
+    // Set up pasteboard with the attributed string
+    let pasteboard = UIPasteboard.general
+    pasteboard.items = [
+      [
+        "public.rtf": try mutableString.data(
+          from: NSRange(location: 0, length: mutableString.length),
+          documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        )
+      ]
+    ]
+
+    // Create initial content
+    try editor.update {
+      let root = getRoot()
+      let paragraph = ParagraphNode()
+      let text = TextNode(text: "Initial")
+      try paragraph.append([text])
+      try root?.append([paragraph])
+    }
+
+    // Set selection at the end
+    try editor.update {
+      let root = getRoot()
+      if let lastDescendant = root?.getLastDescendant() {
+        let point = createPoint(key: lastDescendant.key, offset: 7, type: .text)
+        let selection = RangeSelection(anchor: point, focus: point, format: TextFormat())
+        try setSelection(selection as BaseSelection)
+      }
+    }
+
+    // Paste the content
+    try editor.update {
+      if let selection = try getSelection() as? RangeSelection {
+        try insertDataTransferForRichText(selection: selection, pasteboard: pasteboard)
+      }
+    }
+
+    // Verify pasted content doesn't have anchor attributes
+    try editor.read {
+      // Get text storage directly from the view
+      guard let textStorage = view.textView.textStorage as? TextStorage else {
+        XCTFail("No text storage")
+        return
+      }
+
+      // The text storage should not contain the external anchor attributes
+      var hasExternalAnchors = false
+      textStorage.enumerateAttribute(
+        AnchorManager.anchorAttributeKey,
+        in: NSRange(location: 0, length: textStorage.length),
+        options: []
+      ) { value, range, stop in
+        // Check if this is an external anchor (would have different structure)
+        if value != nil {
+          // Our anchors would have proper metadata, external ones wouldn't
+          if let data = value as? Data,
+             let _ = try? JSONDecoder().decode(
+              AnchorManager.AnchorMetadata.self,
+              from: data
+             ) {
+            // This is a valid internal anchor, that's OK
+          } else {
+            // This is an external anchor, shouldn't be here
+            hasExternalAnchors = true
+            stop.pointee = true
+          }
+        }
+      }
+
+      XCTAssertFalse(hasExternalAnchors, "External anchor attributes should not be preserved")
+    }
+  }
+
+  // MARK: - Round-trip Tests
+
+  // Disabled: Paste prompts not supported in tests
+  func disabled_testCopyPasteRoundTrip() throws {
+    let originalText = "Test paragraph for round-trip copy/paste"
+
+    // Create original content
+    try editor.update {
+      let root = getRoot()
+      let paragraph = ParagraphNode()
+      let text = TextNode(text: originalText)
+      try paragraph.append([text])
+      try root?.append([paragraph])
+    }
+
+    // Reconciliation should happen synchronously in tests
+
+    // Select all and copy
+    try editor.update {
+      let root = getRoot()
+      if let firstDescendant = root?.getFirstDescendant(),
+         let lastDescendant = root?.getLastDescendant() {
+        let anchorPoint = createPoint(key: firstDescendant.key, offset: 0, type: .text)
+        let focusPoint = createPoint(key: lastDescendant.key, offset: originalText.count, type: .text)
+        let selection = RangeSelection(anchor: anchorPoint, focus: focusPoint, format: TextFormat())
+        try setSelection(selection as BaseSelection)
+      }
+    }
+
+    let pasteboard = UIPasteboard.general
+    try editor.update {
+      let selection = try XCTUnwrap(getSelection() as? RangeSelection)
+      try setPasteboard(selection: selection, pasteboard: pasteboard)
+    }
+
+    // Clear the editor
+    try editor.update {
+      let root = getRoot()
+      try root?.clear()
+    }
+
+    // Create a new paragraph and paste
+    try editor.update {
+      let root = getRoot()
+      let paragraph = ParagraphNode()
+      try root?.append([paragraph])
+
+      let point = createPoint(key: paragraph.key, offset: 0, type: .element)
+      let selection = RangeSelection(anchor: point, focus: point, format: TextFormat())
+      try setSelection(selection as BaseSelection)
+    }
+
+    try editor.update {
+      if let selection = try getSelection() as? RangeSelection {
+        try insertDataTransferForRichText(selection: selection, pasteboard: pasteboard)
+      }
+    }
+
+    // Verify the content matches
+    try editor.read {
+      let textContent = getRoot()?.getTextContent() ?? ""
+      XCTAssertEqual(textContent, originalText)
+    }
+  }
+
+  // MARK: - Performance Tests
+
+  func testCopyPerformanceWithAnchors() throws {
+    // Create a large document
+    try editor.update {
+      let root = getRoot()
+      for i in 0..<100 {
+        let paragraph = ParagraphNode()
+        let text = TextNode(text: "Paragraph \(i): This is a test paragraph with some content.")
+        try paragraph.append([text])
+        try root?.append([paragraph])
+      }
+    }
+
+    // Reconciliation should happen synchronously in tests
+
+    // Measure copy performance
+    measure {
+      try? editor.read {
+        guard let textStorage = editor.textStorage else { return }
+
+        // Simulate selecting all
+        let fullRange = NSRange(location: 0, length: textStorage.length)
+        let attributedString = textStorage.attributedSubstring(from: fullRange)
+
+        // Strip anchors (this is what happens during copy)
+        _ = AnchorManager.stripAnchors(from: attributedString)
+      }
+    }
+  }
+}

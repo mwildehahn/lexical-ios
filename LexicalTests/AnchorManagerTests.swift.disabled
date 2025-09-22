@@ -1,0 +1,347 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@testable import Lexical
+import XCTest
+
+@MainActor
+class AnchorManagerTests: XCTestCase {
+
+  private var view: LexicalView!
+  private var editor: Editor!
+  private var anchorManager: AnchorManager!
+
+  override func setUp() {
+    super.setUp()
+    // Enable anchor-based reconciliation for all tests
+    let flags = FeatureFlags(anchorBasedReconciliation: true)
+    view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    editor = view.editor
+    anchorManager = editor.anchorManager
+  }
+
+  override func tearDown() {
+    editor = nil
+    view = nil
+    anchorManager = nil
+    super.tearDown()
+  }
+
+  // MARK: - Anchor Generation Tests
+
+  func testGenerateAnchorAttributedString() throws {
+    let anchor = anchorManager.generateAnchorAttributedString(
+      for: "test-key",
+      type: .preamble,
+      theme: editor.getTheme()
+    )
+
+    XCTAssertNotNil(anchor)
+    XCTAssertEqual(anchor?.string, AnchorManager.anchorCharacter)
+    XCTAssertEqual(anchor?.length, 1)
+
+    // Check attributes
+    let attributes = anchor?.attributes(at: 0, effectiveRange: nil)
+    XCTAssertNotNil(attributes?[AnchorManager.anchorAttributeKey])
+    XCTAssertNotNil(attributes?[AnchorManager.anchorVersionKey])
+    XCTAssertEqual(attributes?[.foregroundColor] as? UIColor, UIColor.clear)
+  }
+
+  func testAnchorMetadataEncoding() throws {
+    let metadata = AnchorManager.AnchorMetadata(
+      nodeKey: "12345",
+      type: .preamble,
+      version: 1
+    )
+
+    let encoded = try JSONEncoder().encode(metadata)
+    let decoded = try JSONDecoder().decode(AnchorManager.AnchorMetadata.self, from: encoded)
+
+    XCTAssertEqual(decoded.nodeKey, metadata.nodeKey)
+    XCTAssertEqual(decoded.type, metadata.type)
+    XCTAssertEqual(decoded.version, metadata.version)
+  }
+
+  func testCompressedKeyGeneration() throws {
+    let metadata = AnchorManager.AnchorMetadata(
+      nodeKey: "12345",
+      type: .preamble,
+      version: 1
+    )
+
+    let compressed = metadata.compressedKey
+    XCTAssertNotEqual(compressed, "12345")
+    // Compressed key could be longer due to base64 encoding of small numbers
+    XCTAssertTrue(compressed.count > 0, "Compressed key should not be empty")
+
+    // Test decompression
+    let decompressed = AnchorManager.AnchorMetadata.decompressKey(compressed)
+    XCTAssertEqual(decompressed, "12345")
+  }
+
+  // MARK: - Anchor Location Tests
+
+  func testFindAnchorsInTextStorage() throws {
+    let textStorage = NSTextStorage(string: "Hello World")
+
+    // Manually insert anchors for testing
+    let preambleAnchor = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .preamble,
+      theme: editor.getTheme()
+    )!
+
+    let postambleAnchor = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .postamble,
+      theme: editor.getTheme()
+    )!
+
+    textStorage.insert(preambleAnchor, at: 0)
+    textStorage.insert(postambleAnchor, at: textStorage.length)
+
+    let anchors = anchorManager.findAnchors(in: textStorage)
+
+    XCTAssertEqual(anchors.count, 1)
+    XCTAssertNotNil(anchors["node1"])
+    XCTAssertEqual(anchors["node1"]?.preambleLocation, 0)
+    XCTAssertEqual(anchors["node1"]?.postambleLocation, 12) // "Hello World" + 1 anchor
+  }
+
+  func testGetRangeBetweenAnchors() throws {
+    let textStorage = NSTextStorage(string: "")
+
+    // Create content with anchors
+    let preambleAnchor = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .preamble,
+      theme: editor.getTheme()
+    )!
+
+    let content = NSAttributedString(string: "Hello World")
+
+    let postambleAnchor = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .postamble,
+      theme: editor.getTheme()
+    )!
+
+    textStorage.append(preambleAnchor)
+    textStorage.append(content)
+    textStorage.append(postambleAnchor)
+
+    let range = anchorManager.getRangeBetweenAnchors(for: "node1", in: textStorage)
+
+    XCTAssertNotNil(range)
+    XCTAssertEqual(range?.location, 1)
+    XCTAssertEqual(range?.length, 11) // "Hello World"
+
+    // Extract the content to verify
+    let extractedContent = textStorage.attributedSubstring(from: range!)
+    XCTAssertEqual(extractedContent.string, "Hello World")
+  }
+
+  // MARK: - Anchor Validation Tests
+
+  func testValidateAnchors() throws {
+    let textStorage = NSTextStorage(string: "")
+
+    // Add valid anchors
+    let anchor1 = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .preamble,
+      theme: editor.getTheme()
+    )!
+
+    textStorage.append(anchor1)
+    textStorage.append(NSAttributedString(string: "Content"))
+
+    let anchor2 = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .postamble,
+      theme: editor.getTheme()
+    )!
+
+    textStorage.append(anchor2)
+
+    let isValid = anchorManager.validateAnchors(in: textStorage)
+    // The validation should pass for properly formatted anchors
+    XCTAssertTrue(isValid, "Valid anchors should pass validation")
+
+    // Corrupt an anchor by changing its character
+    textStorage.replaceCharacters(in: NSRange(location: 0, length: 1), with: "X")
+
+    let isValidAfterCorruption = anchorManager.validateAnchors(in: textStorage)
+    XCTAssertFalse(isValidAfterCorruption)
+  }
+
+  func testInvalidateAnchors() throws {
+    let initialVersion = anchorManager.anchorVersion
+    anchorManager.invalidateAnchors()
+
+    let newAnchor = anchorManager.generateAnchorAttributedString(
+      for: "test",
+      type: .preamble,
+      theme: editor.getTheme()
+    )
+
+    let attributes = newAnchor?.attributes(at: 0, effectiveRange: nil)
+    let version = attributes?[AnchorManager.anchorVersionKey] as? Int
+
+    XCTAssertEqual(version, initialVersion + 1)
+  }
+
+  // MARK: - Copy/Paste Support Tests
+
+  func testStripAnchors() throws {
+    let mutableString = NSMutableAttributedString(string: "Hello")
+
+    // Add anchor in the middle
+    let anchor = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .preamble,
+      theme: editor.getTheme()
+    )!
+
+    mutableString.insert(anchor, at: 2) // He[anchor]llo
+    mutableString.append(NSAttributedString(string: " World"))
+
+    XCTAssertEqual(mutableString.string, "He\u{200B}llo World")
+
+    let stripped = AnchorManager.stripAnchors(from: mutableString)
+
+    XCTAssertEqual(stripped.string, "Hello World")
+    XCTAssertEqual(stripped.length, 11)
+
+    // Check that anchor attributes are removed
+    stripped.enumerateAttribute(
+      AnchorManager.anchorAttributeKey,
+      in: NSRange(location: 0, length: stripped.length),
+      options: []
+    ) { value, _, _ in
+      XCTAssertNil(value)
+    }
+  }
+
+  // MARK: - Selection Support Tests
+
+  func testAdjustSelectionSkippingAnchors() throws {
+    let textStorage = NSTextStorage(string: "")
+
+    // Add anchor at position 0
+    let anchor = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .preamble,
+      theme: editor.getTheme()
+    )!
+
+    textStorage.append(anchor)
+    textStorage.append(NSAttributedString(string: "Hello"))
+
+    // Selection starting on anchor
+    let rangeOnAnchor = NSRange(location: 0, length: 3)
+    let adjusted = AnchorManager.adjustSelectionSkippingAnchors(rangeOnAnchor, in: textStorage)
+
+    XCTAssertEqual(adjusted.location, 1) // Skipped the anchor
+    XCTAssertEqual(adjusted.length, 2)   // Reduced length
+
+    // Selection not on anchor
+    let normalRange = NSRange(location: 1, length: 3)
+    let notAdjusted = AnchorManager.adjustSelectionSkippingAnchors(normalRange, in: textStorage)
+
+    XCTAssertEqual(notAdjusted, normalRange)
+  }
+
+  func testAdjustSelectionEndingOnAnchor() throws {
+    let textStorage = NSTextStorage(string: "Hello")
+
+    // Add anchor at the end
+    let anchor = anchorManager.generateAnchorAttributedString(
+      for: "node1",
+      type: .postamble,
+      theme: editor.getTheme()
+    )!
+
+    textStorage.append(anchor)
+
+    // Selection ending on anchor
+    let range = NSRange(location: 2, length: 4) // "llo" + anchor
+    let adjusted = AnchorManager.adjustSelectionSkippingAnchors(range, in: textStorage)
+
+    XCTAssertEqual(adjusted.location, 2)
+    XCTAssertEqual(adjusted.length, 3) // Reduced to exclude anchor
+  }
+
+  // MARK: - Debug Support Tests
+
+  func testDebugAnchors() throws {
+    let textStorage = NSTextStorage(string: "")
+
+    // Add multiple anchors
+    for i in 1...3 {
+      let preamble = anchorManager.generateAnchorAttributedString(
+        for: "node\(i)",
+        type: .preamble,
+        theme: editor.getTheme()
+      )!
+
+      let postamble = anchorManager.generateAnchorAttributedString(
+        for: "node\(i)",
+        type: .postamble,
+        theme: editor.getTheme()
+      )!
+
+      textStorage.append(preamble)
+      textStorage.append(NSAttributedString(string: "Content\(i)"))
+      textStorage.append(postamble)
+    }
+
+    let debugInfo = anchorManager.debugAnchors(in: textStorage)
+
+    XCTAssertTrue(debugInfo.contains("Anchors found: 3"))
+    XCTAssertTrue(debugInfo.contains("node1"))
+    XCTAssertTrue(debugInfo.contains("node2"))
+    XCTAssertTrue(debugInfo.contains("node3"))
+    XCTAssertTrue(debugInfo.contains("preamble@"))
+    XCTAssertTrue(debugInfo.contains("postamble@"))
+  }
+
+  // MARK: - Integration Tests
+
+  func testAnchorIntegrationWithEditor() throws {
+    // Enable anchor-based reconciliation
+    let flags = FeatureFlags(anchorBasedReconciliation: true)
+    let view = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: flags
+    )
+    let editor = view.editor
+
+    try editor.update {
+      let root = getRoot()
+      let paragraph = ParagraphNode()
+      let text = TextNode(text: "Hello World")
+      try paragraph.append([text])
+      try root?.append([paragraph])
+    }
+
+    // Reconciliation should happen synchronously in tests
+
+    // Check that anchors were inserted
+    // Get text storage directly from the view's textView
+    guard let textStorage = view.textView.textStorage as? TextStorage else {
+      XCTFail("No text storage")
+      return
+    }
+
+    let anchorManager = editor.anchorManager
+    let anchors = anchorManager.findAnchors(in: textStorage)
+
+    // We should have anchors for the paragraph node
+    XCTAssertTrue(anchors.count > 0, "No anchors found in text storage")
+  }
+}

@@ -71,8 +71,17 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       reconcilerSanityCheck = false
     #endif
 
+    // Create new feature flags with possibly modified reconcilerSanityCheck
+    let adjustedFeatureFlags = FeatureFlags(
+      reconcilerSanityCheck: reconcilerSanityCheck,
+      proxyTextViewInputDelegate: featureFlags.proxyTextViewInputDelegate,
+      optimizedReconciler: featureFlags.optimizedReconciler,
+      reconcilerMetrics: featureFlags.reconcilerMetrics,
+      anchorBasedReconciliation: featureFlags.anchorBasedReconciliation
+    )
+
     editor = Editor(
-      featureFlags: FeatureFlags(reconcilerSanityCheck: reconcilerSanityCheck),
+      featureFlags: adjustedFeatureFlags,
       editorConfig: editorConfig)
     textStorage.editor = editor
     placeholderLabel = UILabel(frame: .zero)
@@ -511,6 +520,19 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
       textView.interceptNextSelectionChangeAndReplaceWithRange = nil
       textView.selectedRange = interception
       return
+    }
+
+    // Adjust selection to skip over anchors if anchor-based reconciliation is enabled
+    if textView.editor.featureFlags.anchorBasedReconciliation,
+       let textStorage = textView.textStorage as? TextStorage {
+      let adjustedRange = AnchorManager.adjustSelectionSkippingAnchors(
+        textView.selectedRange,
+        in: textStorage
+      )
+      if adjustedRange != textView.selectedRange {
+        textView.selectedRange = adjustedRange
+        return
+      }
     }
 
     textView.validateNativeSelection(textView)
