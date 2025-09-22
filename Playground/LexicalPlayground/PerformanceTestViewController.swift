@@ -49,6 +49,9 @@ final class PerformanceMetricsContainer: EditorMetricsContainer {
 
 class PerformanceTestViewController: UIViewController {
 
+  // MARK: - Constants
+  private static let benchmarkParagraphCount = 100 // Number of paragraphs for performance tests
+
   // MARK: - UI Elements
   private weak var legacyView: LexicalView?
   private weak var optimizedView: LexicalView?
@@ -242,7 +245,7 @@ class PerformanceTestViewController: UIViewController {
     docGenerationStack.spacing = 8
     docGenerationStack.distribution = .fillEqually
 
-    let generateButton = createButton(title: "Generate 1000 Paragraphs", action: #selector(generateLargeDocument))
+    let generateButton = createButton(title: "Generate \(Self.benchmarkParagraphCount) Paragraphs", action: #selector(generateLargeDocument))
     let clearButton = createButton(title: "Clear All", action: #selector(clearDocuments))
     clearButton.backgroundColor = .systemRed
     let copyButton = createButton(title: "Copy Results", action: #selector(copyResults))
@@ -343,7 +346,7 @@ class PerformanceTestViewController: UIViewController {
   @objc private func generateLargeDocument() {
     guard let legacyView = legacyView, let optimizedView = optimizedView else { return }
 
-    let paragraphCount = 1000
+    let paragraphCount = Self.benchmarkParagraphCount
     updateMetricsLabel(legacyMetricsLabel, with: "Generating \(paragraphCount) paragraphs...")
     updateMetricsLabel(optimizedMetricsLabel, with: "Generating \(paragraphCount) paragraphs...")
 
@@ -622,7 +625,7 @@ class PerformanceTestViewController: UIViewController {
       return
     }
 
-    let paragraphCount = 100 // Reduced from 1000 to prevent freezing
+    let paragraphCount = Self.benchmarkParagraphCount
     print("🔥 DEBUG: About to generate \(paragraphCount) paragraphs")
 
     self.updateMetricsLabel(self.legacyMetricsLabel, with: "Generating \(paragraphCount) paragraphs...")
@@ -934,15 +937,21 @@ class PerformanceResultsViewController: UIViewController {
     view.backgroundColor = .systemBackground
     title = "Test Results"
 
+    // Done button (for dismissing when presented modally or as root)
+    let doneButton = UIBarButtonItem(
+      title: "Done",
+      style: .done,
+      target: self,
+      action: #selector(dismissResults)
+    )
+
     // Export button
     let exportButton = UIBarButtonItem(
-      title: "Export All",
+      title: "Export",
       style: .plain,
       target: self,
       action: #selector(exportAllResults)
     )
-    navigationItem.rightBarButtonItem = exportButton
-    self.exportButton = exportButton
 
     // Clear button
     let clearButton = UIBarButtonItem(
@@ -951,7 +960,15 @@ class PerformanceResultsViewController: UIViewController {
       target: self,
       action: #selector(clearAllResults)
     )
-    navigationItem.leftBarButtonItem = clearButton
+
+    // Set up navigation items
+    // If we're in a navigation controller and not the root, we'll get a back button automatically
+    // Otherwise, show the Done button
+    if navigationController?.viewControllers.first == self {
+      navigationItem.leftBarButtonItem = doneButton
+    }
+    navigationItem.rightBarButtonItems = [exportButton, clearButton]
+    self.exportButton = exportButton
 
     // Table view
     let tableView = UITableView()
@@ -968,6 +985,14 @@ class PerformanceResultsViewController: UIViewController {
       tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
     ])
+  }
+
+  @objc private func dismissResults() {
+    if let navigationController = navigationController {
+      navigationController.popViewController(animated: true)
+    } else {
+      dismiss(animated: true)
+    }
   }
 
   @objc private func exportAllResults() {
