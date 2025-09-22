@@ -450,6 +450,7 @@ class FallbackDetectionTests: XCTestCase {
 class FallbackTestMetricsContainer: EditorMetricsContainer {
   private(set) var reconcilerRuns: [ReconcilerMetric] = []
   private(set) var optimizedReconcilerRuns: [OptimizedReconcilerMetric] = []
+  private(set) var deltaApplications: [DeltaApplicationMetric] = []
   var metricsData: [String: Any] = [:]
 
   func record(_ metric: EditorMetric) {
@@ -458,12 +459,15 @@ class FallbackTestMetricsContainer: EditorMetricsContainer {
       reconcilerRuns.append(data)
     case .optimizedReconcilerRun(let data):
       optimizedReconcilerRuns.append(data)
+    case .deltaApplication(let data):
+      deltaApplications.append(data)
     }
   }
 
   func resetMetrics() {
     reconcilerRuns.removeAll()
     optimizedReconcilerRuns.removeAll()
+    deltaApplications.removeAll()
     metricsData.removeAll()
   }
 }

@@ -155,7 +155,7 @@ internal enum OptimizedReconciler {
           )
         }
 
-        editor.log(.reconciler, .warning, "Optimized reconciliation successful: \(appliedDeltas) deltas applied")
+        editor.log(.reconciler, .message, "Optimized reconciliation successful: \(appliedDeltas) deltas applied")
         return true
 
       case .partialSuccess(_, _, let reason):
@@ -252,7 +252,7 @@ private class DeltaGenerator {
       if let currentNode = currentNode, let pendingNode = pendingNode {
         if let currentTextNode = currentNode as? TextNode,
            let pendingTextNode = pendingNode as? TextNode,
-           currentTextNode.getTextPart() != pendingTextNode.getTextPart(),
+           currentTextNode.getText_dangerousPropertyAccess() != pendingTextNode.getText_dangerousPropertyAccess(),
            let rangeCacheItem = rangeCache[nodeKey] {
 
           let textRange = NSRange(
@@ -263,7 +263,7 @@ private class DeltaGenerator {
           let metadata = DeltaMetadata(sourceUpdate: "Text update")
           let deltaType = ReconcilerDeltaType.textUpdate(
             nodeKey: nodeKey,
-            newText: pendingTextNode.getTextPart(),
+            newText: pendingTextNode.getText_dangerousPropertyAccess(),
             range: textRange
           )
           deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
