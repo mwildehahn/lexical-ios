@@ -48,6 +48,7 @@ final class MetricsTests: XCTestCase {
 @MainActor
 final class TestMetricsContainer: EditorMetricsContainer {
   private(set) var reconcilerRuns: [ReconcilerMetric] = []
+  var metricsData: [String: Any] = [:]
 
   func record(_ metric: EditorMetric) {
     switch metric {
@@ -58,5 +59,6 @@ final class TestMetricsContainer: EditorMetricsContainer {
 
   func resetMetrics() {
     reconcilerRuns.removeAll()
+    metricsData.removeAll()
   }
 }

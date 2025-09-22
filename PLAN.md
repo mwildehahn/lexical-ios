@@ -111,12 +111,16 @@ Full reconciliation triggers for:
 
 ## Implementation Phases
 
-### Phase 1: Foundation Infrastructure (Week 1)
-- [ ] Create `FenwickTree.swift` with full implementation
-- [ ] Add feature flags to `FeatureFlags.swift`
-- [ ] Create `ReconcilerMetrics.swift` for performance tracking
-- [ ] Set up benchmark test harness in `LexicalTests/`
-- [ ] Create large document generators for testing
+### Phase 1: Foundation Infrastructure (Week 1) ✅ COMPLETED
+- [x] Create `FenwickTree.swift` with full implementation
+- [x] Add feature flags to `FeatureFlags.swift`
+- [x] Create `ReconcilerMetrics.swift` for performance tracking (extended existing EditorMetrics)
+- [x] Set up benchmark test harness in `LexicalTests/`
+- [x] Create large document generators for testing
+- [x] **Unit Tests**: `FenwickTreeTests.swift` - test all operations (update, query, rangeQuery)
+- [x] **Unit Tests**: `ReconcilerMetricsTests.swift` - verify metric collection
+- [x] **Unit Tests**: `FeatureFlagsTests.swift` - test flag toggling and defaults
+- [x] **All Tests Passing**: 244 tests passing successfully
 
 ### Phase 2: Anchor System (Week 1-2)
 - [ ] Implement anchor generation in `Node.swift`
@@ -125,6 +129,9 @@ Full reconciliation triggers for:
 - [ ] Handle copy/paste in `CopyPasteHelpers.swift`
 - [ ] Test accessibility with VoiceOver
 - [ ] Validate selection behavior around anchors
+- [ ] **Unit Tests**: `AnchorManagerTests.swift` - anchor creation, validation, extraction
+- [ ] **Unit Tests**: `AnchorCopyPasteTests.swift` - verify anchor stripping on copy
+- [ ] **Unit Tests**: `AnchorSelectionTests.swift` - selection around anchors
 
 ### Phase 3: Delta Reconciler (Week 2-3)
 - [ ] Create `TextStorageDeltaApplier.swift`
@@ -133,6 +140,10 @@ Full reconciliation triggers for:
 - [ ] Integrate Fenwick tree tracking
 - [ ] Build fallback detection logic
 - [ ] Create delta validation system
+- [ ] **Unit Tests**: `TextStorageDeltaApplierTests.swift` - delta application correctness
+- [ ] **Unit Tests**: `ReconcilerDeltaTests.swift` - delta generation from changes
+- [ ] **Unit Tests**: `IncrementalRangeCacheTests.swift` - cache update accuracy
+- [ ] **Unit Tests**: `FallbackDetectionTests.swift` - verify fallback triggers
 
 ### Phase 4: Integration (Week 3-4)
 - [ ] Wire optimized path in `Editor.beginUpdate()`
@@ -141,14 +152,20 @@ Full reconciliation triggers for:
 - [ ] Create A/B testing infrastructure
 - [ ] Add diagnostic tools
 - [ ] Build performance dashboard
+- [ ] **Unit Tests**: `OptimizedReconcilerTests.swift` - end-to-end optimized path
+- [ ] **Unit Tests**: `ReconcilerSelectionTests.swift` - feature flag switching
+- [ ] **Unit Tests**: `MetricsCollectionTests.swift` - verify metrics accuracy
+- [ ] **Integration Tests**: Test both reconcilers produce identical output
 
 ### Phase 5: Testing & Validation (Week 4-5)
-- [ ] Unit tests for each component
-- [ ] Integration tests for full flow
 - [ ] Performance benchmarks vs legacy
 - [ ] Edge case coverage
 - [ ] Stress testing with large documents
 - [ ] Memory profiling
+- [ ] **Performance Tests**: `ReconcilerPerformanceTests.swift` - benchmark suite
+- [ ] **Stress Tests**: `LargeDocumentTests.swift` - 10,000+ paragraph documents
+- [ ] **Edge Case Tests**: `ReconcilerEdgeCaseTests.swift` - boundary conditions
+- [ ] **Memory Tests**: Verify no memory leaks with Instruments
 
 ### Phase 6: Polish & Documentation (Week 5)
 - [ ] API documentation
@@ -156,6 +173,8 @@ Full reconciliation triggers for:
 - [ ] Code review fixes
 - [ ] Migration guide
 - [ ] Release notes
+- [ ] **Documentation Tests**: Verify all public APIs are documented
+- [ ] **Example Tests**: Ensure all example code in docs compiles and runs
 
 ## Test Implementation
 

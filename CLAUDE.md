@@ -31,16 +31,23 @@ swift test --filter TestName
 # Run tests for specific target
 swift test --filter LexicalTests
 swift test --filter LexicalHTMLTests
+swift test --filter FenwickTreeTests
+swift test --filter ReconcilerBenchmarkTests
 ```
 
 ### Playground App (Xcode)
 ```bash
-# Build the playground app
+# Build the playground app for iPhone 17 Pro on iOS 26
 xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator build
 
-# Run on iOS simulator
-xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build
+# Run on iOS simulator (iPhone 17 Pro, iOS 26)
+xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build
 ```
+
+### Using XcodeBuildMCP for Development
+When using Claude Code with this project, use the XcodeBuildMCP tool with iPhone 17 Pro simulator on iOS 26:
+- Build: `build_sim({ projectPath: "Playground/LexicalPlayground.xcodeproj", scheme: "LexicalPlayground", simulatorName: "iPhone 17 Pro" })`
+- Test: `test_sim({ projectPath: "Playground/LexicalPlayground.xcodeproj", scheme: "Lexical", simulatorName: "iPhone 17 Pro" })`
 
 ## Architecture Overview
 
