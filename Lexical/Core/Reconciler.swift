@@ -147,6 +147,27 @@ internal enum Reconciler {
     metricsShouldRecord = true
     metricsState = reconcilerState
 
+    // Attempt optimized reconciliation first (Phase 4 integration)
+    if let optimizedSuccess = try? OptimizedReconciler.attemptOptimizedReconciliation(
+      currentEditorState: currentEditorState,
+      pendingEditorState: pendingEditorState,
+      editor: editor,
+      shouldReconcileSelection: shouldReconcileSelection,
+      markedTextOperation: markedTextOperation
+    ), optimizedSuccess {
+      // Optimized reconciliation succeeded, handle selection reconciliation if needed
+      if shouldReconcileSelection {
+        try reconcileSelection(
+          prevSelection: currentSelection,
+          nextSelection: nextSelection,
+          editor: editor
+        )
+      }
+      return
+    }
+
+    // Fall back to legacy reconciliation
+    editor.log(.reconciler, .warning, "Using legacy reconciliation")
     try reconcileNode(key: kRootNodeKey, reconcilerState: reconcilerState)
 
     let previousMode = textStorage.mode

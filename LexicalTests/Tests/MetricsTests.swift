@@ -48,17 +48,21 @@ final class MetricsTests: XCTestCase {
 @MainActor
 final class TestMetricsContainer: EditorMetricsContainer {
   private(set) var reconcilerRuns: [ReconcilerMetric] = []
+  private(set) var optimizedReconcilerRuns: [OptimizedReconcilerMetric] = []
   var metricsData: [String: Any] = [:]
 
   func record(_ metric: EditorMetric) {
     switch metric {
     case .reconcilerRun(let data):
       reconcilerRuns.append(data)
+    case .optimizedReconcilerRun(let data):
+      optimizedReconcilerRuns.append(data)
     }
   }
 
   func resetMetrics() {
     reconcilerRuns.removeAll()
+    optimizedReconcilerRuns.removeAll()
     metricsData.removeAll()
   }
 }

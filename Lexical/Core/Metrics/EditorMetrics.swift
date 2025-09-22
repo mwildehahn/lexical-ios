@@ -62,8 +62,34 @@ public enum ReconcilerType {
   case hybrid
 }
 
+public struct OptimizedReconcilerMetric {
+  public let deltaCount: Int
+  public let fenwickOperations: Int
+  public let nodeCount: Int
+  public let textStorageLength: Int
+  public let timestamp: Date
+  public let duration: TimeInterval
+
+  public init(
+    deltaCount: Int,
+    fenwickOperations: Int,
+    nodeCount: Int,
+    textStorageLength: Int,
+    timestamp: Date,
+    duration: TimeInterval = 0
+  ) {
+    self.deltaCount = deltaCount
+    self.fenwickOperations = fenwickOperations
+    self.nodeCount = nodeCount
+    self.textStorageLength = textStorageLength
+    self.timestamp = timestamp
+    self.duration = duration
+  }
+}
+
 public enum EditorMetric {
   case reconcilerRun(ReconcilerMetric)
+  case optimizedReconcilerRun(OptimizedReconcilerMetric)
 }
 
 public final class NullEditorMetricsContainer: EditorMetricsContainer {

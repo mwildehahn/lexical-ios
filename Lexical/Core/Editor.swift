@@ -146,6 +146,9 @@ public class Editor: NSObject {
   public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
   internal var featureFlags: FeatureFlags = FeatureFlags()
 
+  // Phase 3: FenwickTree for optimized reconciliation
+  internal var fenwickTree: FenwickTree
+
   // Used for storing editor listener events
   internal var listeners = Listeners()
 
@@ -182,6 +185,10 @@ public class Editor: NSObject {
     rangeCache[rootNodeKey] = RangeCacheItem()
     theme = editorConfig.theme
     plugins = editorConfig.plugins
+
+    // Initialize FenwickTree for optimized reconciliation
+    fenwickTree = FenwickTree(size: 1000) // Start with reasonable initial capacity
+
     super.init()
     initializePlugins(plugins)
 
