@@ -18,7 +18,6 @@ internal class TextStorageDeltaApplier {
 
   private let editor: Editor
   private let fenwickTree: FenwickTree
-  private let anchorManager: AnchorManager
   private var lastValidationTimestamp: Date = Date()
 
   // MARK: - Initialization
@@ -26,7 +25,6 @@ internal class TextStorageDeltaApplier {
   init(editor: Editor, fenwickTree: FenwickTree) {
     self.editor = editor
     self.fenwickTree = fenwickTree
-    self.anchorManager = editor.anchorManager
   }
 
   // MARK: - Delta Application
@@ -82,16 +80,7 @@ internal class TextStorageDeltaApplier {
       }
     }
 
-    // Post-application validation
-    if batch.batchMetadata.requiresAnchorValidation {
-      let anchorValidation = validateAnchorsAfterApplication(textStorage)
-      if !anchorValidation.isValid {
-        return .failure(
-          reason: "Anchor validation failed: \(anchorValidation.reason)",
-          shouldFallback: true
-        )
-      }
-    }
+    // Post-application validation could go here if needed
 
     // Return final result
     if failedDeltas.isEmpty {
@@ -124,9 +113,6 @@ internal class TextStorageDeltaApplier {
 
     case .attributeChange(let nodeKey, let attributes, let range):
       return try applyAttributeChange(nodeKey: nodeKey, attributes: attributes, range: range, to: textStorage)
-
-    case .anchorUpdate(let nodeKey, let preambleLocation, let postambleLocation):
-      return try applyAnchorUpdate(nodeKey: nodeKey, preambleLocation: preambleLocation, postambleLocation: postambleLocation, to: textStorage)
     }
   }
 
@@ -184,35 +170,11 @@ internal class TextStorageDeltaApplier {
       throw DeltaApplicationError.invalidLocation(location, textStorageLength: textStorage.length)
     }
 
-    // Build complete attributed string with anchors if enabled
+    // Build complete attributed string
     let completeString = NSMutableAttributedString()
-
-    if editor.featureFlags.anchorBasedReconciliation {
-      // Add preamble anchor
-      if let preambleAnchor = anchorManager.generateAnchorAttributedString(
-        for: nodeKey,
-        type: .preamble,
-        theme: editor.getTheme()
-      ) {
-        completeString.append(preambleAnchor)
-      }
-    }
-
-    // Add node content
     completeString.append(insertionData.preamble)
     completeString.append(insertionData.content)
     completeString.append(insertionData.postamble)
-
-    if editor.featureFlags.anchorBasedReconciliation {
-      // Add postamble anchor
-      if let postambleAnchor = anchorManager.generateAnchorAttributedString(
-        for: nodeKey,
-        type: .postamble,
-        theme: editor.getTheme()
-      ) {
-        completeString.append(postambleAnchor)
-      }
-    }
 
     // Insert into TextStorage
     textStorage.insert(completeString, at: location)
@@ -276,20 +238,6 @@ internal class TextStorageDeltaApplier {
     return DeltaApplicationSingleResult(fenwickUpdates: 0, lengthDelta: 0)
   }
 
-  private func applyAnchorUpdate(
-    nodeKey: NodeKey,
-    preambleLocation: Int?,
-    postambleLocation: Int?,
-    to textStorage: NSTextStorage
-  ) throws -> DeltaApplicationSingleResult {
-
-    // This is mainly for updating anchor tracking, not the actual TextStorage
-    // The actual anchors are managed by AnchorManager
-
-    // TODO: Update internal anchor tracking if needed
-
-    return DeltaApplicationSingleResult(fenwickUpdates: 0, lengthDelta: 0)
-  }
 
   // MARK: - Helper Methods
 
@@ -327,8 +275,6 @@ internal class TextStorageDeltaApplier {
       return range.location
     case .attributeChange(_, _, let range):
       return range.location
-    case .anchorUpdate:
-      return 0 // Anchor updates don't have a specific location
     }
   }
 
@@ -343,14 +289,6 @@ internal class TextStorageDeltaApplier {
     return false
   }
 
-  private func validateAnchorsAfterApplication(_ textStorage: NSTextStorage) -> (isValid: Bool, reason: String) {
-    guard editor.featureFlags.anchorBasedReconciliation else {
-      return (true, "Anchor validation skipped - feature disabled")
-    }
-
-    let isValid = anchorManager.validateAnchors(in: textStorage)
-    return (isValid, isValid ? "Anchors valid" : "Anchor validation failed")
-  }
 
   private func recordDeltaMetrics(delta: ReconcilerDelta, result: DeltaApplicationSingleResult) {
     // Record delta application metrics if metrics are enabled
@@ -392,7 +330,6 @@ private struct DeltaApplicationSingleResult {
 private enum DeltaApplicationError: Error {
   case invalidRange(NSRange, textStorageLength: Int)
   case invalidLocation(Int, textStorageLength: Int)
-  case anchorValidationFailed(String)
   case fenwickTreeUpdateFailed(String)
 }
 

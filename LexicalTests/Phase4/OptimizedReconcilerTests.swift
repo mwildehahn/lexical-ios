@@ -387,18 +387,17 @@ class OptimizedReconcilerTests: XCTestCase {
 
   func testOptimizedReconcilerIntegrationWithFeatureFlags() throws {
     // Test with different feature flag combinations
-    let flagCombinations: [(optimized: Bool, metrics: Bool, anchors: Bool)] = [
-      (true, true, true),
-      (true, true, false),
-      (true, false, true),
-      (true, false, false)
+    let flagCombinations: [(optimized: Bool, metrics: Bool)] = [
+      (true, true),
+      (true, false),
+      (false, true),
+      (false, false)
     ]
 
-    for (optimized, metrics, anchors) in flagCombinations {
+    for (optimized, metrics) in flagCombinations {
       let featureFlags = FeatureFlags(
         optimizedReconciler: optimized,
-        reconcilerMetrics: metrics,
-        anchorBasedReconciliation: anchors
+        reconcilerMetrics: metrics
       )
 
       let testMetrics = OptimizedReconcilerTestMetricsContainer()
@@ -445,7 +444,7 @@ class OptimizedReconcilerTests: XCTestCase {
       // Verify behavior matches feature flags
       if optimized {
         // Should attempt optimization (may succeed or fallback)
-        print("Optimization attempt with flags - optimized: \(optimized), metrics: \(metrics), anchors: \(anchors), result: \(result)")
+        print("Optimization attempt with flags - optimized: \(optimized), metrics: \(metrics), result: \(result)")
       } else {
         XCTAssertFalse(result, "Should not attempt optimization when flag is disabled")
       }

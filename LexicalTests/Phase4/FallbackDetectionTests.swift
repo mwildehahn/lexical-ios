@@ -214,54 +214,6 @@ class FallbackDetectionTests: XCTestCase {
     }
   }
 
-  func testFallbackOnAnchorCorruption() throws {
-    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true, anchorBasedReconciliation: true)
-    let metrics = FallbackTestMetricsContainer()
-    let editorConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: metrics)
-    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
-    let editor = textKitContext.editor
-    let fallbackDetector = ReconcilerFallbackDetector(editor: editor)
-
-    guard let textStorage = editor.textStorage else {
-      XCTFail("No text storage")
-      return
-    }
-
-    // Create anchor-related delta that might trigger corruption detection
-    let metadata = DeltaMetadata(sourceUpdate: "Anchor corruption test")
-    let delta = ReconcilerDelta(
-      type: .anchorUpdate(
-        nodeKey: "corrupted-anchor",
-        preambleLocation: 0,
-        postambleLocation: 10
-      ),
-      metadata: metadata
-    )
-
-    let context = ReconcilerContext(
-      updateSource: "FallbackTest",
-      nodeCount: 1,
-      textStorageLength: textStorage.length
-    )
-
-    // Test potential fallback on anchor operations
-    let decision = fallbackDetector.shouldFallbackToFullReconciliation(
-      for: [delta],
-      textStorage: textStorage,
-      context: context
-    )
-
-    // Anchor operations may or may not trigger fallback depending on implementation
-    switch decision {
-    case .fallback(let reason):
-      print("Fallback triggered for anchor operation: \(reason)")
-    case .useOptimized:
-      print("Anchor operation allowed to continue")
-    }
-
-    // Test passes regardless of decision - we're testing that the detector can handle anchor deltas
-  }
-
   func testFallbackResetAfterSuccess() throws {
     let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
     let metrics = FallbackTestMetricsContainer()

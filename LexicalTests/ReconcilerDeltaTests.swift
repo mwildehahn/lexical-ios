@@ -98,25 +98,6 @@ class ReconcilerDeltaTests: XCTestCase {
     }
   }
 
-  func testAnchorUpdateDelta() {
-    let nodeKey = "anchor-node-1"
-    let preambleLocation = 15
-    let postambleLocation = 45
-
-    let metadata = DeltaMetadata(sourceUpdate: "Anchor update")
-    let deltaType = ReconcilerDeltaType.anchorUpdate(nodeKey: nodeKey, preambleLocation: preambleLocation, postambleLocation: postambleLocation)
-    let delta = ReconcilerDelta(type: deltaType, metadata: metadata)
-
-    // Verify delta properties
-    if case .anchorUpdate(let key, let preamble, let postamble) = delta.type {
-      XCTAssertEqual(key, nodeKey)
-      XCTAssertEqual(preamble, preambleLocation)
-      XCTAssertEqual(postamble, postambleLocation)
-    } else {
-      XCTFail("Delta type should be anchorUpdate")
-    }
-  }
-
   // MARK: - Delta Batch Tests
 
   func testDeltaBatchCreation() {
@@ -142,7 +123,6 @@ class ReconcilerDeltaTests: XCTestCase {
 
     let batchMetadata = BatchMetadata(
       expectedTextStorageLength: 100,
-      requiresAnchorValidation: true,
       fallbackThreshold: 50
     )
 
@@ -150,7 +130,6 @@ class ReconcilerDeltaTests: XCTestCase {
 
     XCTAssertEqual(batch.deltas.count, 2)
     XCTAssertEqual(batch.batchMetadata.expectedTextStorageLength, 100)
-    XCTAssertTrue(batch.batchMetadata.requiresAnchorValidation)
     XCTAssertEqual(batch.batchMetadata.fallbackThreshold, 50)
   }
 
@@ -179,21 +158,18 @@ class ReconcilerDeltaTests: XCTestCase {
     let batchId = "test-batch-123"
     let timestamp = Date()
     let expectedLength = 500
-    let requiresValidation = false
     let threshold = 75
 
     let metadata = BatchMetadata(
       batchId: batchId,
       timestamp: timestamp,
       expectedTextStorageLength: expectedLength,
-      requiresAnchorValidation: requiresValidation,
       fallbackThreshold: threshold
     )
 
     XCTAssertEqual(metadata.batchId, batchId)
     XCTAssertEqual(metadata.timestamp, timestamp)
     XCTAssertEqual(metadata.expectedTextStorageLength, expectedLength)
-    XCTAssertFalse(metadata.requiresAnchorValidation)
     XCTAssertEqual(metadata.fallbackThreshold, threshold)
   }
 

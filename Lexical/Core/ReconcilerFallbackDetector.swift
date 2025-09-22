@@ -25,7 +25,6 @@ internal class ReconcilerFallbackDetector {
     static let maxDeltasPerBatch = 100
     static let maxStructuralChanges = 50
     static let maxConsecutiveFailures = 3
-    static let maxAnchorCorruption = 5
     static let maxTimeSinceLastSuccess: TimeInterval = 30.0 // seconds
     static let maxMemoryPressure = 0.8 // 80% of available memory
   }
@@ -51,7 +50,6 @@ internal class ReconcilerFallbackDetector {
       checkDeltaBatchSize(deltas),
       checkStructuralChanges(deltas),
       checkConsecutiveFailures(),
-      checkAnchorCorruption(textStorage),
       checkTimeSinceLastSuccess(),
       checkMemoryPressure(),
       checkComplexTransformations(deltas),
@@ -111,16 +109,6 @@ internal class ReconcilerFallbackDetector {
     return .continueOptimization
   }
 
-  private func checkAnchorCorruption(_ textStorage: NSTextStorage) -> FallbackCheck {
-    guard editor.featureFlags.anchorBasedReconciliation else { return .continueOptimization }
-
-    let corruptionCount = detectAnchorCorruption(textStorage)
-    if corruptionCount > FallbackThresholds.maxAnchorCorruption {
-      return .fallback("Anchor corruption detected: \(corruptionCount) corrupt anchors")
-    }
-    return .continueOptimization
-  }
-
   private func checkTimeSinceLastSuccess() -> FallbackCheck {
     let timeSinceSuccess = Date().timeIntervalSince(fallbackMetrics.lastSuccessfulOptimization)
     if timeSinceSuccess > FallbackThresholds.maxTimeSinceLastSuccess {
@@ -174,43 +162,10 @@ internal class ReconcilerFallbackDetector {
       switch delta.type {
       case .nodeInsertion, .nodeDeletion:
         return true
-      case .textUpdate, .attributeChange, .anchorUpdate:
+      case .textUpdate, .attributeChange:
         return false
       }
     }
-  }
-
-  private func detectAnchorCorruption(_ textStorage: NSTextStorage) -> Int {
-    guard editor.featureFlags.anchorBasedReconciliation else { return 0 }
-
-    var corruptionCount = 0
-
-    textStorage.enumerateAttribute(
-      AnchorManager.anchorAttributeKey,
-      in: NSRange(location: 0, length: textStorage.length),
-      options: []
-    ) { value, range, _ in
-      if value != nil {
-        // Check if the anchor character is correct
-        let substring = textStorage.attributedSubstring(from: range)
-        if substring.string != AnchorManager.anchorCharacter {
-          corruptionCount += 1
-        }
-
-        // Check if metadata is valid
-        if let metadataData = value as? Data {
-          do {
-            _ = try JSONDecoder().decode(AnchorManager.AnchorMetadata.self, from: metadataData)
-          } catch {
-            corruptionCount += 1
-          }
-        } else {
-          corruptionCount += 1
-        }
-      }
-    }
-
-    return corruptionCount
   }
 
   private func getCurrentMemoryPressure() -> Double {

@@ -378,12 +378,8 @@ internal enum Reconciler {
     var nextRangeCacheItem = RangeCacheItem()
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
-    // Calculate preamble length including anchor if enabled
-    var nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
-    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
-      // Add 1 for the anchor character
-      nextPreambleLength += 1
-    }
+    // Calculate preamble length
+    let nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
 
     createAddRemoveRanges(
       key: key,
@@ -426,12 +422,8 @@ internal enum Reconciler {
     )
     nextRangeCacheItem.textLength = nextTextLength
 
-    // Calculate postamble length including anchor if enabled
-    var nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
-    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
-      // Add 1 for the anchor character
-      nextPostambleLength += 1
-    }
+    // Calculate postamble length
+    let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
 
     createAddRemoveRanges(
       key: key,
@@ -477,12 +469,8 @@ internal enum Reconciler {
     var nextRangeCacheItem = RangeCacheItem()
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
-    // Calculate preamble length including anchor if enabled
-    var nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
-    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
-      // Add 1 for the anchor character
-      nextPreambleLength += 1
-    }
+    // Calculate preamble length
+    let nextPreambleLength = nextNode.getPreamble().lengthAsNSString()
 
     let preambleInsertion = ReconcilerInsertion(
       location: reconcilerState.locationCursor, nodeKey: key, part: .preamble)
@@ -508,12 +496,8 @@ internal enum Reconciler {
     reconcilerState.locationCursor += nextTextLength
     nextRangeCacheItem.textLength = nextTextLength
 
-    // Calculate postamble length including anchor if enabled
-    var nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
-    if reconcilerState.editor.featureFlags.anchorBasedReconciliation {
-      // Add 1 for the anchor character
-      nextPostambleLength += 1
-    }
+    // Calculate postamble length
+    let nextPostambleLength = nextNode.getPostamble().lengthAsNSString()
 
     let postambleInsertion = ReconcilerInsertion(
       location: reconcilerState.locationCursor, nodeKey: key, part: .postamble)
@@ -696,60 +680,14 @@ internal enum Reconciler {
 
     var attributedString: NSAttributedString
 
-    // Check if we should use anchor-based reconciliation
-    if editor.featureFlags.anchorBasedReconciliation {
-      let anchorManager = editor.anchorManager
-
-      switch insertion.part {
-      case .text:
-        attributedString = NSAttributedString(string: node.getTextPart())
-      case .preamble:
-        // Generate preamble with anchor
-        let preambleString = node.getPreamble()
-        let mutableString = NSMutableAttributedString()
-
-        // Add anchor before preamble content
-        if let anchor = anchorManager.generateAnchorAttributedString(
-          for: insertion.nodeKey,
-          type: .preamble,
-          theme: theme
-        ) {
-          mutableString.append(anchor)
-        }
-
-        // Add the actual preamble content
-        mutableString.append(NSAttributedString(string: preambleString))
-
-        attributedString = mutableString
-      case .postamble:
-        // Generate postamble with anchor
-        let postambleString = node.getPostamble()
-        let mutableString = NSMutableAttributedString()
-
-        // Add the actual postamble content
-        mutableString.append(NSAttributedString(string: postambleString))
-
-        // Add anchor after postamble content
-        if let anchor = anchorManager.generateAnchorAttributedString(
-          for: insertion.nodeKey,
-          type: .postamble,
-          theme: theme
-        ) {
-          mutableString.append(anchor)
-        }
-
-        attributedString = mutableString
-      }
-    } else {
-      // Legacy path without anchors
-      switch insertion.part {
-      case .text:
-        attributedString = NSAttributedString(string: node.getTextPart())
-      case .preamble:
-        attributedString = NSAttributedString(string: node.getPreamble())
-      case .postamble:
-        attributedString = NSAttributedString(string: node.getPostamble())
-      }
+    // Generate attributed string for the node part
+    switch insertion.part {
+    case .text:
+      attributedString = NSAttributedString(string: node.getTextPart())
+    case .preamble:
+      attributedString = NSAttributedString(string: node.getPreamble())
+    case .postamble:
+      attributedString = NSAttributedString(string: node.getPostamble())
     }
 
     attributedString = AttributeUtils.attributedStringByAddingStyles(

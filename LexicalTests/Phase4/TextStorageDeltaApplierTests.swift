@@ -50,7 +50,6 @@ class TextStorageDeltaApplierTests: XCTestCase {
       deltas: [delta],
       batchMetadata: BatchMetadata(
         expectedTextStorageLength: textStorage.length,
-        requiresAnchorValidation: false,
         fallbackThreshold: 100
       )
     )
@@ -106,7 +105,6 @@ class TextStorageDeltaApplierTests: XCTestCase {
       deltas: [delta],
       batchMetadata: BatchMetadata(
         expectedTextStorageLength: textStorage.length,
-        requiresAnchorValidation: false,
         fallbackThreshold: 100
       )
     )
@@ -164,7 +162,6 @@ class TextStorageDeltaApplierTests: XCTestCase {
       deltas: [delta],
       batchMetadata: BatchMetadata(
         expectedTextStorageLength: textStorage.length,
-        requiresAnchorValidation: false,
         fallbackThreshold: 100
       )
     )
@@ -242,7 +239,6 @@ class TextStorageDeltaApplierTests: XCTestCase {
       deltas: [delta1, delta2],
       batchMetadata: BatchMetadata(
         expectedTextStorageLength: textStorage.length,
-        requiresAnchorValidation: false,
         fallbackThreshold: 100
       )
     )
@@ -292,7 +288,6 @@ class TextStorageDeltaApplierTests: XCTestCase {
       deltas: [delta],
       batchMetadata: BatchMetadata(
         expectedTextStorageLength: textStorage.length,
-        requiresAnchorValidation: false,
         fallbackThreshold: 100
       )
     )
@@ -313,55 +308,6 @@ class TextStorageDeltaApplierTests: XCTestCase {
     }
   }
 
-  func testAnchorUpdateDeltaApplication() throws {
-    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true, anchorBasedReconciliation: true)
-    let metrics = DeltaApplierTestMetricsContainer()
-    let editorConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: metrics)
-    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
-    let editor = textKitContext.editor
-    let fenwickTree = editor.fenwickTree
-    let applier = TextStorageDeltaApplier(editor: editor, fenwickTree: fenwickTree)
-
-    guard let textStorage = editor.textStorage else {
-      XCTFail("No text storage")
-      return
-    }
-
-    // Create anchor update delta
-    let metadata = DeltaMetadata(sourceUpdate: "Test anchor update")
-    let delta = ReconcilerDelta(
-      type: .anchorUpdate(
-        nodeKey: "anchor-node",
-        preambleLocation: 0,
-        postambleLocation: 10
-      ),
-      metadata: metadata
-    )
-
-    let deltaBatch = DeltaBatch(
-      deltas: [delta],
-      batchMetadata: BatchMetadata(
-        expectedTextStorageLength: textStorage.length,
-        requiresAnchorValidation: true,
-        fallbackThreshold: 100
-      )
-    )
-
-    // Apply anchor delta
-    let result = applier.applyDeltaBatch(deltaBatch, to: textStorage)
-
-    // Verify application (may succeed or fallback gracefully)
-    switch result {
-    case .success(let appliedDeltas, let fenwickUpdates):
-      XCTAssertEqual(appliedDeltas, 1, "Should apply anchor delta")
-      XCTAssertGreaterThanOrEqual(fenwickUpdates, 0, "Should track Fenwick updates")
-    case .failure(let reason, _):
-      // Anchor operations may fail gracefully
-      print("Anchor delta failed as expected: \(reason)")
-    case .partialSuccess(_, _, let reason):
-      print("Anchor delta partial success: \(reason)")
-    }
-  }
 }
 
 // MARK: - Supporting Types

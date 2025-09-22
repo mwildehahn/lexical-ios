@@ -94,10 +94,6 @@ internal class DeltaValidator {
         errors.append(contentsOf: attributeErrors)
       }
 
-    case .anchorUpdate(let nodeKey, let preambleLocation, let postambleLocation):
-      if let anchorErrors = validateAnchorUpdate(nodeKey: nodeKey, preambleLocation: preambleLocation, postambleLocation: postambleLocation, textStorage: textStorage) {
-        errors.append(contentsOf: anchorErrors)
-      }
     }
 
     return errors.isEmpty ? nil : errors
@@ -124,12 +120,6 @@ internal class DeltaValidator {
       errors.append(contentsOf: rangeCacheErrors)
     }
 
-    // Validate anchors if enabled
-    if editor.featureFlags.anchorBasedReconciliation {
-      if let anchorErrors = validateAnchors(textStorage) {
-        errors.append(contentsOf: anchorErrors)
-      }
-    }
 
     // Validate FenwickTree consistency
     if let fenwickErrors = validateFenwickTreeConsistency(rangeCache) {
@@ -292,41 +282,6 @@ internal class DeltaValidator {
     return errors.isEmpty ? nil : errors
   }
 
-  private func validateAnchorUpdate(
-    nodeKey: NodeKey,
-    preambleLocation: Int?,
-    postambleLocation: Int?,
-    textStorage: NSTextStorage
-  ) -> [ValidationError]? {
-
-    guard editor.featureFlags.anchorBasedReconciliation else {
-      return [ValidationError.anchorUpdateWithoutFeatureFlag(nodeKey)]
-    }
-
-    var errors: [ValidationError] = []
-
-    // Validate locations if provided
-    if let preambleLocation = preambleLocation {
-      if preambleLocation < 0 || preambleLocation >= textStorage.length {
-        errors.append(ValidationError.invalidAnchorLocation("preamble", location: preambleLocation, textStorageLength: textStorage.length))
-      }
-    }
-
-    if let postambleLocation = postambleLocation {
-      if postambleLocation < 0 || postambleLocation >= textStorage.length {
-        errors.append(ValidationError.invalidAnchorLocation("postamble", location: postambleLocation, textStorageLength: textStorage.length))
-      }
-    }
-
-    // Validate ordering if both locations provided
-    if let preambleLocation = preambleLocation, let postambleLocation = postambleLocation {
-      if preambleLocation >= postambleLocation {
-        errors.append(ValidationError.invalidAnchorOrdering(preamble: preambleLocation, postamble: postambleLocation))
-      }
-    }
-
-    return errors.isEmpty ? nil : errors
-  }
 
   private func validateDeltaConflicts(_ deltas: [ReconcilerDelta], textStorage: NSTextStorage) -> [ValidationError]? {
     var errors: [ValidationError] = []
@@ -383,11 +338,6 @@ internal class DeltaValidator {
     return errors.isEmpty ? nil : errors
   }
 
-  private func validateAnchors(_ textStorage: NSTextStorage) -> [ValidationError]? {
-    // Use AnchorManager to validate anchors
-    let isValid = editor.anchorManager.validateAnchors(in: textStorage)
-    return isValid ? nil : [ValidationError.anchorValidationFailed]
-  }
 
   private func validateFenwickTreeConsistency(_ rangeCache: [NodeKey: RangeCacheItem]) -> [ValidationError]? {
     var errors: [ValidationError] = []
@@ -440,8 +390,6 @@ internal class DeltaValidator {
       return range
     case .attributeChange(_, _, let range):
       return range
-    case .anchorUpdate:
-      return NSRange(location: 0, length: 0)
     }
   }
 
@@ -481,15 +429,11 @@ internal enum ValidationError {
   case nodeKeyMismatch(expected: NodeKey, actual: NodeKey)
   case rangeMismatch(expected: NSRange, actual: NSRange, nodeKey: NodeKey)
   case unsafeAttribute(NSAttributedString.Key, value: Any)
-  case anchorUpdateWithoutFeatureFlag(NodeKey)
-  case invalidAnchorLocation(String, location: Int, textStorageLength: Int)
-  case invalidAnchorOrdering(preamble: Int, postamble: Int)
   case overlappingDeltas(range1: NSRange, range2: NSRange)
   case invalidTextStorageLength(Int)
   case textStorageContainsNullCharacter
   case rangeCacheItemOutOfBounds(NodeKey, item: RangeCacheItem, textStorageLength: Int)
   case negativeLengthInRangeCache(NodeKey, item: RangeCacheItem)
-  case anchorValidationFailed
   case rangeCacheInconsistency(String)
   case fenwickTreeInconsistency(String)
 }

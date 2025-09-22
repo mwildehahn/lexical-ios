@@ -13,7 +13,6 @@ public enum ReconcilerDeltaType {
   case nodeInsertion(nodeKey: NodeKey, insertionData: NodeInsertionData, location: Int)
   case nodeDeletion(nodeKey: NodeKey, range: NSRange)
   case attributeChange(nodeKey: NodeKey, attributes: [NSAttributedString.Key: Any], range: NSRange)
-  case anchorUpdate(nodeKey: NodeKey, preambleLocation: Int?, postambleLocation: Int?)
 }
 
 /// Data needed to insert a node
@@ -78,20 +77,17 @@ public struct BatchMetadata {
   let batchId: String
   let timestamp: Date
   let expectedTextStorageLength: Int
-  let requiresAnchorValidation: Bool
   let fallbackThreshold: Int // Number of deltas that triggers fallback
 
   public init(
     batchId: String = UUID().uuidString,
     timestamp: Date = Date(),
     expectedTextStorageLength: Int,
-    requiresAnchorValidation: Bool = true,
     fallbackThreshold: Int = 100
   ) {
     self.batchId = batchId
     self.timestamp = timestamp
     self.expectedTextStorageLength = expectedTextStorageLength
-    self.requiresAnchorValidation = requiresAnchorValidation
     self.fallbackThreshold = fallbackThreshold
   }
 }

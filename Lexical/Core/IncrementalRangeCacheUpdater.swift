@@ -88,12 +88,6 @@ internal class IncrementalRangeCacheUpdater {
           updatedItem.preambleLength = insertionData.preamble.length
           updatedItem.textLength = insertionData.content.length
           updatedItem.postambleLength = insertionData.postamble.length
-
-          // Include anchor lengths if enabled
-          if editor.featureFlags.anchorBasedReconciliation {
-            updatedItem.preambleLength += 1 // preamble anchor
-            updatedItem.postambleLength += 1 // postamble anchor
-          }
         }
 
       case .nodeDeletion(let key, _):
@@ -108,12 +102,6 @@ internal class IncrementalRangeCacheUpdater {
           // Attribute changes don't affect range cache lengths
           // But might affect special character lengths in some cases
           // For now, we'll recalculate if needed
-        }
-
-      case .anchorUpdate(let key, _, _):
-        if key == nodeKey {
-          // Anchor updates might affect preamble/postamble lengths
-          try recalculateAnchorLengths(&updatedItem, nodeKey: nodeKey)
         }
       }
     }
@@ -174,12 +162,6 @@ internal class IncrementalRangeCacheUpdater {
       }
     }
 
-    // Add anchor lengths if enabled
-    if editor.featureFlags.anchorBasedReconciliation {
-      newItem.preambleLength += 1 // preamble anchor
-      newItem.postambleLength += 1 // postamble anchor
-    }
-
     // Use the explicit insertion location when available, otherwise fall back to FenwickTree
     if let insertionLocation = insertionLocation {
       newItem.location = insertionLocation
@@ -188,19 +170,6 @@ internal class IncrementalRangeCacheUpdater {
     }
 
     rangeCache[nodeKey] = newItem
-  }
-
-  /// Recalculate anchor-related lengths in a range cache item
-  private func recalculateAnchorLengths(
-    _ item: inout RangeCacheItem,
-    nodeKey: NodeKey
-  ) throws {
-
-    guard editor.featureFlags.anchorBasedReconciliation else { return }
-
-    // Reset special character lengths to account for anchors
-    item.preambleSpecialCharacterLength = 1 // for anchor
-    // Note: Postamble special characters would be handled similarly if needed
   }
 
   /// Calculate children length for an element node
@@ -236,11 +205,6 @@ internal class IncrementalRangeCacheUpdater {
       }
     }
 
-    // Add anchor lengths if enabled
-    if editor.featureFlags.anchorBasedReconciliation {
-      length += 2 // preamble + postamble anchors
-    }
-
     return length
   }
 
@@ -270,8 +234,6 @@ internal class IncrementalRangeCacheUpdater {
       return nodeKey
     case .attributeChange(let nodeKey, _, _):
       return nodeKey
-    case .anchorUpdate(let nodeKey, _, _):
-      return nodeKey
     }
   }
 
@@ -288,19 +250,12 @@ internal class IncrementalRangeCacheUpdater {
 
       case .nodeInsertion(_, let insertionData, let location):
         let totalLength = insertionData.preamble.length + insertionData.content.length + insertionData.postamble.length
-        var insertionLength = totalLength
-
-        // Add anchor lengths if enabled
-        if editor.featureFlags.anchorBasedReconciliation {
-          insertionLength += 2 // preamble + postamble anchors
-        }
-
-        changes.append((location: location, lengthDelta: insertionLength))
+        changes.append((location: location, lengthDelta: totalLength))
 
       case .nodeDeletion(_, let range):
         changes.append((location: range.location, lengthDelta: -range.length))
 
-      case .attributeChange, .anchorUpdate:
+      case .attributeChange:
         // These don't change text length
         break
       }

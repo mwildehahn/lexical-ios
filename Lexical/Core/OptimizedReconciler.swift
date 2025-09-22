@@ -274,7 +274,6 @@ private class DeltaGenerator {
     // Create batch metadata
     let batchMetadata = BatchMetadata(
       expectedTextStorageLength: editor.textStorage?.length ?? 0,
-      requiresAnchorValidation: editor.featureFlags.anchorBasedReconciliation,
       fallbackThreshold: 100
     )
 

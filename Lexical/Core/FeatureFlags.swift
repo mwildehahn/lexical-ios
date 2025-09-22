@@ -12,20 +12,17 @@ import Foundation
   let proxyTextViewInputDelegate: Bool
   let optimizedReconciler: Bool
   let reconcilerMetrics: Bool
-  let anchorBasedReconciliation: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
     proxyTextViewInputDelegate: Bool = false,
     optimizedReconciler: Bool = false,
-    reconcilerMetrics: Bool = false,
-    anchorBasedReconciliation: Bool = false
+    reconcilerMetrics: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
     self.optimizedReconciler = optimizedReconciler
     self.reconcilerMetrics = reconcilerMetrics
-    self.anchorBasedReconciliation = anchorBasedReconciliation
     super.init()
   }
 }

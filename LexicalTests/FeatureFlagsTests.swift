@@ -18,7 +18,6 @@ class FeatureFlagsTests: XCTestCase {
     XCTAssertFalse(flags.proxyTextViewInputDelegate)
     XCTAssertFalse(flags.optimizedReconciler)
     XCTAssertFalse(flags.reconcilerMetrics)
-    XCTAssertFalse(flags.anchorBasedReconciliation)
   }
 
   func testOptimizedReconcilerFlag() throws {
@@ -26,7 +25,6 @@ class FeatureFlagsTests: XCTestCase {
 
     XCTAssertTrue(flags.optimizedReconciler)
     XCTAssertFalse(flags.reconcilerMetrics)
-    XCTAssertFalse(flags.anchorBasedReconciliation)
   }
 
   func testReconcilerMetricsFlag() throws {
@@ -34,31 +32,21 @@ class FeatureFlagsTests: XCTestCase {
 
     XCTAssertTrue(flags.reconcilerMetrics)
     XCTAssertFalse(flags.optimizedReconciler)
-    XCTAssertFalse(flags.anchorBasedReconciliation)
   }
 
-  func testAnchorBasedReconciliationFlag() throws {
-    let flags = FeatureFlags(anchorBasedReconciliation: true)
-
-    XCTAssertTrue(flags.anchorBasedReconciliation)
-    XCTAssertFalse(flags.optimizedReconciler)
-    XCTAssertFalse(flags.reconcilerMetrics)
-  }
 
   func testAllFlagsEnabled() throws {
     let flags = FeatureFlags(
       reconcilerSanityCheck: true,
       proxyTextViewInputDelegate: true,
       optimizedReconciler: true,
-      reconcilerMetrics: true,
-      anchorBasedReconciliation: true
+      reconcilerMetrics: true
     )
 
     XCTAssertTrue(flags.reconcilerSanityCheck)
     XCTAssertTrue(flags.proxyTextViewInputDelegate)
     XCTAssertTrue(flags.optimizedReconciler)
     XCTAssertTrue(flags.reconcilerMetrics)
-    XCTAssertTrue(flags.anchorBasedReconciliation)
   }
 
   func testMixedFlags() throws {
@@ -66,14 +54,12 @@ class FeatureFlagsTests: XCTestCase {
       reconcilerSanityCheck: false,
       proxyTextViewInputDelegate: true,
       optimizedReconciler: false,
-      reconcilerMetrics: true,
-      anchorBasedReconciliation: false
+      reconcilerMetrics: true
     )
 
     XCTAssertFalse(flags.reconcilerSanityCheck)
     XCTAssertTrue(flags.proxyTextViewInputDelegate)
     XCTAssertFalse(flags.optimizedReconciler)
     XCTAssertTrue(flags.reconcilerMetrics)
-    XCTAssertFalse(flags.anchorBasedReconciliation)
   }
 }
