@@ -9,6 +9,43 @@ import Lexical
 import LexicalListPlugin
 import UIKit
 
+// MARK: - Metrics Container for Performance Testing
+@MainActor
+final class PerformanceMetricsContainer: EditorMetricsContainer {
+  private(set) var reconcilerRuns: [ReconcilerMetric] = []
+  private(set) var optimizedReconcilerRuns: [OptimizedReconcilerMetric] = []
+  private(set) var deltaApplications: [DeltaApplicationMetric] = []
+  var metricsData: [String: Any] = [:]
+
+  func record(_ metric: EditorMetric) {
+    switch metric {
+    case .reconcilerRun(let data):
+      reconcilerRuns.append(data)
+    case .optimizedReconcilerRun(let data):
+      optimizedReconcilerRuns.append(data)
+    case .deltaApplication(let data):
+      deltaApplications.append(data)
+    }
+  }
+
+  func resetMetrics() {
+    reconcilerRuns.removeAll()
+    optimizedReconcilerRuns.removeAll()
+    deltaApplications.removeAll()
+    metricsData.removeAll()
+  }
+
+  func getLastReconcilerMetrics() -> (duration: TimeInterval, fenwickOps: Int, deltasApplied: Int, didFallback: Bool)? {
+    if let optimized = optimizedReconcilerRuns.last {
+      // Check if it fell back by looking for a legacy reconciler run at the same time
+      let didFallback = reconcilerRuns.contains { abs($0.duration - optimized.duration) < 0.001 }
+      return (optimized.duration, optimized.fenwickOperations, deltaApplications.count, didFallback)
+    } else if let legacy = reconcilerRuns.last {
+      return (legacy.duration, 0, 0, false)
+    }
+    return nil
+  }
+}
 
 class PerformanceTestViewController: UIViewController {
 
@@ -25,6 +62,8 @@ class PerformanceTestViewController: UIViewController {
   private var optimizedMetrics: PerformanceMetrics = PerformanceMetrics()
   private let resultsManager = PerformanceResultsManager.shared
   private var autoTestsCompleted = false
+  private let legacyMetricsContainer = PerformanceMetricsContainer()
+  private let optimizedMetricsContainer = PerformanceMetricsContainer()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -272,7 +311,7 @@ class PerformanceTestViewController: UIViewController {
 
     // Create legacy LexicalView (optimized reconciler disabled)
     let legacyFeatureFlags = FeatureFlags(optimizedReconciler: false, reconcilerMetrics: true)
-    let legacyConfig = EditorConfig(theme: Theme(), plugins: [])
+    let legacyConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: legacyMetricsContainer)
     let legacyView = LexicalView(editorConfig: legacyConfig, featureFlags: legacyFeatureFlags)
     legacyView.translatesAutoresizingMaskIntoConstraints = false
     legacyContainer.addSubview(legacyView)
@@ -280,7 +319,7 @@ class PerformanceTestViewController: UIViewController {
 
     // Create optimized LexicalView (optimized reconciler enabled)
     let optimizedFeatureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
-    let optimizedConfig = EditorConfig(theme: Theme(), plugins: [])
+    let optimizedConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: optimizedMetricsContainer)
     let optimizedView = LexicalView(editorConfig: optimizedConfig, featureFlags: optimizedFeatureFlags)
     optimizedView.translatesAutoresizingMaskIntoConstraints = false
     optimizedContainer.addSubview(optimizedView)
@@ -396,16 +435,28 @@ class PerformanceTestViewController: UIViewController {
     updateMetricsLabel(optimizedMetricsLabel, with: "Running \(description)...")
 
     // Test legacy reconciler
+    legacyMetricsContainer.resetMetrics()
     let legacyTime = measurePerformance {
       performOperation(operation, in: legacyView)
     }
     legacyMetrics.duration = legacyTime
+    if let metrics = legacyMetricsContainer.getLastReconcilerMetrics() {
+      legacyMetrics.fenwickOperations = metrics.fenwickOps
+      legacyMetrics.deltasApplied = metrics.deltasApplied
+      legacyMetrics.didFallbackToFull = metrics.didFallback
+    }
 
     // Test optimized reconciler
+    optimizedMetricsContainer.resetMetrics()
     let optimizedTime = measurePerformance {
       performOperation(operation, in: optimizedView)
     }
     optimizedMetrics.duration = optimizedTime
+    if let metrics = optimizedMetricsContainer.getLastReconcilerMetrics() {
+      optimizedMetrics.fenwickOperations = metrics.fenwickOps
+      optimizedMetrics.deltasApplied = metrics.deltasApplied
+      optimizedMetrics.didFallbackToFull = metrics.didFallback
+    }
 
     // Update UI with results
     updateMetricsLabel(legacyMetricsLabel, with: formatMetrics(legacyMetrics, title: "Legacy"))
@@ -427,7 +478,10 @@ class PerformanceTestViewController: UIViewController {
       legacyTime: legacyTime,
       optimizedTime: optimizedTime,
       improvement: improvement,
-      timestamp: Date()
+      timestamp: Date(),
+      fenwickOperations: optimizedMetrics.fenwickOperations,
+      deltasApplied: optimizedMetrics.deltasApplied,
+      didFallbackToFull: optimizedMetrics.didFallbackToFull
     )
     resultsManager.addResult(result)
   }
@@ -443,16 +497,28 @@ class PerformanceTestViewController: UIViewController {
     updateMetricsLabel(optimizedMetricsLabel, with: "Running \(description)...")
 
     // Test legacy reconciler
+    legacyMetricsContainer.resetMetrics()
     let legacyTime = await measurePerformanceAsync {
       await performOperationAsync(operation, in: legacyView)
     }
     legacyMetrics.duration = legacyTime
+    if let metrics = legacyMetricsContainer.getLastReconcilerMetrics() {
+      legacyMetrics.fenwickOperations = metrics.fenwickOps
+      legacyMetrics.deltasApplied = metrics.deltasApplied
+      legacyMetrics.didFallbackToFull = metrics.didFallback
+    }
 
     // Test optimized reconciler
+    optimizedMetricsContainer.resetMetrics()
     let optimizedTime = await measurePerformanceAsync {
       await performOperationAsync(operation, in: optimizedView)
     }
     optimizedMetrics.duration = optimizedTime
+    if let metrics = optimizedMetricsContainer.getLastReconcilerMetrics() {
+      optimizedMetrics.fenwickOperations = metrics.fenwickOps
+      optimizedMetrics.deltasApplied = metrics.deltasApplied
+      optimizedMetrics.didFallbackToFull = metrics.didFallback
+    }
 
     // Update UI with results
     updateMetricsLabel(legacyMetricsLabel, with: formatMetrics(legacyMetrics, title: "Legacy"))
@@ -474,7 +540,10 @@ class PerformanceTestViewController: UIViewController {
       legacyTime: legacyTime,
       optimizedTime: optimizedTime,
       improvement: improvement,
-      timestamp: Date()
+      timestamp: Date(),
+      fenwickOperations: optimizedMetrics.fenwickOperations,
+      deltasApplied: optimizedMetrics.deltasApplied,
+      didFallbackToFull: optimizedMetrics.didFallbackToFull
     )
     resultsManager.addResult(result)
   }
@@ -740,11 +809,24 @@ class PerformanceTestViewController: UIViewController {
   }
 
   private func formatMetrics(_ metrics: PerformanceMetrics, title: String) -> String {
-    return """
+    var result = """
     \(title):
     Duration: \(String(format: "%.1fms", metrics.duration * 1000))
-    Status: \(metrics.duration > 0 ? "✅ Complete" : "⏱ Testing...")
     """
+
+    // Add optimized reconciler metrics if available
+    if metrics.fenwickOperations > 0 || metrics.deltasApplied > 0 {
+      result += "\nFenwick Ops: \(metrics.fenwickOperations)"
+      result += "\nDeltas Applied: \(metrics.deltasApplied)"
+    }
+
+    if metrics.didFallbackToFull {
+      result += "\n⚠️ Fell back to full reconciliation"
+    }
+
+    result += "\nStatus: \(metrics.duration > 0 ? "✅ Complete" : "⏱ Testing...")"
+
+    return result
   }
 
   private func getCurrentResultsText() -> String {
@@ -795,6 +877,9 @@ private struct PerformanceMetrics {
   var duration: TimeInterval = 0
   var nodeCount: Int = 0
   var memoryUsage: Int = 0
+  var fenwickOperations: Int = 0
+  var deltasApplied: Int = 0
+  var didFallbackToFull: Bool = false
 }
 
 // MARK: - Results Management
@@ -805,6 +890,9 @@ struct TestResult {
   let optimizedTime: TimeInterval
   let improvement: Double
   let timestamp: Date
+  let fenwickOperations: Int
+  let deltasApplied: Int
+  let didFallbackToFull: Bool
 }
 
 class PerformanceResultsManager {
@@ -1034,7 +1122,19 @@ class ResultTableViewCell: UITableViewCell {
     testNameLabel.text = result.testName
     timestampLabel.text = DateFormatter.userFriendly.string(from: result.timestamp)
     improvementLabel.text = "\(String(format: "%.1fx", result.improvement)) faster"
-    timesLabel.text = "Legacy: \(String(format: "%.1fms", result.legacyTime * 1000)) | Optimized: \(String(format: "%.1fms", result.optimizedTime * 1000))"
+
+    var timesText = "Legacy: \(String(format: "%.1fms", result.legacyTime * 1000)) | Optimized: \(String(format: "%.1fms", result.optimizedTime * 1000))"
+
+    // Add reconciler metrics if available
+    if result.fenwickOperations > 0 || result.deltasApplied > 0 {
+      timesText += "\nFenwick: \(result.fenwickOperations) ops | Deltas: \(result.deltasApplied)"
+    }
+
+    if result.didFallbackToFull {
+      timesText += " ⚠️"
+    }
+
+    timesLabel.text = timesText
   }
 }
 

@@ -176,7 +176,7 @@ internal class IncrementalRangeCacheUpdater {
     }
 
     // Calculate location using FenwickTree
-    if let fenwickIndex = getFenwickIndexForNode(nodeKey) {
+    if let fenwickIndex = getFenwickIndexForNode(nodeKey, rangeCache: rangeCache) {
       newItem.location = fenwickTree.query(index: fenwickIndex)
     }
 
@@ -319,10 +319,17 @@ internal class IncrementalRangeCacheUpdater {
     return max(0, adjustedLocation)
   }
 
-  private func getFenwickIndexForNode(_ nodeKey: NodeKey) -> Int? {
-    // TODO: Implement mapping from NodeKey to FenwickTree index
-    // This would depend on how nodes are indexed in the FenwickTree
-    return nil
+  private func getFenwickIndexForNode(_ nodeKey: NodeKey, rangeCache: [NodeKey: RangeCacheItem]) -> Int? {
+    // Get the range cache item for this node
+    guard let rangeCacheItem = rangeCache[nodeKey] else { return nil }
+
+    // Use a simple mapping based on the node's location in the document
+    // This maps nodes to fenwick indices based on their text position
+    let nodeLocation = rangeCacheItem.location
+
+    // Calculate fenwick index based on location (simplified approach)
+    // Group every ~100 characters into one fenwick index for efficiency
+    return max(0, nodeLocation / 100)
   }
 }
 

@@ -262,7 +262,7 @@ internal class ReconcilerFallbackDetector {
     guard let node = getNodeByKey(key: nodeKey) else { return false }
 
     // List nodes, decorator nodes, etc. might be complex
-    // For now, just return false as we don't have access to specific node types
+    // Check if the node type name contains indicators of complexity
     return String(describing: type(of: node)).contains("List") || String(describing: type(of: node)).contains("Decorator")
   }
 

@@ -14,6 +14,11 @@ internal final class FenwickTree {
   private var tree: [Int]
   private let size: Int
 
+  /// Get the size of the Fenwick tree
+  var treeSize: Int {
+    return size
+  }
+
   /// Initialize a Fenwick tree with given size
   /// - Parameter size: The maximum number of elements in the tree
   init(size: Int) {

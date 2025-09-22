@@ -352,7 +352,23 @@ internal class TextStorageDeltaApplier {
   }
 
   private func recordDeltaMetrics(delta: ReconcilerDelta, result: DeltaApplicationSingleResult) {
-    // TODO: Record metrics for performance monitoring
+    // Record delta application metrics if metrics are enabled
+    guard editor.featureFlags.reconcilerMetrics,
+          let metricsContainer = editor.metricsContainer else { return }
+
+    // Create a delta metric
+    let deltaMetric = DeltaApplicationMetric(
+      deltaType: String(describing: delta.type),
+      fenwickOperations: result.fenwickUpdates,
+      lengthDelta: result.lengthDelta,
+      timestamp: Date()
+    )
+
+    // Record the metric
+    metricsContainer.record(.deltaApplication(deltaMetric))
+
+    // Log if in debug mode
+    editor.log(.reconciler, .verbose, "Delta applied: type=\(deltaMetric.deltaType), fenwick=\(deltaMetric.fenwickOperations), lengthDelta=\(deltaMetric.lengthDelta)")
   }
 
   private func getFenwickIndexForNode(_ nodeKey: NodeKey) -> Int? {

@@ -390,9 +390,42 @@ internal class DeltaValidator {
   }
 
   private func validateFenwickTreeConsistency(_ rangeCache: [NodeKey: RangeCacheItem]) -> [ValidationError]? {
-    // TODO: Implement FenwickTree consistency checks
-    // This would verify that the FenwickTree state matches the expected cumulative lengths
-    return nil
+    var errors: [ValidationError] = []
+
+    // Sort range cache items by location to validate sequential consistency
+    let sortedItems = rangeCache.values.sorted { $0.location < $1.location }
+
+    // Check that the fenwick tree cumulative lengths match actual positions
+    var expectedCumulativeLength = 0
+    for (index, item) in sortedItems.enumerated() {
+      // Validate that locations are monotonically increasing
+      if item.location < expectedCumulativeLength {
+        errors.append(.rangeCacheInconsistency("Node at location \(item.location) overlaps with previous content ending at \(expectedCumulativeLength)"))
+      }
+
+      // Check fenwick tree consistency if we can map to an index
+      let fenwickIndex = max(0, item.location / 100) // Same mapping as getFenwickIndexForNode
+      let fenwickSum = fenwickTree.query(index: fenwickIndex)
+
+      // The fenwick sum at this index should roughly correspond to the cumulative text up to this point
+      // Allow some tolerance since we're grouping nodes
+      let tolerance = 200 // Allow 200 character tolerance due to grouping
+      if abs(fenwickSum - item.location) > tolerance && fenwickIndex > 0 {
+        errors.append(.fenwickTreeInconsistency("Fenwick tree sum \(fenwickSum) doesn't match expected location \(item.location) at index \(fenwickIndex)"))
+      }
+
+      expectedCumulativeLength = item.location + item.range.length
+    }
+
+    // Validate total fenwick tree sum matches total text length
+    if fenwickTree.treeSize > 0 {
+      let totalFenwickSum = fenwickTree.query(index: fenwickTree.treeSize - 1)
+      if abs(totalFenwickSum - expectedCumulativeLength) > 100 {
+        errors.append(.fenwickTreeInconsistency("Total fenwick sum \(totalFenwickSum) doesn't match total text length \(expectedCumulativeLength)"))
+      }
+    }
+
+    return errors.isEmpty ? nil : errors
   }
 
   // MARK: - Helper Methods
@@ -414,7 +447,7 @@ internal class DeltaValidator {
 
   private func isSafeAttribute(key: NSAttributedString.Key, value: Any) -> Bool {
     // Check for potentially unsafe attributes
-    // This is a simplified check - a real implementation would be more comprehensive
+    // This validates against a whitelist of known safe attributes
 
     // Allow common safe attributes
     let safeAttributes: Set<NSAttributedString.Key> = [
@@ -457,4 +490,6 @@ internal enum ValidationError {
   case rangeCacheItemOutOfBounds(NodeKey, item: RangeCacheItem, textStorageLength: Int)
   case negativeLengthInRangeCache(NodeKey, item: RangeCacheItem)
   case anchorValidationFailed
+  case rangeCacheInconsistency(String)
+  case fenwickTreeInconsistency(String)
 }

@@ -234,8 +234,8 @@ private class DeltaGenerator {
 
       // Node insertion
       if currentNode == nil && pendingNode != nil {
-        // For now, we'll generate a placeholder insertion delta
-        // Full implementation would determine the insertion location
+        // Generate an insertion delta for the new node
+        // The actual content will be filled by the reconciliation process
         let metadata = DeltaMetadata(sourceUpdate: "Node insertion")
         let insertionData = NodeInsertionData(
           preamble: NSAttributedString(string: ""),

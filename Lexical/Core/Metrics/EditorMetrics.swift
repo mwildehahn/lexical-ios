@@ -87,9 +87,29 @@ public struct OptimizedReconcilerMetric {
   }
 }
 
+public struct DeltaApplicationMetric {
+  public let deltaType: String
+  public let fenwickOperations: Int
+  public let lengthDelta: Int
+  public let timestamp: Date
+
+  public init(
+    deltaType: String,
+    fenwickOperations: Int,
+    lengthDelta: Int,
+    timestamp: Date
+  ) {
+    self.deltaType = deltaType
+    self.fenwickOperations = fenwickOperations
+    self.lengthDelta = lengthDelta
+    self.timestamp = timestamp
+  }
+}
+
 public enum EditorMetric {
   case reconcilerRun(ReconcilerMetric)
   case optimizedReconcilerRun(OptimizedReconcilerMetric)
+  case deltaApplication(DeltaApplicationMetric)
 }
 
 public final class NullEditorMetricsContainer: EditorMetricsContainer {
