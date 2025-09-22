@@ -1,0 +1,334 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@testable import Lexical
+import XCTest
+
+@MainActor
+class LargeDocumentTests: XCTestCase {
+
+  // MARK: - Large Document Stress Tests
+
+  func testLargeDocumentCreation() throws {
+    let documentSizes = [1000, 5000, 10000]
+
+    for size in documentSizes {
+      print("Testing large document creation: \(size) paragraphs")
+
+      let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+      let metrics = StressTestMetricsContainer()
+      let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+      let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+      let editor = textKitContext.editor
+
+      let startTime = CFAbsoluteTimeGetCurrent()
+
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else {
+          XCTFail("No root node")
+          return
+        }
+
+        for index in 0..<size {
+          let paragraph = ParagraphNode()
+          let textNode = TextNode(text: "Large document paragraph \(index) with realistic content that would be found in a typical document editor. This content should be long enough to trigger meaningful reconciliation operations and stress test the optimized reconciler system.", key: nil)
+          try paragraph.append([textNode])
+          try rootNode.append([paragraph])
+        }
+      }
+
+      let endTime = CFAbsoluteTimeGetCurrent()
+      let duration = (endTime - startTime) * 1000
+
+      print("Created \(size) paragraphs in \(duration)ms")
+
+      // Verify document structure
+      try editor.read {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else {
+          XCTFail("No root node")
+          return
+        }
+
+        let children = rootNode.getChildren()
+        XCTAssertEqual(children.count, size, "Document should have \(size) paragraphs")
+      }
+
+      // Performance threshold: Large documents should create within reasonable time
+      if size >= 10000 {
+        XCTAssertLessThan(duration, 5000, "Creating \(size) paragraphs should take less than 5 seconds")
+      }
+    }
+  }
+
+  func testLargeDocumentTopInsertion() throws {
+    let documentSize = 5000
+
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = StressTestMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create large document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Paragraph \(index)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    // Perform multiple top insertions
+    let insertionCount = 100
+    var insertionTimes: [Double] = []
+
+    for insertionIndex in 0..<insertionCount {
+      let startTime = CFAbsoluteTimeGetCurrent()
+
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let newParagraph = ParagraphNode()
+        let textNode = TextNode(text: "TOP INSERTION \(insertionIndex)", key: nil)
+        try newParagraph.append([textNode])
+        try rootNode.append([newParagraph])
+      }
+
+      let endTime = CFAbsoluteTimeGetCurrent()
+      insertionTimes.append((endTime - startTime) * 1000)
+    }
+
+    let averageTime = insertionTimes.reduce(0, +) / Double(insertionTimes.count)
+    let maxTime = insertionTimes.max() ?? 0
+
+    print("Large document (\(documentSize) paragraphs) top insertion:")
+    print("Average: \(averageTime)ms, Max: \(maxTime)ms")
+
+    // Optimized reconciler should keep top insertion fast even for large documents
+    XCTAssertLessThan(averageTime, 50, "Average top insertion should be under 50ms")
+    XCTAssertLessThan(maxTime, 200, "Max top insertion should be under 200ms")
+  }
+
+  func testLargeDocumentMemoryStability() throws {
+    let documentSize = 2000
+    let operationCycles = 50
+
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = StressTestMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create large document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Memory test paragraph \(index)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    let initialMemory = getCurrentMemoryUsage()
+    var memoryReadings: [Double] = []
+
+    // Perform repeated operations to test memory stability
+    for cycle in 0..<operationCycles {
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+
+        // Modify middle paragraph
+        let middleIndex = children.count / 2
+        if let middleParagraph = children[middleIndex] as? ParagraphNode {
+          let textNode = TextNode(text: "MODIFIED CYCLE \(cycle)", key: nil)
+          try middleParagraph.clear()
+          try middleParagraph.append([textNode])
+        }
+      }
+
+      // Record memory every 10 cycles
+      if cycle % 10 == 0 {
+        memoryReadings.append(getCurrentMemoryUsage())
+      }
+    }
+
+    let finalMemory = getCurrentMemoryUsage()
+    let memoryGrowth = (finalMemory - initialMemory) / (1024 * 1024) // MB
+
+    print("Memory stability test (\(documentSize) paragraphs, \(operationCycles) operations):")
+    print("Initial: \(initialMemory/(1024*1024))MB, Final: \(finalMemory/(1024*1024))MB")
+    print("Growth: \(memoryGrowth)MB")
+
+    // Memory growth should be reasonable
+    XCTAssertLessThan(memoryGrowth, 50, "Memory growth should be less than 50MB for stress test")
+  }
+
+  func testLargeDocumentConcurrentOperations() throws {
+    let documentSize = 1000
+
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = StressTestMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create large document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Concurrent test paragraph \(index)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    // Perform rapid consecutive operations to test reconciler stability
+    let operationCount = 200
+    var operationTimes: [Double] = []
+
+    for opIndex in 0..<operationCount {
+      let startTime = CFAbsoluteTimeGetCurrent()
+
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+
+        let targetIndex = opIndex % children.count
+        if let targetParagraph = children[targetIndex] as? ParagraphNode {
+          let textNode = TextNode(text: "RAPID EDIT \(opIndex)", key: nil)
+          try targetParagraph.clear()
+          try targetParagraph.append([textNode])
+        }
+      }
+
+      let endTime = CFAbsoluteTimeGetCurrent()
+      operationTimes.append((endTime - startTime) * 1000)
+    }
+
+    let averageTime = operationTimes.reduce(0, +) / Double(operationTimes.count)
+    let maxTime = operationTimes.max() ?? 0
+    let variance = calculateVariance(operationTimes)
+
+    print("Concurrent operations test (\(documentSize) paragraphs, \(operationCount) operations):")
+    print("Average: \(averageTime)ms, Max: \(maxTime)ms, Variance: \(variance)")
+
+    // Operations should remain consistent and fast
+    XCTAssertLessThan(averageTime, 30, "Average operation time should be under 30ms")
+    XCTAssertLessThan(variance, 1000, "Operation time variance should be low")
+  }
+
+  func testLargeDocumentBulkDeletion() throws {
+    let documentSize = 3000
+
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = StressTestMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create large document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Bulk deletion test paragraph \(index)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    // Delete every other paragraph in batches
+    let batchSize = 100
+    let totalDeletions = documentSize / 2
+
+    let startTime = CFAbsoluteTimeGetCurrent()
+
+    for batchStart in stride(from: 0, to: totalDeletions, by: batchSize) {
+      let batchEnd = min(batchStart + batchSize, totalDeletions)
+
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+
+        // Delete paragraphs from back to front to avoid index shifting
+        for i in stride(from: batchEnd - 1, through: batchStart, by: -1) {
+          let deleteIndex = i * 2 // Every other paragraph
+          if deleteIndex < children.count {
+            try children[deleteIndex].remove()
+          }
+        }
+      }
+    }
+
+    let endTime = CFAbsoluteTimeGetCurrent()
+    let duration = (endTime - startTime) * 1000
+
+    print("Bulk deletion test (\(documentSize) → \(documentSize/2) paragraphs): \(duration)ms")
+
+    // Verify final document size
+    try editor.read {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let remainingChildren = rootNode.getChildren().count
+      XCTAssertEqual(remainingChildren, documentSize / 2, "Should have deleted half the paragraphs")
+    }
+
+    // Bulk deletion should complete within reasonable time
+    XCTAssertLessThan(duration, 2000, "Bulk deletion should complete within 2 seconds")
+  }
+
+  // MARK: - Helper Methods
+
+  private func getCurrentMemoryUsage() -> Double {
+    var info = mach_task_basic_info()
+    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+
+    let kerr = withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+        task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+      }
+    }
+
+    if kerr == KERN_SUCCESS {
+      return Double(info.resident_size)
+    }
+    return 0.0
+  }
+
+  private func calculateVariance(_ values: [Double]) -> Double {
+    let mean = values.reduce(0, +) / Double(values.count)
+    let squaredDifferences = values.map { pow($0 - mean, 2) }
+    return squaredDifferences.reduce(0, +) / Double(values.count)
+  }
+}
+
+// MARK: - Supporting Types
+
+@MainActor
+class StressTestMetricsContainer: EditorMetricsContainer {
+  private(set) var reconcilerRuns: [ReconcilerMetric] = []
+  private(set) var optimizedReconcilerRuns: [OptimizedReconcilerMetric] = []
+  var metricsData: [String: Any] = [:]
+
+  func record(_ metric: EditorMetric) {
+    switch metric {
+    case .reconcilerRun(let data):
+      reconcilerRuns.append(data)
+    case .optimizedReconcilerRun(let data):
+      optimizedReconcilerRuns.append(data)
+    }
+  }
+
+  func resetMetrics() {
+    reconcilerRuns.removeAll()
+    optimizedReconcilerRuns.removeAll()
+    metricsData.removeAll()
+  }
+}

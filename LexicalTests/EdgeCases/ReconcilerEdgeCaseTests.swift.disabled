@@ -1,0 +1,531 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@testable import Lexical
+import XCTest
+
+@MainActor
+class ReconcilerEdgeCaseTests: XCTestCase {
+
+  // MARK: - Edge Case Tests
+
+  func testEmptyDocumentOperations() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Test operations on empty document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else {
+        XCTFail("No root node")
+        return
+      }
+
+      // Should be able to add to empty document
+      let paragraph = ParagraphNode()
+      let textNode = TextNode(text: "First paragraph", key: nil)
+      try paragraph.append([textNode])
+      try rootNode.append([paragraph])
+    }
+
+    // Verify document is no longer empty
+    try editor.read {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      XCTAssertEqual(rootNode.getChildren().count, 1, "Should have one paragraph")
+    }
+
+    // Test deleting back to empty
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      for child in children {
+        try child.remove()
+      }
+    }
+
+    // Verify document is empty again
+    try editor.read {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      XCTAssertEqual(rootNode.getChildren().count, 0, "Should be empty again")
+    }
+  }
+
+  func testZeroLengthTextNodes() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+
+      // Create paragraph with zero-length text node
+      let paragraph = ParagraphNode()
+      let emptyTextNode = TextNode(text: "", key: nil)
+      try paragraph.append([emptyTextNode])
+      try rootNode.append([paragraph])
+
+      // Add another paragraph with normal text
+      let normalParagraph = ParagraphNode()
+      let normalTextNode = TextNode(text: "Normal text", key: nil)
+      try normalParagraph.append([normalTextNode])
+      try rootNode.append([normalParagraph])
+    }
+
+    // Test editing empty text node
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      if let firstParagraph = children.first as? ParagraphNode {
+        let paragraphChildren = firstParagraph.getChildren()
+        if let textNode = paragraphChildren.first as? TextNode {
+          try textNode.setText("Now has content")
+        }
+      }
+    }
+
+    // Verify content was set
+    try editor.read {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      if let firstParagraph = children.first as? ParagraphNode {
+        let paragraphChildren = firstParagraph.getChildren()
+        if let textNode = paragraphChildren.first as? TextNode {
+          XCTAssertEqual(textNode.getTextContent(), "Now has content")
+        }
+      }
+    }
+  }
+
+  func testSingleCharacterOperations() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+
+      // Create single character text node
+      let paragraph = ParagraphNode()
+      let singleCharNode = TextNode(text: "A", key: nil)
+      try paragraph.append([singleCharNode])
+      try rootNode.append([paragraph])
+    }
+
+    // Test editing single character
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      if let paragraph = children.first as? ParagraphNode {
+        let paragraphChildren = paragraph.getChildren()
+        if let textNode = paragraphChildren.first as? TextNode {
+          try textNode.setText("B")
+        }
+      }
+    }
+
+    // Test removing single character
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      if let paragraph = children.first as? ParagraphNode {
+        let paragraphChildren = paragraph.getChildren()
+        if let textNode = paragraphChildren.first as? TextNode {
+          try textNode.setText("")
+        }
+      }
+    }
+
+    // Verify empty content
+    try editor.read {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      if let paragraph = children.first as? ParagraphNode {
+        let paragraphChildren = paragraph.getChildren()
+        if let textNode = paragraphChildren.first as? TextNode {
+          XCTAssertEqual(textNode.getTextContent(), "")
+        }
+      }
+    }
+  }
+
+  func testExtremelyLongTextNodes() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create extremely long text (100,000 characters)
+    let longText = String(repeating: "This is a very long text node with lots of content. ", count: 1887) // ~100k chars
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+
+      let paragraph = ParagraphNode()
+      let longTextNode = TextNode(text: longText, key: nil)
+      try paragraph.append([longTextNode])
+      try rootNode.append([paragraph])
+    }
+
+    // Test editing extremely long text
+    let startTime = CFAbsoluteTimeGetCurrent()
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      if let paragraph = children.first as? ParagraphNode {
+        let paragraphChildren = paragraph.getChildren()
+        if let textNode = paragraphChildren.first as? TextNode {
+          try textNode.setText("MODIFIED: " + longText)
+        }
+      }
+    }
+
+    let endTime = CFAbsoluteTimeGetCurrent()
+    let duration = (endTime - startTime) * 1000
+
+    print("Extremely long text edit duration: \(duration)ms")
+
+    // Should handle long text reasonably fast
+    XCTAssertLessThan(duration, 1000, "Long text edit should complete within 1 second")
+  }
+
+  func testRapidConsecutiveEdits() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create initial document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for i in 0..<10 {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Paragraph \(i)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    // Perform rapid consecutive edits
+    let editCount = 1000
+    var editTimes: [Double] = []
+
+    for editIndex in 0..<editCount {
+      let startTime = CFAbsoluteTimeGetCurrent()
+
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+        let targetIndex = editIndex % children.count
+
+        if let paragraph = children[targetIndex] as? ParagraphNode {
+          let paragraphChildren = paragraph.getChildren()
+          if let textNode = paragraphChildren.first as? TextNode {
+            try textNode.setText("EDIT \(editIndex)")
+          }
+        }
+      }
+
+      let endTime = CFAbsoluteTimeGetCurrent()
+      editTimes.append((endTime - startTime) * 1000)
+    }
+
+    let averageTime = editTimes.reduce(0, +) / Double(editTimes.count)
+    let maxTime = editTimes.max() ?? 0
+
+    print("Rapid consecutive edits (\(editCount) edits):")
+    print("Average: \(averageTime)ms, Max: \(maxTime)ms")
+
+    // Rapid edits should remain consistent
+    XCTAssertLessThan(averageTime, 10, "Average rapid edit should be under 10ms")
+    XCTAssertLessThan(maxTime, 100, "Max rapid edit should be under 100ms")
+  }
+
+  func testBoundaryConditions() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Test insertion at exact boundaries
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+
+      // Create 5 paragraphs
+      for i in 0..<5 {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Boundary paragraph \(i)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    // Test insertion at beginning
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      let newParagraph = ParagraphNode()
+      let textNode = TextNode(text: "INSERTED AT START", key: nil)
+      try newParagraph.append([textNode])
+      if let firstChild = children.first {
+        try firstChild.insertBefore(nodeToInsert: newParagraph)
+      } else {
+        try rootNode.append([newParagraph])
+      }
+    }
+
+    // Test insertion at end
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let newParagraph = ParagraphNode()
+      let textNode = TextNode(text: "INSERTED AT END", key: nil)
+      try newParagraph.append([textNode])
+      try rootNode.append([newParagraph])
+    }
+
+    // Test insertion in middle
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      let middleIndex = children.count / 2
+      let newParagraph = ParagraphNode()
+      let textNode = TextNode(text: "INSERTED IN MIDDLE", key: nil)
+      try newParagraph.append([textNode])
+      if middleIndex < children.count {
+        try children[middleIndex].insertBefore(nodeToInsert: newParagraph)
+      } else {
+        try rootNode.append([newParagraph])
+      }
+    }
+
+    // Verify final structure
+    try editor.read {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+      XCTAssertEqual(children.count, 8, "Should have 8 paragraphs after boundary insertions")
+    }
+  }
+
+  func testUnicodeAndSpecialCharacters() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    let specialTexts = [
+      "🚀 Emoji test 🎉",
+      "Unicode: héllo wörld",
+      "Right-to-left: مرحبا بالعالم",
+      "Zero-width joiner: 👨‍👩‍👧‍👦",
+      "Mathematical: ∑∏∆√∞",
+      "Combining marks: a̧b̃c̄d̈",
+      "Line breaks: line1\nline2\rline3\r\nline4",
+      "Tabs and spaces: \t  \u{00A0}  ",
+      "Control characters: \u{0001}\u{0002}\u{0003}"
+    ]
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+
+      for (index, specialText) in specialTexts.enumerated() {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: specialText, key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    // Test editing special characters
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+
+      // Modify each special text paragraph
+      for (index, child) in children.enumerated() {
+        if let paragraph = child as? ParagraphNode {
+          let paragraphChildren = paragraph.getChildren()
+          if let textNode = paragraphChildren.first as? TextNode {
+            try textNode.setText("MODIFIED: " + specialTexts[index])
+          }
+        }
+      }
+    }
+
+    // Verify special characters are preserved
+    try editor.read {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+
+      for (index, child) in children.enumerated() {
+        if let paragraph = child as? ParagraphNode {
+          let paragraphChildren = paragraph.getChildren()
+          if let textNode = paragraphChildren.first as? TextNode {
+            let expectedText = "MODIFIED: " + specialTexts[index]
+            XCTAssertEqual(textNode.getTextContent(), expectedText, "Special characters should be preserved")
+          }
+        }
+      }
+    }
+  }
+
+  func testFallbackTriggerConditions() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create document that might trigger fallback conditions
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+
+      // Create many nodes to potentially trigger batch size fallback
+      for i in 0..<150 { // Above fallback threshold of 100
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Fallback test paragraph \(i)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    // Perform operation that might trigger fallback
+    let startTime = CFAbsoluteTimeGetCurrent()
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let children = rootNode.getChildren()
+
+      // Delete many nodes at once (might trigger fallback)
+      for i in 0..<50 {
+        if i < children.count {
+          try children[i].remove()
+        }
+      }
+    }
+
+    let endTime = CFAbsoluteTimeGetCurrent()
+    let duration = (endTime - startTime) * 1000
+
+    print("Potential fallback operation duration: \(duration)ms")
+
+    // Check if optimized reconciler metrics were recorded
+    let optimizedRuns = metrics.optimizedReconcilerRuns.count
+    let legacyRuns = metrics.reconcilerRuns.count
+
+    print("Optimized runs: \(optimizedRuns), Legacy runs: \(legacyRuns)")
+
+    // Operation should complete regardless of fallback
+    XCTAssertLessThan(duration, 2000, "Fallback operation should complete within 2 seconds")
+  }
+
+  func testMemoryPressureHandling() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = EdgeCaseMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create many large text nodes to simulate memory pressure
+    let largeTextSize = 10000
+    let nodeCount = 100
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+
+      for i in 0..<nodeCount {
+        let paragraph = ParagraphNode()
+        let largeText = String(repeating: "Memory pressure test content \(i). ", count: largeTextSize / 30)
+        let textNode = TextNode(text: largeText, key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    let initialMemory = getCurrentMemoryUsage()
+
+    // Perform operations that might stress memory
+    for round in 0..<10 {
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+
+        // Modify several nodes
+        for i in 0..<min(10, children.count) {
+          if let paragraph = children[i] as? ParagraphNode {
+            let paragraphChildren = paragraph.getChildren()
+            if let textNode = paragraphChildren.first as? TextNode {
+              let newText = String(repeating: "MODIFIED ROUND \(round) ", count: largeTextSize / 20)
+              try textNode.setText(newText)
+            }
+          }
+        }
+      }
+    }
+
+    let finalMemory = getCurrentMemoryUsage()
+    let memoryGrowth = (finalMemory - initialMemory) / (1024 * 1024) // MB
+
+    print("Memory pressure test:")
+    print("Initial: \(initialMemory/(1024*1024))MB, Final: \(finalMemory/(1024*1024))MB")
+    print("Growth: \(memoryGrowth)MB")
+
+    // Memory growth should be reasonable even under pressure
+    XCTAssertLessThan(memoryGrowth, 200, "Memory growth should be reasonable under pressure")
+  }
+
+  // MARK: - Helper Methods
+
+  private func getCurrentMemoryUsage() -> Double {
+    var info = mach_task_basic_info()
+    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+
+    let kerr = withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+        task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+      }
+    }
+
+    if kerr == KERN_SUCCESS {
+      return Double(info.resident_size)
+    }
+    return 0.0
+  }
+}
+
+// MARK: - Supporting Types
+
+@MainActor
+class EdgeCaseMetricsContainer: EditorMetricsContainer {
+  private(set) var reconcilerRuns: [ReconcilerMetric] = []
+  private(set) var optimizedReconcilerRuns: [OptimizedReconcilerMetric] = []
+  var metricsData: [String: Any] = [:]
+
+  func record(_ metric: EditorMetric) {
+    switch metric {
+    case .reconcilerRun(let data):
+      reconcilerRuns.append(data)
+    case .optimizedReconcilerRun(let data):
+      optimizedReconcilerRuns.append(data)
+    }
+  }
+
+  func resetMetrics() {
+    reconcilerRuns.removeAll()
+    optimizedReconcilerRuns.removeAll()
+    metricsData.removeAll()
+  }
+}

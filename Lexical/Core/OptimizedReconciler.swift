@@ -63,6 +63,34 @@ internal enum OptimizedReconciler {
       )
 
       // Check if we should fallback before attempting optimized reconciliation
+
+      // Safeguard: If no deltas generated but we have dirty nodes, something's wrong
+      if deltaBatch.deltas.isEmpty && !editor.dirtyNodes.isEmpty {
+        let reason = "No deltas generated despite \(editor.dirtyNodes.count) dirty nodes - falling back for safety"
+        editor.log(.reconciler, .warning, reason)
+        fallbackDetector.recordOptimizationFailure(reason: reason)
+        return false
+      }
+
+      // Safeguard: If no deltas generated but significant node count change, fallback
+      if deltaBatch.deltas.isEmpty {
+        let nodeCountDiff = abs(currentEditorState.nodeMap.count - pendingEditorState.nodeMap.count)
+        if nodeCountDiff > 2 {
+          let reason = "No deltas generated despite significant node count change (\(currentEditorState.nodeMap.count) -> \(pendingEditorState.nodeMap.count)) - falling back for safety"
+          editor.log(.reconciler, .warning, reason)
+          fallbackDetector.recordOptimizationFailure(reason: reason)
+          return false
+        }
+      }
+
+      // Additional safeguard: If no deltas generated but node count suggests major changes, fallback
+      if deltaBatch.deltas.isEmpty && context.nodeCount > 100 {
+        let reason = "No deltas generated for large document (\(context.nodeCount) nodes) - falling back for safety"
+        editor.log(.reconciler, .warning, reason)
+        fallbackDetector.recordOptimizationFailure(reason: reason)
+        return false
+      }
+
       let fallbackDecision = fallbackDetector.shouldFallbackToFullReconciliation(
         for: deltaBatch.deltas,
         textStorage: textStorage,

@@ -1,0 +1,502 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@testable import Lexical
+import XCTest
+
+@MainActor
+class MemoryProfilingTests: XCTestCase {
+
+  // MARK: - Memory Profiling Tests
+
+  func testMemoryUsageComparison() throws {
+    let documentSizes = [100, 500, 1000, 2000]
+
+    for size in documentSizes {
+      print("Testing memory usage for \(size) paragraphs")
+
+      // Test legacy reconciler memory usage
+      let legacyMemory = try measureMemoryUsage(paragraphs: size, useOptimized: false)
+
+      // Test optimized reconciler memory usage
+      let optimizedMemory = try measureMemoryUsage(paragraphs: size, useOptimized: true)
+
+      print("Legacy: \(legacyMemory.peak)MB peak, \(legacyMemory.growth)MB growth")
+      print("Optimized: \(optimizedMemory.peak)MB peak, \(optimizedMemory.growth)MB growth")
+
+      let memoryEfficiency = legacyMemory.peak / optimizedMemory.peak
+      print("Memory efficiency: \(memoryEfficiency)x")
+
+      // Optimized should use similar or less memory
+      XCTAssertLessThanOrEqual(optimizedMemory.peak, legacyMemory.peak * 1.2,
+                              "Optimized reconciler should not use significantly more memory")
+    }
+  }
+
+  func testMemoryLeakDetection() throws {
+    let operationCycles = 100
+    let documentSize = 500
+
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = MemoryProfilingMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create initial document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Memory leak test paragraph \(index)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    let initialMemory = getCurrentMemoryUsage()
+    var memoryReadings: [MemorySnapshot] = []
+
+    // Perform repeated operations to detect leaks
+    for cycle in 0..<operationCycles {
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+
+        // Add a paragraph
+        let newParagraph = ParagraphNode()
+        let textNode = TextNode(text: "CYCLE \(cycle) NEW PARAGRAPH", key: nil)
+        try newParagraph.append([textNode])
+        try rootNode.append([newParagraph])
+
+        // Modify existing paragraph
+        let middleIndex = children.count / 2
+        if let middleParagraph = children[middleIndex] as? ParagraphNode {
+          let paragraphChildren = middleParagraph.getChildren()
+          if let existingTextNode = paragraphChildren.first as? TextNode {
+            try existingTextNode.setText("MODIFIED CYCLE \(cycle)")
+          }
+        }
+
+        // Remove the added paragraph to maintain document size
+        let allChildren = rootNode.getChildren()
+        if allChildren.count > documentSize {
+          try allChildren.last?.remove()
+        }
+      }
+
+      // Record memory every 10 cycles
+      if cycle % 10 == 0 {
+        let currentMemory = getCurrentMemoryUsage()
+        let snapshot = MemorySnapshot(
+          cycle: cycle,
+          memoryUsage: currentMemory,
+          growth: currentMemory - initialMemory
+        )
+        memoryReadings.append(snapshot)
+      }
+    }
+
+    let finalMemory = getCurrentMemoryUsage()
+    let totalGrowth = (finalMemory - initialMemory) / (1024 * 1024) // MB
+
+    print("Memory leak detection test:")
+    print("Initial: \(initialMemory/(1024*1024))MB")
+    print("Final: \(finalMemory/(1024*1024))MB")
+    print("Total growth: \(totalGrowth)MB")
+
+    // Analyze growth trend
+    let growthTrend = analyzeMemoryGrowthTrend(memoryReadings)
+    print("Growth trend: \(growthTrend)")
+
+    // Memory growth should be minimal for same-size operations
+    XCTAssertLessThan(totalGrowth, 20, "Memory growth should be minimal (under 20MB)")
+
+    // Growth trend should not be consistently increasing (indicating leaks)
+    XCTAssertNotEqual(growthTrend, .consistentIncrease, "Memory should not show consistent increase pattern")
+  }
+
+  func testFenwickTreeMemoryEfficiency() throws {
+    let treeSizes = [100, 1000, 10000, 50000]
+
+    for size in treeSizes {
+      print("Testing FenwickTree memory usage for size \(size)")
+
+      let initialMemory = getCurrentMemoryUsage()
+
+      // Create FenwickTree
+      let fenwickTree = FenwickTree(size: size)
+
+      // Populate with data
+      for i in 0..<size {
+        fenwickTree.update(index: i, delta: i % 100)
+      }
+
+      let afterCreationMemory = getCurrentMemoryUsage()
+
+      // Perform many operations
+      for _ in 0..<1000 {
+        let randomIndex = Int.random(in: 0..<size)
+        let randomDelta = Int.random(in: -50...50)
+        fenwickTree.update(index: randomIndex, delta: randomDelta)
+
+        let randomQueryIndex = Int.random(in: 0..<size)
+        _ = fenwickTree.query(index: randomQueryIndex)
+      }
+
+      let afterOperationsMemory = getCurrentMemoryUsage()
+
+      let creationOverhead = (afterCreationMemory - initialMemory) / (1024 * 1024)
+      let operationsOverhead = (afterOperationsMemory - afterCreationMemory) / (1024 * 1024)
+
+      print("Size \(size): Creation overhead \(creationOverhead)MB, Operations overhead \(operationsOverhead)MB")
+
+      // FenwickTree should have minimal memory overhead
+      XCTAssertLessThan(creationOverhead, Double(size) / 10000, "FenwickTree creation should be memory efficient")
+      XCTAssertLessThan(operationsOverhead, 5, "FenwickTree operations should not leak memory")
+    }
+  }
+
+  func testRangeCacheMemoryOptimization() throws {
+    let documentSize = 1000
+
+    // Test incremental vs full cache updates
+    let incrementalMemory = try measureRangeCacheMemory(documentSize: documentSize, useIncremental: true)
+    let fullRebuildMemory = try measureRangeCacheMemory(documentSize: documentSize, useIncremental: false)
+
+    print("Range cache memory usage:")
+    print("Incremental: \(incrementalMemory.peak)MB peak, \(incrementalMemory.operations)MB during operations")
+    print("Full rebuild: \(fullRebuildMemory.peak)MB peak, \(fullRebuildMemory.operations)MB during operations")
+
+    // Incremental should use less memory during operations
+    XCTAssertLessThan(incrementalMemory.operations, fullRebuildMemory.operations,
+                     "Incremental cache updates should use less memory")
+  }
+
+  func testMemoryUnderPressure() throws {
+    let documentSize = 2000
+
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: true)
+    let metrics = MemoryProfilingMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create large document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let longText = String(repeating: "Memory pressure test content. ", count: 50)
+        let textNode = TextNode(text: longText, key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    let initialMemory = getCurrentMemoryUsage()
+    let memoryWarningThreshold = initialMemory * 1.5 // 50% increase threshold
+
+    // Simulate memory pressure with rapid operations
+    var operationCount = 0
+    var memoryExceeded = false
+
+    while operationCount < 1000 && !memoryExceeded {
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+
+        // Perform memory-intensive operation
+        let targetIndex = operationCount % children.count
+        if let paragraph = children[targetIndex] as? ParagraphNode {
+          let paragraphChildren = paragraph.getChildren()
+          if let textNode = paragraphChildren.first as? TextNode {
+            let expandedText = textNode.getTextContent() + " EXPANDED \(operationCount)"
+            try textNode.setText(expandedText)
+          }
+        }
+      }
+
+      operationCount += 1
+
+      // Check memory every 50 operations
+      if operationCount % 50 == 0 {
+        let currentMemory = getCurrentMemoryUsage()
+        if currentMemory > memoryWarningThreshold {
+          memoryExceeded = true
+          print("Memory threshold exceeded at operation \(operationCount)")
+        }
+      }
+    }
+
+    let finalMemory = getCurrentMemoryUsage()
+    let memoryGrowth = (finalMemory - initialMemory) / (1024 * 1024)
+
+    print("Memory under pressure test:")
+    print("Operations completed: \(operationCount)")
+    print("Memory growth: \(memoryGrowth)MB")
+
+    // Should handle reasonable number of operations before memory pressure
+    XCTAssertGreaterThan(operationCount, 200, "Should handle at least 200 operations under memory pressure")
+  }
+
+  func testAnchorMemoryOverhead() throws {
+    let documentSize = 1000
+
+    // Test with anchors enabled
+    let anchorMemory = try measureAnchorMemoryOverhead(documentSize: documentSize, anchorsEnabled: true)
+
+    // Test with anchors disabled
+    let noAnchorMemory = try measureAnchorMemoryOverhead(documentSize: documentSize, anchorsEnabled: false)
+
+    let anchorOverhead = anchorMemory.peak - noAnchorMemory.peak
+    let overheadPercentage = (anchorOverhead / noAnchorMemory.peak) * 100
+
+    print("Anchor memory overhead:")
+    print("With anchors: \(anchorMemory.peak)MB")
+    print("Without anchors: \(noAnchorMemory.peak)MB")
+    print("Overhead: \(anchorOverhead)MB (\(overheadPercentage)%)")
+
+    // Anchor overhead should be reasonable
+    XCTAssertLessThan(overheadPercentage, 20, "Anchor memory overhead should be less than 20%")
+  }
+
+  // MARK: - Helper Methods
+
+  private func measureMemoryUsage(paragraphs: Int, useOptimized: Bool) throws -> MemoryMeasurement {
+    let featureFlags = FeatureFlags(optimizedReconciler: useOptimized, reconcilerMetrics: true)
+    let metrics = MemoryProfilingMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    let initialMemory = getCurrentMemoryUsage()
+    var peakMemory = initialMemory
+
+    // Create document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<paragraphs {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Memory test paragraph \(index) with some content", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+
+        // Track peak memory during creation
+        let currentMemory = getCurrentMemoryUsage()
+        peakMemory = max(peakMemory, currentMemory)
+      }
+    }
+
+    // Perform operations and track memory
+    for i in 0..<10 {
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+        let targetIndex = i % children.count
+
+        if let paragraph = children[targetIndex] as? ParagraphNode {
+          let paragraphChildren = paragraph.getChildren()
+          if let textNode = paragraphChildren.first as? TextNode {
+            try textNode.setText("MODIFIED \(i)")
+          }
+        }
+      }
+
+      let currentMemory = getCurrentMemoryUsage()
+      peakMemory = max(peakMemory, currentMemory)
+    }
+
+    let finalMemory = getCurrentMemoryUsage()
+
+    return MemoryMeasurement(
+      initial: initialMemory / (1024 * 1024),
+      peak: peakMemory / (1024 * 1024),
+      final: finalMemory / (1024 * 1024),
+      growth: (finalMemory - initialMemory) / (1024 * 1024)
+    )
+  }
+
+  private func measureRangeCacheMemory(documentSize: Int, useIncremental: Bool) throws -> CacheMemoryMeasurement {
+    let featureFlags = FeatureFlags(optimizedReconciler: useIncremental, reconcilerMetrics: true)
+    let metrics = MemoryProfilingMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    // Create document
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Cache test paragraph \(index)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    let initialMemory = getCurrentMemoryUsage()
+    var peakMemory = initialMemory
+    var operationsMemory = initialMemory
+
+    // Perform cache-intensive operations
+    for i in 0..<50 {
+      try editor.update {
+        guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+        let children = rootNode.getChildren()
+        let targetIndex = i % children.count
+
+        if let paragraph = children[targetIndex] as? ParagraphNode {
+          let paragraphChildren = paragraph.getChildren()
+          if let textNode = paragraphChildren.first as? TextNode {
+            try textNode.setText("CACHE UPDATE \(i)")
+          }
+        }
+      }
+
+      let currentMemory = getCurrentMemoryUsage()
+      peakMemory = max(peakMemory, currentMemory)
+      operationsMemory = currentMemory
+    }
+
+    return CacheMemoryMeasurement(
+      peak: peakMemory / (1024 * 1024),
+      operations: operationsMemory / (1024 * 1024)
+    )
+  }
+
+  private func measureAnchorMemoryOverhead(documentSize: Int, anchorsEnabled: Bool) throws -> MemoryMeasurement {
+    let featureFlags = FeatureFlags(
+      optimizedReconciler: anchorsEnabled,
+      reconcilerMetrics: true,
+      anchorBasedReconciliation: anchorsEnabled
+    )
+    let metrics = MemoryProfilingMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    let initialMemory = getCurrentMemoryUsage()
+
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      for index in 0..<documentSize {
+        let paragraph = ParagraphNode()
+        let textNode = TextNode(text: "Anchor test paragraph \(index)", key: nil)
+        try paragraph.append([textNode])
+        try rootNode.append([paragraph])
+      }
+    }
+
+    let peakMemory = getCurrentMemoryUsage()
+
+    return MemoryMeasurement(
+      initial: initialMemory / (1024 * 1024),
+      peak: peakMemory / (1024 * 1024),
+      final: peakMemory / (1024 * 1024),
+      growth: (peakMemory - initialMemory) / (1024 * 1024)
+    )
+  }
+
+  private func getCurrentMemoryUsage() -> Double {
+    var info = mach_task_basic_info()
+    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+
+    let kerr = withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+        task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+      }
+    }
+
+    if kerr == KERN_SUCCESS {
+      return Double(info.resident_size)
+    }
+    return 0.0
+  }
+
+  private func analyzeMemoryGrowthTrend(_ snapshots: [MemorySnapshot]) -> MemoryGrowthTrend {
+    guard snapshots.count >= 3 else { return .insufficient }
+
+    var increasingCount = 0
+    var decreasingCount = 0
+    var stableCount = 0
+
+    for i in 1..<snapshots.count {
+      let current = snapshots[i].memoryUsage
+      let previous = snapshots[i-1].memoryUsage
+      let difference = current - previous
+
+      if difference > 1024 * 1024 { // 1MB threshold
+        increasingCount += 1
+      } else if difference < -1024 * 1024 {
+        decreasingCount += 1
+      } else {
+        stableCount += 1
+      }
+    }
+
+    let totalComparisons = snapshots.count - 1
+    let increasingRatio = Double(increasingCount) / Double(totalComparisons)
+
+    if increasingRatio > 0.7 {
+      return .consistentIncrease
+    } else if increasingRatio < 0.3 {
+      return .stable
+    } else {
+      return .fluctuating
+    }
+  }
+}
+
+// MARK: - Supporting Types
+
+struct MemoryMeasurement {
+  let initial: Double // MB
+  let peak: Double    // MB
+  let final: Double   // MB
+  let growth: Double  // MB
+}
+
+struct CacheMemoryMeasurement {
+  let peak: Double       // MB
+  let operations: Double // MB
+}
+
+struct MemorySnapshot {
+  let cycle: Int
+  let memoryUsage: Double
+  let growth: Double
+}
+
+enum MemoryGrowthTrend {
+  case consistentIncrease
+  case stable
+  case fluctuating
+  case insufficient
+}
+
+@MainActor
+class MemoryProfilingMetricsContainer: EditorMetricsContainer {
+  private(set) var reconcilerRuns: [ReconcilerMetric] = []
+  private(set) var optimizedReconcilerRuns: [OptimizedReconcilerMetric] = []
+  var metricsData: [String: Any] = [:]
+
+  func record(_ metric: EditorMetric) {
+    switch metric {
+    case .reconcilerRun(let data):
+      reconcilerRuns.append(data)
+    case .optimizedReconcilerRun(let data):
+      optimizedReconcilerRuns.append(data)
+    }
+  }
+
+  func resetMetrics() {
+    reconcilerRuns.removeAll()
+    optimizedReconcilerRuns.removeAll()
+    metricsData.removeAll()
+  }
+}

@@ -146,7 +146,7 @@ internal class TextStorageDeltaApplier {
 
     // Calculate length delta
     let oldLength = range.length
-    let newLength = newText.lengthAsNSString()
+    let newLength = (newText as NSString).length
     let lengthDelta = newLength - oldLength
 
     // Apply the text change
@@ -155,9 +155,15 @@ internal class TextStorageDeltaApplier {
     // Update FenwickTree if there's a length change
     var fenwickUpdates = 0
     if lengthDelta != 0 {
-      // FenwickTree integration would go here
-      // For now, we'll just record that an update would be needed
-      fenwickUpdates = 1
+      // Find the FenwickTree index for this node
+      if let fenwickIndex = getFenwickIndexForNode(nodeKey) {
+        fenwickTree.update(index: fenwickIndex, delta: lengthDelta)
+        fenwickUpdates = 1
+      } else {
+        // For now, if we can't find the node in range cache, we'll still succeed
+        // In a real implementation, this might require different handling
+        fenwickUpdates = 0
+      }
     }
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: lengthDelta)
@@ -210,8 +216,13 @@ internal class TextStorageDeltaApplier {
 
     // Update FenwickTree
     var fenwickUpdates = 0
-    // FenwickTree integration would go here
-    fenwickUpdates = 1
+    if let fenwickIndex = getFenwickIndexForNode(nodeKey) {
+      fenwickTree.update(index: fenwickIndex, delta: completeString.length)
+      fenwickUpdates = 1
+    } else {
+      // For new nodes, we might not have a range cache entry yet
+      fenwickUpdates = 0
+    }
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: completeString.length)
   }
@@ -234,8 +245,13 @@ internal class TextStorageDeltaApplier {
 
     // Update FenwickTree
     var fenwickUpdates = 0
-    // FenwickTree integration would go here
-    fenwickUpdates = 1
+    if let fenwickIndex = getFenwickIndexForNode(nodeKey) {
+      fenwickTree.update(index: fenwickIndex, delta: -deletedLength)
+      fenwickUpdates = 1
+    } else {
+      // For nodes being deleted, we might not find them in range cache
+      fenwickUpdates = 0
+    }
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: -deletedLength)
   }
@@ -337,6 +353,19 @@ internal class TextStorageDeltaApplier {
 
   private func recordDeltaMetrics(delta: ReconcilerDelta, result: DeltaApplicationSingleResult) {
     // TODO: Record metrics for performance monitoring
+  }
+
+  private func getFenwickIndexForNode(_ nodeKey: NodeKey) -> Int? {
+    // Get the range cache item for this node
+    guard let rangeCacheItem = editor.rangeCache[nodeKey] else { return nil }
+
+    // For now, use a simple mapping based on the node's location in the document
+    // This would be improved with a proper node-to-index mapping system
+    let nodeLocation = rangeCacheItem.location
+
+    // Calculate fenwick index based on location (simplified approach)
+    // In a real implementation, this would be based on the tree structure
+    return max(0, nodeLocation / 100) // Group every ~100 characters into one fenwick index
   }
 }
 

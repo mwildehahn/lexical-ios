@@ -9,6 +9,7 @@
 import UIKit
 #else
 import AppKit
+typealias UITextStorageDirection = NSTextStorageDirection
 #endif
 
 /* The range cache is used when updating the NSTextStorage following a change to Lexical's

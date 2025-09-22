@@ -56,7 +56,8 @@ internal class ReconcilerFallbackDetector {
       checkMemoryPressure(),
       checkComplexTransformations(deltas),
       checkDebugMode(),
-      checkTextStorageIntegrity(textStorage)
+      checkTextStorageIntegrity(textStorage),
+      checkDeltaRangeValidity(deltas, textStorage: textStorage)
     ]
 
     // Evaluate all checks
@@ -263,6 +264,36 @@ internal class ReconcilerFallbackDetector {
     // List nodes, decorator nodes, etc. might be complex
     // For now, just return false as we don't have access to specific node types
     return String(describing: type(of: node)).contains("List") || String(describing: type(of: node)).contains("Decorator")
+  }
+
+  /// Check if delta ranges are valid for the given text storage
+  private func checkDeltaRangeValidity(_ deltas: [ReconcilerDelta], textStorage: NSTextStorage) -> FallbackCheck {
+    let textStorageLength = textStorage.length
+
+    for delta in deltas {
+      switch delta.type {
+      case .textUpdate(_, _, let range):
+        if range.location < 0 || range.location > textStorageLength ||
+           range.location + range.length > textStorageLength {
+          return .fallback("Invalid range in textUpdate delta: \(range) for textStorage length \(textStorageLength)")
+        }
+      case .nodeDeletion(_, let range):
+        if range.location < 0 || range.location > textStorageLength ||
+           range.location + range.length > textStorageLength {
+          return .fallback("Invalid range in nodeDeletion delta: \(range) for textStorage length \(textStorageLength)")
+        }
+      case .attributeChange(_, _, let range):
+        if range.location < 0 || range.location > textStorageLength ||
+           range.location + range.length > textStorageLength {
+          return .fallback("Invalid range in attributeChange delta: \(range) for textStorage length \(textStorageLength)")
+        }
+      default:
+        // Other delta types don't have ranges to validate
+        break
+      }
+    }
+
+    return .continueOptimization
   }
 
   private func hasInconsistentAttributes(_ textStorage: NSTextStorage) -> Bool {

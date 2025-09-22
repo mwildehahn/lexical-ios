@@ -49,8 +49,20 @@ internal class IncrementalRangeCacheUpdater {
   ) throws {
 
     guard let currentItem = rangeCache[nodeKey] else {
-      // Node might be newly inserted, calculate from scratch
-      try calculateNewNodeRangeCacheItem(&rangeCache, nodeKey: nodeKey)
+      // Node might be newly inserted, check if we have insertion data
+      let insertionDelta = deltas.first { delta in
+        if case .nodeInsertion(let key, _, _) = delta.type, key == nodeKey {
+          return true
+        }
+        return false
+      }
+
+      if let insertionDelta = insertionDelta,
+         case .nodeInsertion(_, let insertionData, _) = insertionDelta.type {
+        try calculateNewNodeRangeCacheItem(&rangeCache, nodeKey: nodeKey, insertionData: insertionData)
+      } else {
+        try calculateNewNodeRangeCacheItem(&rangeCache, nodeKey: nodeKey)
+      }
       return
     }
 
@@ -61,11 +73,9 @@ internal class IncrementalRangeCacheUpdater {
       switch delta.type {
       case .textUpdate(let key, let newText, let range):
         if key == nodeKey {
-          // Update text length
-          let newTextLength = newText.lengthAsNSString()
-          let oldTextLength = range.length
-          let lengthDelta = newTextLength - oldTextLength
-          updatedItem.textLength += lengthDelta
+          // Update text length directly to the new text length
+          // Note: range.length is the length being replaced, not the total text length
+          updatedItem.textLength = newText.lengthAsNSString()
         }
 
       case .nodeInsertion(let key, let insertionData, _):
@@ -130,23 +140,33 @@ internal class IncrementalRangeCacheUpdater {
   /// Calculate new range cache item for a newly inserted node
   private func calculateNewNodeRangeCacheItem(
     _ rangeCache: inout [NodeKey: RangeCacheItem],
-    nodeKey: NodeKey
+    nodeKey: NodeKey,
+    insertionData: NodeInsertionData? = nil
   ) throws {
-
-    guard let node = getNodeByKey(key: nodeKey) else {
-      throw IncrementalUpdateError.nodeNotFound(nodeKey)
-    }
 
     var newItem = RangeCacheItem()
 
-    // Calculate lengths based on node content
-    newItem.preambleLength = node.getPreamble().lengthAsNSString()
-    newItem.postambleLength = node.getPostamble().lengthAsNSString()
+    if let insertionData = insertionData {
+      // Use insertion data directly for newly inserted nodes
+      newItem.preambleLength = insertionData.preamble.length
+      newItem.postambleLength = insertionData.postamble.length
+      newItem.textLength = insertionData.content.length
+      newItem.childrenLength = 0 // New nodes start with no calculated children length
+    } else {
+      // Fallback to finding node in editor state (for existing nodes)
+      guard let node = getNodeByKey(key: nodeKey) else {
+        throw IncrementalUpdateError.nodeNotFound(nodeKey)
+      }
 
-    if let textNode = node as? TextNode {
-      newItem.textLength = textNode.getTextContent().lengthAsNSString()
-    } else if let elementNode = node as? ElementNode {
-      newItem.childrenLength = calculateChildrenLength(elementNode, rangeCache: rangeCache)
+      // Calculate lengths based on node content
+      newItem.preambleLength = node.getPreamble().lengthAsNSString()
+      newItem.postambleLength = node.getPostamble().lengthAsNSString()
+
+      if let textNode = node as? TextNode {
+        newItem.textLength = textNode.getTextContent().lengthAsNSString()
+      } else if let elementNode = node as? ElementNode {
+        newItem.childrenLength = calculateChildrenLength(elementNode, rangeCache: rangeCache)
+      }
     }
 
     // Add anchor lengths if enabled
