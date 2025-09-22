@@ -15,9 +15,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow()
     guard let window else { return false }
     window.makeKeyAndVisible()
-    let viewController = ViewController()
-    let navigationController = UINavigationController(rootViewController: viewController)
-    window.rootViewController = navigationController
+
+    // Create main editor tab
+    let editorVC = ViewController()
+    let editorNavController = UINavigationController(rootViewController: editorVC)
+    editorNavController.tabBarItem = UITabBarItem(title: "Editor", image: UIImage(systemName: "doc.text"), tag: 0)
+
+    // Create performance test tab
+    let performanceVC = PerformanceTestViewController()
+    let performanceNavController = UINavigationController(rootViewController: performanceVC)
+    performanceNavController.tabBarItem = UITabBarItem(title: "Performance", image: UIImage(systemName: "speedometer"), tag: 1)
+
+    // Create tab bar controller
+    let tabBarController = UITabBarController()
+    tabBarController.viewControllers = [editorNavController, performanceNavController]
+
+    window.rootViewController = tabBarController
     return true
   }
 
@@ -26,7 +39,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   func persistEditorState() {
-    guard let viewController = window?.rootViewController as? ViewController else {
+    guard let tabBarController = window?.rootViewController as? UITabBarController,
+          let editorNavController = tabBarController.viewControllers?.first as? UINavigationController,
+          let viewController = editorNavController.viewControllers.first as? ViewController else {
       return
     }
 

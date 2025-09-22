@@ -45,9 +45,17 @@ xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlaygr
 ```
 
 ### Using XcodeBuildMCP for Development
-When using Claude Code with this project, use the XcodeBuildMCP tool with iPhone 17 Pro simulator on iOS 26:
+**ALWAYS USE iPhone 17 Pro Simulator on iOS 26 for all testing unless explicitly specified otherwise**
+
+When using Claude Code with this project:
 - Build: `build_sim({ projectPath: "Playground/LexicalPlayground.xcodeproj", scheme: "LexicalPlayground", simulatorName: "iPhone 17 Pro" })`
 - Test: `test_sim({ projectPath: "Playground/LexicalPlayground.xcodeproj", scheme: "Lexical", simulatorName: "iPhone 17 Pro" })`
+
+### Performance Testing
+- Use the Performance tab in LexicalPlayground app for reconciler benchmarks
+- Automatic benchmarks run when the Performance tab loads
+- Results can be copied and shared
+- Tests compare Legacy vs Optimized reconciler implementations using real LexicalView instances
 
 ## Architecture Overview
 
