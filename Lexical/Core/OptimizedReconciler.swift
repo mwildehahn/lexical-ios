@@ -43,7 +43,6 @@ internal enum OptimizedReconciler {
     // Initialize components
     let deltaGenerator = DeltaGenerator(editor: editor)
     let deltaApplier = TextStorageDeltaApplier(editor: editor, fenwickTree: editor.fenwickTree)
-    let validator = DeltaValidator(editor: editor, fenwickTree: editor.fenwickTree)
 
     // Generate deltas from the state differences
     let deltaBatch = try deltaGenerator.generateDeltaBatch(
@@ -56,18 +55,6 @@ internal enum OptimizedReconciler {
     // Log delta count for debugging
     editor.log(.reconciler, .message, "Generated \(deltaBatch.deltas.count) deltas")
 
-    // Validate deltas for debugging purposes only - never causes failure
-    let validationResult = validator.validateDeltaBatch(
-      deltaBatch,
-      against: textStorage,
-      rangeCache: editor.rangeCache
-    )
-
-    if case .invalid(let errors) = validationResult {
-      // Log validation issues but continue anyway
-      editor.log(.reconciler, .warning, "Delta validation found \(errors.count) issues (continuing)")
-    }
-
     // Apply deltas
     let applicationResult = deltaApplier.applyDeltaBatch(deltaBatch, to: textStorage)
 
@@ -79,18 +66,6 @@ internal enum OptimizedReconciler {
         &editor.rangeCache,
         basedOn: deltaBatch.deltas
       )
-
-      // Post-application validation for debugging only
-      let postValidation = validator.validatePostApplication(
-        textStorage: textStorage,
-        appliedDeltas: deltaBatch.deltas,
-        rangeCache: editor.rangeCache
-      )
-
-      if case .invalid(let errors) = postValidation {
-        // Log but don't fail
-        editor.log(.reconciler, .warning, "Post-application validation found \(errors.count) issues (continuing)")
-      }
 
       // Record metrics if enabled
       if editor.featureFlags.reconcilerMetrics {
