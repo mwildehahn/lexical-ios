@@ -6,7 +6,11 @@
  */
 
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 /// The LexicalViewDelegate allows customisation of certain things, most of which correspond to
 /// UITextView delegate methods.

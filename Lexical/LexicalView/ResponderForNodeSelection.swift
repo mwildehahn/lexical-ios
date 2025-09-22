@@ -6,7 +6,11 @@
  */
 
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 @MainActor
 class ResponderForNodeSelection: UIResponder, UIKeyInput {

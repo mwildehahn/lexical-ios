@@ -6,7 +6,11 @@
  */
 
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 func createPoint(key: NodeKey, offset: Int, type: SelectionType) -> Point {
   Point(key: key, offset: offset, type: type)

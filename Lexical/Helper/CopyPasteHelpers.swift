@@ -6,8 +6,14 @@
  */
 
 import Foundation
+#if canImport(MobileCoreServices)
 import MobileCoreServices
+#endif
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 @MainActor

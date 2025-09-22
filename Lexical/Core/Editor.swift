@@ -5,7 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 @objc public class NodeKeyMultiplier: NSObject {
   let depthBlockSize: UInt64

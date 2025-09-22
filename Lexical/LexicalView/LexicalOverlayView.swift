@@ -4,7 +4,11 @@
 //
 //  Created by Michael Hahn on 7/30/24.
 //
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 final class LexicalOverlayView: UIView {
 

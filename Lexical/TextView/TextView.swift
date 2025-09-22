@@ -5,8 +5,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(MobileCoreServices)
 import MobileCoreServices
+#endif
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 @MainActor

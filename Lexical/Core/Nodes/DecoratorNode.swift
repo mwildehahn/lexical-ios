@@ -5,7 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 /**
  A node that renders an arbitrary `UIView` inline in the text.

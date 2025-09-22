@@ -5,7 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 /// A Lexical frontend that is optimised for consumption. No scrolling, selection, or editing.
 @objc public class LexicalReadOnlyView: UIView {
