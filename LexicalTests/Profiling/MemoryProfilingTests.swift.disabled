@@ -372,8 +372,7 @@ class MemoryProfilingTests: XCTestCase {
   private func measureAnchorMemoryOverhead(documentSize: Int, anchorsEnabled: Bool) throws -> MemoryMeasurement {
     let featureFlags = FeatureFlags(
       optimizedReconciler: anchorsEnabled,
-      reconcilerMetrics: true,
-      anchorBasedReconciliation: anchorsEnabled
+      reconcilerMetrics: true
     )
     let metrics = MemoryProfilingMetricsContainer()
     let editorConfig = EditorConfig(theme: Theme(), plugins: [], featureFlags: featureFlags, metricsContainer: metrics)

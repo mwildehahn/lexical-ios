@@ -93,8 +93,7 @@ Enable/disable the optimized reconciler using feature flags:
 ```swift
 let featureFlags = FeatureFlags(
     optimizedReconciler: true,        // Enable optimized path
-    reconcilerMetrics: true,           // Collect performance metrics
-    anchorBasedReconciliation: false   // Use node anchors (experimental)
+    reconcilerMetrics: true            // Collect performance metrics
 )
 
 let editorConfig = EditorConfig(
@@ -218,9 +217,7 @@ Use the `PerformanceTestViewController` in LexicalPlayground to compare legacy v
 
 ## Limitations
 
-- Marked text operations (IME) always use legacy path
-- Very large batch operations (>100 nodes) trigger fallback
-- Anchor-based reconciliation is experimental
+- Marked text operations (IME) are not yet supported in optimized path
 - Some plugins may not be optimized-path aware
 
 ## Migration Guide

@@ -110,7 +110,6 @@ Instead of rebuilding entire cache:
 class FeatureFlags {
     let optimizedReconciler: Bool = false
     let reconcilerMetrics: Bool = false
-    let anchorBasedReconciliation: Bool = false
 }
 ```
 

@@ -223,8 +223,7 @@ class RemoteFeatureFlags {
         RemoteConfig.fetch { config in
             let flags = FeatureFlags(
                 optimizedReconciler: config["optimized_reconciler_enabled"] as? Bool ?? false,
-                reconcilerMetrics: config["collect_metrics"] as? Bool ?? true,
-                anchorBasedReconciliation: config["use_anchors"] as? Bool ?? false
+                reconcilerMetrics: config["collect_metrics"] as? Bool ?? true
             )
 
             completion(flags)
@@ -358,19 +357,19 @@ class MemoryOptimizedSetup {
         case .small:  // < 100 paragraphs
             featureFlags = FeatureFlags(
                 optimizedReconciler: true,
-                anchorBasedReconciliation: true
+                reconcilerMetrics: true  // Can afford metrics for small docs
             )
 
         case .medium:  // 100-1000 paragraphs
             featureFlags = FeatureFlags(
                 optimizedReconciler: true,
-                anchorBasedReconciliation: false  // Save memory
+                reconcilerMetrics: false  // Save overhead
             )
 
         case .large:  // > 1000 paragraphs
             featureFlags = FeatureFlags(
                 optimizedReconciler: true,
-                anchorBasedReconciliation: false
+                reconcilerMetrics: false  // Reduce overhead
             )
             // Consider pagination or virtualization
         }
