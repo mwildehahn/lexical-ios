@@ -122,15 +122,13 @@ class ReconcilerDeltaTests: XCTestCase {
     ]
 
     let batchMetadata = BatchMetadata(
-      expectedTextStorageLength: 100,
-      fallbackThreshold: 50
+      expectedTextStorageLength: 100
     )
 
     let batch = DeltaBatch(deltas: deltas, batchMetadata: batchMetadata)
 
     XCTAssertEqual(batch.deltas.count, 2)
     XCTAssertEqual(batch.batchMetadata.expectedTextStorageLength, 100)
-    XCTAssertEqual(batch.batchMetadata.fallbackThreshold, 50)
   }
 
   // MARK: - Metadata Tests
@@ -158,19 +156,16 @@ class ReconcilerDeltaTests: XCTestCase {
     let batchId = "test-batch-123"
     let timestamp = Date()
     let expectedLength = 500
-    let threshold = 75
 
     let metadata = BatchMetadata(
       batchId: batchId,
       timestamp: timestamp,
-      expectedTextStorageLength: expectedLength,
-      fallbackThreshold: threshold
+      expectedTextStorageLength: expectedLength
     )
 
     XCTAssertEqual(metadata.batchId, batchId)
     XCTAssertEqual(metadata.timestamp, timestamp)
     XCTAssertEqual(metadata.expectedTextStorageLength, expectedLength)
-    XCTAssertEqual(metadata.fallbackThreshold, threshold)
   }
 
   // MARK: - Application Result Tests
@@ -205,10 +200,9 @@ class ReconcilerDeltaTests: XCTestCase {
     }
 
     // Test failure result
-    let failureResult = DeltaApplicationResult.failure(reason: "Critical error", shouldFallback: true)
-    if case .failure(let reason, let shouldFallback) = failureResult {
+    let failureResult = DeltaApplicationResult.failure(reason: "Critical error")
+    if case .failure(let reason) = failureResult {
       XCTAssertEqual(reason, "Critical error")
-      XCTAssertTrue(shouldFallback)
     } else {
       XCTFail("Should be failure result")
     }

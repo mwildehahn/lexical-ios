@@ -31,8 +31,6 @@ public struct ReconcilerMetricsSummary {
   public let p50Duration: TimeInterval
   public let p95Duration: TimeInterval
   public let p99Duration: TimeInterval
-  public let fallbackRate: Double
-  public let optimizedUsageRate: Double
   public let averageNodesProcessed: Double
   public let averageTextStorageMutations: Double
 
@@ -46,8 +44,6 @@ public struct ReconcilerMetricsSummary {
       self.p50Duration = 0
       self.p95Duration = 0
       self.p99Duration = 0
-      self.fallbackRate = 0
-      self.optimizedUsageRate = 0
       self.averageNodesProcessed = 0
       self.averageTextStorageMutations = 0
       return
@@ -61,12 +57,6 @@ public struct ReconcilerMetricsSummary {
     self.p50Duration = Self.percentile(durations, 0.50)
     self.p95Duration = Self.percentile(durations, 0.95)
     self.p99Duration = Self.percentile(durations, 0.99)
-
-    let fallbackCount = metrics.filter(\.fallbackTriggered).count
-    self.fallbackRate = Double(fallbackCount) / Double(metrics.count)
-
-    let optimizedCount = metrics.filter { $0.reconcilerType == .optimized }.count
-    self.optimizedUsageRate = Double(optimizedCount) / Double(metrics.count)
 
     self.averageNodesProcessed = metrics.map { Double($0.nodesProcessed) }.reduce(0, +) / Double(metrics.count)
     self.averageTextStorageMutations = metrics.map { Double($0.textStorageMutations) }.reduce(0, +) / Double(metrics.count)
@@ -132,7 +122,6 @@ extension ReconcilerMetric: CustomStringConvertible {
   public var description: String {
     return """
     ReconcilerMetric(
-      type: \(reconcilerType),
       duration: \(String(format: "%.3fms", duration * 1000)),
       dirtyNodes: \(dirtyNodes),
       nodesProcessed: \(nodesProcessed),
@@ -140,8 +129,7 @@ extension ReconcilerMetric: CustomStringConvertible {
       rangesDeleted: \(rangesDeleted),
       mutations: \(textStorageMutations),
       documentSize: \(documentSize),
-      nodeCount: \(nodeCount),
-      fallback: \(fallbackTriggered)
+      nodeCount: \(nodeCount)
     )
     """
   }
@@ -155,9 +143,7 @@ extension ReconcilerMetricsSummary: CustomStringConvertible {
       avgDuration: \(String(format: "%.3fms", averageDuration * 1000)),
       p50: \(String(format: "%.3fms", p50Duration * 1000)),
       p95: \(String(format: "%.3fms", p95Duration * 1000)),
-      p99: \(String(format: "%.3fms", p99Duration * 1000)),
-      optimizedRate: \(String(format: "%.1f%%", optimizedUsageRate * 100)),
-      fallbackRate: \(String(format: "%.1f%%", fallbackRate * 100))
+      p99: \(String(format: "%.3fms", p99Duration * 1000))
     )
     """
   }

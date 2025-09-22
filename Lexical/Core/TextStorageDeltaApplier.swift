@@ -37,16 +37,11 @@ internal class TextStorageDeltaApplier {
 
     // Pre-flight checks
     guard validateBatchPreconditions(batch, textStorage: textStorage) else {
-      return .failure(reason: "Batch precondition validation failed", shouldFallback: true)
+      return .failure(reason: "Batch precondition validation failed")
     }
 
-    // Check if we should fallback based on batch size
-    if batch.deltas.count > batch.batchMetadata.fallbackThreshold {
-      return .failure(
-        reason: "Batch size (\(batch.deltas.count)) exceeds threshold (\(batch.batchMetadata.fallbackThreshold))",
-        shouldFallback: true
-      )
-    }
+    // Process any number of deltas - no arbitrary limits
+    editor.log(.reconciler, .message, "Applying \(batch.deltas.count) deltas")
 
     var appliedDeltas = 0
     var fenwickUpdates = 0
@@ -244,12 +239,7 @@ internal class TextStorageDeltaApplier {
   private func validateBatchPreconditions(_ batch: DeltaBatch, textStorage: NSTextStorage) -> Bool {
     // Check expected length
     if textStorage.length != batch.batchMetadata.expectedTextStorageLength {
-      return false
-    }
-
-    // Validate timestamp (not too old)
-    let maxAge: TimeInterval = 5.0 // 5 seconds
-    if Date().timeIntervalSince(batch.batchMetadata.timestamp) > maxAge {
+      editor.log(.reconciler, .warning, "TextStorage length mismatch: expected \(batch.batchMetadata.expectedTextStorageLength), got \(textStorage.length)")
       return false
     }
 

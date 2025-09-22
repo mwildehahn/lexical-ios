@@ -49,8 +49,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     let deltaBatch = DeltaBatch(
       deltas: [delta],
       batchMetadata: BatchMetadata(
-        expectedTextStorageLength: textStorage.length,
-        fallbackThreshold: 100
+        expectedTextStorageLength: textStorage.length
       )
     )
 
@@ -62,7 +61,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     case .success(let appliedDeltas, let fenwickUpdates):
       XCTAssertEqual(appliedDeltas, 1, "Should apply one delta")
       XCTAssertGreaterThanOrEqual(fenwickUpdates, 0, "Should track Fenwick updates")
-    case .failure(let reason, _):
+    case .failure(let reason):
       XCTFail("Delta application failed: \(reason)")
     case .partialSuccess(_, _, let reason):
       XCTFail("Unexpected partial success: \(reason)")
@@ -104,8 +103,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     let deltaBatch = DeltaBatch(
       deltas: [delta],
       batchMetadata: BatchMetadata(
-        expectedTextStorageLength: textStorage.length,
-        fallbackThreshold: 100
+        expectedTextStorageLength: textStorage.length
       )
     )
 
@@ -117,7 +115,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     case .success(let appliedDeltas, let fenwickUpdates):
       XCTAssertEqual(appliedDeltas, 1, "Should apply one delta")
       XCTAssertGreaterThanOrEqual(fenwickUpdates, 0, "Should track Fenwick updates")
-    case .failure(let reason, _):
+    case .failure(let reason):
       XCTFail("Delta application failed: \(reason)")
     case .partialSuccess(_, _, let reason):
       XCTFail("Unexpected partial success: \(reason)")
@@ -161,8 +159,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     let deltaBatch = DeltaBatch(
       deltas: [delta],
       batchMetadata: BatchMetadata(
-        expectedTextStorageLength: textStorage.length,
-        fallbackThreshold: 100
+        expectedTextStorageLength: textStorage.length
       )
     )
 
@@ -174,7 +171,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     case .success(let appliedDeltas, let fenwickUpdates):
       XCTAssertEqual(appliedDeltas, 1, "Should apply one delta")
       XCTAssertGreaterThanOrEqual(fenwickUpdates, 0, "Should track Fenwick updates")
-    case .failure(let reason, _):
+    case .failure(let reason):
       XCTFail("Delta application failed: \(reason)")
     case .partialSuccess(_, _, let reason):
       XCTFail("Unexpected partial success: \(reason)")
@@ -238,8 +235,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     let deltaBatch = DeltaBatch(
       deltas: [delta1, delta2],
       batchMetadata: BatchMetadata(
-        expectedTextStorageLength: textStorage.length,
-        fallbackThreshold: 100
+        expectedTextStorageLength: textStorage.length
       )
     )
 
@@ -251,7 +247,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     case .success(let appliedDeltas, let fenwickUpdates):
       XCTAssertEqual(appliedDeltas, 2, "Should apply two deltas")
       XCTAssertGreaterThanOrEqual(fenwickUpdates, 0, "Should track Fenwick updates")
-    case .failure(let reason, _):
+    case .failure(let reason):
       XCTFail("Delta batch application failed: \(reason)")
     case .partialSuccess(let appliedDeltas, let fenwickUpdates, let reason):
       print("Partial success: \(appliedDeltas) deltas applied, reason: \(reason)")
@@ -287,8 +283,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
     let deltaBatch = DeltaBatch(
       deltas: [delta],
       batchMetadata: BatchMetadata(
-        expectedTextStorageLength: textStorage.length,
-        fallbackThreshold: 100
+        expectedTextStorageLength: textStorage.length
       )
     )
 
@@ -299,9 +294,8 @@ class TextStorageDeltaApplierTests: XCTestCase {
     switch result {
     case .success(_, _):
       XCTFail("Invalid delta should not succeed")
-    case .failure(let reason, let context):
+    case .failure(let reason):
       XCTAssertFalse(reason.isEmpty, "Should provide failure reason")
-      XCTAssertNotNil(context, "Should provide failure context")
     case .partialSuccess(_, _, _):
       // Partial success is acceptable for invalid deltas
       break

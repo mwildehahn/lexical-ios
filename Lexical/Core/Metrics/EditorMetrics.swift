@@ -22,8 +22,6 @@ public struct ReconcilerMetric {
   public let nodesProcessed: Int
   public let textStorageMutations: Int
   public let fenwickOperations: Int
-  public let fallbackTriggered: Bool
-  public let reconcilerType: ReconcilerType
   public let documentSize: Int
   public let nodeCount: Int
 
@@ -36,8 +34,6 @@ public struct ReconcilerMetric {
     nodesProcessed: Int = 0,
     textStorageMutations: Int = 0,
     fenwickOperations: Int = 0,
-    fallbackTriggered: Bool = false,
-    reconcilerType: ReconcilerType = .legacy,
     documentSize: Int = 0,
     nodeCount: Int = 0
   ) {
@@ -49,17 +45,9 @@ public struct ReconcilerMetric {
     self.nodesProcessed = nodesProcessed
     self.textStorageMutations = textStorageMutations
     self.fenwickOperations = fenwickOperations
-    self.fallbackTriggered = fallbackTriggered
-    self.reconcilerType = reconcilerType
     self.documentSize = documentSize
     self.nodeCount = nodeCount
   }
-}
-
-public enum ReconcilerType {
-  case legacy
-  case optimized
-  case hybrid
 }
 
 public struct OptimizedReconcilerMetric {

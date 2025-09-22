@@ -73,18 +73,16 @@ class ReconcilerMetricsTests: XCTestCase {
     XCTAssertEqual(summary.maxDuration, 0.003, accuracy: 0.0001)
   }
 
-  func testMetricsSummaryWithFallback() throws {
+  func testMetricsSummaryWithMultipleMetrics() throws {
     let collector = DefaultReconcilerMetricsCollector()
 
-    // Add metrics with different types
+    // Add metrics with different values
     collector.record(ReconcilerMetric(
       duration: 0.001,
       dirtyNodes: 5,
       rangesAdded: 3,
       rangesDeleted: 2,
-      treatedAllNodesAsDirty: false,
-      fallbackTriggered: false,
-      reconcilerType: .optimized
+      treatedAllNodesAsDirty: false
     ))
 
     collector.record(ReconcilerMetric(
@@ -92,9 +90,7 @@ class ReconcilerMetricsTests: XCTestCase {
       dirtyNodes: 10,
       rangesAdded: 5,
       rangesDeleted: 3,
-      treatedAllNodesAsDirty: true,
-      fallbackTriggered: true,
-      reconcilerType: .hybrid
+      treatedAllNodesAsDirty: true
     ))
 
     collector.record(ReconcilerMetric(
@@ -102,14 +98,12 @@ class ReconcilerMetricsTests: XCTestCase {
       dirtyNodes: 15,
       rangesAdded: 7,
       rangesDeleted: 4,
-      treatedAllNodesAsDirty: false,
-      fallbackTriggered: false,
-      reconcilerType: .legacy
+      treatedAllNodesAsDirty: false
     ))
 
     let summary = collector.summary
-    XCTAssertEqual(summary.fallbackRate, 1.0 / 3.0, accuracy: 0.01) // 1 out of 3 had fallback
-    XCTAssertEqual(summary.optimizedUsageRate, 1.0 / 3.0, accuracy: 0.01) // 1 out of 3 was optimized
+    XCTAssertEqual(summary.totalMetrics, 3)
+    XCTAssertEqual(summary.averageDuration, 0.002, accuracy: 0.0001)
   }
 
   func testMetricsReset() throws {
@@ -143,8 +137,6 @@ class ReconcilerMetricsTests: XCTestCase {
     XCTAssertEqual(summary.p50Duration, 0)
     XCTAssertEqual(summary.p95Duration, 0)
     XCTAssertEqual(summary.p99Duration, 0)
-    XCTAssertEqual(summary.fallbackRate, 0)
-    XCTAssertEqual(summary.optimizedUsageRate, 0)
   }
 
   func testPercentileCalculations() throws {
@@ -180,14 +172,11 @@ class ReconcilerMetricsTests: XCTestCase {
       nodesProcessed: 10,
       textStorageMutations: 5,
       fenwickOperations: 2,
-      fallbackTriggered: false,
-      reconcilerType: .optimized,
       documentSize: 1000,
       nodeCount: 20
     )
 
     let description = metric.description
-    XCTAssertTrue(description.contains("optimized"))
     XCTAssertTrue(description.contains("1.234ms"))
     XCTAssertTrue(description.contains("dirtyNodes: 5"))
   }

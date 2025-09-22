@@ -16,164 +16,103 @@ import AppKit
 @MainActor
 internal enum OptimizedReconciler {
 
-  /// Attempts optimized reconciliation, falling back to full reconciliation if needed
-  static func attemptOptimizedReconciliation(
+  /// Performs optimized reconciliation
+  static func reconcile(
     currentEditorState: EditorState,
     pendingEditorState: EditorState,
     editor: Editor,
     shouldReconcileSelection: Bool,
     markedTextOperation: MarkedTextOperation?
-  ) throws -> Bool {
+  ) throws {
 
-    // Early exit if optimized reconciler is disabled
-    guard editor.featureFlags.optimizedReconciler else {
-      return false
-    }
 
-    // Early exit for marked text operations (not yet supported in optimized path)
+    // Marked text operations not yet supported in optimized path
     if markedTextOperation != nil {
-      editor.log(.reconciler, .warning, "Skipping optimized reconciliation: marked text operation")
-      return false
+      throw LexicalError.invariantViolation("Marked text operations not yet supported in optimized reconciliation")
     }
 
     guard let textStorage = editor.textStorage else {
-      return false
+      throw LexicalError.invariantViolation("TextStorage not available")
     }
 
-    // Create context for this reconciliation attempt
-    let context = ReconcilerContext(
-      updateSource: "OptimizedReconciler",
-      nodeCount: pendingEditorState.nodeMap.count,
-      textStorageLength: textStorage.length
-    )
+    // Track metrics for this reconciliation
+    let startTime = Date()
+    let nodeCount = pendingEditorState.nodeMap.count
+    let textStorageLength = textStorage.length
 
     // Initialize components
-    let fallbackDetector = ReconcilerFallbackDetector(editor: editor)
     let deltaGenerator = DeltaGenerator(editor: editor)
     let deltaApplier = TextStorageDeltaApplier(editor: editor, fenwickTree: editor.fenwickTree)
     let validator = DeltaValidator(editor: editor, fenwickTree: editor.fenwickTree)
 
-    do {
-      // Generate deltas from the state differences
-      let deltaBatch = try deltaGenerator.generateDeltaBatch(
-        from: currentEditorState,
-        to: pendingEditorState,
-        rangeCache: editor.rangeCache,
-        dirtyNodes: editor.dirtyNodes
+    // Generate deltas from the state differences
+    let deltaBatch = try deltaGenerator.generateDeltaBatch(
+      from: currentEditorState,
+      to: pendingEditorState,
+      rangeCache: editor.rangeCache,
+      dirtyNodes: editor.dirtyNodes
+    )
+
+    // Log delta count for debugging
+    editor.log(.reconciler, .message, "Generated \(deltaBatch.deltas.count) deltas")
+
+    // Validate deltas for debugging purposes only - never causes failure
+    let validationResult = validator.validateDeltaBatch(
+      deltaBatch,
+      against: textStorage,
+      rangeCache: editor.rangeCache
+    )
+
+    if case .invalid(let errors) = validationResult {
+      // Log validation issues but continue anyway
+      editor.log(.reconciler, .warning, "Delta validation found \(errors.count) issues (continuing)")
+    }
+
+    // Apply deltas
+    let applicationResult = deltaApplier.applyDeltaBatch(deltaBatch, to: textStorage)
+
+    switch applicationResult {
+    case .success(let appliedDeltas, let fenwickUpdates):
+      // Update range cache incrementally
+      let cacheUpdater = IncrementalRangeCacheUpdater(editor: editor, fenwickTree: editor.fenwickTree)
+      try cacheUpdater.updateRangeCache(
+        &editor.rangeCache,
+        basedOn: deltaBatch.deltas
       )
 
-      // Check if we should fallback before attempting optimized reconciliation
-
-      // Safeguard: If no deltas generated but we have dirty nodes, something's wrong
-      if deltaBatch.deltas.isEmpty && !editor.dirtyNodes.isEmpty {
-        let reason = "No deltas generated despite \(editor.dirtyNodes.count) dirty nodes - falling back for safety"
-        editor.log(.reconciler, .warning, reason)
-        fallbackDetector.recordOptimizationFailure(reason: reason)
-        return false
-      }
-
-      // Safeguard: If no deltas generated but significant node count change, fallback
-      if deltaBatch.deltas.isEmpty {
-        let nodeCountDiff = abs(currentEditorState.nodeMap.count - pendingEditorState.nodeMap.count)
-        if nodeCountDiff > 2 {
-          let reason = "No deltas generated despite significant node count change (\(currentEditorState.nodeMap.count) -> \(pendingEditorState.nodeMap.count)) - falling back for safety"
-          editor.log(.reconciler, .warning, reason)
-          fallbackDetector.recordOptimizationFailure(reason: reason)
-          return false
-        }
-      }
-
-      // Additional safeguard: If no deltas generated but node count suggests major changes, fallback
-      if deltaBatch.deltas.isEmpty && context.nodeCount > 100 {
-        let reason = "No deltas generated for large document (\(context.nodeCount) nodes) - falling back for safety"
-        editor.log(.reconciler, .warning, reason)
-        fallbackDetector.recordOptimizationFailure(reason: reason)
-        return false
-      }
-
-      let fallbackDecision = fallbackDetector.shouldFallbackToFullReconciliation(
-        for: deltaBatch.deltas,
+      // Post-application validation for debugging only
+      let postValidation = validator.validatePostApplication(
         textStorage: textStorage,
-        context: context
-      )
-
-      if case .fallback(let reason) = fallbackDecision {
-        editor.log(.reconciler, .warning, "Falling back to full reconciliation: \(reason)")
-        fallbackDetector.recordOptimizationFailure(reason: reason)
-        return false
-      }
-
-      // Validate deltas before application
-      let validationResult = validator.validateDeltaBatch(
-        deltaBatch,
-        against: textStorage,
+        appliedDeltas: deltaBatch.deltas,
         rangeCache: editor.rangeCache
       )
 
-      if case .invalid(let errors) = validationResult {
-        let reason = "Delta validation failed: \(errors.count) errors"
-        editor.log(.reconciler, .warning, reason)
-        fallbackDetector.recordOptimizationFailure(reason: reason)
-        return false
+      if case .invalid(let errors) = postValidation {
+        // Log but don't fail
+        editor.log(.reconciler, .warning, "Post-application validation found \(errors.count) issues (continuing)")
       }
 
-      // Apply deltas optimistically
-      let applicationResult = deltaApplier.applyDeltaBatch(deltaBatch, to: textStorage)
-
-      switch applicationResult {
-      case .success(let appliedDeltas, let fenwickUpdates):
-        // Update range cache incrementally
-        let cacheUpdater = IncrementalRangeCacheUpdater(editor: editor, fenwickTree: editor.fenwickTree)
-        try cacheUpdater.updateRangeCache(
-          &editor.rangeCache,
-          basedOn: deltaBatch.deltas
+      // Record metrics if enabled
+      if editor.featureFlags.reconcilerMetrics {
+        recordOptimizedReconciliationMetrics(
+          editor: editor,
+          appliedDeltas: appliedDeltas,
+          fenwickUpdates: fenwickUpdates,
+          startTime: startTime,
+          nodeCount: nodeCount,
+          textStorageLength: textStorageLength
         )
-
-        // Post-application validation
-        let postValidation = validator.validatePostApplication(
-          textStorage: textStorage,
-          appliedDeltas: deltaBatch.deltas,
-          rangeCache: editor.rangeCache
-        )
-
-        if case .invalid(let errors) = postValidation {
-          let reason = "Post-application validation failed: \(errors.count) errors"
-          editor.log(.reconciler, .error, reason)
-          fallbackDetector.recordOptimizationFailure(reason: reason)
-          return false
-        }
-
-        // Success! Record metrics and reset fallback state
-        fallbackDetector.resetFallbackState()
-
-        if editor.featureFlags.reconcilerMetrics {
-          recordOptimizedReconciliationMetrics(
-            editor: editor,
-            appliedDeltas: appliedDeltas,
-            fenwickUpdates: fenwickUpdates,
-            context: context
-          )
-        }
-
-        editor.log(.reconciler, .message, "Optimized reconciliation successful: \(appliedDeltas) deltas applied")
-        return true
-
-      case .partialSuccess(_, _, let reason):
-        editor.log(.reconciler, .warning, "Partial success in optimized reconciliation: \(reason)")
-        fallbackDetector.recordOptimizationFailure(reason: "Partial success: \(reason)")
-        return false
-
-      case .failure(let reason, _):
-        editor.log(.reconciler, .warning, "Optimized reconciliation failed: \(reason)")
-        fallbackDetector.recordOptimizationFailure(reason: reason)
-        return false
       }
 
-    } catch {
-      let reason = "Exception during optimized reconciliation: \(error.localizedDescription)"
-      editor.log(.reconciler, .error, reason)
-      fallbackDetector.recordOptimizationFailure(reason: reason)
-      return false
+      editor.log(.reconciler, .message, "Optimized reconciliation successful: \(appliedDeltas) deltas applied")
+
+    case .partialSuccess(let appliedDeltas, let failedDeltas, let reason):
+      // Log but continue - we applied what we could
+      editor.log(.reconciler, .warning, "Partial delta application: \(appliedDeltas) applied, \(failedDeltas.count) failed: \(reason)")
+
+    case .failure(let reason):
+      // This is a real failure - throw an error
+      throw LexicalError.invariantViolation("Delta application failed: \(reason)")
     }
   }
 
@@ -182,15 +121,17 @@ internal enum OptimizedReconciler {
     editor: Editor,
     appliedDeltas: Int,
     fenwickUpdates: Int,
-    context: ReconcilerContext
+    startTime: Date,
+    nodeCount: Int,
+    textStorageLength: Int
   ) {
-    let duration = Date().timeIntervalSince(context.timestamp)
+    let duration = Date().timeIntervalSince(startTime)
     let metric = OptimizedReconcilerMetric(
       deltaCount: appliedDeltas,
       fenwickOperations: fenwickUpdates,
-      nodeCount: context.nodeCount,
-      textStorageLength: context.textStorageLength,
-      timestamp: context.timestamp,
+      nodeCount: nodeCount,
+      textStorageLength: textStorageLength,
+      timestamp: startTime,
       duration: duration
     )
 
@@ -273,8 +214,7 @@ private class DeltaGenerator {
 
     // Create batch metadata
     let batchMetadata = BatchMetadata(
-      expectedTextStorageLength: editor.textStorage?.length ?? 0,
-      fallbackThreshold: 100
+      expectedTextStorageLength: editor.textStorage?.length ?? 0
     )
 
     return DeltaBatch(deltas: deltas, batchMetadata: batchMetadata)

@@ -77,18 +77,15 @@ public struct BatchMetadata {
   let batchId: String
   let timestamp: Date
   let expectedTextStorageLength: Int
-  let fallbackThreshold: Int // Number of deltas that triggers fallback
 
   public init(
     batchId: String = UUID().uuidString,
     timestamp: Date = Date(),
-    expectedTextStorageLength: Int,
-    fallbackThreshold: Int = 100
+    expectedTextStorageLength: Int
   ) {
     self.batchId = batchId
     self.timestamp = timestamp
     self.expectedTextStorageLength = expectedTextStorageLength
-    self.fallbackThreshold = fallbackThreshold
   }
 }
 
@@ -96,5 +93,5 @@ public struct BatchMetadata {
 public enum DeltaApplicationResult {
   case success(appliedDeltas: Int, fenwickTreeUpdates: Int)
   case partialSuccess(appliedDeltas: Int, failedDeltas: [ReconcilerDelta], reason: String)
-  case failure(reason: String, shouldFallback: Bool)
+  case failure(reason: String)
 }
