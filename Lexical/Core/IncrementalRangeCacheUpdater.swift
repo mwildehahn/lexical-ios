@@ -50,18 +50,22 @@ internal class IncrementalRangeCacheUpdater {
 
     guard let currentItem = rangeCache[nodeKey] else {
       // Node might be newly inserted, check if we have insertion data
-      let insertionDelta = deltas.first { delta in
-        if case .nodeInsertion(let key, _, _) = delta.type, key == nodeKey {
-          return true
+      let insertionDetails = deltas.compactMap { delta -> (NodeInsertionData, Int)? in
+        if case .nodeInsertion(let key, let insertionData, let location) = delta.type, key == nodeKey {
+          return (insertionData, location)
         }
-        return false
-      }
+        return nil
+      }.first
 
-      if let insertionDelta = insertionDelta,
-         case .nodeInsertion(_, let insertionData, _) = insertionDelta.type {
-        try calculateNewNodeRangeCacheItem(&rangeCache, nodeKey: nodeKey, insertionData: insertionData)
+      if let (insertionData, location) = insertionDetails {
+        try calculateNewNodeRangeCacheItem(
+          &rangeCache,
+          nodeKey: nodeKey,
+          insertionData: insertionData,
+          insertionLocation: location
+        )
       } else {
-        try calculateNewNodeRangeCacheItem(&rangeCache, nodeKey: nodeKey)
+        try calculateNewNodeRangeCacheItem(&rangeCache, nodeKey: nodeKey, insertionLocation: nil)
       }
       return
     }
@@ -141,7 +145,8 @@ internal class IncrementalRangeCacheUpdater {
   private func calculateNewNodeRangeCacheItem(
     _ rangeCache: inout [NodeKey: RangeCacheItem],
     nodeKey: NodeKey,
-    insertionData: NodeInsertionData? = nil
+    insertionData: NodeInsertionData? = nil,
+    insertionLocation: Int?
   ) throws {
 
     var newItem = RangeCacheItem()
@@ -175,8 +180,10 @@ internal class IncrementalRangeCacheUpdater {
       newItem.postambleLength += 1 // postamble anchor
     }
 
-    // Calculate location using FenwickTree
-    if let fenwickIndex = getFenwickIndexForNode(nodeKey, rangeCache: rangeCache) {
+    // Use the explicit insertion location when available, otherwise fall back to FenwickTree
+    if let insertionLocation = insertionLocation {
+      newItem.location = insertionLocation
+    } else if let fenwickIndex = getFenwickIndexForNode(nodeKey, rangeCache: rangeCache) {
       newItem.location = fenwickTree.query(index: fenwickIndex)
     }
 
@@ -311,7 +318,7 @@ internal class IncrementalRangeCacheUpdater {
     var adjustedLocation = originalLocation
 
     for change in locationChanges {
-      if change.location <= originalLocation {
+      if change.location < originalLocation {
         adjustedLocation += change.lengthDelta
       }
     }

@@ -214,25 +214,46 @@ internal class ReconcilerFallbackDetector {
   }
 
   private func getCurrentMemoryPressure() -> Double {
-    // Simple memory pressure calculation
-    // In a real implementation, this would check actual memory usage
-    var info = mach_task_basic_info()
-    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+    #if canImport(Darwin)
+    let totalMemory = Double(ProcessInfo.processInfo.physicalMemory)
+    guard totalMemory > 0 else { return 0 }
 
-    let kerr = withUnsafeMutablePointer(to: &info) {
-      $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
-        task_info(mach_task_self_,
-                  task_flavor_t(MACH_TASK_BASIC_INFO),
-                  $0,
-                  &count)
+    var vmInfo = task_vm_info_data_t()
+    var vmCount = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+    let vmResult = withUnsafeMutablePointer(to: &vmInfo) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: Int(vmCount)) {
+        task_info(
+          mach_task_self_,
+          task_flavor_t(TASK_VM_INFO),
+          $0,
+          &vmCount
+        )
       }
     }
 
-    if kerr == KERN_SUCCESS {
-      let usedMemory = Double(info.resident_size)
-      let totalMemory = Double(ProcessInfo.processInfo.physicalMemory)
-      return usedMemory / totalMemory
+    if vmResult == KERN_SUCCESS {
+      let footprintRatio = Double(vmInfo.phys_footprint) / totalMemory
+      return min(1.0, max(0.0, footprintRatio))
     }
+
+    var basicInfo = mach_task_basic_info()
+    var basicCount = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+    let basicResult = withUnsafeMutablePointer(to: &basicInfo) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: Int(basicCount)) {
+        task_info(
+          mach_task_self_,
+          task_flavor_t(MACH_TASK_BASIC_INFO),
+          $0,
+          &basicCount
+        )
+      }
+    }
+
+    if basicResult == KERN_SUCCESS {
+      let residentRatio = Double(basicInfo.resident_size) / totalMemory
+      return min(1.0, max(0.0, residentRatio))
+    }
+    #endif
 
     return 0.0 // Default to no pressure if we can't measure
   }

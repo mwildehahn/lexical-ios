@@ -155,14 +155,17 @@ internal class TextStorageDeltaApplier {
     // Update FenwickTree if there's a length change
     var fenwickUpdates = 0
     if lengthDelta != 0 {
-      // Find the FenwickTree index for this node
-      if let fenwickIndex = getFenwickIndexForNode(nodeKey) {
+      let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: range.location)
+
+      if fenwickIndex < fenwickTree.treeSize {
         fenwickTree.update(index: fenwickIndex, delta: lengthDelta)
         fenwickUpdates = 1
       } else {
-        // For now, if we can't find the node in range cache, we'll still succeed
-        // In a real implementation, this might require different handling
-        fenwickUpdates = 0
+        editor.log(
+          .reconciler,
+          .warning,
+          "Fenwick index \(fenwickIndex) out of bounds for size \(fenwickTree.treeSize); skipping update"
+        )
       }
     }
 
@@ -216,12 +219,10 @@ internal class TextStorageDeltaApplier {
 
     // Update FenwickTree
     var fenwickUpdates = 0
-    if let fenwickIndex = getFenwickIndexForNode(nodeKey) {
+    let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: location)
+    if fenwickIndex < fenwickTree.treeSize {
       fenwickTree.update(index: fenwickIndex, delta: completeString.length)
       fenwickUpdates = 1
-    } else {
-      // For new nodes, we might not have a range cache entry yet
-      fenwickUpdates = 0
     }
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: completeString.length)
@@ -377,11 +378,7 @@ internal class TextStorageDeltaApplier {
 
     // For now, use a simple mapping based on the node's location in the document
     // This would be improved with a proper node-to-index mapping system
-    let nodeLocation = rangeCacheItem.location
-
-    // Calculate fenwick index based on location (simplified approach)
-    // In a real implementation, this would be based on the tree structure
-    return max(0, nodeLocation / 100) // Group every ~100 characters into one fenwick index
+    return fenwickIndex(forLocation: rangeCacheItem.location)
   }
 }
 
@@ -397,4 +394,8 @@ private enum DeltaApplicationError: Error {
   case invalidLocation(Int, textStorageLength: Int)
   case anchorValidationFailed(String)
   case fenwickTreeUpdateFailed(String)
+}
+
+private func fenwickIndex(forLocation location: Int) -> Int {
+  return max(0, location / 100)
 }
