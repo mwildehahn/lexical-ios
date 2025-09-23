@@ -142,7 +142,7 @@ private class DeltaGenerator {
       if currentNode != nil && pendingNode == nil {
         if let rangeCacheItem = rangeCache[nodeKey] {
           let metadata = DeltaMetadata(sourceUpdate: "Node deletion")
-          let deltaType = ReconcilerDeltaType.nodeDeletion(nodeKey: nodeKey, range: rangeCacheItem.range(using: editor.fenwickTree))
+          let deltaType = ReconcilerDeltaType.nodeDeletion(nodeKey: nodeKey, range: rangeCacheItem.rangeFromFenwick(using: editor.fenwickTree))
           deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
         }
         continue
@@ -172,7 +172,7 @@ private class DeltaGenerator {
            let rangeCacheItem = rangeCache[nodeKey] {
 
           let textRange = NSRange(
-            location: rangeCacheItem.location(using: editor.fenwickTree) + rangeCacheItem.preambleLength,
+            location: rangeCacheItem.locationFromFenwick(using: editor.fenwickTree) + rangeCacheItem.preambleLength,
             length: rangeCacheItem.textLength
           )
 

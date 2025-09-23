@@ -213,7 +213,8 @@ enum AttributeUtils {
 
     // for more information about the extraLineFragment, see NSLayoutManager docs
     let extraLineFragmentIsPresent = extraLineFragmentIsPresent(textStorage)
-    let range = cacheItem.range(using: fenwickTree)
+    // This is called from legacy reconciler, so use the direct range property
+    let range = cacheItem.range
     let startTouchesExtraLineFragment =
       (extraLineFragmentIsPresent && range.length == 0
         && range.location == textStorage.length)

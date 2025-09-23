@@ -637,8 +637,9 @@ public class Editor: NSObject {
           node.decoratorWillAppear(view: view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
           if node.hasDynamicSize(), let rangeCacheItem = rangeCache[nodeKey] {
+            let range = featureFlags.optimizedReconciler ? rangeCacheItem.rangeFromFenwick(using: fenwickTree) : rangeCacheItem.range
             frontend?.layoutManager.invalidateLayout(
-              forCharacterRange: rangeCacheItem.range(using: fenwickTree), actualCharacterRange: nil)
+              forCharacterRange: range, actualCharacterRange: nil)
           }
 
           self.log(
@@ -671,8 +672,9 @@ public class Editor: NSObject {
           }
           if let rangeCacheItem = rangeCache[nodeKey] {
             // required so that TextKit does the new size calculation, and correctly hides or unhides the view
+            let range = featureFlags.optimizedReconciler ? rangeCacheItem.rangeFromFenwick(using: fenwickTree) : rangeCacheItem.range
             frontend?.layoutManager.invalidateLayout(
-              forCharacterRange: rangeCacheItem.range(using: fenwickTree), actualCharacterRange: nil)
+              forCharacterRange: range, actualCharacterRange: nil)
           }
         }
       }

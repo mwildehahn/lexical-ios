@@ -19,7 +19,10 @@ typealias UITextStorageDirection = NSTextStorageDirection
  */
 
 struct RangeCacheItem {
-  var nodeIndex: Int = 0  // Index in the Fenwick tree for this node
+  // Dual storage: location for legacy reconciler, nodeIndex for optimized reconciler with Fenwick tree
+  var location: Int = 0  // Absolute location for legacy reconciler
+  var nodeIndex: Int = 0  // Index in the Fenwick tree for optimized reconciler
+
   // the length of the full preamble, including any special characters
   var preambleLength: Int = 0
   // the length of any special characters in the preamble
@@ -28,16 +31,24 @@ struct RangeCacheItem {
   var textLength: Int = 0
   var postambleLength: Int = 0
 
-  // Location is now computed dynamically from the Fenwick tree
+  // For optimized reconciler: compute location dynamically from Fenwick tree
   @MainActor
-  func location(using fenwickTree: FenwickTree) -> Int {
+  func locationFromFenwick(using fenwickTree: FenwickTree) -> Int {
     return fenwickTree.getNodeOffset(nodeIndex: nodeIndex)
   }
 
-  @MainActor
-  func range(using fenwickTree: FenwickTree) -> NSRange {
+  // Get range using absolute location (legacy reconciler)
+  var range: NSRange {
     NSRange(
-      location: location(using: fenwickTree),
+      location: location,
+      length: preambleLength + childrenLength + textLength + postambleLength)
+  }
+
+  // Get range using Fenwick tree (optimized reconciler)
+  @MainActor
+  func rangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
+    NSRange(
+      location: locationFromFenwick(using: fenwickTree),
       length: preambleLength + childrenLength + textLength + postambleLength)
   }
 }
@@ -91,10 +102,14 @@ private func evaluateNode(
         let editor = getActiveEditor() else {
     throw LexicalError.rangeCacheSearch("Couldn't find node or range cache item for key \(nodeKey)")
   }
+
+  // Use appropriate method based on feature flag
+  let useOptimized = editor.featureFlags.optimizedReconciler
   let fenwickTree = editor.fenwickTree
 
   if let parentKey = node.parent, let parentRangeCacheItem = rangeCache[parentKey] {
-    if stringLocation == parentRangeCacheItem.location(using: fenwickTree)
+    let parentLocation = useOptimized ? parentRangeCacheItem.locationFromFenwick(using: fenwickTree) : parentRangeCacheItem.location
+    if stringLocation == parentLocation
       && parentRangeCacheItem.preambleSpecialCharacterLength - parentRangeCacheItem.preambleLength
         == 0
     {
@@ -104,12 +119,14 @@ private func evaluateNode(
     }
   }
 
-  if !rangeCacheItem.entireRange(using: fenwickTree).byAddingOne().contains(stringLocation) {
+  let entireRange = useOptimized ? rangeCacheItem.entireRangeFromFenwick(using: fenwickTree) : rangeCacheItem.entireRange
+  if !entireRange.byAddingOne().contains(stringLocation) {
     return nil
   }
 
   if node is TextNode {
-    let expandedTextRange = rangeCacheItem.textRange(using: fenwickTree).byAddingOne()
+    let textRange = useOptimized ? rangeCacheItem.textRangeFromFenwick(using: fenwickTree) : rangeCacheItem.textRange
+    let expandedTextRange = textRange.byAddingOne()
     if expandedTextRange.contains(stringLocation) {
       return RangeCacheSearchResult(
         nodeKey: nodeKey, type: .text, offset: stringLocation - expandedTextRange.location)
@@ -150,9 +167,11 @@ private func evaluateNode(
     }
   }
 
-  if rangeCacheItem.entireRange(using: fenwickTree).length == 0 {
+  let entireRangeForCheck = useOptimized ? rangeCacheItem.entireRangeFromFenwick(using: fenwickTree) : rangeCacheItem.entireRange
+  if entireRangeForCheck.length == 0 {
     // caret is at the last row - element with no children
-    if stringLocation == rangeCacheItem.location(using: fenwickTree) {
+    let itemLocation = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+    if stringLocation == itemLocation {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
@@ -162,7 +181,8 @@ private func evaluateNode(
     return RangeCacheSearchResult(nodeKey: nodeKey, type: boundary, offset: nil)
   }
 
-  if stringLocation == rangeCacheItem.location(using: fenwickTree) {
+  let itemLocation = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+  if stringLocation == itemLocation {
     if rangeCacheItem.preambleLength == 0 && node is ElementNode {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
@@ -170,17 +190,19 @@ private func evaluateNode(
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
   }
 
-  if stringLocation == rangeCacheItem.entireRange(using: fenwickTree).upperBound {
-    if rangeCacheItem.selectableRange(using: fenwickTree).length == 0 {
+  if stringLocation == entireRangeForCheck.upperBound {
+    let selectableRange = useOptimized ? rangeCacheItem.selectableRangeFromFenwick(using: fenwickTree) : rangeCacheItem.selectableRange
+    if selectableRange.length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .endBoundary, offset: nil)
   }
 
-  let preambleEnd = rangeCacheItem.location(using: fenwickTree) + rangeCacheItem.preambleLength
+  let preambleEnd = itemLocation + rangeCacheItem.preambleLength
   if stringLocation == preambleEnd {
-    if rangeCacheItem.selectableRange(using: fenwickTree).length == 0 {
+    let selectableRange = useOptimized ? rangeCacheItem.selectableRangeFromFenwick(using: fenwickTree) : rangeCacheItem.selectableRange
+    if selectableRange.length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
@@ -201,28 +223,50 @@ extension NSRange {
 }
 
 extension RangeCacheItem {
+  // Legacy reconciler methods (use absolute location)
+  var entireRange: NSRange {
+    return NSRange(
+      location: location, length: preambleLength + childrenLength + textLength + postambleLength)
+  }
+
+  var textRange: NSRange {
+    return NSRange(location: location + preambleLength + childrenLength, length: textLength)
+  }
+
+  var childrenRange: NSRange {
+    return NSRange(location: location + preambleLength, length: childrenLength)
+  }
+
+  var selectableRange: NSRange {
+    return NSRange(
+      location: location,
+      length: preambleLength + childrenLength + textLength + postambleLength
+        - preambleSpecialCharacterLength)
+  }
+
+  // Optimized reconciler methods (use Fenwick tree)
   @MainActor
-  func entireRange(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = location(using: fenwickTree)
+  func entireRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = locationFromFenwick(using: fenwickTree)
     return NSRange(
       location: loc, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 
   @MainActor
-  func textRange(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = location(using: fenwickTree)
+  func textRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = locationFromFenwick(using: fenwickTree)
     return NSRange(location: loc + preambleLength + childrenLength, length: textLength)
   }
 
   @MainActor
-  func childrenRange(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = location(using: fenwickTree)
+  func childrenRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = locationFromFenwick(using: fenwickTree)
     return NSRange(location: loc + preambleLength, length: childrenLength)
   }
 
   @MainActor
-  func selectableRange(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = location(using: fenwickTree)
+  func selectableRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = locationFromFenwick(using: fenwickTree)
     return NSRange(
       location: loc,
       length: preambleLength + childrenLength + textLength + postambleLength

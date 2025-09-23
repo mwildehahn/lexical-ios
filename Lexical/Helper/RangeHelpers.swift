@@ -114,19 +114,26 @@ public func allNodeKeysSortedByLocation() -> [NodeKey] {
   guard let editor = getActiveEditor() else {
     return []
   }
+  let fenwickTree = editor.fenwickTree
+  let useOptimized = editor.featureFlags.optimizedReconciler
+
   return editor.rangeCache.map { $0 }
     .sorted { a, b in
       // return true if a<b
       let itemA = a.value
       let itemB = b.value
-      if itemA.location < itemB.location {
+      let locationA = useOptimized ? itemA.locationFromFenwick(using: fenwickTree) : itemA.location
+      let locationB = useOptimized ? itemB.locationFromFenwick(using: fenwickTree) : itemB.location
+      if locationA < locationB {
         return true
       }
-      if itemA.location > itemB.location {
+      if locationA > locationB {
         return false
       }
       // we have the same location
-      return itemA.range.length > itemB.range.length
+      let rangeA = useOptimized ? itemA.rangeFromFenwick(using: fenwickTree) : itemA.range
+      let rangeB = useOptimized ? itemB.rangeFromFenwick(using: fenwickTree) : itemB.range
+      return rangeA.length > rangeB.length
     }
     .map { element in
       element.key

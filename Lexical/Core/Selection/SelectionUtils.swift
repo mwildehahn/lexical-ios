@@ -195,12 +195,14 @@ func editorStateHasDirtySelection(pendingEditorState: EditorState, editor: Edito
 func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   let rangeCache = editor.rangeCache
   let fenwickTree = editor.fenwickTree
+  let useOptimized = editor.featureFlags.optimizedReconciler
 
   guard let rangeCacheItem = rangeCache[point.key] else { return nil }
 
   switch point.type {
   case .text:
-    return rangeCacheItem.location(using: fenwickTree) + rangeCacheItem.preambleLength + point.offset
+    let location = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+    return location + rangeCacheItem.preambleLength + point.offset
   case .element:
     guard let node = getNodeByKey(key: point.key) as? ElementNode else { return nil }
 
@@ -210,12 +212,14 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
     }
 
     if point.offset == childrenKeys.count {
-      return rangeCacheItem.location(using: fenwickTree) + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
+      let location = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+      return location + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
     }
 
     guard let childRangeCacheItem = rangeCache[childrenKeys[point.offset]] else { return nil }
 
-    return childRangeCacheItem.location(using: fenwickTree)
+    let childLocation = useOptimized ? childRangeCacheItem.locationFromFenwick(using: fenwickTree) : childRangeCacheItem.location
+    return childLocation
   case .range:
     throw LexicalError.invariantViolation("Need range selection")
   case .node:
