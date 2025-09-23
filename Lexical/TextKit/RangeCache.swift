@@ -29,10 +29,12 @@ struct RangeCacheItem {
   var postambleLength: Int = 0
 
   // Location is now computed dynamically from the Fenwick tree
+  @MainActor
   func location(using fenwickTree: FenwickTree) -> Int {
     return fenwickTree.getNodeOffset(nodeIndex: nodeIndex)
   }
 
+  @MainActor
   func range(using fenwickTree: FenwickTree) -> NSRange {
     NSRange(
       location: location(using: fenwickTree),
@@ -107,7 +109,7 @@ private func evaluateNode(
   }
 
   if node is TextNode {
-    let expandedTextRange = rangeCacheItem.textRange().byAddingOne()
+    let expandedTextRange = rangeCacheItem.textRange(using: fenwickTree).byAddingOne()
     if expandedTextRange.contains(stringLocation) {
       return RangeCacheSearchResult(
         nodeKey: nodeKey, type: .text, offset: stringLocation - expandedTextRange.location)
@@ -199,19 +201,26 @@ extension NSRange {
 }
 
 extension RangeCacheItem {
+  @MainActor
   func entireRange(using fenwickTree: FenwickTree) -> NSRange {
     let loc = location(using: fenwickTree)
     return NSRange(
       location: loc, length: preambleLength + childrenLength + textLength + postambleLength)
   }
+
+  @MainActor
   func textRange(using fenwickTree: FenwickTree) -> NSRange {
     let loc = location(using: fenwickTree)
     return NSRange(location: loc + preambleLength + childrenLength, length: textLength)
   }
+
+  @MainActor
   func childrenRange(using fenwickTree: FenwickTree) -> NSRange {
     let loc = location(using: fenwickTree)
     return NSRange(location: loc + preambleLength, length: childrenLength)
   }
+
+  @MainActor
   func selectableRange(using fenwickTree: FenwickTree) -> NSRange {
     let loc = location(using: fenwickTree)
     return NSRange(
@@ -241,43 +250,24 @@ internal func updateRangeCacheForTextChange(nodeKey: NodeKey, delta: Int) {
     fatalError()
   }
 
+  // Update the text length in the cache
+  let oldTextLength = editor.rangeCache[nodeKey]?.textLength ?? 0
   editor.rangeCache[nodeKey]?.textLength = node.getTextPart().lengthAsNSString()
-  let parentKeys = node.getParents().map { $0.getKey() }
+  let newTextLength = editor.rangeCache[nodeKey]?.textLength ?? 0
 
+  // Update parent nodes' children length
+  let parentKeys = node.getParents().map { $0.getKey() }
   for parentKey in parentKeys {
     editor.rangeCache[parentKey]?.childrenLength += delta
   }
 
-  updateNodeLocationFor(
-    nodeKey: kRootNodeKey, nodeIsAfterChangedNode: false, changedNodeKey: nodeKey,
-    changedNodeParents: parentKeys, delta: delta)
-}
-
-@MainActor
-private func updateNodeLocationFor(
-  nodeKey: NodeKey, nodeIsAfterChangedNode: Bool, changedNodeKey: NodeKey,
-  changedNodeParents: [NodeKey], delta: Int
-) {
-  guard let editor = getActiveEditor() else {
-    fatalError()
-  }
-
-  if nodeIsAfterChangedNode {
-    editor.rangeCache[nodeKey]?.location += delta
-  }
-
-  var isAfterChangedNode = nodeIsAfterChangedNode
-
-  if let elementNode = getNodeByKey(key: nodeKey) as? ElementNode,
-    isAfterChangedNode || changedNodeParents.contains(nodeKey)
-  {
-    for child in elementNode.getChildren() {
-      updateNodeLocationFor(
-        nodeKey: child.getKey(), nodeIsAfterChangedNode: isAfterChangedNode,
-        changedNodeKey: changedNodeKey, changedNodeParents: changedNodeParents, delta: delta)
-      if child.getKey() == changedNodeKey || changedNodeParents.contains(child.getKey()) {
-        isAfterChangedNode = true
-      }
-    }
+  // Update the Fenwick tree with the length change
+  if let cacheItem = editor.rangeCache[nodeKey] {
+    editor.fenwickTree.updateNodeLength(
+      nodeIndex: cacheItem.nodeIndex,
+      oldLength: oldTextLength,
+      newLength: newTextLength
+    )
   }
 }
+
