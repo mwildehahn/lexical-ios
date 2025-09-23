@@ -62,7 +62,9 @@ internal class IncrementalRangeCacheUpdater {
           insertionLocation: location
         )
       } else {
-        try calculateNewNodeRangeCacheItem(&rangeCache, nodeKey: nodeKey, insertionLocation: nil)
+        // This is an error - we're trying to update a node that's not in cache
+        // and we don't have insertion data for it
+        throw IncrementalUpdateError.nodeNotInCache(nodeKey)
       }
       return
     }
@@ -72,7 +74,7 @@ internal class IncrementalRangeCacheUpdater {
     // Apply each delta to update the range cache item
     for delta in deltas {
       switch delta.type {
-      case .textUpdate(let key, let newText, let range):
+      case .textUpdate(let key, let newText, _):
         if key == nodeKey {
           // Update text length directly to the new text length
           // Note: range.length is the length being replaced, not the total text length
@@ -110,34 +112,17 @@ internal class IncrementalRangeCacheUpdater {
   private func calculateNewNodeRangeCacheItem(
     _ rangeCache: inout [NodeKey: RangeCacheItem],
     nodeKey: NodeKey,
-    insertionData: NodeInsertionData? = nil,
+    insertionData: NodeInsertionData,
     insertionLocation: Int?
   ) throws {
 
     var newItem = RangeCacheItem()
 
-    if let insertionData = insertionData {
-      // Use insertion data directly for newly inserted nodes
-      newItem.preambleLength = insertionData.preamble.length
-      newItem.postambleLength = insertionData.postamble.length
-      newItem.textLength = insertionData.content.length
-      newItem.childrenLength = 0 // New nodes start with no calculated children length
-    } else {
-      // Fallback to finding node in editor state (for existing nodes)
-      guard let node = getNodeByKey(key: nodeKey) else {
-        throw IncrementalUpdateError.nodeNotFound(nodeKey)
-      }
-
-      // Calculate lengths based on node content
-      newItem.preambleLength = node.getPreamble().lengthAsNSString()
-      newItem.postambleLength = node.getPostamble().lengthAsNSString()
-
-      if let textNode = node as? TextNode {
-        newItem.textLength = textNode.getTextContent().lengthAsNSString()
-      } else if let elementNode = node as? ElementNode {
-        newItem.childrenLength = calculateChildrenLength(elementNode, rangeCache: rangeCache)
-      }
-    }
+    // Use insertion data directly for newly inserted nodes
+    newItem.preambleLength = insertionData.preamble.length
+    newItem.postambleLength = insertionData.postamble.length
+    newItem.textLength = insertionData.content.length
+    newItem.childrenLength = 0 // New nodes start with no calculated children length
 
     // Assign a node index for the Fenwick tree
     // For now, we'll use a simple mapping based on the insertion order
@@ -150,43 +135,6 @@ internal class IncrementalRangeCacheUpdater {
     }
 
     rangeCache[nodeKey] = newItem
-  }
-
-  /// Calculate children length for an element node
-  private func calculateChildrenLength(
-    _ elementNode: ElementNode,
-    rangeCache: [NodeKey: RangeCacheItem]
-  ) -> Int {
-
-    var totalLength = 0
-
-    for child in elementNode.getChildren() {
-      if let childItem = rangeCache[child.key] {
-        // Calculate the total length of this child node
-        totalLength += childItem.preambleLength + childItem.childrenLength + childItem.textLength + childItem.postambleLength
-      } else {
-        // Child not in cache yet, calculate its length
-        totalLength += calculateNodeLength(child)
-      }
-    }
-
-    return totalLength
-  }
-
-  /// Calculate the total length of a node
-  private func calculateNodeLength(_ node: Node) -> Int {
-    var length = node.getPreamble().lengthAsNSString()
-    length += node.getPostamble().lengthAsNSString()
-
-    if let textNode = node as? TextNode {
-      length += textNode.getTextContent().lengthAsNSString()
-    } else if let elementNode = node as? ElementNode {
-      for child in elementNode.getChildren() {
-        length += calculateNodeLength(child)
-      }
-    }
-
-    return length
   }
 
   // MARK: - Helper Methods
@@ -232,6 +180,7 @@ internal class IncrementalRangeCacheUpdater {
 
 private enum IncrementalUpdateError: Error {
   case nodeNotFound(NodeKey)
+  case nodeNotInCache(NodeKey)
   case invalidRangeCache(String)
   case fenwickTreeUpdateFailed(String)
 }
