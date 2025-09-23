@@ -92,6 +92,16 @@ internal enum OptimizedReconciler {
         basedOn: deltaBatch.deltas
       )
 
+      // Apply block-level attributes (parity with legacy reconciler)
+      if let textStorage = editor.textStorage {
+        applyBlockLevelAttributes(
+          editor: editor,
+          pendingState: pendingEditorState,
+          dirtyNodes: editor.dirtyNodes,
+          textStorage: textStorage
+        )
+      }
+
       // Record metrics if enabled
       if editor.featureFlags.reconcilerMetrics {
         recordOptimizedReconciliationMetrics(
@@ -113,6 +123,39 @@ internal enum OptimizedReconciler {
     case .failure(let reason):
       // This is a real failure - throw an error
       throw LexicalError.invariantViolation("Delta application failed: \(reason)")
+    }
+  }
+
+  /// Mirror legacy's block-level attributes pass
+  private static func applyBlockLevelAttributes(
+    editor: Editor,
+    pendingState: EditorState,
+    dirtyNodes: DirtyNodeMap,
+    textStorage: NSTextStorage
+  ) {
+    let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(theme: editor.getTheme())
+
+    var nodesToApply: Set<NodeKey> = []
+    for (nodeKey, _) in dirtyNodes { nodesToApply.insert(nodeKey) }
+    // Also include parents of dirty nodes (attributes can affect paragraph containers)
+    for (nodeKey, _) in dirtyNodes {
+      if let node = pendingState.nodeMap[nodeKey] { for p in node.getParentKeys() { nodesToApply.insert(p) } }
+    }
+
+    let rangeCache = editor.rangeCache
+    for key in nodesToApply {
+      guard let node = pendingState.nodeMap[key], node.isAttached(), let cacheItem = rangeCache[key] else { continue }
+      let attrs = node.getBlockLevelAttributes(theme: editor.getTheme())
+      if !attrs.isEmpty {
+        AttributeUtils.applyBlockLevelAttributes(
+          attrs,
+          cacheItem: cacheItem,
+          textStorage: textStorage,
+          nodeKey: key,
+          lastDescendentAttributes: lastDescendentAttributes ?? [:],
+          fenwickTree: editor.fenwickTree
+        )
+      }
     }
   }
 
@@ -158,8 +201,12 @@ private class DeltaGenerator {
 
     var deltas: [ReconcilerDelta] = []
 
+    // Process nodes in document order so sibling insertions keep correct order.
+    let orderedDirty = orderedDirtyNodes(in: pendingState, limitedTo: dirtyNodes)
+    var processedInsertionLengths: [NodeKey: Int] = [:]
+
     // Generate deltas for each dirty node
-    for (nodeKey, _) in dirtyNodes {
+    for nodeKey in orderedDirty {
       let currentNode = currentState.nodeMap[nodeKey]
       let pendingNode = pendingState.nodeMap[nodeKey]
 
@@ -221,10 +268,19 @@ private class DeltaGenerator {
         )
 
         // Calculate insertion location based on document structure
-        let insertionLocation = self.calculateInsertionLocation(for: nodeKey, in: pendingState, rangeCache: rangeCache, editor: editor)
+        let insertionLocation = self.calculateInsertionLocationOrdered(
+          for: nodeKey,
+          in: pendingState,
+          rangeCache: rangeCache,
+          processedInsertionLengths: processedInsertionLengths,
+          editor: editor)
 
         let deltaType = ReconcilerDeltaType.nodeInsertion(nodeKey: nodeKey, insertionData: insertionData, location: insertionLocation)
         deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
+
+        // Track length for subsequent siblings when not present in cache yet
+        let totalLength = insertionData.preamble.length + insertionData.content.length + insertionData.postamble.length
+        processedInsertionLengths[nodeKey] = totalLength
         continue
       }
 
@@ -257,6 +313,75 @@ private class DeltaGenerator {
     )
 
     return DeltaBatch(deltas: deltas, batchMetadata: batchMetadata)
+  }
+
+  /// Traverse the pending state's tree in document order and return the dirty keys in that order.
+  private func orderedDirtyNodes(in pendingState: EditorState, limitedTo dirty: DirtyNodeMap) -> [NodeKey] {
+    var result: [NodeKey] = []
+    func visit(_ key: NodeKey) {
+      if dirty[key] != nil { result.append(key) }
+      if let node = pendingState.nodeMap[key] as? ElementNode {
+        for child in node.getChildrenKeys() { visit(child) }
+      }
+    }
+    if let root = pendingState.nodeMap[kRootNodeKey] { visit(root.getKey()) }
+    // Fallback: if some dirty nodes were not reachable (shouldn't happen), append them
+    for (k, _) in dirty where !result.contains(k) { result.append(k) }
+    return result
+  }
+
+  /// Calculate insertion using cache first; if previous sibling not in cache, use processedInsertionLengths.
+  private func calculateInsertionLocationOrdered(
+    for nodeKey: NodeKey,
+    in editorState: EditorState,
+    rangeCache: [NodeKey: RangeCacheItem],
+    processedInsertionLengths: [NodeKey: Int],
+    editor: Editor
+  ) -> Int {
+    guard let node = editorState.nodeMap[nodeKey] else { return 0 }
+    guard let parentKey = node.parent,
+          let parentNode = editorState.nodeMap[parentKey] as? ElementNode else { return 0 }
+
+    let children = parentNode.getChildrenKeys()
+    guard let idx = children.firstIndex(of: nodeKey) else { return 0 }
+
+    if idx == 0 {
+      // First child: start at parent's content start
+      if let parentCache = rangeCache[parentKey] {
+        let loc = editor.featureFlags.optimizedReconciler
+          ? parentCache.locationFromFenwick(using: editor.fenwickTree)
+          : parentCache.location
+        return loc + parentCache.preambleLength
+      }
+      // Parent also newly inserted in this batch: if we already processed parent length/location, fall back to 0
+      return 0
+    }
+
+    let prevKey = children[idx - 1]
+    if let prevCache = rangeCache[prevKey] {
+      let prevLoc = editor.featureFlags.optimizedReconciler
+        ? prevCache.locationFromFenwick(using: editor.fenwickTree)
+        : prevCache.location
+      return prevLoc + prevCache.preambleLength + prevCache.childrenLength + prevCache.textLength + prevCache.postambleLength
+    }
+    // Previous sibling also inserted in this batch; use its processed length if available.
+    if let prevInsertedLen = processedInsertionLengths[prevKey],
+       let parentCache = rangeCache[parentKey] {
+      let parentLoc = editor.featureFlags.optimizedReconciler
+        ? parentCache.locationFromFenwick(using: editor.fenwickTree)
+        : parentCache.location
+      // Start of parent's content plus sum of already processed sibling lengths up to prev
+      var loc = parentLoc + parentCache.preambleLength
+      // Accumulate lengths of siblings up to prev that are in processedInsertionLengths
+      for k in children.prefix(idx) {
+        if let l = processedInsertionLengths[k] { loc += l }
+        else if let c = rangeCache[k] {
+          loc += c.preambleLength + c.childrenLength + c.textLength + c.postambleLength
+        }
+      }
+      return loc
+    }
+    return 0
   }
 
   /// Calculate the insertion location for a new node in the document
