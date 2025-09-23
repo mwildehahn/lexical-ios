@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lexical iOS is an extensible text editor/renderer written in Swift, built on top of TextKit, sharing philosophy and API with Lexical JavaScript. It's a Swift Package targeting iOS 13+ with a modular plugin architecture.
+Lexical iOS is an extensible text editor/renderer written in Swift, built on top of TextKit, sharing philosophy and API with Lexical JavaScript. It's a Swift Package targeting iOS 16+ with a modular plugin architecture.
 
 ## Build and Development Commands
 
@@ -14,10 +14,10 @@ Lexical iOS is an extensible text editor/renderer written in Swift, built on top
 swift build
 
 # Build for iOS Simulator (x86_64)
-swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "x86_64-apple-ios13.0-simulator"
+swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "x86_64-apple-ios16.0-simulator"
 
 # Build for iOS Simulator (arm64)
-swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "arm64-apple-ios13.0-simulator"
+swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "arm64-apple-ios16.0-simulator"
 ```
 
 ### Testing

@@ -1,4 +1,4 @@
-// swift-tools-version: 5.6
+// swift-tools-version: 5.7
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -10,7 +10,7 @@ import PackageDescription
 
 let package = Package(
   name: "Lexical",
-  platforms: [.iOS(.v13)],
+  platforms: [.iOS(.v16)],
   products: [
     .library(
       name: "Lexical",

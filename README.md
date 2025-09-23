@@ -21,7 +21,7 @@ The playground app contains the code for a rich text toolbar. While this is not 
 This playground app is very new, and many more features will come in time!
 
 ## Requirements
-Lexical iOS is written in Swift, and targets iOS 13 and above. (Note that the Playground app requires at least iOS 14, due to use of UIKit features such as UIMenu.)
+Lexical iOS is written in Swift, and targets iOS 16 and above. (The Playground app also targets iOS 16+.)
 
 ## Building Lexical
 We provide a Swift package file that is sufficient to build Lexical core. Add this as a dependency of your app to use Lexical.
