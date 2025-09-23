@@ -142,7 +142,7 @@ private class DeltaGenerator {
       if currentNode != nil && pendingNode == nil {
         if let rangeCacheItem = rangeCache[nodeKey] {
           let metadata = DeltaMetadata(sourceUpdate: "Node deletion")
-          let deltaType = ReconcilerDeltaType.nodeDeletion(nodeKey: nodeKey, range: rangeCacheItem.range)
+          let deltaType = ReconcilerDeltaType.nodeDeletion(nodeKey: nodeKey, range: rangeCacheItem.range(using: editor.fenwickTree))
           deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
         }
         continue

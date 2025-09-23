@@ -638,7 +638,7 @@ public class Editor: NSObject {
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
           if node.hasDynamicSize(), let rangeCacheItem = rangeCache[nodeKey] {
             frontend?.layoutManager.invalidateLayout(
-              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+              forCharacterRange: rangeCacheItem.range(using: fenwickTree), actualCharacterRange: nil)
           }
 
           self.log(
@@ -672,7 +672,7 @@ public class Editor: NSObject {
           if let rangeCacheItem = rangeCache[nodeKey] {
             // required so that TextKit does the new size calculation, and correctly hides or unhides the view
             frontend?.layoutManager.invalidateLayout(
-              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+              forCharacterRange: rangeCacheItem.range(using: fenwickTree), actualCharacterRange: nil)
           }
         }
       }
