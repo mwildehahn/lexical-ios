@@ -12,7 +12,7 @@ import Foundation
 @MainActor
 internal final class FenwickTree {
   private var tree: [Int]
-  private let size: Int
+  private var size: Int
 
   /// Get the size of the Fenwick tree
   var treeSize: Int {
@@ -26,12 +26,47 @@ internal final class FenwickTree {
     self.tree = Array(repeating: 0, count: size + 1)
   }
 
+  /// Resize the tree to accommodate more elements
+  /// - Parameter newSize: The new size for the tree
+  /// - Note: This preserves existing values and allows the tree to grow
+  private func resize(to newSize: Int) {
+    guard newSize > size else { return }
+
+    // Get current values before resizing
+    let currentValues = debugValues
+
+    // Create new tree with larger size
+    self.size = newSize
+    self.tree = Array(repeating: 0, count: newSize + 1)
+
+    // Rebuild tree with existing values
+    for (index, value) in currentValues.enumerated() where value != 0 {
+      update(index: index, delta: value)
+    }
+  }
+
+  /// Ensure the tree has capacity for the given index
+  /// - Parameter index: The index that needs to be accommodated
+  /// - Returns: true if resize was performed, false otherwise
+  @discardableResult
+  func ensureCapacity(for index: Int) -> Bool {
+    guard index >= size else { return false }
+
+    // Calculate new size with growth factor of 2x or index + buffer, whichever is larger
+    let newSize = max(size * 2, index + 100)
+    resize(to: newSize)
+    return true
+  }
+
   /// Update the value at index by delta
   /// - Parameters:
   ///   - index: The index to update (0-based)
   ///   - delta: The amount to add to the value at index
-  /// - Complexity: O(log n)
+  /// - Complexity: O(log n), O(n log n) if resize is needed
   func update(index: Int, delta: Int) {
+    // Ensure capacity before updating
+    ensureCapacity(for: index)
+
     var idx = index + 1 // Convert to 1-based indexing
     while idx <= size {
       tree[idx] += delta
@@ -72,8 +107,11 @@ internal final class FenwickTree {
   /// - Parameters:
   ///   - index: The index to set (0-based)
   ///   - value: The new value to set at index
-  /// - Complexity: O(log n)
+  /// - Complexity: O(log n), O(n log n) if resize is needed
   func set(index: Int, value: Int) {
+    // Ensure capacity before setting
+    ensureCapacity(for: index)
+
     let currentValue = rangeQuery(left: index, right: index)
     let delta = value - currentValue
     update(index: index, delta: delta)
@@ -153,6 +191,7 @@ extension FenwickTree {
   ///   - nodeIndex: The index of the node in document order
   ///   - oldLength: The previous text length of the node
   ///   - newLength: The new text length of the node
+  /// - Note: Automatically resizes the tree if nodeIndex exceeds capacity
   func updateNodeLength(nodeIndex: Int, oldLength: Int, newLength: Int) {
     let delta = newLength - oldLength
     if delta != 0 {

@@ -137,17 +137,8 @@ internal class TextStorageDeltaApplier {
     var fenwickUpdates = 0
     if lengthDelta != 0 {
       let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: range.location)
-
-      if fenwickIndex < fenwickTree.treeSize {
-        fenwickTree.update(index: fenwickIndex, delta: lengthDelta)
-        fenwickUpdates = 1
-      } else {
-        editor.log(
-          .reconciler,
-          .warning,
-          "Fenwick index \(fenwickIndex) out of bounds for size \(fenwickTree.treeSize); skipping update"
-        )
-      }
+      fenwickTree.update(index: fenwickIndex, delta: lengthDelta)
+      fenwickUpdates = 1
     }
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: lengthDelta)
@@ -175,12 +166,9 @@ internal class TextStorageDeltaApplier {
     textStorage.insert(completeString, at: location)
 
     // Update FenwickTree
-    var fenwickUpdates = 0
     let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: location)
-    if fenwickIndex < fenwickTree.treeSize {
-      fenwickTree.update(index: fenwickIndex, delta: completeString.length)
-      fenwickUpdates = 1
-    }
+    fenwickTree.update(index: fenwickIndex, delta: completeString.length)
+    let fenwickUpdates = 1
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: completeString.length)
   }

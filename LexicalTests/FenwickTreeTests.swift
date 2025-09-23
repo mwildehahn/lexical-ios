@@ -245,4 +245,131 @@ class FenwickTreeTests: XCTestCase {
       }
     }
   }
+
+  // MARK: - Dynamic Resizing Tests
+
+  func testDynamicResizing() throws {
+    let tree = FenwickTree(size: 10)
+
+    // Update at index 5 (within initial capacity)
+    tree.update(index: 5, delta: 10)
+    XCTAssertEqual(tree.query(index: 5), 10)
+
+    // Update at index 15 (beyond initial capacity)
+    tree.update(index: 15, delta: 20)
+    XCTAssertEqual(tree.query(index: 15), 30)  // 10 + 20
+
+    // Verify original values are preserved
+    XCTAssertEqual(tree.rangeQuery(left: 5, right: 5), 10)
+
+    // Update at index 100 (much beyond initial capacity)
+    tree.update(index: 100, delta: 50)
+    XCTAssertEqual(tree.query(index: 100), 80)  // 10 + 20 + 50
+
+    // Verify all values are preserved
+    XCTAssertEqual(tree.rangeQuery(left: 5, right: 5), 10)
+    XCTAssertEqual(tree.rangeQuery(left: 15, right: 15), 20)
+    XCTAssertEqual(tree.rangeQuery(left: 100, right: 100), 50)
+  }
+
+  func testResizingPreservesValues() throws {
+    let tree = FenwickTree(size: 5)
+
+    // Set initial values
+    tree.set(index: 0, value: 1)
+    tree.set(index: 1, value: 2)
+    tree.set(index: 2, value: 3)
+    tree.set(index: 3, value: 4)
+    tree.set(index: 4, value: 5)
+
+    // Verify initial sum
+    XCTAssertEqual(tree.totalSum, 15)
+
+    // Trigger resize by updating beyond capacity
+    tree.set(index: 10, value: 10)
+
+    // Verify all original values are preserved
+    XCTAssertEqual(tree.rangeQuery(left: 0, right: 0), 1)
+    XCTAssertEqual(tree.rangeQuery(left: 1, right: 1), 2)
+    XCTAssertEqual(tree.rangeQuery(left: 2, right: 2), 3)
+    XCTAssertEqual(tree.rangeQuery(left: 3, right: 3), 4)
+    XCTAssertEqual(tree.rangeQuery(left: 4, right: 4), 5)
+    XCTAssertEqual(tree.rangeQuery(left: 10, right: 10), 10)
+
+    // Verify cumulative queries still work
+    XCTAssertEqual(tree.query(index: 4), 15)
+    XCTAssertEqual(tree.query(index: 10), 25)
+  }
+
+  func testLargeIndexResizing() throws {
+    let tree = FenwickTree(size: 1)
+
+    // Update at very large index
+    tree.update(index: 10000, delta: 42)
+    XCTAssertEqual(tree.rangeQuery(left: 10000, right: 10000), 42)
+
+    // Tree should have resized to accommodate
+    XCTAssertGreaterThanOrEqual(tree.treeSize, 10000)
+
+    // Update at another large index
+    tree.update(index: 20000, delta: 100)
+    XCTAssertEqual(tree.rangeQuery(left: 20000, right: 20000), 100)
+
+    // Verify both values
+    XCTAssertEqual(tree.query(index: 20000), 142)
+  }
+
+  func testNodeLengthUpdateWithResize() throws {
+    let tree = FenwickTree.createForReconciler(nodeCount: 5)
+
+    // Update nodes within initial capacity
+    tree.updateNodeLength(nodeIndex: 0, oldLength: 0, newLength: 10)
+    tree.updateNodeLength(nodeIndex: 1, oldLength: 0, newLength: 20)
+
+    // Update node beyond initial capacity
+    tree.updateNodeLength(nodeIndex: 100, oldLength: 0, newLength: 50)
+
+    // Verify offsets
+    XCTAssertEqual(tree.getNodeOffset(nodeIndex: 0), 0)
+    XCTAssertEqual(tree.getNodeOffset(nodeIndex: 1), 10)
+    XCTAssertEqual(tree.getNodeOffset(nodeIndex: 2), 30)  // 10 + 20
+    XCTAssertEqual(tree.getNodeOffset(nodeIndex: 101), 80)  // 10 + 20 + 50
+  }
+
+  func testResizingPerformance() throws {
+    let tree = FenwickTree(size: 10)
+
+    measure {
+      // This should trigger multiple resizes
+      for i in 0..<1000 {
+        tree.update(index: i, delta: i)
+      }
+
+      // Verify sum
+      XCTAssertEqual(tree.query(index: 999), (999 * 1000) / 2)
+
+      tree.reset()
+    }
+  }
+
+  func testEnsureCapacityReturnValue() throws {
+    let tree = FenwickTree(size: 10)
+
+    // Should not resize for index within capacity
+    XCTAssertFalse(tree.ensureCapacity(for: 5))
+    XCTAssertFalse(tree.ensureCapacity(for: 9))
+
+    // Should resize for index beyond capacity
+    XCTAssertTrue(tree.ensureCapacity(for: 10))
+
+    // After resizing for index 10, size should be max(10*2, 10+100) = 110
+    // So index 100 should not trigger another resize
+    XCTAssertFalse(tree.ensureCapacity(for: 100))
+
+    // Should not resize again if already large enough
+    XCTAssertFalse(tree.ensureCapacity(for: 50))
+
+    // Should resize for index beyond new capacity
+    XCTAssertTrue(tree.ensureCapacity(for: 200))
+  }
 }
