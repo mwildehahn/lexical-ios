@@ -66,6 +66,13 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
     `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
 - After each significant change, ensure all tests pass and the Playground build succeeds on the iPhone 17 Pro (iOS 26.0) simulator. Do not commit unless these checks pass.
 
+## Implementation Tracking
+- Keep `IMPLEMENTATION.md` up to date while working:
+  - When tackling a task from `IMPLEMENTATION.md`, update progress as you go (notes, partial results, next steps).
+  - After completing a listed task, mark it done and add a short summary (what changed, key files, test/build status). Include commit SHA and PR link if available.
+  - If scope or approach changes, reflect it in `IMPLEMENTATION.md` so the plan stays accurate.
+  - Aim to update after each significant milestone to avoid stale status.
+
 ## Agent MCP Usage
 - XcodeBuildMCP (preferred; iOS only):
   - Build Playground
@@ -138,6 +145,7 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - Playground app builds on simulator:
     - `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
   - Docs updated if APIs change.
+  - `IMPLEMENTATION.md` updated to reflect progress and completion of tasks.
 
 ## Agent Commit Policy
 - Never commit, push, or open PRs without explicit user approval.
