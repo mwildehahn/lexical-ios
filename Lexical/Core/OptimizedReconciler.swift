@@ -204,9 +204,14 @@ private class DeltaGenerator {
 
     // Process nodes in document order so sibling insertions keep correct order.
     let orderedDirty = orderedDirtyNodes(in: pendingState, limitedTo: dirtyNodes)
-    print("🔥 OPTIMIZED RECONCILER: dirty nodes in order: \(orderedDirty)")
     var processedInsertionLengths: [NodeKey: Int] = [:]
-
+    var runningOffset = 0  // Track cumulative insertion offset
+    
+    // Detect if this is a fresh document creation or large bulk insertion
+    // When most nodes are new insertions and the cache is mostly empty, use sequential positions
+    let newInsertionCount = dirtyNodes.keys.filter { rangeCache[$0] == nil }.count
+    let isFreshDocument = rangeCache.count < 5 && newInsertionCount > 10
+    
     // Generate deltas for each dirty node
     for nodeKey in orderedDirty {
       let currentNode = currentState.nodeMap[nodeKey]
@@ -229,14 +234,37 @@ private class DeltaGenerator {
 
         // Extract actual content from the pending node
         let theme = editor.getTheme()
+        
+        // For fresh documents with ElementNodes, adjust preamble/postamble handling
+        // to ensure newlines appear between paragraph content, not before it
+        var preambleString = pendingNode.getPreamble()
+        var postambleString = pendingNode.getPostamble()
+        
+        if isFreshDocument, let elementNode = pendingNode as? ElementNode, !elementNode.isInline() {
+          // For block-level elements in fresh documents:
+          // Move postamble to preamble of next sibling to ensure newlines come after content
+          if let nextSibling = elementNode.getNextSibling(),
+             !nextSibling.isInline(),
+             postambleString == "\n" {
+            // Don't emit postamble here; the next block will get it as preamble
+            postambleString = ""
+          }
+          // If we're a block after another block, add newline as preamble
+          if let prevSibling = elementNode.getPreviousSibling() as? ElementNode,
+             !prevSibling.isInline(),
+             preambleString == "" {
+            preambleString = "\n"
+          }
+        }
+        
         let preambleContent = AttributeUtils.attributedStringByAddingStyles(
-          NSAttributedString(string: pendingNode.getPreamble()),
+          NSAttributedString(string: preambleString),
           from: pendingNode,
           state: pendingState,
           theme: theme
         )
         let postambleContent = AttributeUtils.attributedStringByAddingStyles(
-          NSAttributedString(string: pendingNode.getPostamble()),
+          NSAttributedString(string: postambleString),
           from: pendingNode,
           state: pendingState,
           theme: theme
@@ -270,19 +298,29 @@ private class DeltaGenerator {
         )
 
         // Calculate insertion location based on document structure
-        let insertionLocation = self.calculateInsertionLocationOrdered(
-          for: nodeKey,
-          in: pendingState,
-          rangeCache: rangeCache,
-          processedInsertionLengths: processedInsertionLengths,
-          editor: editor)
+        let insertionLocation: Int
+        let totalLength = insertionData.preamble.length + insertionData.content.length + insertionData.postamble.length
+        
+        // For fresh documents, use sequential insertion
+        if isFreshDocument {
+          insertionLocation = runningOffset
+          runningOffset += totalLength
+        } else {
+          // For incremental updates, calculate position based on document structure
+          insertionLocation = self.calculateInsertionLocationOrdered(
+            for: nodeKey,
+            in: pendingState,
+            rangeCache: rangeCache,
+            processedInsertionLengths: processedInsertionLengths,
+            runningOffset: &runningOffset,
+            editor: editor)
+        }
+        
+        // Track length for subsequent siblings
+        processedInsertionLengths[nodeKey] = totalLength
 
         let deltaType = ReconcilerDeltaType.nodeInsertion(nodeKey: nodeKey, insertionData: insertionData, location: insertionLocation)
         deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
-
-        // Track length for subsequent siblings when not present in cache yet
-        let totalLength = insertionData.preamble.length + insertionData.content.length + insertionData.postamble.length
-        processedInsertionLengths[nodeKey] = totalLength
         continue
       }
 
@@ -333,7 +371,8 @@ private class DeltaGenerator {
 
     // Create batch metadata
     let batchMetadata = BatchMetadata(
-      expectedTextStorageLength: editor.textStorage?.length ?? 0
+      expectedTextStorageLength: editor.textStorage?.length ?? 0,
+      isFreshDocument: isFreshDocument
     )
 
     return DeltaBatch(deltas: deltas, batchMetadata: batchMetadata)
@@ -345,7 +384,8 @@ private class DeltaGenerator {
     func visit(_ key: NodeKey) {
       if dirty[key] != nil { result.append(key) }
       if let node = pendingState.nodeMap[key] as? ElementNode {
-        for child in node.getChildrenKeys() { visit(child) }
+        // Use fromLatest: false since we're working with pendingState nodes
+        for child in node.getChildrenKeys(fromLatest: false) { visit(child) }
       }
     }
     if let root = pendingState.nodeMap[kRootNodeKey] { visit(root.getKey()) }
@@ -360,14 +400,16 @@ private class DeltaGenerator {
     in editorState: EditorState,
     rangeCache: [NodeKey: RangeCacheItem],
     processedInsertionLengths: [NodeKey: Int],
+    runningOffset: inout Int,
     editor: Editor
   ) -> Int {
-    guard let node = editorState.nodeMap[nodeKey] else { return 0 }
+    guard let node = editorState.nodeMap[nodeKey] else { return runningOffset }
     guard let parentKey = node.parent,
-          let parentNode = editorState.nodeMap[parentKey] as? ElementNode else { return 0 }
+          let parentNode = editorState.nodeMap[parentKey] as? ElementNode else { return runningOffset }
 
-    let children = parentNode.getChildrenKeys()
-    guard let idx = children.firstIndex(of: nodeKey) else { return 0 }
+    // Use fromLatest: false since parentNode is from editorState, not active state
+    let children = parentNode.getChildrenKeys(fromLatest: false)
+    guard let idx = children.firstIndex(of: nodeKey) else { return runningOffset }
 
     if idx == 0 {
       // First child: start at parent's content start
@@ -377,8 +419,8 @@ private class DeltaGenerator {
           : parentCache.location
         return loc + parentCache.preambleLength
       }
-      // Parent also newly inserted in this batch: if we already processed parent length/location, fall back to 0
-      return 0
+      // Parent is root or also newly inserted - use running offset
+      return runningOffset
     }
 
     let prevKey = children[idx - 1]
@@ -405,7 +447,8 @@ private class DeltaGenerator {
       }
       return loc
     }
-    return 0
+    // No cache info available - use running offset for sequential insertions
+    return runningOffset
   }
 
   /// Calculate the insertion location for a new node in the document
@@ -424,7 +467,8 @@ private class DeltaGenerator {
        let parentNode = editorState.nodeMap[parent],
        let elementParent = parentNode as? ElementNode {
 
-      let childrenKeys = elementParent.getChildrenKeys()
+      // Use fromLatest: false since elementParent is from editorState, not active state
+      let childrenKeys = elementParent.getChildrenKeys(fromLatest: false)
       guard let nodeIndex = childrenKeys.firstIndex(of: nodeKey) else {
         return 0
       }

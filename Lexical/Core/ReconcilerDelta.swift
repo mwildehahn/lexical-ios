@@ -77,15 +77,18 @@ public struct BatchMetadata {
   let batchId: String
   let timestamp: Date
   let expectedTextStorageLength: Int
+  let isFreshDocument: Bool
 
   public init(
     batchId: String = UUID().uuidString,
     timestamp: Date = Date(),
-    expectedTextStorageLength: Int
+    expectedTextStorageLength: Int,
+    isFreshDocument: Bool = false
   ) {
     self.batchId = batchId
     self.timestamp = timestamp
     self.expectedTextStorageLength = expectedTextStorageLength
+    self.isFreshDocument = isFreshDocument
   }
 }
 
