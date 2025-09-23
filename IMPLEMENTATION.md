@@ -24,7 +24,6 @@ Status legend: [x] done, [>] in progress, [ ] todo
 - [x] Compute insertion locations when siblings/parents are also inserted (no “insert at 0” collapse)
 - [x] Incremental RangeCache updates for childrenLength after text/insert/delete
 - [x] Stable Fenwick indexing for nodes (per‑node index map on Editor)
-- [ ] Remove debug prints and replace with structured metrics/logging
 
 ## 3) Observability
 
@@ -34,7 +33,7 @@ Status legend: [x] done, [>] in progress, [ ] todo
 
 ## 4) Migration & Safety
 
-- [ ] Feature flag guards remain until parity boxes are checked
+- [ ] Feature flag guards remain
 - [ ] Add dark‑launch option: run optimized, verify, then discard and run legacy (debug only)
 - [ ] Document rollout and recovery steps
 

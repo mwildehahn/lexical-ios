@@ -85,6 +85,7 @@ internal enum OptimizedReconciler {
 
     switch applicationResult {
     case .success(let appliedDeltas, let fenwickUpdates):
+      print("🔥 OPTIMIZED RECONCILER: delta application success (applied=\(appliedDeltas), fenwick=\(fenwickUpdates))")
       // Update range cache incrementally
       let cacheUpdater = IncrementalRangeCacheUpdater(editor: editor, fenwickTree: editor.fenwickTree)
       try cacheUpdater.updateRangeCache(
@@ -119,6 +120,7 @@ internal enum OptimizedReconciler {
     case .partialSuccess(let appliedDeltas, let failedDeltas, let reason):
       // Log but continue - we applied what we could
       editor.log(.reconciler, .warning, "Partial delta application: \(appliedDeltas) applied, \(failedDeltas.count) failed: \(reason)")
+      print("🔥 OPTIMIZED RECONCILER: delta application partial (applied=\(appliedDeltas), failed=\(failedDeltas.count)) reason=\(reason)")
 
     case .failure(let reason):
       // This is a real failure - throw an error
@@ -202,6 +204,7 @@ private class DeltaGenerator {
 
     // Process nodes in document order so sibling insertions keep correct order.
     let orderedDirty = orderedDirtyNodes(in: pendingState, limitedTo: dirtyNodes)
+    print("🔥 OPTIMIZED RECONCILER: dirty nodes in order: \(orderedDirty)")
     var processedInsertionLengths: [NodeKey: Int] = [:]
 
     // Generate deltas for each dirty node
@@ -302,6 +305,7 @@ private class DeltaGenerator {
             range: textRange
           )
           deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
+          print("🔥 OPTIMIZED RECONCILER: queued textUpdate for node \(nodeKey) range=\(textRange) old='\(currentTextNode.getText_dangerousPropertyAccess())' new='\(pendingTextNode.getText_dangerousPropertyAccess())'")
         }
 
         // Inline attribute (format) changes without text change

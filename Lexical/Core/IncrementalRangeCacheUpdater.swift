@@ -33,8 +33,25 @@ internal class IncrementalRangeCacheUpdater {
     let deltasByNode = groupDeltasByNode(deltas)
     print("🔥 RANGE CACHE UPDATER: applying deltas for \(deltasByNode.keys.count) nodes")
 
+    // Process element insertions before leaf insertions to ensure parents exist
+    let ordered: [(NodeKey, [ReconcilerDelta])] = deltasByNode.sorted { lhs, rhs in
+      func isElementInsertionByHeuristic(_ entry: (NodeKey, [ReconcilerDelta])) -> Bool {
+        // Heuristic: element insertions typically have empty content in insertionData
+        for d in entry.1 {
+          if case let .nodeInsertion(_, insertionData, _) = d.type {
+            return insertionData.content.length == 0
+          }
+        }
+        return false
+      }
+      // Element insertions first; otherwise preserve map order
+      if isElementInsertionByHeuristic(lhs) && !isElementInsertionByHeuristic(rhs) { return true }
+      if !isElementInsertionByHeuristic(lhs) && isElementInsertionByHeuristic(rhs) { return false }
+      return false
+    }
+
     // Process each affected node
-    for (nodeKey, nodeDeltas) in deltasByNode {
+    for (nodeKey, nodeDeltas) in ordered {
       print("🔥 RANGE CACHE UPDATER: node=\(nodeKey) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
       try updateNodeInRangeCache(&rangeCache, nodeKey: nodeKey, deltas: nodeDeltas)
     }
