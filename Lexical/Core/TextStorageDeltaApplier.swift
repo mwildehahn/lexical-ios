@@ -160,7 +160,7 @@ internal class TextStorageDeltaApplier {
     // Update FenwickTree if there's a length change
     var fenwickUpdates = 0
     if lengthDelta != 0 {
-      let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: range.location)
+      let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? ensureFenwickIndex(for: nodeKey)
       fenwickTree.update(index: fenwickIndex, delta: lengthDelta)
       fenwickUpdates = 1
     }
@@ -207,8 +207,8 @@ internal class TextStorageDeltaApplier {
     textStorage.insert(completeString, at: clampedLocation)
     print("🔥 DELTA APPLIER: post-insert text length \(textStorage.length)")
 
-    // Update FenwickTree
-    let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: clampedLocation)
+    // Update FenwickTree using a stable node index
+    let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? ensureFenwickIndex(for: nodeKey)
     fenwickTree.update(index: fenwickIndex, delta: completeString.length)
     let fenwickUpdates = 1
 
@@ -336,6 +336,15 @@ internal class TextStorageDeltaApplier {
 
     // Return the node's index in the Fenwick tree
     return rangeCacheItem.nodeIndex
+  }
+
+  // Ensure a stable Fenwick index exists for this node and return it
+  private func ensureFenwickIndex(for nodeKey: NodeKey) -> Int {
+    if let idx = editor.fenwickIndexMap[nodeKey] { return idx }
+    let idx = editor.nextFenwickIndex
+    editor.nextFenwickIndex += 1
+    editor.fenwickIndexMap[nodeKey] = idx
+    return idx
   }
 }
 
