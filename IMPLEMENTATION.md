@@ -20,10 +20,21 @@ Status legend: [x] done, [>] in progress, [ ] todo
 
 - [x] TextStorage controller‑mode editing around optimized batch (begin/endEditing)
 - [x] Clamp insert ranges to textStorage bounds
-- [x] Clamp textUpdate ranges to textStorage bounds
+- [x] Clamp textUpdate ranges to textStorage bounds (now strict; invalid ranges fail)
 - [x] Compute insertion locations when siblings/parents are also inserted (no “insert at 0” collapse)
 - [x] Incremental RangeCache updates for childrenLength after text/insert/delete
-- [x] Stable Fenwick indexing for nodes (per‑node index map on Editor)
+- [x] Stable Fenwick indexing for nodes (per‑node index map on Editor; assigned on first delta)
+
+### 2025‑09‑23 — Optimized reconciler fixes
+- Stabilized Fenwick indices across deltas; avoid location‑based fallback indices.
+- Strict textUpdate range validation; removed silent clamping.
+- Incremental RangeCache now bumps ancestors’ `childrenLength` on insert/update/delete.
+- Ordered element insertions before leaf insertions within a batch (heuristic) to seed parent cache.
+- RangeCacheChildrenLengthTests runs under optimized path; full suite green on iOS Simulator.
+
+Follow‑ups
+- Remove temporary debug prints after burn‑in.
+- Tighten delta ordering for complex sibling insert batches; add targeted tests.
 
 ## 3) Observability
 

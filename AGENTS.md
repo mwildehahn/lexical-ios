@@ -153,10 +153,18 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - `IMPLEMENTATION.md` updated to reflect progress and completion of tasks.
 
 ## Agent Commit Policy
-- Never commit, push, or open PRs without explicit user approval.
-- Propose changes and a commit message; wait for “OK to commit/push?”.
-- Avoid destructive actions (e.g., `git reset --hard`, branch deletes) unless requested.
+- ABSOLUTE RULE: Do not run `git add`, `git commit`, `git merge`, `git rebase`, `git tag`, or `git push` without explicit written approval from the user in the same conversation turn.
+- Approval must include the literal phrase: `OK to commit` (and `OK to push` if pushing) plus the intended commit message.
+- Default workflow: use `apply_patch` to propose file changes; show the diff summary and a proposed commit message; wait for approval.
+- If any commit occurs without approval, immediately pause and ask whether to revert. Do not push under any circumstance without explicit `OK to push`.
+- Avoid destructive git actions (e.g., `git reset --hard`, branch deletes) unless explicitly requested with an `OK to reset` confirmation.
 - External contributors must sign the Meta CLA (see `CONTRIBUTING.md`).
+
+Enforcement checklist (before any commit/push)
+- Confirm tests/build checklist in Post-Change Verification passed on the iOS simulator.
+- Paste proposed commit message and a concise list of modified paths.
+- Obtain explicit, verbatim consent: `OK to commit` (and `OK to push` if applicable).
+- If consent is not present, do not perform any git operation.
 
 ## Security & Configuration Tips
 - Minimum iOS is 16 (Playground commonly targets iOS 26.0 on simulator).
