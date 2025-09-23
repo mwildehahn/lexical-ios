@@ -59,11 +59,13 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 ## Post-Change Verification
 - Always verify locally after making significant changes:
   - Package build: `swift build`
-  - Run all tests (SwiftPM): `swift test`
-  - Run iOS simulator tests to match CI:
+  - Run all tests on iOS simulator (authoritative):
     `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+    - Filter example:
+      `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
   - Build Playground app on simulator:
     `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
+  - Note: `swift test` targets macOS and may fail due to UIKit/TextKit iOS-only APIs; prefer the Xcode iOS simulator command above.
 - After each significant change, ensure all tests pass and the Playground build succeeds on the iPhone 17 Pro (iOS 26.0) simulator. Do not commit unless these checks pass.
 
 ## Implementation Tracking
@@ -139,9 +141,10 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 - PRs: describe change, link issues, note user impact, and include screenshots of the Playground UI when relevant.
 - Ensure before commit/PR:
   - Package builds: `swift build`
-  - All tests pass via SwiftPM and Xcode iOS simulator:
-    - `swift test`
+  - All tests pass on iOS simulator (Xcode):
     - `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+    - Optional filters (speed up iteration):
+      - `-only-testing:LexicalTests/<SuiteName>` or `-only-testing:LexicalTests/<SuiteName>/<testName>`
   - Playground app builds on simulator:
     - `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
   - Docs updated if APIs change.
