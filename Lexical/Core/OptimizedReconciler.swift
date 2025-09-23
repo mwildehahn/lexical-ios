@@ -131,7 +131,7 @@ internal enum OptimizedReconciler {
     editor: Editor,
     pendingState: EditorState,
     dirtyNodes: DirtyNodeMap,
-    textStorage: NSTextStorage
+    textStorage: TextStorage
   ) {
     let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(theme: editor.getTheme())
 
@@ -145,8 +145,7 @@ internal enum OptimizedReconciler {
     let rangeCache = editor.rangeCache
     for key in nodesToApply {
       guard let node = pendingState.nodeMap[key], node.isAttached(), let cacheItem = rangeCache[key] else { continue }
-      let attrs = node.getBlockLevelAttributes(theme: editor.getTheme())
-      if !attrs.isEmpty {
+      if let attrs = node.getBlockLevelAttributes(theme: editor.getTheme()) {
         AttributeUtils.applyBlockLevelAttributes(
           attrs,
           cacheItem: cacheItem,
@@ -386,7 +385,7 @@ private class DeltaGenerator {
       return prevLoc + prevCache.preambleLength + prevCache.childrenLength + prevCache.textLength + prevCache.postambleLength
     }
     // Previous sibling also inserted in this batch; use its processed length if available.
-    if let prevInsertedLen = processedInsertionLengths[prevKey],
+    if processedInsertionLengths[prevKey] != nil,
        let parentCache = rangeCache[parentKey] {
       let parentLoc = editor.featureFlags.optimizedReconciler
         ? parentCache.locationFromFenwick(using: editor.fenwickTree)

@@ -134,6 +134,11 @@ internal class TextStorageDeltaApplier {
         .warning,
         "Adjusted textUpdate range from \(NSStringFromRange(range)) to \(NSStringFromRange(safeRange)) for node \(nodeKey)"
       )
+      if let mc = editor.metricsContainer {
+        let key = "optimized.clampedTextUpdates"
+        let current = (mc.metricsData[key] as? Int) ?? 0
+        mc.metricsData[key] = current + 1
+      }
     }
 
     // Calculate length delta
@@ -175,6 +180,11 @@ internal class TextStorageDeltaApplier {
 
     if clampedLocation != location {
       print("🔥 DELTA APPLIER: clamped insertion for node \(nodeKey) from \(location) to \(clampedLocation) (text length \(textStorage.length))")
+      if let mc = editor.metricsContainer {
+        let key = "optimized.clampedInsertions"
+        let current = (mc.metricsData[key] as? Int) ?? 0
+        mc.metricsData[key] = current + 1
+      }
     } else {
       print("🔥 DELTA APPLIER: inserting node \(nodeKey) at \(clampedLocation) (text length \(textStorage.length))")
     }
