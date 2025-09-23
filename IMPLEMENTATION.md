@@ -10,8 +10,8 @@ Status legend: [x] done, [>] in progress, [ ] todo
 - [ ] Decorator nodes parity:
   - [ ] Correct position updates for `decoratorPositionCache`
   - [ ] Create/decorate lifecycle to match legacy (needs cache + view hooks)
-- [>] Block‑level attributes parity (paragraph/list/table attributes applied after insert)
-- [ ] Attribute deltas coverage (bold/italic etc) generation in DeltaGenerator
+- [x] Block‑level attributes parity (paragraph/list/table attributes applied after insert)
+- [x] Attribute deltas coverage (bold/italic etc) generation in DeltaGenerator (attributeChange)
 - [x] Children ordering invariants (insertions occur in document order for fresh content)
 - [ ] Selection reconciliation edge‑cases identical to legacy (node selections, anchor types)
 - [ ] Placeholder visibility and controller/non‑controlled mode consistency
@@ -43,16 +43,20 @@ Status legend: [x] done, [>] in progress, [ ] todo
 ## Immediate Work Items (Milestone A)
 
 1. Generate deltas in document order so fresh documents keep child order. [x]
-2. Apply block‑level attributes after optimized batch (mirror legacy). [>]
+2. Apply block‑level attributes after optimized batch (mirror legacy). [x]
 3. Basic decorator positions update (minimal parity: position cache only). [ ]
 4. Emit attributeChange deltas for inline style toggles on TextNode. [x]
 5. Wire metrics (clamping counts, delta type counts) and parity tests. [>]
+   - [x] Count clamped insertions/updates
+   - [x] Parity tests: fresh‑doc ordering; inline attribute change
+   - [ ] Per‑delta applied/failed counters
+   - [ ] ChildrenLength propagation test on nested trees
 
 ## Milestone B
 
 - Marked text handling (IME): mirror legacy reconcile flow (selection guard + setMarkedTextFromReconciler). [ ]
-- Stable Fenwick indexing semantics (nodeIndex lifecycle). [ ]
-- RangeCache incremental childrenLength recompute on element insertions. [ ]
+- Stable Fenwick indexing semantics (nodeIndex lifecycle). [x]
+- RangeCache incremental childrenLength recompute on element insertions. [x]
 
 ## Milestone C
 
