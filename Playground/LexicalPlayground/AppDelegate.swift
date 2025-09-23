@@ -30,6 +30,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     let tabBarController = UITabBarController()
     tabBarController.viewControllers = [editorNavController, performanceNavController]
 
+    // Preselect the Performance tab
+    tabBarController.selectedIndex = 1
+
     window.rootViewController = tabBarController
     return true
   }
