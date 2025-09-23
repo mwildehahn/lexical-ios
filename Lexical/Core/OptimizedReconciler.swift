@@ -25,7 +25,6 @@ internal enum OptimizedReconciler {
     markedTextOperation: MarkedTextOperation?
   ) throws {
 
-
     // Marked text operations not yet supported in optimized path
     if markedTextOperation != nil {
       throw LexicalError.invariantViolation("Marked text operations not yet supported in optimized reconciliation")
@@ -69,8 +68,20 @@ internal enum OptimizedReconciler {
       }
     }
 
+    print("🔥 OPTIMIZED RECONCILER: textStorage length before apply: \(textStorage.length)")
+
+    let previousMode = textStorage.mode
+    textStorage.mode = .controllerMode
+    textStorage.beginEditing()
+    defer {
+      textStorage.endEditing()
+      textStorage.mode = previousMode
+    }
+
     // Apply deltas
     let applicationResult = deltaApplier.applyDeltaBatch(deltaBatch, to: textStorage)
+
+    print("🔥 OPTIMIZED RECONCILER: textStorage length after apply: \(textStorage.length)")
 
     switch applicationResult {
     case .success(let appliedDeltas, let fenwickUpdates):
@@ -168,14 +179,38 @@ private class DeltaGenerator {
         let metadata = DeltaMetadata(sourceUpdate: "Node insertion")
 
         // Extract actual content from the pending node
-        let preambleContent = NSAttributedString(string: pendingNode.getPreamble())
-        let postambleContent = NSAttributedString(string: pendingNode.getPostamble())
+        let theme = editor.getTheme()
+        let preambleContent = AttributeUtils.attributedStringByAddingStyles(
+          NSAttributedString(string: pendingNode.getPreamble()),
+          from: pendingNode,
+          state: pendingState,
+          theme: theme
+        )
+        let postambleContent = AttributeUtils.attributedStringByAddingStyles(
+          NSAttributedString(string: pendingNode.getPostamble()),
+          from: pendingNode,
+          state: pendingState,
+          theme: theme
+        )
 
         // Get the text content based on node type
         var textContent = NSAttributedString(string: "")
         if let textNode = pendingNode as? TextNode {
           let textString = textNode.getText_dangerousPropertyAccess()
-          textContent = NSAttributedString(string: textString)
+          textContent = AttributeUtils.attributedStringByAddingStyles(
+            NSAttributedString(string: textString),
+            from: pendingNode,
+            state: pendingState,
+            theme: theme
+          )
+        } else if let elementNode = pendingNode as? ElementNode {
+          // Element nodes may contribute text via pre/post content; their own content is empty.
+          textContent = AttributeUtils.attributedStringByAddingStyles(
+            NSAttributedString(string: ""),
+            from: elementNode,
+            state: pendingState,
+            theme: theme
+          )
         }
 
         let insertionData = NodeInsertionData(
