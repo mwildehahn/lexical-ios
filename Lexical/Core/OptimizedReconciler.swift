@@ -55,6 +55,20 @@ internal enum OptimizedReconciler {
     // Log delta count for debugging
     editor.log(.reconciler, .message, "Generated \(deltaBatch.deltas.count) deltas")
 
+    // Debug: Log what deltas we actually generated
+    for (index, delta) in deltaBatch.deltas.enumerated() {
+      switch delta.type {
+      case .nodeInsertion(let nodeKey, let insertionData, let location):
+        editor.log(.reconciler, .message, "Delta \(index): INSERT node \(nodeKey) at \(location), content length: \(insertionData.content.length)")
+      case .textUpdate(let nodeKey, let newText, let range):
+        editor.log(.reconciler, .message, "Delta \(index): UPDATE node \(nodeKey) text: '\(newText.prefix(20))...' at \(range)")
+      case .nodeDeletion(let nodeKey, let range):
+        editor.log(.reconciler, .message, "Delta \(index): DELETE node \(nodeKey) at \(range)")
+      case .attributeChange(let nodeKey, _, let range):
+        editor.log(.reconciler, .message, "Delta \(index): ATTR node \(nodeKey) at \(range)")
+      }
+    }
+
     // Apply deltas
     let applicationResult = deltaApplier.applyDeltaBatch(deltaBatch, to: textStorage)
 
