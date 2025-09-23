@@ -80,7 +80,12 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 - Use imperative, scoped subjects: `Optimized reconciler: emit attributeChange deltas`, `Fix build: …`, `Refactor: …`.
 - Keep body concise with bullet points for rationale/impact.
 - PRs: describe change, link issues, note user impact, and include screenshots of the Playground UI when relevant.
-- Ensure: builds pass (`swift build`), tests pass (`swift test` or Xcode/iOS sim), and docs updated if APIs change.
+- Ensure: builds pass (`swift build`), tests pass (`swift test` or Xcode/iOS sim via MCP), and docs updated if APIs change.
+
+## Agent Commit Policy
+- Never commit, push, or open PRs without explicit user approval.
+- Propose changes and a commit message; wait for “OK to commit/push?”.
+- Avoid destructive actions (e.g., `git reset --hard`, branch deletes) unless requested.
 - External contributors must sign the Meta CLA (see `CONTRIBUTING.md`).
 
 ## Security & Configuration Tips
