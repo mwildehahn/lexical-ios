@@ -31,9 +31,11 @@ internal class IncrementalRangeCacheUpdater {
 
     // Group deltas by node for efficient processing
     let deltasByNode = groupDeltasByNode(deltas)
+    print("🔥 RANGE CACHE UPDATER: applying deltas for \(deltasByNode.keys.count) nodes")
 
     // Process each affected node
     for (nodeKey, nodeDeltas) in deltasByNode {
+      print("🔥 RANGE CACHE UPDATER: node=\(nodeKey) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
       try updateNodeInRangeCache(&rangeCache, nodeKey: nodeKey, deltas: nodeDeltas)
     }
   }
@@ -118,6 +120,7 @@ internal class IncrementalRangeCacheUpdater {
 
     rangeCache[nodeKey] = updatedItem
     if childrenDeltaAccumulator != 0 {
+      print("🔥 RANGE CACHE UPDATER: bumping ancestors of \(nodeKey) by \(childrenDeltaAccumulator)")
       adjustAncestorsChildrenLength(&rangeCache, nodeKey: nodeKey, delta: childrenDeltaAccumulator)
     }
   }
@@ -136,7 +139,20 @@ internal class IncrementalRangeCacheUpdater {
     newItem.preambleLength = insertionData.preamble.length
     newItem.postambleLength = insertionData.postamble.length
     newItem.textLength = insertionData.content.length
-    newItem.childrenLength = 0 // New nodes start with no calculated children length
+    // New nodes start with no calculated children length; if the node is an element
+    // and some of its children were inserted earlier in this batch, seed the
+    // childrenLength from currently-known children in the cache.
+    if let element: ElementNode = getNodeByKey(key: nodeKey) {
+      var sum = 0
+      for childKey in element.getChildrenKeys() {
+        if let child = rangeCache[childKey] {
+          sum += child.preambleLength + child.childrenLength + child.textLength + child.postambleLength
+        }
+      }
+      newItem.childrenLength = sum
+    } else {
+      newItem.childrenLength = 0
+    }
 
     // Assign a stable node index for the Fenwick tree
     newItem.nodeIndex = getOrAssignFenwickIndex(for: nodeKey)
@@ -144,6 +160,12 @@ internal class IncrementalRangeCacheUpdater {
     _ = fenwickTree.ensureCapacity(for: newItem.nodeIndex)
 
     rangeCache[nodeKey] = newItem
+
+    // Bump ancestors' childrenLength by the full contribution of this node
+    let totalContribution = newItem.preambleLength + newItem.childrenLength + newItem.textLength + newItem.postambleLength
+    if totalContribution != 0 {
+      adjustAncestorsChildrenLength(&rangeCache, nodeKey: nodeKey, delta: totalContribution)
+    }
   }
 
   // MARK: - Helper Methods
@@ -198,7 +220,10 @@ internal class IncrementalRangeCacheUpdater {
     let parents = node.getParentKeys()
     for p in parents {
       if var item = rangeCache[p] {
+        let before = item.childrenLength
         item.childrenLength = max(0, item.childrenLength + delta)
+        let after = item.childrenLength
+        print("🔥 RANGE CACHE UPDATER: parent=\(p) childrenLength: \(before) -> \(after) (delta=\(delta))")
         rangeCache[p] = item
       }
     }
