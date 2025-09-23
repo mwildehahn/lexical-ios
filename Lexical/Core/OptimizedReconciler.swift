@@ -149,17 +149,32 @@ private class DeltaGenerator {
       }
 
       // Node insertion
-      if currentNode == nil && pendingNode != nil {
-        // Generate an insertion delta for the new node
-        // The actual content will be filled by the reconciliation process
+      if currentNode == nil, let pendingNode = pendingNode {
+        // Generate an insertion delta for the new node with actual content
         let metadata = DeltaMetadata(sourceUpdate: "Node insertion")
+
+        // Extract actual content from the pending node
+        let preambleContent = NSAttributedString(string: pendingNode.getPreamble())
+        let postambleContent = NSAttributedString(string: pendingNode.getPostamble())
+
+        // Get the text content based on node type
+        var textContent = NSAttributedString(string: "")
+        if let textNode = pendingNode as? TextNode {
+          let textString = textNode.getText_dangerousPropertyAccess()
+          textContent = NSAttributedString(string: textString)
+        }
+
         let insertionData = NodeInsertionData(
-          preamble: NSAttributedString(string: ""),
-          content: NSAttributedString(string: ""),
-          postamble: NSAttributedString(string: ""),
+          preamble: preambleContent,
+          content: textContent,
+          postamble: postambleContent,
           nodeKey: nodeKey
         )
-        let deltaType = ReconcilerDeltaType.nodeInsertion(nodeKey: nodeKey, insertionData: insertionData, location: 0)
+
+        // Calculate insertion location based on document structure
+        let insertionLocation = self.calculateInsertionLocation(for: nodeKey, in: pendingState, rangeCache: rangeCache, editor: editor)
+
+        let deltaType = ReconcilerDeltaType.nodeInsertion(nodeKey: nodeKey, insertionData: insertionData, location: insertionLocation)
         deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
         continue
       }
@@ -193,5 +208,50 @@ private class DeltaGenerator {
     )
 
     return DeltaBatch(deltas: deltas, batchMetadata: batchMetadata)
+  }
+
+  /// Calculate the insertion location for a new node in the document
+  private func calculateInsertionLocation(
+    for nodeKey: NodeKey,
+    in editorState: EditorState,
+    rangeCache: [NodeKey: RangeCacheItem],
+    editor: Editor
+  ) -> Int {
+    guard let node = editorState.nodeMap[nodeKey] else {
+      return 0
+    }
+
+    // Find the insertion point based on the node's position in its parent
+    if let parent = node.parent,
+       let parentNode = editorState.nodeMap[parent],
+       let elementParent = parentNode as? ElementNode {
+
+      let childrenKeys = elementParent.getChildrenKeys()
+      guard let nodeIndex = childrenKeys.firstIndex(of: nodeKey) else {
+        return 0
+      }
+
+      // If this is the first child, insert at parent's content start
+      if nodeIndex == 0 {
+        if let parentCacheItem = rangeCache[parent] {
+          let parentLocation = editor.featureFlags.optimizedReconciler
+            ? parentCacheItem.locationFromFenwick(using: editor.fenwickTree)
+            : parentCacheItem.location
+          return parentLocation + parentCacheItem.preambleLength
+        }
+        return 0
+      }
+
+      // Otherwise, insert after the previous sibling
+      let previousSiblingKey = childrenKeys[nodeIndex - 1]
+      if let previousCacheItem = rangeCache[previousSiblingKey] {
+        let siblingLocation = editor.featureFlags.optimizedReconciler
+          ? previousCacheItem.locationFromFenwick(using: editor.fenwickTree)
+          : previousCacheItem.location
+        return siblingLocation + previousCacheItem.preambleLength + previousCacheItem.childrenLength + previousCacheItem.textLength + previousCacheItem.postambleLength
+      }
+    }
+
+    return 0
   }
 }
