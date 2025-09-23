@@ -69,6 +69,13 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - Never pass `-quiet` to `xcodebuild` for tests or builds; keep output visible for diagnosis and CI logs.
 - After each significant change, ensure all tests pass and the Playground build succeeds on the iPhone 17 Pro (iOS 26.0) simulator. Do not commit unless these checks pass.
 
+## Debug Logging
+- Use "🔥"-prefixed debug prints for temporary diagnostics to make logs easy to grep, e.g.:
+  - `print("🔥 OPTIMIZED RECONCILER: delta application success (applied=\(applied), fenwick=\(ops))")`
+  - `print("🔥 DELTA APPLIER: handling delta \(delta.type)")`
+- Keep messages concise and subsystem-tagged (e.g., OPTIMIZED RECONCILER, DELTA APPLIER, RANGE CACHE UPDATER).
+- Remove or gate these prints behind debug flags before finalizing long-lived changes.
+
 ## Implementation Tracking
 - Keep `IMPLEMENTATION.md` up to date while working:
   - When tackling a task from `IMPLEMENTATION.md`, update progress as you go (notes, partial results, next steps).
@@ -135,6 +142,11 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 - Place tests in the corresponding `*Tests` target; mirror source structure where practical.
 - New public APIs or behavior changes require tests. Aim to cover edge cases found in `LexicalTests/EdgeCases` and performance scenarios separately.
 - Run locally with `swift test` or via Xcode using the `Lexical` scheme.
+- Important: For any significant change — especially items taken from `IMPLEMENTATION.md` — add or update unit tests that:
+  - Prove the new/changed behavior (happy path) and key edge cases.
+  - Regress the original failure if fixing a bug.
+  - Live under the appropriate target (e.g., `LexicalTests/Phase4` for optimized reconciler work).
+  - Are runnable on the iOS simulator using the commands in this guide.
 
 ## Commit & Pull Request Guidelines
 - Use imperative, scoped subjects: `Optimized reconciler: emit attributeChange deltas`, `Fix build: …`, `Refactor: …`.
@@ -150,21 +162,17 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - Playground app builds on simulator:
     - `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
   - Docs updated if APIs change.
+  - Tests added/updated for important changes; reference the related `IMPLEMENTATION.md` task in the PR body.
   - `IMPLEMENTATION.md` updated to reflect progress and completion of tasks.
 
-## Agent Commit Policy
-- ABSOLUTE RULE: Do not run `git add`, `git commit`, `git merge`, `git rebase`, `git tag`, or `git push` without explicit written approval from the user in the same conversation turn.
-- Approval must include the literal phrase: `OK to commit` (and `OK to push` if pushing) plus the intended commit message.
-- Default workflow: use `apply_patch` to propose file changes; show the diff summary and a proposed commit message; wait for approval.
-- If any commit occurs without approval, immediately pause and ask whether to revert. Do not push under any circumstance without explicit `OK to push`.
-- Avoid destructive git actions (e.g., `git reset --hard`, branch deletes) unless explicitly requested with an `OK to reset` confirmation.
-- External contributors must sign the Meta CLA (see `CONTRIBUTING.md`).
-
-Enforcement checklist (before any commit/push)
-- Confirm tests/build checklist in Post-Change Verification passed on the iOS simulator.
-- Paste proposed commit message and a concise list of modified paths.
-- Obtain explicit, verbatim consent: `OK to commit` (and `OK to push` if applicable).
-- If consent is not present, do not perform any git operation.
+## Git and File Safety Policy
+- Destructive git actions are prohibited unless explicitly requested by the user in this conversation. Do not run:
+  - History or index destructive commands: `git reset --hard`, `git clean -fdx`, `git reflog expire --expire-unreachable=now --all`, history rewrites (`filter-branch`, `filter-repo`, BFG), forced rebases, or force pushes (`git push --force*`).
+  - Destructive ref ops: branch or tag deletions (local or remote), remote prunes.
+  - Any command that discards uncommitted work or rewrites public history.
+- File safety: Do not delete or remove files (including `git rm`, `apply_patch` deletions, or moving files that result in content loss) unless the user provides explicit approval with the exact paths, e.g., `OK to delete: path1, path2`.
+- Prefer non-destructive changes: deprecate or rename rather than delete; gate behavior behind feature flags; keep migrations reversible.
+- If a destructive operation is explicitly requested, restate the impact and wait for clear confirmation before proceeding.
 
 ## Security & Configuration Tips
 - Minimum iOS is 16 (Playground commonly targets iOS 26.0 on simulator).
