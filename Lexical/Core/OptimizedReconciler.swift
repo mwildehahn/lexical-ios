@@ -304,6 +304,27 @@ private class DeltaGenerator {
           )
           deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
         }
+
+        // Inline attribute (format) changes without text change
+        if let currentTextNode = currentNode as? TextNode,
+           let pendingTextNode = pendingNode as? TextNode,
+           currentTextNode.getText_dangerousPropertyAccess() == pendingTextNode.getText_dangerousPropertyAccess(),
+           currentTextNode.getFormat() != pendingTextNode.getFormat(),
+           let rangeCacheItem = rangeCache[nodeKey] {
+
+          let textRange = NSRange(
+            location: rangeCacheItem.locationFromFenwick(using: editor.fenwickTree) + rangeCacheItem.preambleLength,
+            length: rangeCacheItem.textLength
+          )
+          let attrs = pendingTextNode.getAttributedStringAttributes(theme: editor.getTheme())
+          let metadata = DeltaMetadata(sourceUpdate: "Inline attribute update")
+          let deltaType = ReconcilerDeltaType.attributeChange(
+            nodeKey: nodeKey,
+            attributes: attrs,
+            range: textRange
+          )
+          deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
+        }
       }
     }
 
