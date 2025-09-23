@@ -36,9 +36,6 @@ internal class IncrementalRangeCacheUpdater {
     for (nodeKey, nodeDeltas) in deltasByNode {
       try updateNodeInRangeCache(&rangeCache, nodeKey: nodeKey, deltas: nodeDeltas)
     }
-
-    // Update location offsets for all nodes based on cumulative changes
-    try updateLocationOffsets(&rangeCache, basedOn: deltas)
   }
 
   /// Update a specific node in the range cache
@@ -109,26 +106,6 @@ internal class IncrementalRangeCacheUpdater {
     rangeCache[nodeKey] = updatedItem
   }
 
-  /// Update location offsets for all nodes based on cumulative length changes
-  private func updateLocationOffsets(
-    _ rangeCache: inout [NodeKey: RangeCacheItem],
-    basedOn deltas: [ReconcilerDelta]
-  ) throws {
-
-    // Calculate cumulative length changes by location
-    let locationChanges = calculateLocationChanges(from: deltas)
-
-    // Update each range cache item's location
-    for (nodeKey, var item) in rangeCache {
-      let adjustedLocation = calculateAdjustedLocation(
-        originalLocation: item.location,
-        locationChanges: locationChanges
-      )
-      item.location = adjustedLocation
-      rangeCache[nodeKey] = item
-    }
-  }
-
   /// Calculate new range cache item for a newly inserted node
   private func calculateNewNodeRangeCacheItem(
     _ rangeCache: inout [NodeKey: RangeCacheItem],
@@ -162,11 +139,14 @@ internal class IncrementalRangeCacheUpdater {
       }
     }
 
-    // Use the explicit insertion location when available, otherwise fall back to FenwickTree
-    if let insertionLocation = insertionLocation {
-      newItem.location = insertionLocation
-    } else if let fenwickIndex = getFenwickIndexForNode(nodeKey, rangeCache: rangeCache) {
-      newItem.location = fenwickTree.query(index: fenwickIndex)
+    // Assign a node index for the Fenwick tree
+    // For now, we'll use a simple mapping based on the insertion order
+    // This could be improved with a more sophisticated indexing scheme
+    if let fenwickIndex = getFenwickIndexForNode(nodeKey, rangeCache: rangeCache) {
+      newItem.nodeIndex = fenwickIndex
+    } else {
+      // For new nodes, find the next available index
+      newItem.nodeIndex = rangeCache.count
     }
 
     rangeCache[nodeKey] = newItem
@@ -182,7 +162,8 @@ internal class IncrementalRangeCacheUpdater {
 
     for child in elementNode.getChildren() {
       if let childItem = rangeCache[child.key] {
-        totalLength += childItem.range.length
+        // Calculate the total length of this child node
+        totalLength += childItem.preambleLength + childItem.childrenLength + childItem.textLength + childItem.postambleLength
       } else {
         // Child not in cache yet, calculate its length
         totalLength += calculateNodeLength(child)
@@ -237,61 +218,13 @@ internal class IncrementalRangeCacheUpdater {
     }
   }
 
-  private func calculateLocationChanges(from deltas: [ReconcilerDelta]) -> [(location: Int, lengthDelta: Int)] {
-    var changes: [(location: Int, lengthDelta: Int)] = []
-
-    for delta in deltas {
-      switch delta.type {
-      case .textUpdate(_, let newText, let range):
-        let lengthDelta = newText.lengthAsNSString() - range.length
-        if lengthDelta != 0 {
-          changes.append((location: range.location, lengthDelta: lengthDelta))
-        }
-
-      case .nodeInsertion(_, let insertionData, let location):
-        let totalLength = insertionData.preamble.length + insertionData.content.length + insertionData.postamble.length
-        changes.append((location: location, lengthDelta: totalLength))
-
-      case .nodeDeletion(_, let range):
-        changes.append((location: range.location, lengthDelta: -range.length))
-
-      case .attributeChange:
-        // These don't change text length
-        break
-      }
-    }
-
-    // Sort by location (reverse order for correct offset calculation)
-    return changes.sorted { $0.location > $1.location }
-  }
-
-  private func calculateAdjustedLocation(
-    originalLocation: Int,
-    locationChanges: [(location: Int, lengthDelta: Int)]
-  ) -> Int {
-
-    var adjustedLocation = originalLocation
-
-    for change in locationChanges {
-      if change.location < originalLocation {
-        adjustedLocation += change.lengthDelta
-      }
-    }
-
-    return max(0, adjustedLocation)
-  }
 
   private func getFenwickIndexForNode(_ nodeKey: NodeKey, rangeCache: [NodeKey: RangeCacheItem]) -> Int? {
     // Get the range cache item for this node
     guard let rangeCacheItem = rangeCache[nodeKey] else { return nil }
 
-    // Use a simple mapping based on the node's location in the document
-    // This maps nodes to fenwick indices based on their text position
-    let nodeLocation = rangeCacheItem.location
-
-    // Calculate fenwick index based on location (simplified approach)
-    // Group every ~100 characters into one fenwick index for efficiency
-    return max(0, nodeLocation / 100)
+    // Return the node's index in the Fenwick tree
+    return rangeCacheItem.nodeIndex
   }
 }
 

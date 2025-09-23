@@ -19,7 +19,7 @@ typealias UITextStorageDirection = NSTextStorageDirection
  */
 
 struct RangeCacheItem {
-  var location: Int = 0
+  var nodeIndex: Int = 0  // Index in the Fenwick tree for this node
   // the length of the full preamble, including any special characters
   var preambleLength: Int = 0
   // the length of any special characters in the preamble
@@ -28,9 +28,15 @@ struct RangeCacheItem {
   var textLength: Int = 0
   var postambleLength: Int = 0
 
-  var range: NSRange {
+  // Location is now computed dynamically from the Fenwick tree
+  func location(using fenwickTree: FenwickTree) -> Int {
+    return fenwickTree.getNodeOffset(nodeIndex: nodeIndex)
+  }
+
+  func range(using fenwickTree: FenwickTree) -> NSRange {
     NSRange(
-      location: location, length: preambleLength + childrenLength + textLength + postambleLength)
+      location: location(using: fenwickTree),
+      length: preambleLength + childrenLength + textLength + postambleLength)
   }
 }
 
@@ -78,12 +84,15 @@ private func evaluateNode(
   _ nodeKey: NodeKey, stringLocation: Int, searchDirection: UITextStorageDirection,
   rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> RangeCacheSearchResult? {
-  guard let rangeCacheItem = rangeCache[nodeKey], let node = getNodeByKey(key: nodeKey) else {
+  guard let rangeCacheItem = rangeCache[nodeKey],
+        let node = getNodeByKey(key: nodeKey),
+        let editor = getActiveEditor() else {
     throw LexicalError.rangeCacheSearch("Couldn't find node or range cache item for key \(nodeKey)")
   }
+  let fenwickTree = editor.fenwickTree
 
   if let parentKey = node.parent, let parentRangeCacheItem = rangeCache[parentKey] {
-    if stringLocation == parentRangeCacheItem.location
+    if stringLocation == parentRangeCacheItem.location(using: fenwickTree)
       && parentRangeCacheItem.preambleSpecialCharacterLength - parentRangeCacheItem.preambleLength
         == 0
     {
@@ -93,7 +102,7 @@ private func evaluateNode(
     }
   }
 
-  if !rangeCacheItem.entireRange().byAddingOne().contains(stringLocation) {
+  if !rangeCacheItem.entireRange(using: fenwickTree).byAddingOne().contains(stringLocation) {
     return nil
   }
 
@@ -139,9 +148,9 @@ private func evaluateNode(
     }
   }
 
-  if rangeCacheItem.entireRange().length == 0 {
+  if rangeCacheItem.entireRange(using: fenwickTree).length == 0 {
     // caret is at the last row - element with no children
-    if stringLocation == rangeCacheItem.location {
+    if stringLocation == rangeCacheItem.location(using: fenwickTree) {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
@@ -151,7 +160,7 @@ private func evaluateNode(
     return RangeCacheSearchResult(nodeKey: nodeKey, type: boundary, offset: nil)
   }
 
-  if stringLocation == rangeCacheItem.location {
+  if stringLocation == rangeCacheItem.location(using: fenwickTree) {
     if rangeCacheItem.preambleLength == 0 && node is ElementNode {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
@@ -159,17 +168,17 @@ private func evaluateNode(
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
   }
 
-  if stringLocation == rangeCacheItem.entireRange().upperBound {
-    if rangeCacheItem.selectableRange().length == 0 {
+  if stringLocation == rangeCacheItem.entireRange(using: fenwickTree).upperBound {
+    if rangeCacheItem.selectableRange(using: fenwickTree).length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .endBoundary, offset: nil)
   }
 
-  let preambleEnd = rangeCacheItem.location + rangeCacheItem.preambleLength
+  let preambleEnd = rangeCacheItem.location(using: fenwickTree) + rangeCacheItem.preambleLength
   if stringLocation == preambleEnd {
-    if rangeCacheItem.selectableRange().length == 0 {
+    if rangeCacheItem.selectableRange(using: fenwickTree).length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
@@ -190,19 +199,23 @@ extension NSRange {
 }
 
 extension RangeCacheItem {
-  func entireRange() -> NSRange {
+  func entireRange(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = location(using: fenwickTree)
     return NSRange(
-      location: location, length: preambleLength + childrenLength + textLength + postambleLength)
+      location: loc, length: preambleLength + childrenLength + textLength + postambleLength)
   }
-  func textRange() -> NSRange {
-    return NSRange(location: location + preambleLength + childrenLength, length: textLength)
+  func textRange(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = location(using: fenwickTree)
+    return NSRange(location: loc + preambleLength + childrenLength, length: textLength)
   }
-  func childrenRange() -> NSRange {
-    return NSRange(location: location + preambleLength, length: childrenLength)
+  func childrenRange(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = location(using: fenwickTree)
+    return NSRange(location: loc + preambleLength, length: childrenLength)
   }
-  func selectableRange() -> NSRange {
+  func selectableRange(using fenwickTree: FenwickTree) -> NSRange {
+    let loc = location(using: fenwickTree)
     return NSRange(
-      location: location,
+      location: loc,
       length: preambleLength + childrenLength + textLength + postambleLength
         - preambleSpecialCharacterLength)
   }

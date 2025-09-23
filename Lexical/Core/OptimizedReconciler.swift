@@ -172,7 +172,7 @@ private class DeltaGenerator {
            let rangeCacheItem = rangeCache[nodeKey] {
 
           let textRange = NSRange(
-            location: rangeCacheItem.location + rangeCacheItem.preambleLength,
+            location: rangeCacheItem.location(using: editor.fenwickTree) + rangeCacheItem.preambleLength,
             length: rangeCacheItem.textLength
           )
 

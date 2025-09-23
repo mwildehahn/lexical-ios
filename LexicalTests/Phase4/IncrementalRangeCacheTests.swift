@@ -305,7 +305,7 @@ class IncrementalRangeCacheTests: XCTestCase {
     // Verify initial cache consistency
     var totalLength = 0
     for (nodeKey, cacheItem) in rangeCache {
-      XCTAssertGreaterThanOrEqual(cacheItem.location, 0, "Cache location should be non-negative")
+      XCTAssertGreaterThanOrEqual(cacheItem.nodeIndex, 0, "Node index should be non-negative")
       XCTAssertGreaterThanOrEqual(cacheItem.textLength, 0, "Text length should be non-negative")
       totalLength += cacheItem.textLength
     }
@@ -334,7 +334,7 @@ class IncrementalRangeCacheTests: XCTestCase {
     // Verify cache consistency after updates
     var updatedTotalLength = 0
     for (nodeKey, cacheItem) in rangeCache {
-      XCTAssertGreaterThanOrEqual(cacheItem.location, 0, "Cache location should remain non-negative")
+      XCTAssertGreaterThanOrEqual(cacheItem.nodeIndex, 0, "Node index should remain non-negative")
       XCTAssertGreaterThanOrEqual(cacheItem.textLength, 0, "Text length should remain non-negative")
       updatedTotalLength += cacheItem.textLength
     }

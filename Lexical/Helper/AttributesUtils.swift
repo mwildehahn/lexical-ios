@@ -208,17 +208,18 @@ enum AttributeUtils {
 
   internal static func applyBlockLevelAttributes(
     _ attributes: BlockLevelAttributes, cacheItem: RangeCacheItem, textStorage: TextStorage,
-    nodeKey: NodeKey, lastDescendentAttributes: [NSAttributedString.Key: Any]
+    nodeKey: NodeKey, lastDescendentAttributes: [NSAttributedString.Key: Any], fenwickTree: FenwickTree
   ) {
 
     // for more information about the extraLineFragment, see NSLayoutManager docs
     let extraLineFragmentIsPresent = extraLineFragmentIsPresent(textStorage)
+    let range = cacheItem.range(using: fenwickTree)
     let startTouchesExtraLineFragment =
-      (extraLineFragmentIsPresent && cacheItem.range.length == 0
-        && cacheItem.range.location == textStorage.length)
+      (extraLineFragmentIsPresent && range.length == 0
+        && range.location == textStorage.length)
     let endTouchesExtraLineFragment =
       (extraLineFragmentIsPresent
-        && (NSMaxRange(cacheItem.range) - cacheItem.postambleLength) == textStorage.length)  // ignore postamble, since postamble terminates the block
+        && (NSMaxRange(range) - cacheItem.postambleLength) == textStorage.length)  // ignore postamble, since postamble terminates the block
 
     var extraLineFragmentAttributes = (extraLineFragmentIsPresent) ? lastDescendentAttributes : [:]
 
@@ -228,7 +229,7 @@ enum AttributeUtils {
       paragraphs.append(.extraLineFragment)
     } else {
       // this time we _don't_ ignore postamble, since we want the applied styles to touch the newlines, and enumerateSubstrings handles trimming newlines anyway
-      textStorage.mutableString.enumerateSubstrings(in: cacheItem.range, options: .byParagraphs) {
+      textStorage.mutableString.enumerateSubstrings(in: range, options: .byParagraphs) {
         _, substringRange, enclosingRange, _ in
         paragraphs.append(.range(substringRange, enclosingRange))
       }

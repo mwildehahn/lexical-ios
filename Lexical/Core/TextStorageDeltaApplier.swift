@@ -292,9 +292,8 @@ internal class TextStorageDeltaApplier {
     // Get the range cache item for this node
     guard let rangeCacheItem = editor.rangeCache[nodeKey] else { return nil }
 
-    // For now, use a simple mapping based on the node's location in the document
-    // This would be improved with a proper node-to-index mapping system
-    return fenwickIndex(forLocation: rangeCacheItem.location)
+    // Return the node's index in the Fenwick tree
+    return rangeCacheItem.nodeIndex
   }
 }
 
