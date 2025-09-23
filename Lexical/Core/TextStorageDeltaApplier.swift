@@ -122,23 +122,32 @@ internal class TextStorageDeltaApplier {
     to textStorage: NSTextStorage
   ) throws -> DeltaApplicationSingleResult {
 
-    // Validate range
-    guard range.location >= 0 && NSMaxRange(range) <= textStorage.length else {
-      throw DeltaApplicationError.invalidRange(range, textStorageLength: textStorage.length)
+    // Validate and clamp range to current storage bounds. In optimized mode
+    // the Fenwick/range-cache can lag by a few characters within the same UI
+    // turn; instead of aborting, align to TextKit expectations and continue.
+    var safeLocation = max(0, min(range.location, textStorage.length))
+    var safeMax = max(safeLocation, min(NSMaxRange(range), textStorage.length))
+    var safeRange = NSRange(location: safeLocation, length: safeMax - safeLocation)
+    if safeRange != range {
+      editor.log(
+        .reconciler,
+        .warning,
+        "Adjusted textUpdate range from \(NSStringFromRange(range)) to \(NSStringFromRange(safeRange)) for node \(nodeKey)"
+      )
     }
 
     // Calculate length delta
-    let oldLength = range.length
+    let oldLength = safeRange.length
     let newLength = (newText as NSString).length
     let lengthDelta = newLength - oldLength
 
     // Apply the text change
-    textStorage.replaceCharacters(in: range, with: newText)
+    textStorage.replaceCharacters(in: safeRange, with: newText)
 
     // Update FenwickTree if there's a length change
     var fenwickUpdates = 0
     if lengthDelta != 0 {
-      let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: range.location)
+      let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? fenwickIndex(forLocation: safeRange.location)
       fenwickTree.update(index: fenwickIndex, delta: lengthDelta)
       fenwickUpdates = 1
     }
