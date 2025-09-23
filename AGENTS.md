@@ -10,11 +10,51 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 - `docs/` — generated DocC site (deployed via GitHub Actions).
 
 ## Build, Test, and Development Commands (iOS Only)
-- Always target iOS Simulator. Do not build/test for macOS.
-- Build (iOS sim): `xcodebuild -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
-- Unit tests (iOS sim): `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
-- Filter tests (iOS sim): `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
-- Playground build (iOS sim): `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator build`
+- Always target iOS Simulator (iPhone 17 Pro, iOS 26.0). Do not build/test for macOS.
+
+- SwiftPM (CLI):
+  ```bash
+  # Build the main package
+  swift build
+
+  # Run all tests
+  swift test
+
+  # Run specific test by name or target
+  swift test --filter TestName
+  swift test --filter LexicalTests
+  swift test --filter LexicalHTMLTests
+  swift test --filter FenwickTreeTests
+  swift test --filter ReconcilerBenchmarkTests
+  ```
+
+- SwiftPM (build for iOS Simulator explicitly):
+  ```bash
+  # x86_64 simulator
+  swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+    -Xswiftc "-target" -Xswiftc "x86_64-apple-ios16.0-simulator"
+
+  # arm64 simulator (Apple Silicon)
+  swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+    -Xswiftc "-target" -Xswiftc "arm64-apple-ios16.0-simulator"
+  ```
+
+- Xcodebuild (SPM target on iOS simulator):
+  - Build: `xcodebuild -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
+  - Unit tests: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+  - Filter tests: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
+
+- Playground app (Xcode/iOS simulator):
+  ```bash
+  # Build for iPhone 17 Pro on iOS 26
+  xcodebuild -project Playground/LexicalPlayground.xcodeproj \
+    -scheme LexicalPlayground -sdk iphonesimulator build
+
+  # Build specifying simulator destination
+  xcodebuild -project Playground/LexicalPlayground.xcodeproj \
+    -scheme LexicalPlayground -sdk iphonesimulator \
+    -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build
+  ```
 
 ## Agent MCP Usage
 - XcodeBuildMCP (preferred; iOS only):
