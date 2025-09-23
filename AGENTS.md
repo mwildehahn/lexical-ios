@@ -9,15 +9,15 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 - `Playground/` — Xcode demo app (`LexicalPlayground`).
 - `docs/` — generated DocC site (deployed via GitHub Actions).
 
-## Build, Test, and Development Commands
-- Package build: `swift build`
-- All tests: `swift test`
-- Filter tests: `swift test --filter NodeTests`
-- Xcode unit tests (SPM): `./build-metrics-test.sh` (iPhone 17 Pro / iOS 26.0)
-- Playground (Xcode): `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator build`
+## Build, Test, and Development Commands (iOS Only)
+- Always target iOS Simulator. Do not build/test for macOS.
+- Build (iOS sim): `xcodebuild -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
+- Unit tests (iOS sim): `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+- Filter tests (iOS sim): `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
+- Playground build (iOS sim): `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator build`
 
 ## Agent MCP Usage
-- XcodeBuildMCP (preferred for app flows):
+- XcodeBuildMCP (preferred; iOS only):
   - Build Playground
     ```
     build_sim({ projectPath: "Playground/LexicalPlayground.xcodeproj",
@@ -36,7 +36,25 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
     launch_app_sim({ simulatorName: "iPhone 17 Pro",
                      bundleId: "com.facebook.LexicalPlayground" })
     ```
-  - Tests: Prefer `swift test` or `./build-metrics-test.sh`. XcodeBuildMCP can compile schemes, but XCTest execution is not exposed via MCP.
+  - Run unit tests via Xcode project scheme
+    ```
+    // Use the project workspace so the SPM test scheme is visible
+    build_sim({
+      workspacePath: "Playground/LexicalPlayground.xcodeproj/project.xcworkspace",
+      scheme: "Lexical",
+      simulatorName: "iPhone 17 Pro",
+      useLatestOS: true,
+      extraArgs: ["test"]
+    })
+    // Filter example
+    build_sim({
+      workspacePath: "Playground/LexicalPlayground.xcodeproj/project.xcworkspace",
+      scheme: "Lexical",
+      simulatorName: "iPhone 17 Pro",
+      useLatestOS: true,
+      extraArgs: ["-only-testing:LexicalTests/NodeTests", "test"]
+    })
+    ```
 - apple-docs (required for SDK/API research):
   ```
   // Search iOS/macOS/Swift docs
@@ -62,7 +80,7 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 - Use imperative, scoped subjects: `Optimized reconciler: emit attributeChange deltas`, `Fix build: …`, `Refactor: …`.
 - Keep body concise with bullet points for rationale/impact.
 - PRs: describe change, link issues, note user impact, and include screenshots of the Playground UI when relevant.
-- Ensure: builds pass (`swift build`), tests pass (`swift test` or script), and docs updated if APIs change.
+- Ensure: builds pass (`swift build`), tests pass (`swift test` or Xcode/iOS sim), and docs updated if APIs change.
 - External contributors must sign the Meta CLA (see `CONTRIBUTING.md`).
 
 ## Security & Configuration Tips
