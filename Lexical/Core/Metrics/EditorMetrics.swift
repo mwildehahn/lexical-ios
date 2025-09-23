@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 public protocol EditorMetricsContainer: AnyObject {
   func record(_ metric: EditorMetric)
   func resetMetrics()

@@ -8,6 +8,7 @@
 import Foundation
 
 /// Protocol for collecting and analyzing reconciler metrics
+@MainActor
 public protocol ReconcilerMetricsCollector: AnyObject {
   /// Record a new reconciler metric
   func record(_ metric: ReconcilerMetric)
