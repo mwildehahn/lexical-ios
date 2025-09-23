@@ -70,6 +70,7 @@ internal class IncrementalRangeCacheUpdater {
     }
 
     var updatedItem = currentItem
+    var childrenDeltaAccumulator = 0
 
     // Apply each delta to update the range cache item
     for delta in deltas {
@@ -78,21 +79,31 @@ internal class IncrementalRangeCacheUpdater {
         if key == nodeKey {
           // Update text length directly to the new text length
           // Note: range.length is the length being replaced, not the total text length
-          updatedItem.textLength = newText.lengthAsNSString()
+          let old = updatedItem.textLength
+          let newLen = newText.lengthAsNSString()
+          updatedItem.textLength = newLen
+          childrenDeltaAccumulator += (newLen - old)
         }
 
       case .nodeInsertion(let key, let insertionData, _):
         if key == nodeKey {
           // This is a new node insertion
           updatedItem.preambleLength = insertionData.preamble.length
+          let old = updatedItem.textLength + updatedItem.preambleLength + updatedItem.postambleLength + updatedItem.childrenLength
           updatedItem.textLength = insertionData.content.length
           updatedItem.postambleLength = insertionData.postamble.length
+          let newTotal = updatedItem.preambleLength + updatedItem.textLength + updatedItem.postambleLength + updatedItem.childrenLength
+          childrenDeltaAccumulator += (newTotal - old)
         }
 
       case .nodeDeletion(let key, _):
         if key == nodeKey {
           // Node is being deleted, remove from cache
+          let total = updatedItem.preambleLength + updatedItem.textLength + updatedItem.postambleLength + updatedItem.childrenLength
+          childrenDeltaAccumulator -= total
           rangeCache.removeValue(forKey: nodeKey)
+          // adjust ancestors then return
+          adjustAncestorsChildrenLength(&rangeCache, nodeKey: nodeKey, delta: childrenDeltaAccumulator)
           return
         }
 
@@ -106,6 +117,9 @@ internal class IncrementalRangeCacheUpdater {
     }
 
     rangeCache[nodeKey] = updatedItem
+    if childrenDeltaAccumulator != 0 {
+      adjustAncestorsChildrenLength(&rangeCache, nodeKey: nodeKey, delta: childrenDeltaAccumulator)
+    }
   }
 
   /// Calculate new range cache item for a newly inserted node
@@ -124,15 +138,10 @@ internal class IncrementalRangeCacheUpdater {
     newItem.textLength = insertionData.content.length
     newItem.childrenLength = 0 // New nodes start with no calculated children length
 
-    // Assign a node index for the Fenwick tree
-    // For now, we'll use a simple mapping based on the insertion order
-    // This could be improved with a more sophisticated indexing scheme
-    if let fenwickIndex = getFenwickIndexForNode(nodeKey, rangeCache: rangeCache) {
-      newItem.nodeIndex = fenwickIndex
-    } else {
-      // For new nodes, find the next available index
-      newItem.nodeIndex = rangeCache.count
-    }
+    // Assign a stable node index for the Fenwick tree
+    newItem.nodeIndex = getOrAssignFenwickIndex(for: nodeKey)
+    // Ensure capacity in Fenwick tree for this index
+    _ = fenwickTree.ensureCapacity(for: newItem.nodeIndex)
 
     rangeCache[nodeKey] = newItem
   }
@@ -173,6 +182,26 @@ internal class IncrementalRangeCacheUpdater {
 
     // Return the node's index in the Fenwick tree
     return rangeCacheItem.nodeIndex
+  }
+
+  private func getOrAssignFenwickIndex(for nodeKey: NodeKey) -> Int {
+    if let idx = editor.fenwickIndexMap[nodeKey] { return idx }
+    let idx = editor.nextFenwickIndex
+    editor.nextFenwickIndex += 1
+    editor.fenwickIndexMap[nodeKey] = idx
+    return idx
+  }
+
+  // Adjust ancestors' childrenLength incrementally based on delta length
+  private func adjustAncestorsChildrenLength(_ rangeCache: inout [NodeKey: RangeCacheItem], nodeKey: NodeKey, delta: Int) {
+    guard delta != 0, let node = getNodeByKey(key: nodeKey) else { return }
+    let parents = node.getParentKeys()
+    for p in parents {
+      if var item = rangeCache[p] {
+        item.childrenLength = max(0, item.childrenLength + delta)
+        rangeCache[p] = item
+      }
+    }
   }
 }
 

@@ -148,6 +148,9 @@ public class Editor: NSObject {
 
   // Phase 3: FenwickTree for optimized reconciliation
   internal var fenwickTree: FenwickTree
+  // Stable mapping from NodeKey -> Fenwick index (monotonic, holes allowed after deletions)
+  internal var fenwickIndexMap: [NodeKey: Int] = [:]
+  internal var nextFenwickIndex: Int = 0
 
   // Used for storing editor listener events
   internal var listeners = Listeners()
