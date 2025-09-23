@@ -50,6 +50,22 @@ internal class TextStorageDeltaApplier {
     // Sort deltas by location (reverse order for safe application)
     let sortedDeltas = sortDeltasForApplication(batch.deltas)
 
+    // Metrics helpers
+    func inc(_ key: String) {
+      guard let mc = editor.metricsContainer else { return }
+      let current = (mc.metricsData[key] as? Int) ?? 0
+      mc.metricsData[key] = current + 1
+    }
+
+    func typeKey(_ delta: ReconcilerDelta) -> String {
+      switch delta.type {
+      case .textUpdate: return "textUpdate"
+      case .nodeInsertion: return "nodeInsertion"
+      case .nodeDeletion: return "nodeDeletion"
+      case .attributeChange: return "attributeChange"
+      }
+    }
+
     for delta in sortedDeltas {
       do {
         let result = try applySingleDelta(delta, to: textStorage)
@@ -59,10 +75,16 @@ internal class TextStorageDeltaApplier {
         // Update metrics if enabled
         if editor.featureFlags.reconcilerMetrics {
           recordDeltaMetrics(delta: delta, result: result)
+          inc("optimized.delta.applied.total")
+          inc("optimized.delta.applied.\(typeKey(delta))")
         }
 
       } catch {
         failedDeltas.append(delta)
+        if editor.featureFlags.reconcilerMetrics {
+          inc("optimized.delta.failed.total")
+          inc("optimized.delta.failed.\(typeKey(delta))")
+        }
 
         // Decide whether to continue or abort
         if shouldAbortOnFailure(delta, error: error) {
