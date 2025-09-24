@@ -152,6 +152,18 @@ internal enum OptimizedReconciler {
 
       editor.log(.reconciler, .message, "Optimized reconciliation successful: \(appliedDeltas) deltas applied")
 
+      // Optional invariants validation for debug builds
+      if editor.featureFlags.reconcilerSanityCheck {
+        let report = validateEditorInvariants(editor: editor)
+        if !report.isClean {
+          for issue in report.issues {
+            editor.log(.reconciler, .warning, "Invariant failed: \(issue)")
+          }
+        } else {
+          editor.log(.reconciler, .verbose, "Invariants OK")
+        }
+      }
+
     case .partialSuccess(let appliedDeltas, let failedDeltas, let reason):
       // Log but continue - we applied what we could
       editor.log(.reconciler, .warning, "Partial delta application: \(appliedDeltas) applied, \(failedDeltas.count) failed: \(reason)")
