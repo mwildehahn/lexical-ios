@@ -86,3 +86,32 @@ Follow‑ups
 - Optimized DeltaGenerator currently ignores block style changes and many element updates; only text updates/inserts/deletes are emitted.
 - Document‑order generation is required to avoid “insert at 0” producing reversed/scrambled output on fresh documents.
 - Decorator lifecycle parity will need small hooks similar to legacy `decoratorsToAdd/Decorate` flow.
+
+---
+
+## Backlog: Selection Parity and Tooling
+
+Selection parity tasks to drive to strict equality (tracked and tackled next):
+
+- [ ] Styled boundaries: add parity tests at inline style runs (bold/italic/code) and verify `pointAtStringLocation` forward/backward behavior.
+- [ ] List item edges: add tests for boundaries at start/end of list items (including nested lists); ensure element offsets map identically.
+- [ ] Multi‑paragraph ranges: add tests where selections span multiple paragraphs; assert `createNativeSelection` returns identical `length` and, once stable, `location`.
+- [ ] Investigate nil returns at boundaries in optimized path; align `RangeCache.evaluateNode` handling of `.startBoundary`/`.endBoundary` with legacy semantics for empty elements and adjacent text nodes.
+- [ ] Audit `SelectionUtils.stringLocationForPoint` parity (Fenwick vs absolute) for element offsets; unify logic to produce identical absolute locations.
+- [ ] Add detailed mismatch logging (DEBUG‑only): dump node keys, offsets, absolute positions, and surrounding cache slices when parity differs.
+- [ ] Tighten tests from tolerant comparisons to strict equality after fixes; remove guards/skips and re‑enable exact asserts.
+
+Playground and Observability:
+
+- [ ] Selection probe in Playground: show caret absolute location, forward/backward boundary Points, and native range in both modes; toggle optimized/dark‑launch; show invariants status.
+- [ ] Metrics polish: aggregate per‑delta histograms and clamped counts into `ReconcilerMetricsSummary`; lightweight panel in Playground to display latest run metrics.
+
+Documentation:
+
+- [ ] Document `darkLaunchOptimized` and `reconcilerSanityCheck` (how to enable, when to use, caveats) in docs.
+- [ ] Add a brief “Selection Parity” section describing test strategy (absolute location round‑trips) and how to interpret logs.
+
+Decorator lifecycle (follow‑ups):
+
+- [ ] Wire create/decorate/remove hooks in optimized path to fully mirror legacy `decoratorsToAdd/Decorate` flow; add tests for move/attach/detach and position updates after mutations.
+- [ ] Remove temporary “🔥” debug prints or gate behind a debug flag before flipping defaults.
