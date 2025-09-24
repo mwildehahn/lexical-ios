@@ -258,10 +258,34 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
       return location + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
     }
 
-    guard let childRangeCacheItem = rangeCache[childrenKeys[point.offset]] else { return nil }
+    // Compute child start without relying on Fenwick when optimized to avoid
+    // counting the parent's postamble before children. Use absolute accumulation
+    // from the parent start plus preceding siblings' full contributions.
+    if useOptimized {
+      // Recursive absolute start for the element parent
+      func absoluteStart(_ key: NodeKey) -> Int {
+        if key == kRootNodeKey { return 0 }
+        guard let n = getNodeByKey(key: key), let pk = n.parent, let pc = rangeCache[pk], let p = getNodeByKey(key: pk) as? ElementNode else {
+          return rangeCache[key]?.locationFromFenwick(using: fenwickTree) ?? 0
+        }
+        var start = absoluteStart(pk) + pc.preambleLength
+        for k in p.getChildrenKeys() {
+          if k == key { break }
+          if let s = rangeCache[k] { start += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }
+        }
+        return start
+      }
 
-    let childLocation = useOptimized ? childRangeCacheItem.locationFromFenwick(using: fenwickTree) : childRangeCacheItem.location
-    return childLocation
+      var loc = absoluteStart(point.key) + rangeCacheItem.preambleLength
+      for idx in 0..<point.offset {
+        let k = childrenKeys[idx]
+        if let s = rangeCache[k] { loc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }
+      }
+      return loc
+    } else {
+      guard let childRangeCacheItem = rangeCache[childrenKeys[point.offset]] else { return nil }
+      return childRangeCacheItem.location
+    }
   case .range:
     throw LexicalError.invariantViolation("Need range selection")
   case .node:

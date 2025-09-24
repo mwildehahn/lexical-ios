@@ -48,6 +48,53 @@ internal enum OptimizedReconciler {
       dirtyNodes: editor.dirtyNodes
     )
 
+    // Assign stable Fenwick indices for newly inserted nodes in string order BEFORE applying deltas.
+    // This guarantees that Fenwick indices increase with document position, so
+    // locationFromFenwick() yields correct absolute locations regardless of delta
+    // application order (reverse-sorted for non-fresh batches).
+    do {
+      // Collect inserted nodes and their intended start locations
+      var inserted: [(key: NodeKey, location: Int)] = []
+      for d in deltaBatch.deltas {
+        if case let .nodeInsertion(nodeKey, _, location) = d.type {
+          inserted.append((nodeKey, location))
+        }
+      }
+      if !inserted.isEmpty {
+        // Helper: ancestor check in pending state
+        func isAncestor(_ a: NodeKey, of b: NodeKey) -> Bool {
+          var cur: NodeKey? = b
+          while let k = cur, k != kRootNodeKey {
+            if k == a { return true }
+            guard let n = pendingEditorState.nodeMap[k] else { break }
+            cur = n.parent
+          }
+          return false
+        }
+
+        // Sort: ancestors before descendants, then by ascending location.
+        // This keeps element node starts (locationFromFenwick) stable for
+        // boundary computations that read the element's start directly.
+        inserted.sort { lhs, rhs in
+          let l = lhs.key, r = rhs.key
+          if isAncestor(l, of: r) { return true }  // l before r
+          if isAncestor(r, of: l) { return false } // l after r
+          if lhs.location != rhs.location { return lhs.location < rhs.location }
+          // Stable fallback by key compare
+          return l < r
+        }
+
+        for (key, _) in inserted {
+          if editor.fenwickIndexMap[key] == nil {
+            let idx = editor.nextFenwickIndex
+            editor.nextFenwickIndex += 1
+            editor.fenwickIndexMap[key] = idx
+            _ = editor.fenwickTree.ensureCapacity(for: idx)
+          }
+        }
+      }
+    }
+
     // Log delta count for debugging
     editor.log(.reconciler, .message, "Generated \(deltaBatch.deltas.count) deltas")
 
