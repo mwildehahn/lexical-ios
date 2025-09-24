@@ -123,3 +123,7 @@ Decorator lifecycle (follow‑ups):
   - Staying decorators: mark `.needsDecorating(view)` when dirty or when moved (old vs new absolute position via Fenwick).
   - Removed decorators: remove subview, destroy cache, clear position.
 - Added tests `LexicalTests/Phase4/DecoratorLifecycleParityTests.swift` covering create → decorate, dirty → re‑decorate, move → re‑decorate, and remove → cache cleanup.
+
+Optional heuristic (behind flag):
+
+- Added `FeatureFlags.decoratorSiblingRedecorate` (default false). When enabled, the optimized reconciler marks decorators as needing re‑decorate when any sibling under the same parent changes (insert/update/delete/attributeChange), even if the decorator’s absolute position remains unchanged. This mirrors legacy’s conservative redecorate behavior and can be used to diagnose layout-dependent decorators.

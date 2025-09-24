@@ -13,19 +13,22 @@ import Foundation
   let optimizedReconciler: Bool
   let reconcilerMetrics: Bool
   let darkLaunchOptimized: Bool
+  let decoratorSiblingRedecorate: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
     proxyTextViewInputDelegate: Bool = false,
     optimizedReconciler: Bool = false,
     reconcilerMetrics: Bool = false,
-    darkLaunchOptimized: Bool = false
+    darkLaunchOptimized: Bool = false,
+    decoratorSiblingRedecorate: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
     self.optimizedReconciler = optimizedReconciler
     self.reconcilerMetrics = reconcilerMetrics
     self.darkLaunchOptimized = darkLaunchOptimized
+    self.decoratorSiblingRedecorate = decoratorSiblingRedecorate
     super.init()
   }
 }

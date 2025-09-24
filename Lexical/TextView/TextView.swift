@@ -82,7 +82,9 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       reconcilerSanityCheck: reconcilerSanityCheck,
       proxyTextViewInputDelegate: featureFlags.proxyTextViewInputDelegate,
       optimizedReconciler: featureFlags.optimizedReconciler,
-      reconcilerMetrics: featureFlags.reconcilerMetrics
+      reconcilerMetrics: featureFlags.reconcilerMetrics,
+      darkLaunchOptimized: featureFlags.darkLaunchOptimized,
+      decoratorSiblingRedecorate: featureFlags.decoratorSiblingRedecorate
     )
 
     editor = Editor(
