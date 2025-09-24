@@ -402,10 +402,9 @@ final class SelectionParityTests: XCTestCase {
       oRange = try createNativeSelection(from: sel, editor: optEditor).range
     }
 
-    // Tolerant assert: expect equality, allow a 2-char newline gap across paragraph boundaries
+    // Now that newline placement is aligned, assert strict equality
     if let l = lRange, let o = oRange {
-      let diff = abs(l.length - o.length)
-      XCTAssertTrue(diff == 0 || diff == 2, "Expected equal selection length or 2-char newline gap; legacy=\(l.length) optimized=\(o.length)")
+      XCTAssertEqual(l.length, o.length)
     } else {
       XCTFail("Expected both legacy and optimized to produce native ranges")
     }

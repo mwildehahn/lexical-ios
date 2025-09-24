@@ -454,24 +454,15 @@ private class DeltaGenerator {
         // Extract actual content from the pending node
         let theme = editor.getTheme()
         
-        // For fresh documents with ElementNodes, adjust preamble/postamble handling
-        // to ensure newlines appear between paragraph content, not before it
+        // Use node-provided pre/post; for fresh docs, nudge newlines to match legacy serialized order with child insertions
         var preambleString = pendingNode.getPreamble()
         var postambleString = pendingNode.getPostamble()
-        
         if isFreshDocument, let elementNode = pendingNode as? ElementNode, !elementNode.isInline() {
-          // For block-level elements in fresh documents:
-          // Move postamble to preamble of next sibling to ensure newlines come after content
-          if let nextSibling = elementNode.getNextSibling(),
-             !nextSibling.isInline(),
-             postambleString == "\n" {
-            // Don't emit postamble here; the next block will get it as preamble
+          if let _ = elementNode.getNextSibling(), postambleString == "\n" {
+            // Defer the newline so child text lands before it; will be placed as preamble of the following block
             postambleString = ""
           }
-          // If we're a block after another block, add newline as preamble
-          if let prevSibling = elementNode.getPreviousSibling() as? ElementNode,
-             !prevSibling.isInline(),
-             preambleString == "" {
+          if let prev = elementNode.getPreviousSibling(), prev is ElementNode, preambleString.isEmpty {
             preambleString = "\n"
           }
         }
@@ -520,12 +511,11 @@ private class DeltaGenerator {
         let insertionLocation: Int
         let totalLength = insertionData.preamble.length + insertionData.content.length + insertionData.postamble.length
         
-        // For fresh documents, use sequential insertion
+        // For fresh documents, use sequential insertion to match serialized order; otherwise compute structure-based position
         if isFreshDocument {
           insertionLocation = runningOffset
           runningOffset += totalLength
         } else {
-          // For incremental updates, calculate position based on document structure
           insertionLocation = self.calculateInsertionLocationOrdered(
             for: nodeKey,
             in: pendingState,

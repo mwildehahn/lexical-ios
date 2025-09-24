@@ -47,10 +47,8 @@ internal class TextStorageDeltaApplier {
     var fenwickUpdates = 0
     var failedDeltas: [ReconcilerDelta] = []
 
-    // For fresh documents, apply in generation order. For updates, sort by location (reverse)
-    let sortedDeltas = batch.batchMetadata.isFreshDocument 
-      ? batch.deltas
-      : sortDeltasForApplication(batch.deltas)
+    // For fresh documents, keep generation order; otherwise sort by location (reverse) to avoid index shifting
+    let sortedDeltas = batch.batchMetadata.isFreshDocument ? batch.deltas : sortDeltasForApplication(batch.deltas)
 
     // Metrics helpers
     func inc(_ key: String) {
