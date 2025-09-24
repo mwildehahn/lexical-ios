@@ -14,6 +14,7 @@ Status legend: [x] done, [>] in progress, [ ] todo
 - [x] Attribute deltas coverage (bold/italic etc) generation in DeltaGenerator (attributeChange)
 - [x] Children ordering invariants (insertions occur in document order for fresh content)
 - [ ] Selection reconciliation edge‑cases identical to legacy (node selections, anchor types)
+  - [>] Parity tests scaffolded (disabled by default); observed differences under investigation
 - [ ] Placeholder visibility and controller/non‑controlled mode consistency
 
 ## 2) Correctness/Robustness
@@ -45,11 +46,12 @@ Follow‑ups
 - [x] Bench playground shows on‑screen results and copies identical text
 - [>] Add OptimizedReconciler metrics for: delta types distribution, failures, adjusted ranges count (clamped insertions/updates recorded)
 - [ ] Add invariants checker (optional) that validates rangeCache/fenwick/textStorage coherence in debug builds
+  - [x] Invariants checker implemented and gated behind `reconcilerSanityCheck`
 
 ## 4) Migration & Safety
 
 - [ ] Feature flag guards remain
-- [ ] Add dark‑launch option: run optimized, verify, then discard and run legacy (debug only)
+- [x] Add dark‑launch option: run optimized, verify, then discard and run legacy (debug only)
 - [ ] Document rollout and recovery steps
 
 ---
