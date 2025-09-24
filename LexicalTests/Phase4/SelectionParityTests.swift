@@ -85,6 +85,67 @@ final class SelectionParityTests: XCTestCase {
     }
   }
 
+  func testStyledBoundaryBetweenAdjacentTextNodesParity() throws {
+    // Legacy
+    let legacyCtx = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(optimizedReconciler: false)
+    )
+    let legacyEditor = legacyCtx.editor
+    var legacyT2: NodeKey = ""
+    try legacyEditor.update {
+      guard let root = getActiveEditorState()?.getRootNode() else { return }
+      let p = ParagraphNode()
+      let n1 = TextNode(text: "ab", key: nil)
+      let n2 = TextNode(text: "cd", key: nil)
+      try n2.setBold(true)
+      try p.append([n1, n2])
+      try root.append([p])
+      legacyT2 = n2.getKey()
+    }
+    try legacyEditor.update {}
+
+    // Optimized
+    let optCtx = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(optimizedReconciler: true)
+    )
+    let optEditor = optCtx.editor
+    var optT2: NodeKey = ""
+    try optEditor.update {
+      guard let root = getActiveEditorState()?.getRootNode() else { return }
+      let p = ParagraphNode()
+      let n1 = TextNode(text: "ab", key: nil)
+      let n2 = TextNode(text: "cd", key: nil)
+      try n2.setBold(true)
+      try p.append([n1, n2])
+      try root.append([p])
+      optT2 = n2.getKey()
+    }
+    try optEditor.update {}
+
+    var legacyLoc = 0, optLoc = 0
+    try legacyEditor.read {
+      guard let rc2 = legacyEditor.rangeCache[legacyT2] else { return }
+      legacyLoc = rc2.textRange.location
+    }
+    try optEditor.read {
+      guard let rc2 = optEditor.rangeCache[optT2] else { return }
+      optLoc = rc2.textRangeFromFenwick(using: optEditor.fenwickTree).location
+    }
+
+    let lF = try? pointAtStringLocation(legacyLoc, searchDirection: .forward, rangeCache: legacyEditor.rangeCache)
+    let lB = try? pointAtStringLocation(legacyLoc, searchDirection: .backward, rangeCache: legacyEditor.rangeCache)
+    let oF = try? pointAtStringLocation(optLoc, searchDirection: .forward, rangeCache: optEditor.rangeCache)
+    let oB = try? pointAtStringLocation(optLoc, searchDirection: .backward, rangeCache: optEditor.rangeCache)
+
+    func loc(_ p: Point?, _ ed: Editor) -> Int? { (try? stringLocationForPoint(p!, editor: ed)) }
+    if let lF { XCTAssertEqual(loc(lF, legacyEditor), legacyLoc) }
+    if let lB { XCTAssertEqual(loc(lB, legacyEditor), legacyLoc) }
+    if let oF { XCTAssertEqual(loc(oF, optEditor), optLoc) }
+    if let oB { XCTAssertEqual(loc(oB, optEditor), optLoc) }
+  }
+
   func testElementBoundaryParity() throws {
     // Build a paragraph element with no children and test boundary behavior
     func buildEmptyParagraphDoc(_ editor: Editor) throws -> NodeKey {
