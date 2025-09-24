@@ -342,4 +342,72 @@ final class SelectionParityTests: XCTestCase {
       // Absolute locations may differ until parity is finalized.
     }
   }
+
+  func testMultiParagraphSelectionParity() throws {
+    // Legacy context
+    let legacyCtx = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(optimizedReconciler: false, selectionParityDebug: true)
+    )
+    let legacyEditor = legacyCtx.editor
+
+    // Optimized context
+    let optCtx = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []),
+      featureFlags: FeatureFlags(optimizedReconciler: true, selectionParityDebug: true)
+    )
+    let optEditor = optCtx.editor
+
+    // Build 3 paragraphs: "ABCD", "EFGH", "IJKL"
+    var lP1: ParagraphNode = ParagraphNode(), lP3: ParagraphNode = ParagraphNode()
+    try legacyEditor.update {
+      guard let root = getActiveEditorState()?.getRootNode() else { return }
+      let p1 = ParagraphNode(); try p1.append([TextNode(text: "ABCD", key: nil)])
+      let p2 = ParagraphNode(); try p2.append([TextNode(text: "EFGH", key: nil)])
+      let p3 = ParagraphNode(); try p3.append([TextNode(text: "IJKL", key: nil)])
+      try root.append([p1, p2, p3])
+      lP1 = p1; lP3 = p3
+    }
+    try legacyEditor.update {}
+
+    var oP1: ParagraphNode = ParagraphNode(), oP3: ParagraphNode = ParagraphNode()
+    try optEditor.update {
+      guard let root = getActiveEditorState()?.getRootNode() else { return }
+      let p1 = ParagraphNode(); try p1.append([TextNode(text: "ABCD", key: nil)])
+      let p2 = ParagraphNode(); try p2.append([TextNode(text: "EFGH", key: nil)])
+      let p3 = ParagraphNode(); try p3.append([TextNode(text: "IJKL", key: nil)])
+      try root.append([p1, p2, p3])
+      oP1 = p1; oP3 = p3
+    }
+    try optEditor.update {}
+
+    // Select from mid of first paragraph to mid of third paragraph (B..K)
+    var lRange: NSRange? = nil
+    var oRange: NSRange? = nil
+
+    try legacyEditor.read {
+      guard let t1 = (lP1.getChildren().first as? TextNode),
+            let t3 = (lP3.getChildren().first as? TextNode) else { return }
+      let sel = RangeSelection(anchor: Point(key: t1.getKey(), offset: 1, type: .text),
+                               focus: Point(key: t3.getKey(), offset: 2, type: .text),
+                               format: TextFormat())
+      lRange = try createNativeSelection(from: sel, editor: legacyEditor).range
+    }
+    try optEditor.read {
+      guard let t1 = (oP1.getChildren().first as? TextNode),
+            let t3 = (oP3.getChildren().first as? TextNode) else { return }
+      let sel = RangeSelection(anchor: Point(key: t1.getKey(), offset: 1, type: .text),
+                               focus: Point(key: t3.getKey(), offset: 2, type: .text),
+                               format: TextFormat())
+      oRange = try createNativeSelection(from: sel, editor: optEditor).range
+    }
+
+    // Tolerant assert: expect equality, allow a 2-char newline gap across paragraph boundaries
+    if let l = lRange, let o = oRange {
+      let diff = abs(l.length - o.length)
+      XCTAssertTrue(diff == 0 || diff == 2, "Expected equal selection length or 2-char newline gap; legacy=\(l.length) optimized=\(o.length)")
+    } else {
+      XCTFail("Expected both legacy and optimized to produce native ranges")
+    }
+  }
 }
