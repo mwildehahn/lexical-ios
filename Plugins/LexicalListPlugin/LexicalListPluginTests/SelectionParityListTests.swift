@@ -67,10 +67,11 @@ final class SelectionParityListTests: XCTestCase {
     let oB = try? pointAtStringLocation(optLoc, searchDirection: .backward, rangeCache: optEditor.rangeCache)
 
     func loc(_ p: Point?, _ ed: Editor) -> Int? { guard let p else { return nil }; return try? stringLocationForPoint(p, editor: ed) }
-    if let lF { XCTAssertEqual(loc(lF, legacyEditor), legacyLoc) }
-    if let lB { XCTAssertEqual(loc(lB, legacyEditor), legacyLoc) }
-    if let oF { XCTAssertEqual(loc(oF, optEditor), optLoc) }
-    if let oB { XCTAssertEqual(loc(oB, optEditor), optLoc) }
+    XCTAssertNotNil(lF); XCTAssertNotNil(lB); XCTAssertNotNil(oF); XCTAssertNotNil(oB)
+    XCTAssertEqual(loc(lF, legacyEditor), legacyLoc)
+    XCTAssertEqual(loc(lB, legacyEditor), legacyLoc)
+    XCTAssertEqual(loc(oF, optEditor), optLoc)
+    XCTAssertEqual(loc(oB, optEditor), optLoc)
   }
 
   func testNestedListStartBoundaryParity() throws {
@@ -136,10 +137,11 @@ final class SelectionParityListTests: XCTestCase {
     let oB = try? pointAtStringLocation(oLoc, searchDirection: .backward, rangeCache: optEditor.rangeCache)
 
     func loc(_ p: Point?, _ ed: Editor) -> Int? { guard let p else { return nil }; return try? stringLocationForPoint(p, editor: ed) }
-    if let lF { XCTAssertEqual(loc(lF, legacyEditor), lLoc) }
-    if let lB { XCTAssertEqual(loc(lB, legacyEditor), lLoc) }
-    if let oF { XCTAssertEqual(loc(oF, optEditor), oLoc) }
-    if let oB { XCTAssertEqual(loc(oB, optEditor), oLoc) }
+    XCTAssertNotNil(lF); XCTAssertNotNil(lB); XCTAssertNotNil(oF); XCTAssertNotNil(oB)
+    XCTAssertEqual(loc(lF, legacyEditor), lLoc)
+    XCTAssertEqual(loc(lB, legacyEditor), lLoc)
+    XCTAssertEqual(loc(oF, optEditor), oLoc)
+    XCTAssertEqual(loc(oB, optEditor), oLoc)
   }
 
   func testListItemEndBoundaryParity() throws {
@@ -195,9 +197,10 @@ final class SelectionParityListTests: XCTestCase {
     let oB = try? pointAtStringLocation(oEnd, searchDirection: .backward, rangeCache: optEditor.rangeCache)
 
     func loc2(_ p: Point?, _ ed: Editor) -> Int? { guard let p else { return nil }; return try? stringLocationForPoint(p, editor: ed) }
-    if let lF { XCTAssertEqual(loc2(lF, legacyEditor), lEnd) }
-    if let lB { XCTAssertEqual(loc2(lB, legacyEditor), lEnd) }
-    if let oF { XCTAssertEqual(loc2(oF, optEditor), oEnd) }
-    if let oB { XCTAssertEqual(loc2(oB, optEditor), oEnd) }
+    XCTAssertNotNil(lF); XCTAssertNotNil(lB); XCTAssertNotNil(oF); XCTAssertNotNil(oB)
+    XCTAssertEqual(loc2(lF, legacyEditor), lEnd)
+    XCTAssertEqual(loc2(lB, legacyEditor), lEnd)
+    XCTAssertEqual(loc2(oF, optEditor), oEnd)
+    XCTAssertEqual(loc2(oB, optEditor), oEnd)
   }
 }

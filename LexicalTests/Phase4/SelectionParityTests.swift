@@ -266,7 +266,6 @@ final class SelectionParityTests: XCTestCase {
     let optFLoc = try aloc(optF, optEditor)
     let optBLoc = try aloc(optB, optEditor)
 
-    // Round-trip to boundary within each mode (tolerate nil while under investigation)
     if let lfl = legacyFLoc, let lbl = legacyBLoc {
       XCTAssertEqual(lfl, legacyStart)
       XCTAssertEqual(lbl, legacyStart)
