@@ -165,6 +165,35 @@ private func evaluateNode(
       // We do this 'possible result' check so that we prioritise text results where we can.
       return possibleBoundaryElementResult
     }
+
+    // Fallback: if no child yielded a direct result, try mapping exact boundaries
+    // to element offsets to avoid nil results at child start/end boundaries.
+    let normalOrderChildren = node.getChildrenKeys()
+    // Compute parent start for convenience
+    let parentStart = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+    // Start of children content
+    let childrenStart = parentStart + rangeCacheItem.preambleLength
+    // End of children content
+    let childrenEnd = childrenStart + rangeCacheItem.childrenLength
+
+    // Exact start of children maps to offset 0
+    if stringLocation == childrenStart {
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
+    }
+    // Exact end of children maps to offset count
+    if stringLocation == childrenEnd {
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: normalOrderChildren.count)
+    }
+
+    // Check exact match to each child's start location to derive appropriate offset
+    for (idx, ck) in normalOrderChildren.enumerated() {
+      if let childItem = rangeCache[ck] {
+        let childStart = useOptimized ? childItem.locationFromFenwick(using: fenwickTree) : childItem.location
+        if stringLocation == childStart {
+          return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: idx)
+        }
+      }
+    }
   }
 
   let entireRangeForCheck = useOptimized ? rangeCacheItem.entireRangeFromFenwick(using: fenwickTree) : rangeCacheItem.entireRange
@@ -314,4 +343,3 @@ internal func updateRangeCacheForTextChange(nodeKey: NodeKey, delta: Int) {
     )
   }
 }
-
