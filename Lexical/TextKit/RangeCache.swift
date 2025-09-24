@@ -215,7 +215,6 @@ private func evaluateNode(
     if rangeCacheItem.preambleLength == 0 && node is ElementNode {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
-
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
   }
 
@@ -224,7 +223,6 @@ private func evaluateNode(
     if selectableRange.length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
-
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .endBoundary, offset: nil)
   }
 
@@ -234,11 +232,9 @@ private func evaluateNode(
     if selectableRange.length == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
-
     if rangeCacheItem.childrenLength == 0 {
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
-
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)
   }
 
