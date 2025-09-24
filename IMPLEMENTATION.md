@@ -58,9 +58,9 @@ Legend: [x] done · [>] in progress · [ ] todo
 ---
 
 ## Immediate Work (Next)
-1. Selection parity fixes (boundaries, multi‑paragraph) and enable strict cross‑mode asserts in `SelectionParityTests`.
-2. Gate/remove debug prints; keep opt‑in debug via flags only.
-3. Metrics summary + brief docs; integrate a lightweight panel in Playground.
+1. Selection parity fixes (boundaries, multi‑paragraph) and enable strict cross‑mode asserts in `SelectionParityTests`. [>]
+2. Gate/remove debug prints; keep opt‑in debug via flags only. [ ]
+3. Metrics summary + brief docs; integrate a lightweight panel in Playground. [ ]
 
 ---
 
@@ -101,3 +101,17 @@ Run (examples):
 - Invariants clean under `reconcilerSanityCheck` for test corpus and Playground flows.
 - Metrics show no persistent delta failures; temporary debug prints removed/gated.
 - Playground (iPhone 17 Pro, iOS 26.0) builds and behaves identically in manual checks.
+
+---
+
+## 2025‑09‑24 — Selection Parity Prep and Fenwick Stability [in progress]
+
+- Factored absolute node start calculation into `absoluteNodeStartLocation(...)` and used it in:
+  - `SelectionUtils.stringLocationForPoint` (text/element branches)
+  - `RangeCache.evaluateNode` parent/start boundary computations
+- Pre-assigned Fenwick indices for insertions in ancestor‑first, location‑ascending order to keep element starts stable under optimized path.
+- Enabled `reconcilerSanityCheck` in `SelectionParityTests` contexts.
+- Added tests:
+  - `FenwickIndexOrderingTests`: ancestor‑first index ordering and element start parity.
+  - `FenwickIndexStabilityTests`: deletion + reinsert keeps existing indices stable; new indices strictly increase.
+- Status: Selection parity suites pass with invariants enabled. Next step: tighten cross‑mode assertions from tolerant to strict (absolute location equality) and expand multi‑paragraph cases.

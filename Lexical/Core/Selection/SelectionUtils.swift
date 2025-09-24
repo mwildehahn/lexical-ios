@@ -202,45 +202,12 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   switch point.type {
   case .text:
     if useOptimized {
-      // Compute location relative to parent to avoid counting ancestor postambles before children
-      guard let node = getNodeByKey(key: point.key), let parentKey = node.parent, let parent = getNodeByKey(key: parentKey) as? ElementNode,
-            let parentCache = rangeCache[parentKey] else {
-        // Fallback to fenwick-based location
-        let base = rangeCacheItem.locationFromFenwick(using: fenwickTree)
-        if editor.featureFlags.selectionParityDebug {
-          print("🔥 PARITY TEXT LOC (fallback): key=\(point.key) base=\(base) pre=\(rangeCacheItem.preambleLength) off=\(point.offset)")
-        }
-        return base + rangeCacheItem.preambleLength + point.offset
-      }
-      // Prefer recursive absolute location derived from tree to avoid Fenwick inaccuracies during fresh builds
-      func absoluteStart(_ key: NodeKey) -> Int {
-        if key == kRootNodeKey { return 0 }
-        guard let n = getNodeByKey(key: key), let pk = n.parent, let pc = rangeCache[pk], let p = getNodeByKey(key: pk) as? ElementNode else {
-          return rangeCache[key]?.locationFromFenwick(using: fenwickTree) ?? 0
-        }
-        var start = absoluteStart(pk) + pc.preambleLength
-        for k in p.getChildrenKeys() {
-          if k == key { break }
-          if let s = rangeCache[k] { start += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }
-        }
-        return start
-      }
-      var loc = absoluteStart(parentKey) + parentCache.preambleLength
-      // Sum contributions of siblings that come before this node within the parent
-      let children = parent.getChildrenKeys()
+      // Absolute start of this text node based on parent/siblings accumulation
+      let base = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
       if editor.featureFlags.selectionParityDebug {
-        print("🔥 PARITY TEXT LOC (parent): node=\(point.key) parent=\(parentKey) base=\(loc) children=\(children)")
+        print("🔥 PARITY TEXT LOC: key=\(point.key) base=\(base) pre=\(rangeCacheItem.preambleLength) off=\(point.offset)")
       }
-      for k in children {
-        if k == point.key { break }
-        if let s = rangeCache[k] {
-          loc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength
-        }
-      }
-      if editor.featureFlags.selectionParityDebug {
-        print("🔥 PARITY TEXT LOC (final): node=\(point.key) loc=\(loc) pre=\(rangeCacheItem.preambleLength) off=\(point.offset)")
-      }
-      return loc + rangeCacheItem.preambleLength + point.offset
+      return base + rangeCacheItem.preambleLength + point.offset
     } else {
       let location = rangeCacheItem.location
       return location + rangeCacheItem.preambleLength + point.offset
@@ -258,25 +225,8 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
       return location + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
     }
 
-    // Compute child start without relying on Fenwick when optimized to avoid
-    // counting the parent's postamble before children. Use absolute accumulation
-    // from the parent start plus preceding siblings' full contributions.
     if useOptimized {
-      // Recursive absolute start for the element parent
-      func absoluteStart(_ key: NodeKey) -> Int {
-        if key == kRootNodeKey { return 0 }
-        guard let n = getNodeByKey(key: key), let pk = n.parent, let pc = rangeCache[pk], let p = getNodeByKey(key: pk) as? ElementNode else {
-          return rangeCache[key]?.locationFromFenwick(using: fenwickTree) ?? 0
-        }
-        var start = absoluteStart(pk) + pc.preambleLength
-        for k in p.getChildrenKeys() {
-          if k == key { break }
-          if let s = rangeCache[k] { start += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }
-        }
-        return start
-      }
-
-      var loc = absoluteStart(point.key) + rangeCacheItem.preambleLength
+      var loc = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree) + rangeCacheItem.preambleLength
       for idx in 0..<point.offset {
         let k = childrenKeys[idx]
         if let s = rangeCache[k] { loc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }

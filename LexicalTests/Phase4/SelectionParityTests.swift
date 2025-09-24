@@ -38,7 +38,14 @@ final class SelectionParityTests: XCTestCase {
     // Legacy context
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: false, selectionParityDebug: true)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: false,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
     let (legacyT1, legacyT2) = try buildSimpleTwoTextNodesDocument(editor: legacyEditor)
@@ -46,7 +53,14 @@ final class SelectionParityTests: XCTestCase {
     // Optimized context
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: true, selectionParityDebug: true)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: true,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     let (optT1, optT2) = try buildSimpleTwoTextNodesDocument(editor: optEditor)
@@ -89,7 +103,14 @@ final class SelectionParityTests: XCTestCase {
     // Legacy
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: false)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: false,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: false)
     )
     let legacyEditor = legacyCtx.editor
     var legacyT2: NodeKey = ""
@@ -108,7 +129,14 @@ final class SelectionParityTests: XCTestCase {
     // Optimized
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: true)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: true,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: false)
     )
     let optEditor = optCtx.editor
     var optT2: NodeKey = ""
@@ -164,14 +192,28 @@ final class SelectionParityTests: XCTestCase {
 
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: false)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: false,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: false)
     )
     let legacyEditor = legacyCtx.editor
     let legacyP = try buildEmptyParagraphDoc(legacyEditor)
 
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: true)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: true,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: false)
     )
     let optEditor = optCtx.editor
     let optP = try buildEmptyParagraphDoc(optEditor)
@@ -219,7 +261,14 @@ final class SelectionParityTests: XCTestCase {
     // Legacy editor: two paragraphs, measure boundary at start of second paragraph
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: false)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: false,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: false)
     )
     let legacyEditor = legacyCtx.editor
     var legacyP2: NodeKey = ""
@@ -236,7 +285,14 @@ final class SelectionParityTests: XCTestCase {
     // Optimized editor: same structure
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: true)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: true,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: false)
     )
     let optEditor = optCtx.editor
     var optP2: NodeKey = ""
@@ -347,14 +403,28 @@ final class SelectionParityTests: XCTestCase {
     // Legacy context
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: false, selectionParityDebug: true)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: false,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
 
     // Optimized context
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: true, selectionParityDebug: true)
+      featureFlags: FeatureFlags(
+        reconcilerSanityCheck: true,
+        proxyTextViewInputDelegate: false,
+        optimizedReconciler: true,
+        reconcilerMetrics: false,
+        darkLaunchOptimized: false,
+        decoratorSiblingRedecorate: false,
+        selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
 

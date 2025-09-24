@@ -108,7 +108,9 @@ private func evaluateNode(
   let fenwickTree = editor.fenwickTree
 
   if let parentKey = node.parent, let parentRangeCacheItem = rangeCache[parentKey] {
-    let parentLocation = useOptimized ? parentRangeCacheItem.locationFromFenwick(using: fenwickTree) : parentRangeCacheItem.location
+    let parentLocation = useOptimized
+      ? absoluteNodeStartLocation(parentKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
+      : parentRangeCacheItem.location
     if stringLocation == parentLocation
       && parentRangeCacheItem.preambleSpecialCharacterLength - parentRangeCacheItem.preambleLength
         == 0
@@ -176,7 +178,9 @@ private func evaluateNode(
     // to element offsets to avoid nil results at child start/end boundaries.
     let normalOrderChildren = node.getChildrenKeys()
     // Compute parent start for convenience
-    let parentStart = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+    let parentStart = useOptimized
+      ? absoluteNodeStartLocation(nodeKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
+      : rangeCacheItem.location
     // Start of children content
     let childrenStart = parentStart + rangeCacheItem.preambleLength
     // End of children content
@@ -228,7 +232,9 @@ private func evaluateNode(
     return RangeCacheSearchResult(nodeKey: nodeKey, type: boundary, offset: nil)
   }
 
-  let itemLocation = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+  let itemLocation = useOptimized
+    ? absoluteNodeStartLocation(nodeKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
+    : rangeCacheItem.location
   if stringLocation == itemLocation {
     if rangeCacheItem.preambleLength == 0 && node is ElementNode {
       if editor.featureFlags.selectionParityDebug {
