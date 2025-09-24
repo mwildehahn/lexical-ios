@@ -18,6 +18,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
   weak var toolbar: UIToolbar?
   weak var hierarchyView: UIView?
   private let editorStatePersistenceKey = "editorState"
+  private let selectionInfoLabel: UILabel = UILabel()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -57,9 +58,34 @@ class ViewController: UIViewController, UIToolbarDelegate {
     view.addSubview(lexicalView)
     view.addSubview(toolbar)
     view.addSubview(hierarchyView)
+    // Selection probe overlay setup
+    selectionInfoLabel.font = UIFont.systemFont(ofSize: 12)
+    selectionInfoLabel.textColor = .secondaryLabel
+    selectionInfoLabel.numberOfLines = 2
+    selectionInfoLabel.textAlignment = .left
+    view.addSubview(selectionInfoLabel)
 
     navigationItem.title = "Lexical"
     setUpExportMenu()
+
+    // Register update listener to display selection probe info
+    if let editor = lexicalView.editor as Editor? {
+      _ = editor.registerUpdateListener { [weak self] editorState, _, _ in
+        guard let self else { return }
+        DispatchQueue.main.async {
+          let tvTextLen = self.lexicalView?.textView.text.lengthAsNSString() ?? 0
+          var info = "docLen=\(tvTextLen)"
+          if let sel = editorState.selection as? RangeSelection {
+            let nativeRange = (try? createNativeSelection(from: sel, editor: editor).range)
+            let rangeDesc = nativeRange.map { "[\($0.location), \($0.length)]" } ?? "<nil>"
+            info += " | native=\(rangeDesc)"
+          } else {
+            info += " | selection=<none>"
+          }
+          self.selectionInfoLabel.text = info
+        }
+      }
+    }
   }
 
   override func viewDidLayoutSubviews() {
@@ -77,6 +103,10 @@ class ViewController: UIViewController, UIToolbarDelegate {
                                  y: toolbar.frame.maxY,
                                  width: view.bounds.width,
                                  height: view.bounds.height - toolbar.frame.maxY - safeAreaInsets.bottom - hierarchyViewHeight)
+      selectionInfoLabel.frame = CGRect(x: 8,
+                                        y: lexicalView.frame.maxY - 36,
+                                        width: view.bounds.width - 16,
+                                        height: 32)
       hierarchyView.frame = CGRect(x: 0,
                                    y: lexicalView.frame.maxY,
                                    width: view.bounds.width,
