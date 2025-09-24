@@ -163,16 +163,100 @@ class OptimizedReconcilerTests: XCTestCase {
     )
 
     // Test optimized reconciliation with marked text
-    // Should throw an error when marked text is present since it's not supported
-    XCTAssertThrowsError(try OptimizedReconciler.reconcile(
+    // Should succeed now that marked text is supported in the optimized path
+    XCTAssertNoThrow(try OptimizedReconciler.reconcile(
       currentEditorState: currentState,
       pendingEditorState: pendingState,
       editor: editor,
       shouldReconcileSelection: false,
       markedTextOperation: markedTextOperation
-    )) { error in
-      // Should receive an error indicating marked text is not supported
-      print("Expected marked text error: \(error)")
+    ))
+  }
+
+  func testOptimizedReconcilerDecoratorLifecycle() throws {
+    let featureFlags = FeatureFlags(optimizedReconciler: true, reconcilerMetrics: false)
+    let metrics = OptimizedReconcilerTestMetricsContainer()
+    let editorConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: metrics)
+    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: featureFlags)
+    let editor = textKitContext.editor
+
+    try editor.registerNode(nodeType: .testNode, class: TestDecoratorNode.self)
+
+    // Initial doc with no decorators
+    var currentState: EditorState!
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let p = ParagraphNode()
+      let t = TextNode(text: "Hello", key: nil)
+      try p.append([t])
+      try rootNode.append([p])
+      currentState = getActiveEditorState()
+    }
+
+    // Pending state adds a decorator node
+    var pendingState: EditorState!
+    var decoratorKey: NodeKey!
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      let p = ParagraphNode()
+      let t = TextNode(text: "Hello", key: nil)
+      let d = TestDecoratorNode()
+      decoratorKey = d.getKey()
+      try p.append([t, d])
+      try rootNode.append([p])
+      pendingState = getActiveEditorState()
+    }
+
+    // Reconcile
+    try OptimizedReconciler.reconcile(
+      currentEditorState: currentState,
+      pendingEditorState: pendingState,
+      editor: editor,
+      shouldReconcileSelection: false,
+      markedTextOperation: nil
+    )
+
+    // Verify cache updated for decorator creation and position
+    XCTAssertNotNil(editor.decoratorCache[decoratorKey], "Decorator should have a cache entry")
+    if let cacheItem = editor.decoratorCache[decoratorKey] {
+      switch cacheItem {
+      case .needsCreation, .unmountedCachedView, .cachedView, .needsDecorating:
+        break // any valid cache state is acceptable right after reconcile
+      }
+    }
+    if let pos = editor.textStorage?.decoratorPositionCache[decoratorKey] {
+      XCTAssertGreaterThanOrEqual(pos, 0, "Decorator position should be set")
+    } else {
+      XCTFail("Decorator position should have been populated")
+    }
+
+    // Now keep the decorator but modify text to force another optimized pass
+    currentState = pendingState
+    try editor.update {
+      guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
+      if let p = rootNode.getChildren().first as? ParagraphNode,
+         let t = p.getChildren().first as? TextNode {
+        try t.setText("Hello again")
+      }
+      pendingState = getActiveEditorState()
+    }
+
+    try OptimizedReconciler.reconcile(
+      currentEditorState: currentState,
+      pendingEditorState: pendingState,
+      editor: editor,
+      shouldReconcileSelection: false,
+      markedTextOperation: nil
+    )
+
+    // Remaining decorator should be marked for (re)decorate or have a view cached
+    if let cacheItem = editor.decoratorCache[decoratorKey] {
+      switch cacheItem {
+      case .needsDecorating, .cachedView, .unmountedCachedView, .needsCreation:
+        break
+      }
+    } else {
+      XCTFail("Decorator cache should still exist after update")
     }
   }
 

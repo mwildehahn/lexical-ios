@@ -25,10 +25,7 @@ internal enum OptimizedReconciler {
     markedTextOperation: MarkedTextOperation?
   ) throws {
 
-    // Marked text operations not yet supported in optimized path
-    if markedTextOperation != nil {
-      throw LexicalError.invariantViolation("Marked text operations not yet supported in optimized reconciliation")
-    }
+    // Marked text operations are supported; special handling occurs after delta application.
 
     guard let textStorage = editor.textStorage else {
       throw LexicalError.invariantViolation("TextStorage not available")
@@ -103,6 +100,44 @@ internal enum OptimizedReconciler {
         )
       }
 
+      // Update decorator lifecycle and position cache (basic parity)
+      updateDecoratorLifecycle(editor: editor, currentState: currentEditorState, pendingState: pendingEditorState)
+      updateDecoratorPositions(editor: editor, pendingState: pendingEditorState)
+
+      // Handle marked text (IME/composition) if requested
+      if let op = markedTextOperation, op.createMarkedText, let frontend = editor.frontend, let textStorage = editor.textStorage {
+        let length = op.markedTextString.lengthAsNSString()
+        // Find starting Point using updated range cache
+        let startPoint = try? pointAtStringLocation(
+          op.selectionRangeToReplace.location,
+          searchDirection: .forward,
+          rangeCache: editor.rangeCache
+        )
+
+        if let startPoint {
+          let endPoint = Point(key: startPoint.key, offset: startPoint.offset + length, type: .text)
+          let selection = RangeSelection(anchor: startPoint, focus: endPoint, format: TextFormat())
+          // Update native selection to cover the marked text region
+          try frontend.updateNativeSelection(from: selection)
+          // Resolve absolute range from selection to fetch attributed substring with styles
+          let nativeSel = try createNativeSelection(from: selection, editor: editor)
+          if let absRange = nativeSel.range {
+            let safeLen = min(length, max(0, textStorage.length - absRange.location))
+            let attributedSubstring = textStorage.attributedSubstring(
+              from: NSRange(location: absRange.location, length: safeLen)
+            )
+            // Tell the text view to convert this inserted text into a marked-text session
+            frontend.setMarkedTextFromReconciler(attributedSubstring, selectedRange: op.markedTextInternalSelection)
+            // Skip any further selection reconciliation like legacy does
+            editor.log(.reconciler, .message, "Handled marked text via optimized reconciler")
+          } else {
+            editor.log(.reconciler, .warning, "Native selection did not produce a numeric range; skipping marked-text handling")
+          }
+        } else {
+          editor.log(.reconciler, .warning, "Failed to resolve startPoint for marked text; skipping marked-text handling")
+        }
+      }
+
       // Record metrics if enabled
       if editor.featureFlags.reconcilerMetrics {
         recordOptimizedReconciliationMetrics(
@@ -156,6 +191,78 @@ internal enum OptimizedReconciler {
           lastDescendentAttributes: lastDescendentAttributes ?? [:],
           fenwickTree: editor.fenwickTree
         )
+      }
+    }
+  }
+
+  /// Minimal parity for decorator positioning: update TextStorage.decoratorPositionCache
+  private static func updateDecoratorPositions(
+    editor: Editor,
+    pendingState: EditorState
+  ) {
+    guard let textStorage = editor.textStorage else { return }
+    var newCache: [NodeKey: Int] = [:]
+
+    for (key, node) in pendingState.nodeMap {
+      if node is DecoratorNode, let cacheItem = editor.rangeCache[key] {
+        let loc = cacheItem.locationFromFenwick(using: editor.fenwickTree)
+        newCache[key] = loc
+      }
+    }
+
+    textStorage.decoratorPositionCache = newCache
+  }
+
+  /// Basic decorator lifecycle parity: add/decorate/remove cache entries to mirror legacy expectations
+  private static func updateDecoratorLifecycle(
+    editor: Editor,
+    currentState: EditorState,
+    pendingState: EditorState
+  ) {
+    guard let textStorage = editor.textStorage else { return }
+
+    // Collect decorator keys in each state
+    let currentDecorators: Set<NodeKey> = Set(
+      currentState.nodeMap.compactMap { (k, v) in v is DecoratorNode ? k : nil }
+    )
+    let pendingDecorators: Set<NodeKey> = Set(
+      pendingState.nodeMap.compactMap { (k, v) in v is DecoratorNode ? k : nil }
+    )
+
+    let removed = currentDecorators.subtracting(pendingDecorators)
+    let added = pendingDecorators.subtracting(currentDecorators)
+    let staying = currentDecorators.intersection(pendingDecorators)
+
+    // Handle removals: remove view if present, drop caches
+    for key in removed {
+      if let item = editor.decoratorCache[key], let view = item.view {
+        view.removeFromSuperview()
+      }
+      destroyCachedDecoratorView(forKey: key)
+      textStorage.decoratorPositionCache[key] = nil
+    }
+
+    // Handle additions: mark for creation and set initial position
+    for key in added {
+      if editor.decoratorCache[key] == nil {
+        editor.decoratorCache[key] = .needsCreation
+      }
+      if let cacheItem = editor.rangeCache[key] {
+        textStorage.decoratorPositionCache[key] = cacheItem.locationFromFenwick(using: editor.fenwickTree)
+      }
+    }
+
+    // Handle decorators that remain: mark for (re)decorate and refresh position
+    for key in staying {
+      if let cacheItem = editor.decoratorCache[key], let view = cacheItem.view {
+        editor.decoratorCache[key] = .needsDecorating(view)
+      } else if editor.decoratorCache[key] == nil {
+        // No cache entry yet; ensure creation will occur
+        editor.decoratorCache[key] = .needsCreation
+      }
+
+      if let rc = editor.rangeCache[key] {
+        textStorage.decoratorPositionCache[key] = rc.locationFromFenwick(using: editor.fenwickTree)
       }
     }
   }

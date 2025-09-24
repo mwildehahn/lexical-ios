@@ -6,9 +6,9 @@ Status legend: [x] done, [>] in progress, [ ] todo
 
 ## 1) Functional Parity
 
-- [ ] Marked text/IME operations in optimized path (currently throws)
+- [x] Marked text/IME operations in optimized path (currently throws)
 - [ ] Decorator nodes parity:
-  - [ ] Correct position updates for `decoratorPositionCache`
+  - [x] Correct position updates for `decoratorPositionCache`
   - [ ] Create/decorate lifecycle to match legacy (needs cache + view hooks)
 - [x] Block‑level attributes parity (paragraph/list/table attributes applied after insert)
 - [x] Attribute deltas coverage (bold/italic etc) generation in DeltaGenerator (attributeChange)
@@ -31,6 +31,10 @@ Status legend: [x] done, [>] in progress, [ ] todo
 - Incremental RangeCache now bumps ancestors’ `childrenLength` on insert/update/delete.
 - Ordered element insertions before leaf insertions within a batch (heuristic) to seed parent cache.
 - RangeCacheChildrenLengthTests runs under optimized path; full suite green on iOS Simulator.
+ - Added IME/marked‑text handling path to OptimizedReconciler (no longer throws).
+ - Implemented minimal decorator position cache updates after delta application.
+ - Per‑delta applied/failed metrics recorded; clamped insertions counter retained.
+ - Verified on iOS simulator: `Lexical` tests pass; `LexicalPlayground` builds.
 
 Follow‑ups
 - Remove temporary debug prints after burn‑in.
@@ -54,17 +58,17 @@ Follow‑ups
 
 1. Generate deltas in document order so fresh documents keep child order. [x]
 2. Apply block‑level attributes after optimized batch (mirror legacy). [x]
-3. Basic decorator positions update (minimal parity: position cache only). [ ]
+3. Basic decorator positions update (minimal parity: position cache only). [x]
 4. Emit attributeChange deltas for inline style toggles on TextNode. [x]
 5. Wire metrics (clamping counts, delta type counts) and parity tests. [>]
    - [x] Count clamped insertions/updates
    - [x] Parity tests: fresh‑doc ordering; inline attribute change
-   - [ ] Per‑delta applied/failed counters
+   - [x] Per‑delta applied/failed counters
    - [ ] ChildrenLength propagation test on nested trees
 
 ## Milestone B
 
-- Marked text handling (IME): mirror legacy reconcile flow (selection guard + setMarkedTextFromReconciler). [ ]
+- Marked text handling (IME): mirror legacy reconcile flow (selection guard + setMarkedTextFromReconciler). [x]
 - Stable Fenwick indexing semantics (nodeIndex lifecycle). [x]
 - RangeCache incremental childrenLength recompute on element insertions. [x]
 
