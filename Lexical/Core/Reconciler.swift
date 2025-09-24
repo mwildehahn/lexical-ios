@@ -147,10 +147,18 @@ internal enum Reconciler {
     metricsShouldRecord = true
     metricsState = reconcilerState
 
-    // Choose reconciliation path based on feature flag - NO FALLBACK
-    if editor.featureFlags.optimizedReconciler {
-      // Use ONLY optimized reconciliation
-      editor.log(.reconciler, .message, "Using optimized reconciliation")
+    // Choose reconciliation path based on feature flag
+    if editor.featureFlags.optimizedReconciler || editor.featureFlags.darkLaunchOptimized {
+      // Optionally snapshot state for dark-launch
+      var snapshotString: NSAttributedString?
+      var snapshotRangeCache: [NodeKey: RangeCacheItem] = [:]
+      if editor.featureFlags.darkLaunchOptimized {
+        let ts = textStorage
+        snapshotString = ts.attributedSubstring(from: NSRange(location: 0, length: ts.length))
+        snapshotRangeCache = editor.rangeCache
+      }
+
+      editor.log(.reconciler, .message, "Using optimized reconciliation\(editor.featureFlags.darkLaunchOptimized ? " (dark-launch)" : "")")
       try OptimizedReconciler.reconcile(
         currentEditorState: currentEditorState,
         pendingEditorState: pendingEditorState,
@@ -167,7 +175,26 @@ internal enum Reconciler {
           editor: editor
         )
       }
-      return
+
+      if editor.featureFlags.darkLaunchOptimized {
+        // Restore snapshot then run legacy path for authoritative state
+        if let snap = snapshotString {
+          let previousMode = textStorage.mode
+          textStorage.mode = .controllerMode
+          textStorage.beginEditing()
+          textStorage.replaceCharacters(
+            in: NSRange(location: 0, length: textStorage.string.lengthAsNSString()),
+            with: snap)
+          textStorage.endEditing()
+          textStorage.mode = previousMode
+        }
+        editor.rangeCache = snapshotRangeCache
+
+        editor.log(.reconciler, .message, "Dark-launch: running legacy reconciliation after optimized")
+        // fall through to legacy reconciliation below (do not return)
+      } else {
+        return
+      }
     }
 
     // Use legacy reconciliation
