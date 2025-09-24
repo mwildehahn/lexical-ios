@@ -14,6 +14,7 @@ import Foundation
   let reconcilerMetrics: Bool
   let darkLaunchOptimized: Bool
   let decoratorSiblingRedecorate: Bool
+  let selectionParityDebug: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
@@ -21,7 +22,8 @@ import Foundation
     optimizedReconciler: Bool = false,
     reconcilerMetrics: Bool = false,
     darkLaunchOptimized: Bool = false,
-    decoratorSiblingRedecorate: Bool = false
+    decoratorSiblingRedecorate: Bool = false,
+    selectionParityDebug: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -29,6 +31,7 @@ import Foundation
     self.reconcilerMetrics = reconcilerMetrics
     self.darkLaunchOptimized = darkLaunchOptimized
     self.decoratorSiblingRedecorate = decoratorSiblingRedecorate
+    self.selectionParityDebug = selectionParityDebug
     super.init()
   }
 }

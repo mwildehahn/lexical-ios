@@ -144,6 +144,8 @@ final class SelectionParityTests: XCTestCase {
     if let lB { XCTAssertEqual(loc(lB, legacyEditor), legacyLoc) }
     if let oF { XCTAssertEqual(loc(oF, optEditor), optLoc) }
     if let oB { XCTAssertEqual(loc(oB, optEditor), optLoc) }
+
+    // Cross-mode absolute location equality intentionally not asserted yet.
   }
 
   func testElementBoundaryParity() throws {
@@ -209,6 +211,8 @@ final class SelectionParityTests: XCTestCase {
       XCTAssertEqual(ofl, optStart)
       XCTAssertEqual(obl, optStart)
     }
+
+    // Cross-mode absolute location equality intentionally not asserted yet.
   }
 
   func testParagraphBoundaryParity() throws {
@@ -275,7 +279,7 @@ final class SelectionParityTests: XCTestCase {
       XCTAssertEqual(obl, optStart)
     }
 
-    // Cross-mode equality intentionally not asserted yet
+    // Cross-mode absolute location equality intentionally not asserted yet.
   }
 
   func testCreateNativeSelectionParity() throws {

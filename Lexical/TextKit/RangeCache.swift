@@ -113,6 +113,9 @@ private func evaluateNode(
       && parentRangeCacheItem.preambleSpecialCharacterLength - parentRangeCacheItem.preambleLength
         == 0
     {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: at parent-start boundary for child \(nodeKey), mapping to text-start if TextNode")
+      }
       if node is TextNode {
         return RangeCacheSearchResult(nodeKey: nodeKey, type: .text, offset: 0)
       }
@@ -162,6 +165,9 @@ private func evaluateNode(
     }
 
     if let possibleBoundaryElementResult {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: child boundary -> returning element offset for parent=\(nodeKey) offset=\(possibleBoundaryElementResult.offset ?? -1)")
+      }
       // We do this 'possible result' check so that we prioritise text results where we can.
       return possibleBoundaryElementResult
     }
@@ -178,10 +184,16 @@ private func evaluateNode(
 
     // Exact start of children maps to offset 0
     if stringLocation == childrenStart {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: exact childrenStart -> element offset 0 for node=\(nodeKey)")
+      }
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
     // Exact end of children maps to offset count
     if stringLocation == childrenEnd {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: exact childrenEnd -> element offset count for node=\(nodeKey)")
+      }
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: normalOrderChildren.count)
     }
 
@@ -190,6 +202,9 @@ private func evaluateNode(
       if let childItem = rangeCache[ck] {
         let childStart = useOptimized ? childItem.locationFromFenwick(using: fenwickTree) : childItem.location
         if stringLocation == childStart {
+          if editor.featureFlags.selectionParityDebug {
+            print("🔥 RANGE CACHE PARITY: exact child start -> element offset idx=\(idx) for parent=\(nodeKey) child=\(ck)")
+          }
           return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: idx)
         }
       }
@@ -201,6 +216,9 @@ private func evaluateNode(
     // caret is at the last row - element with no children
     let itemLocation = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
     if stringLocation == itemLocation {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: empty element at start -> element offset 0 for node=\(nodeKey)")
+      }
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
 
@@ -213,6 +231,9 @@ private func evaluateNode(
   let itemLocation = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
   if stringLocation == itemLocation {
     if rangeCacheItem.preambleLength == 0 && node is ElementNode {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: element at start with no preamble -> element offset 0 for node=\(nodeKey)")
+      }
       return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
     }
     return RangeCacheSearchResult(nodeKey: nodeKey, type: .startBoundary, offset: nil)

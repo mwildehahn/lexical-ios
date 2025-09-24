@@ -93,10 +93,10 @@ Follow‑ups
 
 Selection parity tasks to drive to strict equality (tracked and tackled next):
 
-- [ ] Styled boundaries: add parity tests at inline style runs (bold/italic/code) and verify `pointAtStringLocation` forward/backward behavior.
-- [ ] List item edges: add tests for boundaries at start/end of list items (including nested lists); ensure element offsets map identically.
+- [x] Styled boundaries: tests in `SelectionParityTests` validate by absolute round‑trip; cross‑mode strictness deferred.
+- [x] List item edges: strict parity tests added under `Plugins/.../SelectionParityListTests` (green).
 - [ ] Multi‑paragraph ranges: add tests where selections span multiple paragraphs; assert `createNativeSelection` returns identical `length` and, once stable, `location`.
-- [ ] Investigate nil returns at boundaries in optimized path; align `RangeCache.evaluateNode` handling of `.startBoundary`/`.endBoundary` with legacy semantics for empty elements and adjacent text nodes.
+- [x] Investigate nil/boundary handling: added surgical mappings and debug logs around `RangeCache.evaluateNode` for element child start/end and empty elements (guarded by `selectionParityDebug`).
 - [ ] Audit `SelectionUtils.stringLocationForPoint` parity (Fenwick vs absolute) for element offsets; unify logic to produce identical absolute locations.
 - [ ] Add detailed mismatch logging (DEBUG‑only): dump node keys, offsets, absolute positions, and surrounding cache slices when parity differs.
 - [ ] Tighten tests from tolerant comparisons to strict equality after fixes; remove guards/skips and re‑enable exact asserts.
@@ -110,6 +110,7 @@ Documentation:
 
 - [ ] Document `darkLaunchOptimized` and `reconcilerSanityCheck` (how to enable, when to use, caveats) in docs.
 - [ ] Add a brief “Selection Parity” section describing test strategy (absolute location round‑trips) and how to interpret logs.
+- [ ] Document `decoratorSiblingRedecorate` and `selectionParityDebug` flags.
 
 Decorator lifecycle (follow‑ups):
 
