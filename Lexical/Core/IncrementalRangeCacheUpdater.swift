@@ -33,26 +33,33 @@ internal class IncrementalRangeCacheUpdater {
     let deltasByNode = groupDeltasByNode(deltas)
     print("🔥 RANGE CACHE UPDATER: applying deltas for \(deltasByNode.keys.count) nodes")
 
-    // Process element insertions before leaf insertions to ensure parents exist
-    let ordered: [(NodeKey, [ReconcilerDelta])] = deltasByNode.sorted { lhs, rhs in
-      func isElementInsertionByHeuristic(_ entry: (NodeKey, [ReconcilerDelta])) -> Bool {
-        // Heuristic: element insertions typically have empty content in insertionData
-        for d in entry.1 {
-          if case let .nodeInsertion(_, insertionData, _) = d.type {
-            return insertionData.content.length == 0
-          }
+    // Establish a document-order pass for newly inserted nodes based on their insertion locations
+    // 1) collect insertions with locations
+    var insertionOrder: [(NodeKey, Int)] = []
+    for deltas in deltasByNode.values {
+      for d in deltas {
+        if case let .nodeInsertion(nodeKey: key, insertionData: _, location: loc) = d.type {
+          insertionOrder.append((key, loc))
         }
-        return false
       }
-      // Element insertions first; otherwise preserve map order
-      if isElementInsertionByHeuristic(lhs) && !isElementInsertionByHeuristic(rhs) { return true }
-      if !isElementInsertionByHeuristic(lhs) && isElementInsertionByHeuristic(rhs) { return false }
-      return false
+    }
+    // 2) sort insertions by ascending location to approximate document order in the backing string
+    insertionOrder.sort { $0.1 < $1.1 }
+    var visited: Set<NodeKey> = []
+
+    // First, process insertions in string order (assigns stable Fenwick indices in order of appearance)
+    for (key, _) in insertionOrder {
+      if visited.contains(key) { continue }
+      if let nodeDeltas = deltasByNode[key] {
+        print("🔥 RANGE CACHE UPDATER: insertion-first node=\(key) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
+        try updateNodeInRangeCache(&rangeCache, nodeKey: key, deltas: nodeDeltas)
+        visited.insert(key)
+      }
     }
 
-    // Process each affected node
-    for (nodeKey, nodeDeltas) in ordered {
-      print("🔥 RANGE CACHE UPDATER: node=\(nodeKey) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
+    // Then process any remaining nodes (updates/attributes/deletions)
+    for (nodeKey, nodeDeltas) in deltasByNode where !visited.contains(nodeKey) {
+      print("🔥 RANGE CACHE UPDATER: remaining node=\(nodeKey) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
       try updateNodeInRangeCache(&rangeCache, nodeKey: nodeKey, deltas: nodeDeltas)
     }
   }

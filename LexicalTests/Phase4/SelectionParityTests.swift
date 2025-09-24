@@ -38,7 +38,7 @@ final class SelectionParityTests: XCTestCase {
     // Legacy context
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: false)
+      featureFlags: FeatureFlags(optimizedReconciler: false, selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
     let (legacyT1, legacyT2) = try buildSimpleTwoTextNodesDocument(editor: legacyEditor)
@@ -46,7 +46,7 @@ final class SelectionParityTests: XCTestCase {
     // Optimized context
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []),
-      featureFlags: FeatureFlags(optimizedReconciler: true)
+      featureFlags: FeatureFlags(optimizedReconciler: true, selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     let (optT1, optT2) = try buildSimpleTwoTextNodesDocument(editor: optEditor)
