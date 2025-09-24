@@ -19,6 +19,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
   weak var hierarchyView: UIView?
   private let editorStatePersistenceKey = "editorState"
   private let selectionInfoLabel: UILabel = UILabel()
+  private let metricsInfoLabel: UILabel = UILabel()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -64,13 +65,19 @@ class ViewController: UIViewController, UIToolbarDelegate {
     selectionInfoLabel.numberOfLines = 2
     selectionInfoLabel.textAlignment = .left
     view.addSubview(selectionInfoLabel)
+    // Metrics probe overlay setup
+    metricsInfoLabel.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    metricsInfoLabel.textColor = .tertiaryLabel
+    metricsInfoLabel.numberOfLines = 2
+    metricsInfoLabel.textAlignment = .left
+    view.addSubview(metricsInfoLabel)
 
     navigationItem.title = "Lexical"
     setUpExportMenu()
 
     // Register update listener to display selection probe info
     if let editor = lexicalView.editor as Editor? {
-      _ = editor.registerUpdateListener { [weak self] editorState, _, _ in
+      _ = editor.registerUpdateListener(listener: { [weak self] editorState, _, _ in
         guard let self else { return }
         DispatchQueue.main.async {
           let tvTextLen = self.lexicalView?.textView.text.lengthAsNSString() ?? 0
@@ -83,8 +90,27 @@ class ViewController: UIViewController, UIToolbarDelegate {
             info += " | selection=<none>"
           }
           self.selectionInfoLabel.text = info
+          // Use the metricsContainer provided in EditorConfig if available; otherwise skip.
+          // Use a default container if none was supplied
+          // Use the metrics container supplied on EditorConfig if present; otherwise just show blanks.
+          let mcOpt: EditorMetricsContainer? = editorConfig.metricsContainer
+          if let mc = mcOpt {
+            let s = mc.optimizedDeltaSummary
+            var parts: [String] = []
+            parts.append("applied=\(s.appliedTotal)")
+            if s.failedTotal > 0 { parts.append("failed=\(s.failedTotal)") }
+            if s.clampedInsertions > 0 { parts.append("clamped=\(s.clampedInsertions)") }
+            if !s.appliedByType.isEmpty {
+              let top = s.appliedByType.sorted { $0.value > $1.value }.prefix(2)
+              let topStr = top.map { "\($0.key)=\($0.value)" }.joined(separator: ",")
+              parts.append(topStr)
+            }
+            self.metricsInfoLabel.text = parts.joined(separator: "  ")
+          } else {
+            self.metricsInfoLabel.text = ""
+          }
         }
-      }
+      })
     }
   }
 
@@ -107,6 +133,10 @@ class ViewController: UIViewController, UIToolbarDelegate {
                                         y: lexicalView.frame.maxY - 36,
                                         width: view.bounds.width - 16,
                                         height: 32)
+      metricsInfoLabel.frame = CGRect(x: 8,
+                                      y: lexicalView.frame.maxY - 18,
+                                      width: view.bounds.width - 16,
+                                      height: 16)
       hierarchyView.frame = CGRect(x: 0,
                                    y: lexicalView.frame.maxY,
                                    width: view.bounds.width,

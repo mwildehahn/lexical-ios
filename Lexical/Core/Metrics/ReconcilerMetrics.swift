@@ -117,6 +117,68 @@ extension EditorMetricsContainer {
   }
 }
 
+// MARK: - Optimized Delta Summary
+
+@MainActor
+public struct OptimizedDeltaSummary {
+  public let appliedTotal: Int
+  public let failedTotal: Int
+  public let appliedByType: [String: Int]
+  public let failedByType: [String: Int]
+  public let clampedInsertions: Int
+
+  public init(appliedTotal: Int, failedTotal: Int, appliedByType: [String: Int], failedByType: [String: Int], clampedInsertions: Int) {
+    self.appliedTotal = appliedTotal
+    self.failedTotal = failedTotal
+    self.appliedByType = appliedByType
+    self.failedByType = failedByType
+    self.clampedInsertions = clampedInsertions
+  }
+}
+
+extension EditorMetricsContainer {
+  /// Aggregates optimized-delta counters recorded in `metricsData` into a summary.
+  /// Keys considered (all optional):
+  ///  - optimized.delta.applied.total
+  ///  - optimized.delta.applied.<type>
+  ///  - optimized.delta.failed.total
+  ///  - optimized.delta.failed.<type>
+  ///  - optimized.clampedInsertions
+  @MainActor
+  public var optimizedDeltaSummary: OptimizedDeltaSummary {
+    var appliedTotal = 0
+    var failedTotal = 0
+    var appliedByType: [String: Int] = [:]
+    var failedByType: [String: Int] = [:]
+    var clamped = 0
+
+    for (k, v) in metricsData {
+      guard let val = v as? Int else { continue }
+      if k == "optimized.delta.applied.total" {
+        appliedTotal = val
+      } else if k.hasPrefix("optimized.delta.applied.") {
+        let typeKey = String(k.dropFirst("optimized.delta.applied.".count))
+        if typeKey != "total" { appliedByType[typeKey, default: 0] = val }
+      } else if k == "optimized.delta.failed.total" {
+        failedTotal = val
+      } else if k.hasPrefix("optimized.delta.failed.") {
+        let typeKey = String(k.dropFirst("optimized.delta.failed.".count))
+        if typeKey != "total" { failedByType[typeKey, default: 0] = val }
+      } else if k == "optimized.clampedInsertions" {
+        clamped = val
+      }
+    }
+
+    return OptimizedDeltaSummary(
+      appliedTotal: appliedTotal,
+      failedTotal: failedTotal,
+      appliedByType: appliedByType,
+      failedByType: failedByType,
+      clampedInsertions: clamped
+    )
+  }
+}
+
 // MARK: - Debug Output
 
 extension ReconcilerMetric: CustomStringConvertible {
