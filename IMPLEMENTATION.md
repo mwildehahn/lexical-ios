@@ -7,9 +7,9 @@ Status legend: [x] done, [>] in progress, [ ] todo
 ## 1) Functional Parity
 
 - [x] Marked text/IME operations in optimized path (currently throws)
-- [ ] Decorator nodes parity:
+- [x] Decorator nodes parity:
   - [x] Correct position updates for `decoratorPositionCache`
-  - [ ] Create/decorate lifecycle to match legacy (needs cache + view hooks)
+  - [x] Create/decorate/remove lifecycle parity (needsCreation/needsDecorating/remove + movement detection)
 - [x] Block‑level attributes parity (paragraph/list/table attributes applied after insert)
 - [x] Attribute deltas coverage (bold/italic etc) generation in DeltaGenerator (attributeChange)
 - [x] Children ordering invariants (insertions occur in document order for fresh content)
@@ -113,5 +113,13 @@ Documentation:
 
 Decorator lifecycle (follow‑ups):
 
-- [ ] Wire create/decorate/remove hooks in optimized path to fully mirror legacy `decoratorsToAdd/Decorate` flow; add tests for move/attach/detach and position updates after mutations.
+- [ ] Consider sibling-triggered redecorate propagation even when absolute position unchanged (match legacy’s conservative sibling redecorate heuristic).
 - [ ] Remove temporary “🔥” debug prints or gate behind a debug flag before flipping defaults.
+
+2025‑09‑24 — Decorator lifecycle parity
+
+- Implemented lifecycle parity in `OptimizedReconciler.updateDecoratorLifecycle`:
+  - New decorators: `.needsCreation` + position cache set.
+  - Staying decorators: mark `.needsDecorating(view)` when dirty or when moved (old vs new absolute position via Fenwick).
+  - Removed decorators: remove subview, destroy cache, clear position.
+- Added tests `LexicalTests/Phase4/DecoratorLifecycleParityTests.swift` covering create → decorate, dirty → re‑decorate, move → re‑decorate, and remove → cache cleanup.

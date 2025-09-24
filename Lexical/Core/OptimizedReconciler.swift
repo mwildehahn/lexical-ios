@@ -75,6 +75,17 @@ internal enum OptimizedReconciler {
       textStorage.mode = previousMode
     }
 
+    // Capture pre-apply decorator positions (string locations) for movement detection
+    let oldDecoratorPositions: [NodeKey: Int] = {
+      var map: [NodeKey: Int] = [:]
+      for (key, node) in currentEditorState.nodeMap where node is DecoratorNode {
+        if let cacheItem = editor.rangeCache[key] {
+          map[key] = cacheItem.locationFromFenwick(using: editor.fenwickTree)
+        }
+      }
+      return map
+    }()
+
     // Apply deltas
     let applicationResult = deltaApplier.applyDeltaBatch(deltaBatch, to: textStorage)
 
@@ -100,8 +111,13 @@ internal enum OptimizedReconciler {
         )
       }
 
-      // Update decorator lifecycle and position cache (basic parity)
-      updateDecoratorLifecycle(editor: editor, currentState: currentEditorState, pendingState: pendingEditorState)
+      // Update decorator lifecycle and position cache (parity with legacy: create/decorate/remove + moved)
+      updateDecoratorLifecycle(
+        editor: editor,
+        currentState: currentEditorState,
+        pendingState: pendingEditorState,
+        oldPositions: oldDecoratorPositions
+      )
       updateDecoratorPositions(editor: editor, pendingState: pendingEditorState)
 
       // Handle marked text (IME/composition) if requested
@@ -216,7 +232,7 @@ internal enum OptimizedReconciler {
     var newCache: [NodeKey: Int] = [:]
 
     for (key, node) in pendingState.nodeMap {
-      if node is DecoratorNode, let cacheItem = editor.rangeCache[key] {
+      if node is DecoratorNode, isAttachedInState(key, state: pendingState), let cacheItem = editor.rangeCache[key] {
         let loc = cacheItem.locationFromFenwick(using: editor.fenwickTree)
         newCache[key] = loc
       }
@@ -225,11 +241,15 @@ internal enum OptimizedReconciler {
     textStorage.decoratorPositionCache = newCache
   }
 
-  /// Basic decorator lifecycle parity: add/decorate/remove cache entries to mirror legacy expectations
+  /// Decorator lifecycle parity: create/decorate/remove and reposition
+  /// - We mark new decorators as .needsCreation
+  /// - We mark staying decorators as .needsDecorating(view) if they are dirty or moved
+  /// - We remove deleted decorators and clear caches
   private static func updateDecoratorLifecycle(
     editor: Editor,
     currentState: EditorState,
-    pendingState: EditorState
+    pendingState: EditorState,
+    oldPositions: [NodeKey: Int]
   ) {
     guard let textStorage = editor.textStorage else { return }
 
@@ -241,9 +261,35 @@ internal enum OptimizedReconciler {
       pendingState.nodeMap.compactMap { (k, v) in v is DecoratorNode ? k : nil }
     )
 
-    let removed = currentDecorators.subtracting(pendingDecorators)
+    // Consider a decorator removed if it either no longer exists in pending state OR exists but is detached (GC happens later)
+    var removed = Set<NodeKey>()
+    for key in currentDecorators {
+      if let _ = pendingState.nodeMap[key] {
+        if !isAttachedInState(key, state: pendingState) { removed.insert(key) }
+      } else {
+        removed.insert(key)
+      }
+    }
     let added = pendingDecorators.subtracting(currentDecorators)
-    let staying = currentDecorators.intersection(pendingDecorators)
+    var staying = currentDecorators.intersection(pendingDecorators)
+    // Exclude detached/deleted keys from staying
+    staying.subtract(removed)
+
+    // Compute new positions after delta application and cache update
+    var newPositions: [NodeKey: Int] = [:]
+    for key in pendingDecorators where isAttachedInState(key, state: pendingState) {
+      if let cacheItem = editor.rangeCache[key] {
+        newPositions[key] = cacheItem.locationFromFenwick(using: editor.fenwickTree)
+      }
+    }
+    
+    // Detect movement of decorators present in both states
+    var moved: Set<NodeKey> = []
+    for key in staying {
+      if let oldPos = oldPositions[key], let newPos = newPositions[key], oldPos != newPos {
+        moved.insert(key)
+      }
+    }
 
     // Handle removals: remove view if present, drop caches
     for key in removed {
@@ -264,19 +310,38 @@ internal enum OptimizedReconciler {
       }
     }
 
-    // Handle decorators that remain: mark for (re)decorate and refresh position
+    // Handle decorators that remain: mark for (re)decorate if dirty or moved; refresh position
     for key in staying {
-      if let cacheItem = editor.decoratorCache[key], let view = cacheItem.view {
-        editor.decoratorCache[key] = .needsDecorating(view)
-      } else if editor.decoratorCache[key] == nil {
-        // No cache entry yet; ensure creation will occur
-        editor.decoratorCache[key] = .needsCreation
+      // Skip any keys that were removed/detached
+      if removed.contains(key) { continue }
+
+      let isDirty = editor.dirtyNodes[key] != nil || editor.dirtyType == .fullReconcile
+      let shouldRedecorate = isDirty || moved.contains(key)
+
+      if shouldRedecorate {
+        if let cacheItem = editor.decoratorCache[key], let view = cacheItem.view {
+          editor.decoratorCache[key] = .needsDecorating(view)
+        } else if editor.decoratorCache[key] == nil {
+          // No cache entry yet; ensure creation will occur
+          editor.decoratorCache[key] = .needsCreation
+        }
       }
 
       if let rc = editor.rangeCache[key] {
         textStorage.decoratorPositionCache[key] = rc.locationFromFenwick(using: editor.fenwickTree)
       }
     }
+  }
+
+  /// Attachment check against a specific EditorState (do not rely on global active state)
+  private static func isAttachedInState(_ nodeKey: NodeKey, state: EditorState) -> Bool {
+    var key: NodeKey? = nodeKey
+    while let k = key {
+      if k == kRootNodeKey { return true }
+      guard let node = state.nodeMap[k], let parent = node.parent else { break }
+      key = parent
+    }
+    return false
   }
 
   /// Records metrics for successful optimized reconciliation
