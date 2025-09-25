@@ -16,7 +16,7 @@ Updates in this patch (2025‑09‑25)
   - Adjusted docs: feature flags quick reference no longer lists removed flags.
 - Verification (iOS 26.0, iPhone 17 Pro):
   - Focused suites: SelectionParityTests (key case), InlineDecoratorBoundaryParityTests, IncrementalUpdaterTextLengthTests — green.
-  - Build‑for‑testing succeeds for the Lexical scheme.
+  - Build‑for‑testing succeeds for the Lexical‑Package test scheme.
 
 **What “Legacy” Does vs “Optimized”**
 - Legacy (`Lexical/Core/Reconciler.swift:1`): tree walk computes rangesToDelete/rangesToAdd, maintains `decoratorsToAdd/Decorate/Remove`, applies to `TextStorage`, then block‑level attributes, selection, marked‑text; updates `rangeCache` in one pass.
@@ -93,7 +93,7 @@ Updates in this patch (2025‑09‑25)
 - Heavy suites (`*.swift.disabled`): perf/stress/edge cases — kept off for now.
 
 Run (examples):
-- Unit tests: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+- Unit tests (always use Lexical‑Package): `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
 - Filter: `... -only-testing:LexicalTests/SelectionParityTests test`
 
 ---
