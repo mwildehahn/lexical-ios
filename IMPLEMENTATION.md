@@ -128,8 +128,8 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - Stress & Metrics
     - [ ] Large‑document typing, mass attribute toggles, large reorders; assert string parity and record op counts / durations (non‑flaky bounds).
   - Plugins (selected smoke parity)
-    - [ ] Link plugin inline formatting around edits.
-    - [ ] List plugin numbering/indent changes across reorders/edits.
+    - [x] Link plugin inline formatting around edits (toggle link on selection, remove link) — string parity across optimized vs legacy.
+    - [x] List plugin: insert unordered/ordered lists and remove list — string parity across optimized vs legacy; selection kept inside text node to avoid transform selection loss.
     - [ ] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings).
 
 - [ ] M6 — Performance & Rollout

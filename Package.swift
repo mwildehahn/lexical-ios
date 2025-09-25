@@ -51,7 +51,7 @@ let package = Package(
       path: "./Lexical"),
     .testTarget(
       name: "LexicalTests",
-      dependencies: ["Lexical"],
+      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin"],
       path: "./LexicalTests"),
 
     .target(
