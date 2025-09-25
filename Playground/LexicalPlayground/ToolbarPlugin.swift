@@ -116,6 +116,18 @@ public class ToolbarPlugin: Plugin {
     }
   }
 
+  // Allow host VC to prepend custom bar button items (e.g., a mode selector)
+  private var leadingItems: [UIBarButtonItem] = []
+  public func setLeadingItems(_ items: [UIBarButtonItem]) {
+    self.leadingItems = items
+    // Recompose items if already set up
+    if var itemsArr = _toolbar.items, !itemsArr.isEmpty {
+      // Extract default items built in setUpToolbar (ignore any previous leading injections)
+      // For simplicity in playground, replace with new composition
+      composeToolbarItems()
+    }
+  }
+
   // MARK: - Private helpers
 
   var undoButton: UIBarButtonItem?
@@ -174,7 +186,18 @@ public class ToolbarPlugin: Plugin {
                                           action: #selector(sampleDecoratorBlock))
     self.insertSampleDecoratorBlock = insertSampleDecoratorBlock
 
-    toolbar.items = [undo, redo, paragraph, styling, link, decreaseIndent, increaseIndent, insertImage, insertSampleDecoratorBlock]
+    toolbar.items = []
+    composeToolbarItems(defaultItems: [undo, redo, paragraph, styling, link, decreaseIndent, increaseIndent, insertImage, insertSampleDecoratorBlock])
+  }
+
+  private func composeToolbarItems(defaultItems: [UIBarButtonItem]? = nil) {
+    if let def = defaultItems {
+      _toolbar.items = leadingItems + def
+    } else if let existing = _toolbar.items {
+      // Assume existing are the defaults; re-apply with leading
+      // (This is a best-effort for the playground toolbar.)
+      _toolbar.items = leadingItems + existing.filter { !leadingItems.contains($0) }
+    }
   }
 
   private enum ParagraphMenuSelectedItemType {

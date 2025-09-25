@@ -30,8 +30,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     let tabBarController = UITabBarController()
     tabBarController.viewControllers = [editorNavController, performanceNavController]
 
-    // Preselect the Performance tab
-    tabBarController.selectedIndex = 1
+    // Start on the Editor tab (index 0) so the mode control is visible by default
+    tabBarController.selectedIndex = 0
 
     window.rootViewController = tabBarController
     return true
