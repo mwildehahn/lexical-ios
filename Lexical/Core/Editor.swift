@@ -185,7 +185,9 @@ public class Editor: NSObject {
     guard let rootNodeKey = editorState.getRootNode()?.key else {
       fatalError("Expected root node key when creating new editor state")
     }
-    rangeCache[rootNodeKey] = RangeCacheItem()
+    var rootItem = RangeCacheItem()
+    rootItem.nodeKey = rootNodeKey
+    rangeCache[rootNodeKey] = rootItem
     theme = editorConfig.theme
     plugins = editorConfig.plugins
 
@@ -452,7 +454,9 @@ public class Editor: NSObject {
     editorState = EditorState(version: editorStateVersion)
 
     rangeCache = [:]
-    rangeCache[kRootNodeKey] = RangeCacheItem()
+    var rootItem2 = RangeCacheItem()
+    rootItem2.nodeKey = kRootNodeKey
+    rangeCache[kRootNodeKey] = rootItem2
 
     if let textStorage = frontend?.textStorage {
       let oldMode = textStorage.mode
@@ -1066,7 +1070,9 @@ public class Editor: NSObject {
     self.dirtyNodes = [:]
     self.dirtyType = .noDirtyNodes
     self.cloneNotNeeded = Set()
-    self.rangeCache = [kRootNodeKey: RangeCacheItem()]
+    var rootItem3 = RangeCacheItem()
+    rootItem3.nodeKey = kRootNodeKey
+    self.rangeCache = [kRootNodeKey: rootItem3]
     self.normalizedNodes = Set()
     self.editorState = editorState
     self.pendingEditorState = nil

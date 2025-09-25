@@ -60,7 +60,7 @@ internal func validateEditorInvariants(editor: Editor) -> InvariantsReport {
   // 3) TextNode text matches TextStorage substring at textRange
   for (key, item) in rangeCache {
     guard let node = editor.getEditorState().nodeMap[key] as? TextNode else { continue }
-    let tr = item.textRangeFromFenwick(using: fenwick)
+    let tr = item.textRangeFromFenwick(using: fenwick, leadingShift: editor.featureFlags.leadingNewlineBaselineShift, rangeCache: editor.rangeCache)
     if NSMaxRange(tr) <= textStorage.length { // sanity guard
       let storageText = textStorage.attributedSubstring(from: tr).string
       let nodeText = node.getText_dangerousPropertyAccess()
@@ -74,4 +74,3 @@ internal func validateEditorInvariants(editor: Editor) -> InvariantsReport {
 
   return InvariantsReport(issues: issues)
 }
-

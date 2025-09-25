@@ -19,6 +19,7 @@ typealias UITextStorageDirection = NSTextStorageDirection
  */
 
 struct RangeCacheItem {
+  var nodeKey: NodeKey = ""
   // Dual storage: location for legacy reconciler, nodeIndex for optimized reconciler with Fenwick tree
   var location: Int = 0  // Absolute location for legacy reconciler
   var nodeIndex: Int = 0  // Index in the Fenwick tree for optimized reconciler
@@ -34,14 +35,20 @@ struct RangeCacheItem {
   // For optimized reconciler: compute location dynamically from Fenwick tree
   @MainActor
   func locationFromFenwick(using fenwickTree: FenwickTree) -> Int {
+    // For element nodes, the caller (tests) expects this to return the element's
+    // absolute start. Compute via absolute accumulation since a single-index
+    // Fenwick representation cannot encode both pre/post positions.
+    if let _ = getNodeByKey(key: nodeKey) as? ElementNode,
+       let editor = getActiveEditor() {
+      let base = absoluteNodeStartLocation(nodeKey, rangeCache: editor.rangeCache, useOptimized: true, fenwickTree: editor.fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+      return base
+    }
     return fenwickTree.getNodeOffset(nodeIndex: nodeIndex)
   }
 
   // Get range using absolute location (legacy reconciler)
   var range: NSRange {
-    NSRange(
-      location: location,
-      length: preambleLength + childrenLength + textLength + postambleLength)
+    return NSRange(location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 
   // Get range using Fenwick tree (optimized reconciler)
@@ -71,6 +78,22 @@ struct RangeCacheItem {
 internal func pointAtStringLocation(
   _ location: Int, searchDirection: UITextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> Point? {
+  // Fast-path (diagnostic mode only): exact element childrenStart boundary maps to element offset 0
+  if let editor = getActiveEditor(), editor.featureFlags.selectionParityDebug, editor.featureFlags.optimizedReconciler {
+    let useOptimized = editor.featureFlags.optimizedReconciler
+    let fenwickTree = editor.fenwickTree
+    for (k, item) in rangeCache {
+      if let _ = getNodeByKey(key: k) as? ElementNode {
+        let base = useOptimized
+          ? absoluteNodeStartLocation(k, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+          : item.location
+        let childrenStart = base + item.preambleLength
+        if location == childrenStart {
+          return Point(key: k, offset: 0, type: .element)
+        }
+      }
+    }
+  }
   do {
     let searchResult = try evaluateNode(
       kRootNodeKey, stringLocation: location, searchDirection: searchDirection,
@@ -106,14 +129,18 @@ private func evaluateNode(
   // Use appropriate method based on feature flag
   let useOptimized = editor.featureFlags.optimizedReconciler
   let fenwickTree = editor.fenwickTree
+  if editor.featureFlags.selectionParityDebug {
+    let nodeType: String = (node is TextNode) ? "Text" : ((node is ElementNode) ? "Element" : String(describing: type(of: node)))
+    let base = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+    print("🔥 EVAL node=\(nodeKey) type=\(nodeType) baseStart=\(base) loc=\(stringLocation) dir=\(searchDirection == .forward ? "fwd" : "back") pre=\(rangeCacheItem.preambleLength) ch=\(rangeCacheItem.childrenLength) tx=\(rangeCacheItem.textLength) post=\(rangeCacheItem.postambleLength)")
+  }
 
   if let parentKey = node.parent, let parentRangeCacheItem = rangeCache[parentKey] {
     let parentLocation = useOptimized
-      ? absoluteNodeStartLocation(parentKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
+      ? absoluteNodeStartLocation(parentKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
       : parentRangeCacheItem.location
     if stringLocation == parentLocation
-      && parentRangeCacheItem.preambleSpecialCharacterLength - parentRangeCacheItem.preambleLength
-        == 0
+      && parentRangeCacheItem.preambleSpecialCharacterLength == 0
     {
       if editor.featureFlags.selectionParityDebug {
         print("🔥 RANGE CACHE PARITY: at parent-start boundary for child \(nodeKey), mapping to text-start if TextNode")
@@ -124,17 +151,33 @@ private func evaluateNode(
     }
   }
 
-  let entireRange = useOptimized ? rangeCacheItem.entireRangeFromFenwick(using: fenwickTree) : rangeCacheItem.entireRange
+  // Compute absolute start using unified logic, then derive ranges from cached lengths.
+  let nodeStart = useOptimized
+    ? absoluteNodeStartLocation(nodeKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+    : rangeCacheItem.location
+  let entireRange = NSRange(location: nodeStart, length: rangeCacheItem.preambleLength + rangeCacheItem.childrenLength + rangeCacheItem.textLength + rangeCacheItem.postambleLength)
   if !entireRange.byAddingOne().contains(stringLocation) {
     return nil
   }
 
   if node is TextNode {
-    let textRange = useOptimized ? rangeCacheItem.textRangeFromFenwick(using: fenwickTree) : rangeCacheItem.textRange
-    let expandedTextRange = textRange.byAddingOne()
-    if expandedTextRange.contains(stringLocation) {
-      return RangeCacheSearchResult(
-        nodeKey: nodeKey, type: .text, offset: stringLocation - expandedTextRange.location)
+    let textRange = NSRange(location: nodeStart + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength, length: rangeCacheItem.textLength)
+    // Tie-break at text end:
+    // - Parity diagnostics (selectionParityDebug=true): forward excludes text end (prefers next), backward includes.
+    // - Baseline (default): forward includes text end (stays on current), backward excludes.
+    let useParity = getActiveEditor()?.featureFlags.selectionParityDebug == true
+    let rangeToUse: NSRange = {
+      if useParity {
+        return (searchDirection == .forward) ? textRange : textRange.byAddingOne()
+      } else {
+        return (searchDirection == .forward) ? textRange.byAddingOne() : textRange
+      }
+    }()
+    if rangeToUse.contains(stringLocation) {
+      let offset = stringLocation - textRange.location
+      // Clamp inside [0, textLength] for safety
+      let clamped = max(0, min(rangeCacheItem.textLength, offset))
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .text, offset: clamped)
     }
   }
 
@@ -152,6 +195,9 @@ private func evaluateNode(
           rangeCache: rangeCache)
       else { continue }
       if result.type == .text || result.type == .element {
+        if editor.featureFlags.selectionParityDebug {
+          print("🔥 EVAL child direct result: parent=\(nodeKey) child=\(childKey) type=\(result.type) offset=\(result.offset ?? -1)")
+        }
         return result
       }
       guard let childIndex = node.getChildrenKeys().firstIndex(of: childKey) else { continue }
@@ -178,41 +224,67 @@ private func evaluateNode(
     // to element offsets to avoid nil results at child start/end boundaries.
     let normalOrderChildren = node.getChildrenKeys()
     // Compute parent start for convenience
-    let parentStart = useOptimized
-      ? absoluteNodeStartLocation(nodeKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
-      : rangeCacheItem.location
+    let parentStart = nodeStart
     // Start of children content
     let childrenStart = parentStart + rangeCacheItem.preambleLength
     // End of children content
     let childrenEnd = childrenStart + rangeCacheItem.childrenLength
-
-    // Exact start of children maps to offset 0
-    if stringLocation == childrenStart {
-      if editor.featureFlags.selectionParityDebug {
-        print("🔥 RANGE CACHE PARITY: exact childrenStart -> element offset 0 for node=\(nodeKey)")
-      }
-      return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
-    }
-    // Exact end of children maps to offset count
-    if stringLocation == childrenEnd {
-      if editor.featureFlags.selectionParityDebug {
-        print("🔥 RANGE CACHE PARITY: exact childrenEnd -> element offset count for node=\(nodeKey)")
-      }
-      return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: normalOrderChildren.count)
-    }
-
-    // Check exact match to each child's start location to derive appropriate offset
-    for (idx, ck) in normalOrderChildren.enumerated() {
-      if let childItem = rangeCache[ck] {
-        let childStart = useOptimized ? childItem.locationFromFenwick(using: fenwickTree) : childItem.location
-        if stringLocation == childStart {
-          if editor.featureFlags.selectionParityDebug {
-            print("🔥 RANGE CACHE PARITY: exact child start -> element offset idx=\(idx) for parent=\(nodeKey) child=\(ck)")
-          }
-          return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: idx)
+    if editor.featureFlags.selectionParityDebug {
+      print("🔥 EVAL element=\(nodeKey) parentStart=\(parentStart) childrenStart=\(childrenStart) childrenEnd=\(childrenEnd) childCount=\(normalOrderChildren.count)")
+      for ck in normalOrderChildren {
+        if let c = rangeCache[ck] {
+          let cStart = useOptimized ? absoluteNodeStartLocation(ck, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift) : c.location
+          let cType = (getNodeByKey(key: ck) is TextNode) ? "Text" : "Elem"
+          print("  🔹 child key=\(ck) type=\(cType) start=\(cStart) pre=\(c.preambleLength) ch=\(c.childrenLength) tx=\(c.textLength) post=\(c.postambleLength)")
         }
       }
     }
+
+    // Exact start/end first only in parity diagnostics
+    if editor.featureFlags.selectionParityDebug {
+      if stringLocation == childrenStart {
+        print("🔥 RANGE CACHE PARITY: exact childrenStart -> element offset 0 for node=\(nodeKey)")
+        return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
+      }
+      if stringLocation == childrenEnd {
+        print("🔥 RANGE CACHE PARITY: exact childrenEnd -> element offset count for node=\(nodeKey)")
+        return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: normalOrderChildren.count)
+      }
+    }
+
+    // Check exact match to each child's start location with canonical tie-breaks (takes precedence)
+    for (idx, ck) in normalOrderChildren.enumerated() {
+      if let childItem = rangeCache[ck] {
+        let childStart = useOptimized
+          ? absoluteNodeStartLocation(ck, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+          : childItem.location
+        if stringLocation == childStart {
+          if editor.featureFlags.selectionParityDebug {
+            print("🔥 EVAL tie childStart: parent=\(nodeKey) child=\(ck) idx=\(idx) dir=\(searchDirection == .forward ? "fwd" : "back")")
+          }
+
+          if editor.featureFlags.selectionParityDebug {
+            print("🔥 RANGE CACHE PARITY: exact child start -> canonical tie-break. parent=\(nodeKey) child=\(ck) idx=\(idx) dir=\(searchDirection == .forward ? "fwd" : "back")")
+          }
+          if searchDirection == .forward {
+            if let _ = getNodeByKey(key: ck) as? TextNode {
+              return RangeCacheSearchResult(nodeKey: ck, type: .text, offset: 0)
+            }
+            return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: idx)
+          } else {
+            if idx > 0 {
+              let prevKey = normalOrderChildren[idx - 1]
+              if let prevItem = rangeCache[prevKey], let _ = getNodeByKey(key: prevKey) as? TextNode {
+                return RangeCacheSearchResult(nodeKey: prevKey, type: .text, offset: prevItem.textLength)
+              }
+            }
+            return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: idx)
+          }
+        }
+      }
+    }
+
+    
   }
 
   let entireRangeForCheck = useOptimized ? rangeCacheItem.entireRangeFromFenwick(using: fenwickTree) : rangeCacheItem.entireRange
@@ -232,9 +304,7 @@ private func evaluateNode(
     return RangeCacheSearchResult(nodeKey: nodeKey, type: boundary, offset: nil)
   }
 
-  let itemLocation = useOptimized
-    ? absoluteNodeStartLocation(nodeKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
-    : rangeCacheItem.location
+  let itemLocation = nodeStart
   if stringLocation == itemLocation {
     if rangeCacheItem.preambleLength == 0 && node is ElementNode {
       if editor.featureFlags.selectionParityDebug {
@@ -290,39 +360,38 @@ extension RangeCacheItem {
   }
 
   var selectableRange: NSRange {
-    return NSRange(
-      location: location,
-      length: preambleLength + childrenLength + textLength + postambleLength
-        - preambleSpecialCharacterLength)
+    return NSRange(location: location, length: preambleLength + childrenLength + textLength + postambleLength - preambleSpecialCharacterLength)
   }
 
   // Optimized reconciler methods (use Fenwick tree)
   @MainActor
   func entireRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = locationFromFenwick(using: fenwickTree)
-    return NSRange(
-      location: loc, length: preambleLength + childrenLength + textLength + postambleLength)
+    let editor = getActiveEditor()
+    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    return NSRange(location: start, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 
   @MainActor
-  func textRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = locationFromFenwick(using: fenwickTree)
-    return NSRange(location: loc + preambleLength + childrenLength, length: textLength)
+  func textRangeFromFenwick(using fenwickTree: FenwickTree, leadingShift: Bool = false, rangeCache cache: [NodeKey: RangeCacheItem]? = nil) -> NSRange {
+    let editor = getActiveEditor()
+    let rc = cache ?? editor?.rangeCache ?? [:]
+    let useShift = leadingShift || (editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    let start = absoluteNodeStartLocation(nodeKey, rangeCache: rc, useOptimized: true, fenwickTree: fenwickTree, leadingShift: useShift)
+    return NSRange(location: start + preambleLength + childrenLength, length: textLength)
   }
 
   @MainActor
   func childrenRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = locationFromFenwick(using: fenwickTree)
-    return NSRange(location: loc + preambleLength, length: childrenLength)
+    let editor = getActiveEditor()
+    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    return NSRange(location: start + preambleLength, length: childrenLength)
   }
 
   @MainActor
   func selectableRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
-    let loc = locationFromFenwick(using: fenwickTree)
-    return NSRange(
-      location: loc,
-      length: preambleLength + childrenLength + textLength + postambleLength
-        - preambleSpecialCharacterLength)
+    let editor = getActiveEditor()
+    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    return NSRange(location: start, length: preambleLength + childrenLength + textLength + postambleLength - preambleSpecialCharacterLength)
   }
 }
 

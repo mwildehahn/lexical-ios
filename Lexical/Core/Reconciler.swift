@@ -407,6 +407,7 @@ internal enum Reconciler {
     }
 
     var nextRangeCacheItem = RangeCacheItem()
+    nextRangeCacheItem.nodeKey = key
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
     // Calculate preamble length
@@ -498,6 +499,7 @@ internal enum Reconciler {
     }
 
     var nextRangeCacheItem = RangeCacheItem()
+    nextRangeCacheItem.nodeKey = key
     nextRangeCacheItem.location = reconcilerState.locationCursor
 
     // Calculate preamble length

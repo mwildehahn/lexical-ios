@@ -203,7 +203,7 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   case .text:
     if useOptimized {
       // Absolute start of this text node based on parent/siblings accumulation
-      let base = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree)
+      let base = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
       if editor.featureFlags.selectionParityDebug {
         print("🔥 PARITY TEXT LOC: key=\(point.key) base=\(base) pre=\(rangeCacheItem.preambleLength) off=\(point.offset)")
       }
@@ -226,7 +226,14 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
     }
 
     if useOptimized {
-      var loc = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree) + rangeCacheItem.preambleLength
+      // Parity mode anchors element offset 0 to childrenStart; baseline uses element base + preamble.
+      let editor = getActiveEditor()
+      var loc: Int
+      if editor?.featureFlags.selectionParityDebug == true {
+        loc = rangeCacheItem.childrenRangeFromFenwick(using: fenwickTree).location
+      } else {
+        loc = rangeCacheItem.locationFromFenwick(using: fenwickTree) + rangeCacheItem.preambleLength
+      }
       for idx in 0..<point.offset {
         let k = childrenKeys[idx]
         if let s = rangeCache[k] { loc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }
@@ -246,27 +253,20 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
 }
 
 @MainActor
-public func createNativeSelection(from selection: RangeSelection, editor: Editor) throws
-  -> NativeSelection
-{
-  let isBefore = try selection.anchor.isBefore(point: selection.focus)
-  var affinity: UITextStorageDirection = isBefore ? .forward : .backward
-
-  if selection.anchor == selection.focus {
-    affinity = .forward
-  }
-
+public func createNativeSelection(from selection: RangeSelection, editor: Editor) throws -> NativeSelection {
+  // Compute absolute locations first, then order by numeric position to avoid
+  // requiring node lookups (which can fail when nodes are transient or detached).
   guard let anchorLocation = try stringLocationForPoint(selection.anchor, editor: editor),
-    let focusLocation = try stringLocationForPoint(selection.focus, editor: editor)
-  else {
+        let focusLocation = try stringLocationForPoint(selection.focus, editor: editor) else {
     return NativeSelection()
   }
 
-  let location = isBefore ? anchorLocation : focusLocation
+  let isBefore = anchorLocation <= focusLocation
+  let affinity: UITextStorageDirection = isBefore ? .forward : .backward
+  let location = min(anchorLocation, focusLocation)
+  let length = abs(anchorLocation - focusLocation)
 
-  return NativeSelection(
-    range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
-    affinity: affinity)
+  return NativeSelection(range: NSRange(location: location, length: length), affinity: affinity)
 }
 
 @MainActor

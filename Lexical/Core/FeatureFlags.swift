@@ -15,6 +15,7 @@ import Foundation
   let darkLaunchOptimized: Bool
   let decoratorSiblingRedecorate: Bool
   let selectionParityDebug: Bool
+  let leadingNewlineBaselineShift: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
@@ -23,7 +24,8 @@ import Foundation
     reconcilerMetrics: Bool = false,
     darkLaunchOptimized: Bool = false,
     decoratorSiblingRedecorate: Bool = false,
-    selectionParityDebug: Bool = false
+    selectionParityDebug: Bool = false,
+    leadingNewlineBaselineShift: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -32,6 +34,7 @@ import Foundation
     self.darkLaunchOptimized = darkLaunchOptimized
     self.decoratorSiblingRedecorate = decoratorSiblingRedecorate
     self.selectionParityDebug = selectionParityDebug
+    self.leadingNewlineBaselineShift = leadingNewlineBaselineShift
     super.init()
   }
 }

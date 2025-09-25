@@ -207,10 +207,13 @@ internal class TextStorageDeltaApplier {
     textStorage.insert(completeString, at: clampedLocation)
     print("🔥 DELTA APPLIER: post-insert text length \(textStorage.length)")
 
-    // Update FenwickTree using a stable node index
-    let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? ensureFenwickIndex(for: nodeKey)
-    fenwickTree.update(index: fenwickIndex, delta: completeString.length)
-    let fenwickUpdates = 1
+    // Update FenwickTree only for nodes that contribute text content.
+    var fenwickUpdates = 0
+    if insertionData.content.length > 0 {
+      let fenwickIndex = getFenwickIndexForNode(nodeKey) ?? ensureFenwickIndex(for: nodeKey)
+      fenwickTree.update(index: fenwickIndex, delta: insertionData.content.length)
+      fenwickUpdates = 1
+    }
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: completeString.length)
   }
@@ -231,14 +234,14 @@ internal class TextStorageDeltaApplier {
     // Remove from TextStorage
     textStorage.deleteCharacters(in: range)
 
-    // Update FenwickTree
+    // Update FenwickTree only by the node's text contribution, not entire range
     var fenwickUpdates = 0
-    if let fenwickIndex = getFenwickIndexForNode(nodeKey) {
-      fenwickTree.update(index: fenwickIndex, delta: -deletedLength)
-      fenwickUpdates = 1
-    } else {
-      // For nodes being deleted, we might not find them in range cache
-      fenwickUpdates = 0
+    if let fenwickIndex = getFenwickIndexForNode(nodeKey), let cacheItem = editor.rangeCache[nodeKey] {
+      let textLen = cacheItem.textLength
+      if textLen != 0 {
+        fenwickTree.update(index: fenwickIndex, delta: -textLen)
+        fenwickUpdates = 1
+      }
     }
 
     return DeltaApplicationSingleResult(fenwickUpdates: fenwickUpdates, lengthDelta: -deletedLength)
@@ -277,11 +280,16 @@ internal class TextStorageDeltaApplier {
   }
 
   private func sortDeltasForApplication(_ deltas: [ReconcilerDelta]) -> [ReconcilerDelta] {
-    // Sort by location in reverse order to avoid index shifting issues
-    return deltas.sorted { delta1, delta2 in
-      let location1 = getLocationFromDelta(delta1)
-      let location2 = getLocationFromDelta(delta2)
-      return location1 > location2
+    // Sort by location in reverse order to avoid index shifting issues.
+    // When locations tie, apply later-generated deltas first to preserve
+    // document order for siblings inserted at the same position.
+    return deltas.sorted { d1, d2 in
+      let l1 = getLocationFromDelta(d1)
+      let l2 = getLocationFromDelta(d2)
+      if l1 != l2 { return l1 > l2 }
+      let o1 = d1.metadata.orderIndex ?? 0
+      let o2 = d2.metadata.orderIndex ?? 0
+      return o1 > o2
     }
   }
 

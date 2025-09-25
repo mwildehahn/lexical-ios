@@ -47,17 +47,20 @@ public struct DeltaMetadata {
   let sourceUpdate: String // Description of what caused this delta
   let fenwickTreeIndex: Int? // Index in FenwickTree if applicable
   let originalRange: NSRange? // Original range before transformation
+  let orderIndex: Int? // Generation order within the batch (for stable application ordering)
 
   public init(
     timestamp: Date = Date(),
     sourceUpdate: String,
     fenwickTreeIndex: Int? = nil,
-    originalRange: NSRange? = nil
+    originalRange: NSRange? = nil,
+    orderIndex: Int? = nil
   ) {
     self.timestamp = timestamp
     self.sourceUpdate = sourceUpdate
     self.fenwickTreeIndex = fenwickTreeIndex
     self.originalRange = originalRange
+    self.orderIndex = orderIndex
   }
 }
 

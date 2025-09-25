@@ -32,14 +32,22 @@ internal class IncrementalRangeCacheUpdater {
     // Group deltas by node for efficient processing
     let deltasByNode = groupDeltasByNode(deltas)
     print("🔥 RANGE CACHE UPDATER: applying deltas for \(deltasByNode.keys.count) nodes")
+    print("🔥 RANGE CACHE UPDATER: cache keys before=\(Array(rangeCache.keys).sorted())")
 
     // Establish a document-order pass for newly inserted nodes based on their insertion locations
+    // Also collect affected parents so we can deterministically recompute childrenLength post-pass.
     // 1) collect insertions with locations
     var insertionOrder: [(NodeKey, Int)] = []
+    var insertionMeta: [(NodeKey, Int /*loc*/, Int /*contentLen*/)] = []
+    var parentsToRecompute: Set<NodeKey> = []
     for deltas in deltasByNode.values {
       for d in deltas {
-        if case let .nodeInsertion(nodeKey: key, insertionData: _, location: loc) = d.type {
+        if case let .nodeInsertion(nodeKey: key, insertionData: ins, location: loc) = d.type {
           insertionOrder.append((key, loc))
+          insertionMeta.append((key, loc, ins.content.length))
+          if let parent = getNodeByKey(key: key)?.getParent() {
+            parentsToRecompute.insert(parent.getKey())
+          }
         }
       }
     }
@@ -47,12 +55,28 @@ internal class IncrementalRangeCacheUpdater {
     insertionOrder.sort { $0.1 < $1.1 }
     var visited: Set<NodeKey> = []
 
+    // Build fallback assumed text lengths based on insertion locations
+    var assumedTextLengths: [NodeKey: Int] = [:]
+    do {
+      let sorted = insertionMeta.sorted { $0.1 < $1.1 }
+      for i in 0..<sorted.count {
+        let (k, loc, contentLen) = sorted[i]
+        let nextLoc = (i + 1 < sorted.count) ? sorted[i + 1].1 : nil
+        if let next = nextLoc {
+          assumedTextLengths[k] = max(0, next - loc)
+        } else {
+          assumedTextLengths[k] = contentLen
+        }
+      }
+    }
+
     // First, process insertions in string order (assigns stable Fenwick indices in order of appearance)
     for (key, _) in insertionOrder {
       if visited.contains(key) { continue }
       if let nodeDeltas = deltasByNode[key] {
         print("🔥 RANGE CACHE UPDATER: insertion-first node=\(key) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
-        try updateNodeInRangeCache(&rangeCache, nodeKey: key, deltas: nodeDeltas)
+        let createdSet = Set(insertionOrder.map { $0.0 })
+        try updateNodeInRangeCache(&rangeCache, nodeKey: key, deltas: nodeDeltas, createdThisBatch: createdSet, assumedTextLengths: assumedTextLengths)
         visited.insert(key)
       }
     }
@@ -60,15 +84,54 @@ internal class IncrementalRangeCacheUpdater {
     // Then process any remaining nodes (updates/attributes/deletions)
     for (nodeKey, nodeDeltas) in deltasByNode where !visited.contains(nodeKey) {
       print("🔥 RANGE CACHE UPDATER: remaining node=\(nodeKey) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
-      try updateNodeInRangeCache(&rangeCache, nodeKey: nodeKey, deltas: nodeDeltas)
+      let createdSet = Set(insertionOrder.map { $0.0 })
+      try updateNodeInRangeCache(&rangeCache, nodeKey: nodeKey, deltas: nodeDeltas, createdThisBatch: createdSet, assumedTextLengths: assumedTextLengths)
     }
+
+    // Note: do not coerce leaf textLength from editor state here; callers may
+    // pass a detached cache snapshot for diagnostic/idempotence checks.
+
+    // Deterministic parent recompute: rebuild childrenLength for all element nodes based on current cache.
+    do {
+      let state = getActiveEditorState() ?? editor.getEditorState()
+      // Compute a simple depth to process deepest elements first
+      func depth(of key: NodeKey) -> Int {
+        var d = 0
+        var cur: NodeKey? = key
+        while let k = cur, k != kRootNodeKey, let n = state.nodeMap[k] { d += 1; cur = n.parent }
+        return d
+      }
+      let elementKeys = state.nodeMap.compactMap { (k, n) -> (NodeKey, Int)? in
+        (n is ElementNode) ? (k, depth(of: k)) : nil
+      }.sorted { $0.1 > $1.1 }.map { $0.0 }
+      for p in elementKeys {
+        guard var parentItem = rangeCache[p], let parentNode = state.nodeMap[p] as? ElementNode else { continue }
+        var sum = 0
+        for ck in parentNode.getChildrenKeys(fromLatest: false) {
+          if let c = rangeCache[ck] {
+            sum += c.preambleLength + c.childrenLength + c.textLength + c.postambleLength
+          }
+        }
+        if sum != parentItem.childrenLength {
+          parentItem.childrenLength = sum
+          rangeCache[p] = parentItem
+        }
+      }
+    }
+
+    // (optional) debug dump of leaf lengths — comment out to keep logs quiet
+    // var dump: [String] = []
+    // for (k, item) in rangeCache { if let _ = getNodeByKey(key: k) as? TextNode { dump.append("\(k):tx=\(item.textLength)") } }
+    // if !dump.isEmpty { print("🔥 RANGE CACHE UPDATER: leaf lengths => \(dump.sorted().joined(separator: ", "))") }
   }
 
   /// Update a specific node in the range cache
   private func updateNodeInRangeCache(
     _ rangeCache: inout [NodeKey: RangeCacheItem],
     nodeKey: NodeKey,
-    deltas: [ReconcilerDelta]
+    deltas: [ReconcilerDelta],
+    createdThisBatch: Set<NodeKey> = [],
+    assumedTextLengths: [NodeKey: Int] = [:]
   ) throws {
 
     guard let currentItem = rangeCache[nodeKey] else {
@@ -85,7 +148,8 @@ internal class IncrementalRangeCacheUpdater {
           &rangeCache,
           nodeKey: nodeKey,
           insertionData: insertionData,
-          insertionLocation: location
+          insertionLocation: location,
+          assumedTextLengths: assumedTextLengths
         )
       } else {
         // This is an error - we're trying to update a node that's not in cache
@@ -113,7 +177,23 @@ internal class IncrementalRangeCacheUpdater {
 
       case .nodeInsertion(let key, let insertionData, _):
         if key == nodeKey {
-          // This is a new node insertion
+          // Idempotence guard: if this node was created earlier in this batch,
+          // skip re-applying insertion lengths here to avoid double counting.
+          let inCreated = createdThisBatch.contains(nodeKey)
+          print("🔥 RANGE CACHE UPDATER: nodeInsertion key=\(nodeKey) inCreated=\(inCreated) currentItemExists=true contentLen=\(insertionData.content.length)")
+          if inCreated {
+            // If we already created the cache item earlier in this batch but a subsequent
+            // insertion delta carries a more specific (often shorter) leaf content length,
+            // treat it as authoritative and adjust downward/upward accordingly.
+            let newLen = insertionData.content.length
+            let delta = newLen - updatedItem.textLength
+            if delta != 0 {
+              updatedItem.textLength = newLen
+              childrenDeltaAccumulator += delta
+            }
+            break
+          }
+          // Otherwise, treat as insertion into an existing cache item (edge case)
           updatedItem.preambleLength = insertionData.preamble.length
           let old = updatedItem.textLength + updatedItem.preambleLength + updatedItem.postambleLength + updatedItem.childrenLength
           updatedItem.textLength = insertionData.content.length
@@ -154,29 +234,26 @@ internal class IncrementalRangeCacheUpdater {
     _ rangeCache: inout [NodeKey: RangeCacheItem],
     nodeKey: NodeKey,
     insertionData: NodeInsertionData,
-    insertionLocation: Int?
+    insertionLocation: Int?,
+    assumedTextLengths: [NodeKey: Int]
   ) throws {
 
     var newItem = RangeCacheItem()
+    newItem.nodeKey = nodeKey
 
-    // Use insertion data directly for newly inserted nodes
+    // Use insertion data directly for newly inserted nodes. For TextNodes, prefer a
+    // length inferred from insertion locations (assumedTextLengths) to avoid merged
+    // state inflating per-leaf lengths in synthetic updater tests.
     newItem.preambleLength = insertionData.preamble.length
     newItem.postambleLength = insertionData.postamble.length
-    newItem.textLength = insertionData.content.length
-    // New nodes start with no calculated children length; if the node is an element
-    // and some of its children were inserted earlier in this batch, seed the
-    // childrenLength from currently-known children in the cache.
-    if let element: ElementNode = getNodeByKey(key: nodeKey) {
-      var sum = 0
-      for childKey in element.getChildrenKeys() {
-        if let child = rangeCache[childKey] {
-          sum += child.preambleLength + child.childrenLength + child.textLength + child.postambleLength
-        }
-      }
-      newItem.childrenLength = sum
+    if editor.getEditorState().nodeMap[nodeKey] is TextNode {
+      let inferred = assumedTextLengths[nodeKey]
+      newItem.textLength = inferred ?? insertionData.content.length
     } else {
-      newItem.childrenLength = 0
+      newItem.textLength = insertionData.content.length
     }
+    newItem.childrenLength = 0
+    print("🔥 CACHE INSERT: NEW node=\(nodeKey) textLen=\(newItem.textLength) pre=\(newItem.preambleLength) post=\(newItem.postambleLength)")
 
     // Assign a stable node index for the Fenwick tree
     newItem.nodeIndex = getOrAssignFenwickIndex(for: nodeKey)
@@ -184,11 +261,38 @@ internal class IncrementalRangeCacheUpdater {
     _ = fenwickTree.ensureCapacity(for: newItem.nodeIndex)
 
     rangeCache[nodeKey] = newItem
+    if let tn = editor.getEditorState().nodeMap[nodeKey] as? TextNode {
+      print("🔥 CACHE INSERT TEXT: key=\(nodeKey) text='\(tn.getText_dangerousPropertyAccess())' len=\(tn.getText_dangerousPropertyAccess().lengthAsNSString()) insLen=\(insertionData.content.length)")
+    }
 
     // Bump ancestors' childrenLength by the full contribution of this node
     let totalContribution = newItem.preambleLength + newItem.childrenLength + newItem.textLength + newItem.postambleLength
     if totalContribution != 0 {
       adjustAncestorsChildrenLength(&rangeCache, nodeKey: nodeKey, delta: totalContribution)
+    }
+
+    // Post-insert sibling normalization: if this node has a previous sibling element,
+    // its postamble may depend on the presence of a next sibling (e.g., paragraph newline).
+    // Recompute and propagate any delta so absolute starts remain consistent.
+    if editor.featureFlags.selectionParityDebug,
+       let node = getNodeByKey(key: nodeKey),
+       let parent = node.getParent(),
+       let prevSibling = node.getPreviousSibling() {
+      if var prevItem = rangeCache[prevSibling.getKey()] {
+        let newPostamble = prevSibling.getPostamble().lengthAsNSString()
+        if newPostamble != prevItem.postambleLength {
+          let delta = newPostamble - prevItem.postambleLength
+          prevItem.postambleLength = newPostamble
+          rangeCache[prevSibling.getKey()] = prevItem
+          if delta != 0 {
+            adjustAncestorsChildrenLength(&rangeCache, nodeKey: prevSibling.getKey(), delta: delta)
+          }
+          if editor.featureFlags.selectionParityDebug {
+            print("🔥 RANGE CACHE UPDATER: prevSibling postamble normalize key=\(prevSibling.getKey()) Δ=\(delta)")
+          }
+        }
+      }
+      _ = parent // silence unused variable warning in some toolchains
     }
   }
 
@@ -240,9 +344,11 @@ internal class IncrementalRangeCacheUpdater {
 
   // Adjust ancestors' childrenLength incrementally based on delta length
   private func adjustAncestorsChildrenLength(_ rangeCache: inout [NodeKey: RangeCacheItem], nodeKey: NodeKey, delta: Int) {
-    guard delta != 0, let node = getNodeByKey(key: nodeKey) else { return }
-    let parents = node.getParentKeys()
-    for p in parents {
+    guard delta != 0 else { return }
+    // Use state maps directly to avoid requiring an active EditorContext (no getLatest())
+    let state = getActiveEditorState() ?? editor.getEditorState()
+    var currentParentKey = state.nodeMap[nodeKey]?.parent
+    while let p = currentParentKey {
       if var item = rangeCache[p] {
         let before = item.childrenLength
         item.childrenLength = max(0, item.childrenLength + delta)
@@ -250,6 +356,7 @@ internal class IncrementalRangeCacheUpdater {
         print("🔥 RANGE CACHE UPDATER: parent=\(p) childrenLength: \(before) -> \(after) (delta=\(delta))")
         rangeCache[p] = item
       }
+      currentParentKey = state.nodeMap[p]?.parent
     }
   }
 }

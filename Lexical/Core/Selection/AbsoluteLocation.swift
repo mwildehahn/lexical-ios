@@ -12,7 +12,8 @@ internal func absoluteNodeStartLocation(
   _ key: NodeKey,
   rangeCache: [NodeKey: RangeCacheItem],
   useOptimized: Bool,
-  fenwickTree: FenwickTree
+  fenwickTree: FenwickTree,
+  leadingShift: Bool = false
 ) -> Int {
   if key == kRootNodeKey { return 0 }
   guard let node = getNodeByKey(key: key) else {
@@ -29,16 +30,25 @@ internal func absoluteNodeStartLocation(
   }
 
   // Recurse to parent's absolute start
-  let parentStart = absoluteNodeStartLocation(parentKey, rangeCache: rangeCache, useOptimized: useOptimized, fenwickTree: fenwickTree)
+  let parentStart = absoluteNodeStartLocation(parentKey, rangeCache: rangeCache, useOptimized: useOptimized, fenwickTree: fenwickTree, leadingShift: leadingShift)
   var acc = parentStart + parentItem.preambleLength
+  if leadingShift, parentKey == kRootNodeKey {
+    acc += 1
+  }
+  if let editor = getActiveEditor(), editor.featureFlags.selectionParityDebug {
+    print("🔥 ABS-START: key=\(key) parent=\(parentKey) parentStart=\(parentStart) parent.pre=\(parentItem.preambleLength) parent.ch=\(parentItem.childrenLength) parent.tx=\(parentItem.textLength) parent.post=\(parentItem.postambleLength)")
+  }
 
   // Sum contributions of siblings that come before this node within the parent
   for childKey in parent.getChildrenKeys(fromLatest: false) {
     if childKey == key { break }
     if let s = rangeCache[childKey] {
-      acc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength
+      let add = s.preambleLength + s.childrenLength + s.textLength + s.postambleLength
+      acc += add
+      if let editor = getActiveEditor(), editor.featureFlags.selectionParityDebug {
+        print("  🔹 ABS sib=\(childKey) add=\(add) pre=\(s.preambleLength) ch=\(s.childrenLength) tx=\(s.textLength) post=\(s.postambleLength)")
+      }
     }
   }
   return acc
 }
-

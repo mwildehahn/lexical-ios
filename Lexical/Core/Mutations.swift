@@ -51,7 +51,7 @@ internal func handleTextMutation(textStorage: TextStorage, rangeOfChange: NSRang
 
   editor.log(.other, .verbose, "Before setting text: dirty nodes count \(editor.dirtyNodes.count)")
 
-  let oldRange = editor.featureFlags.optimizedReconciler ? rangeCacheItem.textRangeFromFenwick(using: editor.fenwickTree) : rangeCacheItem.textRange
+  let oldRange = editor.featureFlags.optimizedReconciler ? rangeCacheItem.textRangeFromFenwick(using: editor.fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift, rangeCache: editor.rangeCache) : rangeCacheItem.textRange
   let newRange = NSRange(location: oldRange.location, length: oldRange.length + lengthDelta)
 
   if newRange.location + newRange.length <= textStorage.length {

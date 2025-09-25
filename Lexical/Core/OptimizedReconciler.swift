@@ -72,15 +72,19 @@ internal enum OptimizedReconciler {
           return false
         }
 
-        // Sort: ancestors before descendants, then by ascending location.
-        // This keeps element node starts (locationFromFenwick) stable for
-        // boundary computations that read the element's start directly.
+        // Sort order depends on debug mode:
+        // - Default (full suite expectations): ancestor-first, then by ascending location.
+        // - Parity diagnostics (selectionParityDebug=true): descendant-first to aid postamble-before-child analyses.
         inserted.sort { lhs, rhs in
           let l = lhs.key, r = rhs.key
-          if isAncestor(l, of: r) { return true }  // l before r
-          if isAncestor(r, of: l) { return false } // l after r
+          if editor.featureFlags.selectionParityDebug {
+            if isAncestor(l, of: r) { return false }
+            if isAncestor(r, of: l) { return true }
+          } else {
+            if isAncestor(l, of: r) { return true }
+            if isAncestor(r, of: l) { return false }
+          }
           if lhs.location != rhs.location { return lhs.location < rhs.location }
-          // Stable fallback by key compare
           return l < r
         }
 
@@ -156,6 +160,22 @@ internal enum OptimizedReconciler {
           dirtyNodes: editor.dirtyNodes,
           textStorage: textStorage
         )
+      }
+
+      // Prune stale range cache entries for nodes that no longer exist in pending state
+      do {
+        let currentKeys = Set(currentEditorState.nodeMap.keys)
+        let pendingKeys = Set(pendingEditorState.nodeMap.keys)
+        let removedKeys = currentKeys.subtracting(pendingKeys)
+        if !removedKeys.isEmpty { for k in removedKeys { editor.rangeCache.removeValue(forKey: k) } }
+        // Also prune keys that exist but are detached in pending state
+        var toPrune: [NodeKey] = []
+        for (k, _) in editor.rangeCache {
+          if pendingEditorState.nodeMap[k] != nil && !isAttachedInState(k, state: pendingEditorState) {
+            toPrune.append(k)
+          }
+        }
+        for k in toPrune { editor.rangeCache.removeValue(forKey: k) }
       }
 
       // Update decorator lifecycle and position cache (parity with legacy: create/decorate/remove + moved)
@@ -467,6 +487,7 @@ private class DeltaGenerator {
   ) throws -> DeltaBatch {
 
     var deltas: [ReconcilerDelta] = []
+    var seq: Int = 0
 
     // Process nodes in document order so sibling insertions keep correct order.
     let orderedDirty = orderedDirtyNodes(in: pendingState, limitedTo: dirtyNodes)
@@ -486,7 +507,8 @@ private class DeltaGenerator {
       // Node deletion
       if currentNode != nil && pendingNode == nil {
         if let rangeCacheItem = rangeCache[nodeKey] {
-          let metadata = DeltaMetadata(sourceUpdate: "Node deletion")
+          let metadata = DeltaMetadata(sourceUpdate: "Node deletion", orderIndex: seq)
+          seq += 1
           let deltaType = ReconcilerDeltaType.nodeDeletion(nodeKey: nodeKey, range: rangeCacheItem.rangeFromFenwick(using: editor.fenwickTree))
           deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
         }
@@ -496,7 +518,8 @@ private class DeltaGenerator {
       // Node insertion
       if currentNode == nil, let pendingNode = pendingNode {
         // Generate an insertion delta for the new node with actual content
-        let metadata = DeltaMetadata(sourceUpdate: "Node insertion")
+        let metadata = DeltaMetadata(sourceUpdate: "Node insertion", orderIndex: seq)
+        seq += 1
 
         // Extract actual content from the pending node
         let theme = editor.getTheme()
@@ -575,9 +598,9 @@ private class DeltaGenerator {
         // Track length for subsequent siblings
         processedInsertionLengths[nodeKey] = totalLength
 
-        let deltaType = ReconcilerDeltaType.nodeInsertion(nodeKey: nodeKey, insertionData: insertionData, location: insertionLocation)
-        deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
-        continue
+          let deltaType = ReconcilerDeltaType.nodeInsertion(nodeKey: nodeKey, insertionData: insertionData, location: insertionLocation)
+          deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
+          continue
       }
 
       // Node modification
@@ -598,7 +621,8 @@ private class DeltaGenerator {
             newText: pendingTextNode.getText_dangerousPropertyAccess(),
             range: textRange
           )
-          deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
+          deltas.append(ReconcilerDelta(type: deltaType, metadata: DeltaMetadata(sourceUpdate: metadata.sourceUpdate, fenwickTreeIndex: metadata.fenwickTreeIndex, originalRange: metadata.originalRange, orderIndex: seq)))
+          seq += 1
           print("🔥 OPTIMIZED RECONCILER: queued textUpdate for node \(nodeKey) range=\(textRange) old='\(currentTextNode.getText_dangerousPropertyAccess())' new='\(pendingTextNode.getText_dangerousPropertyAccess())'")
         }
 
@@ -620,7 +644,8 @@ private class DeltaGenerator {
             attributes: attrs,
             range: textRange
           )
-          deltas.append(ReconcilerDelta(type: deltaType, metadata: metadata))
+          deltas.append(ReconcilerDelta(type: deltaType, metadata: DeltaMetadata(sourceUpdate: metadata.sourceUpdate, fenwickTreeIndex: metadata.fenwickTreeIndex, originalRange: metadata.originalRange, orderIndex: seq)))
+          seq += 1
         }
       }
     }

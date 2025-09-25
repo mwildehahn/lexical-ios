@@ -57,7 +57,9 @@ public class TextStorage: NSTextStorage {
   override open func replaceCharacters(in range: NSRange, with attrString: NSAttributedString) {
     if mode == .none {
       let newString = attrString.string
-      let currentString = backingAttributedString.attributedSubstring(from: range).string
+      // Clamp incoming range to avoid OOB attributedSubstring when UIKit supplies an unsafe range
+      let safeRange = NSIntersectionRange(range, NSRange(location: 0, length: backingAttributedString.length))
+      let currentString = backingAttributedString.attributedSubstring(from: safeRange).string
       // We are introducing this check to fix a bug where app is getting the same string over and over again in a loop
       // when run on Mac (in Designed for iPad mode)
       if currentString != newString {
@@ -69,7 +71,7 @@ public class TextStorage: NSTextStorage {
           .NSTextStorage, .verboseIncludingUserContent,
           "Replace characters mode=none, string length \(self.backingAttributedString.length), range \(range), replacement \(attrString.string)"
         )
-        performControllerModeUpdate(attrString.string, range: range)
+        performControllerModeUpdate(attrString.string, range: safeRange)
       }
       return
     }
@@ -80,9 +82,10 @@ public class TextStorage: NSTextStorage {
 
   override open func replaceCharacters(in range: NSRange, with str: String) {
     if mode == .none {
-      let currentString = backingAttributedString.attributedSubstring(from: range).string
+      let safeRange = NSIntersectionRange(range, NSRange(location: 0, length: backingAttributedString.length))
+      let currentString = backingAttributedString.attributedSubstring(from: safeRange).string
       if currentString != str {
-        performControllerModeUpdate(str, range: range)
+        performControllerModeUpdate(str, range: safeRange)
       }
       return
     }
