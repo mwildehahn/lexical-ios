@@ -342,6 +342,31 @@ class TextViewTests: XCTestCase {
     }
   }
 
+  func testPlaceholderReappearsOnImeCancel() throws {
+    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let textView = view.textView
+    textView.setPlaceholderText("Compose here…", textColor: .lightGray, font: .systemFont(ofSize: 10))
+
+    // Initially visible
+    if let label = textView.subviews.first(where: { $0 is UILabel }) as? UILabel {
+      XCTAssertTrue(!label.isHidden)
+    }
+
+    // Begin composition (IME) — placeholder should hide during composition
+    textView.setMarkedText("あ", selectedRange: NSRange(location: 1, length: 0))
+    textView.showPlaceholderText()
+    if let label = textView.subviews.first(where: { $0 is UILabel }) as? UILabel {
+      XCTAssertTrue(label.isHidden)
+    }
+
+    // Cancel composition by setting empty marked text; then update placeholder
+    textView.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
+    textView.showPlaceholderText()
+    if let label = textView.subviews.first(where: { $0 is UILabel }) as? UILabel {
+      XCTAssertTrue(!label.isHidden)
+    }
+  }
+
   func testBasicInsertStrategy() throws {
     let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
     let textView = view.textView
