@@ -143,6 +143,8 @@ internal enum OptimizedReconciler {
     }
 
     // Try optimized fast paths before falling back (even if fullReconcile)
+    // Optional central aggregation of Fenwick deltas across paths
+    var fenwickAggregatedDeltas: [NodeKey: Int] = [:]
     // Pre-compute part diffs (used by some paths and metrics)
     let _ = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
     if try fastPath_ReorderChildren(
@@ -159,8 +161,13 @@ internal enum OptimizedReconciler {
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
       editor: editor,
-      shouldReconcileSelection: shouldReconcileSelection
+      shouldReconcileSelection: shouldReconcileSelection,
+      fenwickAggregatedDeltas: &fenwickAggregatedDeltas
     ) {
+      // If central aggregation is enabled, apply aggregated rebuild now
+      if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
+        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+      }
       return
     }
 
@@ -168,8 +175,12 @@ internal enum OptimizedReconciler {
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
       editor: editor,
-      shouldReconcileSelection: shouldReconcileSelection
+      shouldReconcileSelection: shouldReconcileSelection,
+      fenwickAggregatedDeltas: &fenwickAggregatedDeltas
     ) {
+      if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
+        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+      }
       return
     }
 
@@ -282,7 +293,8 @@ internal enum OptimizedReconciler {
     currentEditorState: EditorState,
     pendingEditorState: EditorState,
     editor: Editor,
-    shouldReconcileSelection: Bool
+    shouldReconcileSelection: Bool,
+    fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
     // Find a single TextNode whose text part changed (length may or may not change).
     // We allow other dirty nodes (e.g., parents marked dirty), but only operate when
@@ -391,7 +403,11 @@ internal enum OptimizedReconciler {
         let parentKeys = node.getParents().map { $0.getKey() }
         for pk in parentKeys { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } }
       }
-      editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+      if editor.featureFlags.useReconcilerFenwickCentralAggregation {
+        fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
+      } else {
+        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+      }
     } else {
       updateRangeCacheForTextChange(nodeKey: dirtyKey, delta: delta)
     }
@@ -711,7 +727,8 @@ internal enum OptimizedReconciler {
     currentEditorState: EditorState,
     pendingEditorState: EditorState,
     editor: Editor,
-    shouldReconcileSelection: Bool
+    shouldReconcileSelection: Bool,
+    fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
     guard editor.dirtyNodes.count == 1, let dirtyKey = editor.dirtyNodes.keys.first else {
       return false
@@ -754,7 +771,11 @@ internal enum OptimizedReconciler {
       if editor.featureFlags.useReconcilerFenwickDelta {
         if var item = editor.rangeCache[dirtyKey] { item.postambleLength = nextPostLen; editor.rangeCache[dirtyKey] = item }
         if let node = pendingEditorState.nodeMap[dirtyKey] { let parents = node.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } }
-        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+        if editor.featureFlags.useReconcilerFenwickCentralAggregation {
+          fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
+        } else {
+          editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+        }
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .postamble, newPartLength: nextPostLen, delta: delta)
       }
@@ -774,7 +795,11 @@ internal enum OptimizedReconciler {
       if editor.featureFlags.useReconcilerFenwickDelta {
         if var item = editor.rangeCache[dirtyKey] { item.preambleLength = nextPreLen; item.preambleSpecialCharacterLength = preSpecial; editor.rangeCache[dirtyKey] = item }
         if let node = pendingEditorState.nodeMap[dirtyKey] { let parents = node.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } }
-        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+        if editor.featureFlags.useReconcilerFenwickCentralAggregation {
+          fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
+        } else {
+          editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+        }
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .preamble, newPartLength: nextPreLen, preambleSpecialCharacterLength: preSpecial, delta: delta)
       }

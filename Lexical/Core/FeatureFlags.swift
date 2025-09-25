@@ -15,6 +15,7 @@ import Foundation
   let useReconcilerKeyedDiff: Bool
   let useReconcilerBlockRebuild: Bool
   let useOptimizedReconcilerStrictMode: Bool
+  let useReconcilerFenwickCentralAggregation: Bool
   let useReconcilerShadowCompare: Bool
 
   @objc public init(
@@ -25,6 +26,7 @@ import Foundation
     useReconcilerKeyedDiff: Bool = false,
     useReconcilerBlockRebuild: Bool = false,
     useOptimizedReconcilerStrictMode: Bool = false,
+    useReconcilerFenwickCentralAggregation: Bool = false,
     useReconcilerShadowCompare: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
@@ -34,6 +36,7 @@ import Foundation
     self.useReconcilerKeyedDiff = useReconcilerKeyedDiff
     self.useReconcilerBlockRebuild = useReconcilerBlockRebuild
     self.useOptimizedReconcilerStrictMode = useOptimizedReconcilerStrictMode
+    self.useReconcilerFenwickCentralAggregation = useReconcilerFenwickCentralAggregation
     self.useReconcilerShadowCompare = useReconcilerShadowCompare
     super.init()
   }
