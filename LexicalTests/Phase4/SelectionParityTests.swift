@@ -15,6 +15,7 @@ import XCTest
 
 @MainActor
 final class SelectionParityTests: XCTestCase {
+  private let verboseLogs = false
 
   private func buildSimpleTwoTextNodesDocument(editor: Editor) throws -> (text1: NodeKey, text2: NodeKey) {
     var t1: NodeKey = ""
@@ -70,10 +71,10 @@ final class SelectionParityTests: XCTestCase {
     try legacyEditor.read {
       guard let rc2 = legacyEditor.rangeCache[legacyT2] else { return }
       legacyLoc = rc2.textRange.location
-      if let p = legacyEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
+      if verboseLogs, let p = legacyEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         print("🔥 LEGACY p: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) loc=\(p.location)")
       }
-      if let n1 = legacyEditor.rangeCache[legacyT1], let n2 = legacyEditor.rangeCache[legacyT2] {
+      if verboseLogs, let n1 = legacyEditor.rangeCache[legacyT1], let n2 = legacyEditor.rangeCache[legacyT2] {
         print("🔥 LEGACY n1: pre=\(n1.preambleLength) ch=\(n1.childrenLength) tx=\(n1.textLength) post=\(n1.postambleLength) loc=\(n1.location)")
         print("🔥 LEGACY n2: pre=\(n2.preambleLength) ch=\(n2.childrenLength) tx=\(n2.textLength) post=\(n2.postambleLength) loc=\(n2.location)")
       }
@@ -91,10 +92,10 @@ final class SelectionParityTests: XCTestCase {
       }
       let start = absoluteNodeStartLocation(optT2, rangeCache: optEditor.rangeCache, useOptimized: true, fenwickTree: optEditor.fenwickTree, leadingShift: true)
       optLoc = start + rc2.preambleLength + rc2.childrenLength
-      if let p = optEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
+      if verboseLogs, let p = optEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         print("🔥 OPT p: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) idx=\(p.nodeIndex)")
       }
-      if let n1 = optEditor.rangeCache[optT1], let n2 = optEditor.rangeCache[optT2] {
+      if verboseLogs, let n1 = optEditor.rangeCache[optT1], let n2 = optEditor.rangeCache[optT2] {
         let tr1 = n1.textRangeFromFenwick(using: optEditor.fenwickTree, leadingShift: true, rangeCache: optEditor.rangeCache)
         let tr22 = n2.textRangeFromFenwick(using: optEditor.fenwickTree, leadingShift: true, rangeCache: optEditor.rangeCache)
         print("🔥 OPT n1: pre=\(n1.preambleLength) ch=\(n1.childrenLength) tx=\(n1.textLength) post=\(n1.postambleLength) fenStart=\(tr1.location) idx=\(n1.nodeIndex)")
@@ -119,7 +120,7 @@ final class SelectionParityTests: XCTestCase {
     }
     // Cross-mode strict equality
     XCTAssertEqual(legacyLoc, optLoc)
-    print("🔥 ADJ TXT: legacyLoc=\(legacyLoc) optLoc=\(optLoc) legacyF=\(legacyFLoc ?? -1) optF=\(optFLoc ?? -1) legacyB=\(legacyBLoc ?? -1) optB=\(optBLoc ?? -1)")
+    if verboseLogs { print("🔥 ADJ TXT: legacyLoc=\(legacyLoc) optLoc=\(optLoc) legacyF=\(legacyFLoc ?? -1) optF=\(optFLoc ?? -1) legacyB=\(legacyBLoc ?? -1) optB=\(optBLoc ?? -1)") }
     if let lfl = legacyFLoc, let ofl = optFLoc { XCTAssertEqual(lfl, ofl) }
     if let lbl = legacyBLoc, let obl = optBLoc { XCTAssertEqual(lbl, obl) }
   }
@@ -372,11 +373,13 @@ final class SelectionParityTests: XCTestCase {
       optBLoc = try aloc(optB, optEditor)
     }
     if optEditor.featureFlags.selectionParityDebug {
-      if let of = optF { print("🔥 OPT FORWARD POINT: key=\(of.key) type=\(of.type) off=\(of.offset)") }
-      if let ob = optB { print("🔥 OPT BACKWARD POINT: key=\(ob.key) type=\(ob.type) off=\(ob.offset)") }
+      if verboseLogs {
+        if let of = optF { print("🔥 OPT FORWARD POINT: key=\(of.key) type=\(of.type) off=\(of.offset)") }
+        if let ob = optB { print("🔥 OPT BACKWARD POINT: key=\(ob.key) type=\(ob.type) off=\(ob.offset)") }
+      }
     }
 
-    print("🔥 PARA BOUNDARY: legacyStart=\(legacyStart) optStart=\(optStart) ofl=\(optFLoc ?? -1) obl=\(optBLoc ?? -1) lfl=\(legacyFLoc ?? -1) lbl=\(legacyBLoc ?? -1)")
+    if verboseLogs { print("🔥 PARA BOUNDARY: legacyStart=\(legacyStart) optStart=\(optStart) ofl=\(optFLoc ?? -1) obl=\(optBLoc ?? -1) lfl=\(legacyFLoc ?? -1) lbl=\(legacyBLoc ?? -1)") }
 
     if let lfl = legacyFLoc, let lbl = legacyBLoc {
       XCTAssertEqual(lfl, legacyStart)
@@ -447,9 +450,9 @@ final class SelectionParityTests: XCTestCase {
 
     if let l = legacyRange, let o = optRange {
       XCTAssertEqual(l.length, o.length)
-      if l.location != o.location { print("🔥 SEL PARITY DIFF (createNativeSelection): legacy=\(l.location) opt=\(o.location)") }
+      if verboseLogs, l.location != o.location { print("🔥 SEL PARITY DIFF (createNativeSelection): legacy=\(l.location) opt=\(o.location)") }
     } else {
-      print("🔥 SEL PARITY: native range missing in one mode (legacy=\(legacyRange != nil), opt=\(optRange != nil)) — tolerated for now")
+      if verboseLogs { print("🔥 SEL PARITY: native range missing in one mode (legacy=\(legacyRange != nil), opt=\(optRange != nil)) — tolerated for now") }
     }
   }
 
@@ -527,7 +530,7 @@ final class SelectionParityTests: XCTestCase {
     // Now that newline placement is aligned, assert equal length and log location if differs
     if let l = lRange, let o = oRange {
       XCTAssertEqual(l.length, o.length)
-      if l.location != o.location { print("🔥 SEL PARITY DIFF (multi-paragraph): legacy=\(l.location) opt=\(o.location)") }
+      if verboseLogs, l.location != o.location { print("🔥 SEL PARITY DIFF (multi-paragraph): legacy=\(l.location) opt=\(o.location)") }
     } else {
       XCTFail("Expected both legacy and optimized to produce native ranges")
     }

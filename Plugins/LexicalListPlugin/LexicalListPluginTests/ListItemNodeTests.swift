@@ -28,10 +28,11 @@ class ListItemNodeTests: XCTestCase {
   }
 
   func debugEditor(_ editor: Editor) {
-    print((try? getNodeHierarchy(editorState: editor.getEditorState())) ?? "")
-    print(view?.textStorage.debugDescription ?? "")
-    print((try? getSelectionData(editorState: editor.getEditorState())) ?? "")
-    print((try? editor.getEditorState().toJSON(outputFormatting: .sortedKeys)) ?? "")
+    let verboseLogs = false
+    if verboseLogs { print((try? getNodeHierarchy(editorState: editor.getEditorState())) ?? "") }
+    if verboseLogs { print(view?.textStorage.debugDescription ?? "") }
+    if verboseLogs { print((try? getSelectionData(editorState: editor.getEditorState())) ?? "") }
+    if verboseLogs { print((try? editor.getEditorState().toJSON(outputFormatting: .sortedKeys)) ?? "") }
   }
 
   func testItemCharacterWithNestedNumberedList() throws {

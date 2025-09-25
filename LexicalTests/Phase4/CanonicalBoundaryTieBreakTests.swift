@@ -7,6 +7,7 @@ import XCTest
 
 @MainActor
 final class CanonicalBoundaryTieBreakTests: XCTestCase {
+  private let verboseLogs = false
   func testLogStyledAdjacentTextStarts() throws {
     // Legacy
     let legacyCtx = LexicalReadOnlyTextKitContext(
@@ -59,20 +60,20 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
     try optEditor.update {}
 
     try legacyEditor.read {
-      if let p = legacyEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
+      if verboseLogs, let p = legacyEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         print("🔥 LEGACY P: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) loc=\(p.location)")
       }
-      if let n1 = legacyEditor.rangeCache[lT1], let n2 = legacyEditor.rangeCache[lT2] {
+      if verboseLogs, let n1 = legacyEditor.rangeCache[lT1], let n2 = legacyEditor.rangeCache[lT2] {
         print("🔥 LEGACY T1: pre=\(n1.preambleLength) ch=\(n1.childrenLength) tx=\(n1.textLength) post=\(n1.postambleLength) loc=\(n1.location)")
         print("🔥 LEGACY T2: pre=\(n2.preambleLength) ch=\(n2.childrenLength) tx=\(n2.textLength) post=\(n2.postambleLength) loc=\(n2.location) textStart=\(n2.textRange.location)")
       }
     }
     try optEditor.read {
-      if let p = optEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
+      if verboseLogs, let p = optEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         let pr = p.entireRangeFromFenwick(using: optEditor.fenwickTree)
         print("🔥 OPT P: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) idx=\(p.nodeIndex) fenStart=\(pr.location)")
       }
-      if let n1 = optEditor.rangeCache[oT1], let n2 = optEditor.rangeCache[oT2] {
+      if verboseLogs, let n1 = optEditor.rangeCache[oT1], let n2 = optEditor.rangeCache[oT2] {
         let tr1 = n1.textRangeFromFenwick(using: optEditor.fenwickTree)
         let tr2 = n2.textRangeFromFenwick(using: optEditor.fenwickTree)
         print("🔥 OPT T1: pre=\(n1.preambleLength) ch=\(n1.childrenLength) tx=\(n1.textLength) post=\(n1.postambleLength) idx=\(n1.nodeIndex) fenStart=\(tr1.location)")
@@ -140,7 +141,7 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
         optLoc = rc2.textRangeFromFenwick(using: optEditor.fenwickTree).location
       }
     }
-    if legacyLoc != optLoc {
+    if verboseLogs, legacyLoc != optLoc {
       print("🔥 Styled Adjacent (diagnostic): legacyLoc=\(legacyLoc), optLoc=\(optLoc)")
     }
   }
@@ -209,6 +210,6 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
     let oStr = optEditor.getTextStorageString() ?? "<nil>"
     let lLen = lStr.lengthAsNSString(); let oLen = oStr.lengthAsNSString()
     let summary = "LEG[len=\(lLen)]='\(lStr.replacingOccurrences(of: "\n", with: "\\n"))' | OPT[len=\(oLen)]='\(oStr.replacingOccurrences(of: "\n", with: "\\n"))'"
-    print("🔥 CanonicalBoundary (diagnostic): \(summary) :: \(msg.replacingOccurrences(of: "\n", with: " | "))")
+    if verboseLogs { print("🔥 CanonicalBoundary (diagnostic): \(summary) :: \(msg.replacingOccurrences(of: "\n", with: " | "))") }
   }
 }
