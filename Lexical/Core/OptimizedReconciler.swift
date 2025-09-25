@@ -128,15 +128,15 @@ internal enum OptimizedReconciler {
       fatalError("Cannot run optimized reconciler on an editor with no text storage")
     }
 
-    // Skip optimized paths when composition is active
-    if markedTextOperation != nil {
-      return try delegateToLegacy(
+    // Composition (marked text) fast path first
+    if let mto = markedTextOperation {
+      if try fastPath_Composition(
         currentEditorState: currentEditorState,
         pendingEditorState: pendingEditorState,
         editor: editor,
         shouldReconcileSelection: shouldReconcileSelection,
-        markedTextOperation: markedTextOperation
-      )
+        op: mto
+      ) { return }
     }
 
     // Try optimized fast paths before falling back (even if fullReconcile)
@@ -676,6 +676,58 @@ internal enum OptimizedReconciler {
     }
 
     print("🔥 OPTIMIZED RECONCILER: pre/post fast path applied (key=\(dirtyKey))")
+    return true
+  }
+
+  // MARK: - Fast path: composition (marked text) start/update
+  @MainActor
+  private static func fastPath_Composition(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    shouldReconcileSelection: Bool,
+    op: MarkedTextOperation
+  ) throws -> Bool {
+    guard let textStorage = editor.textStorage else { return false }
+    // Only special-handle start of composition. Updates/end are handled by Events via insert/replace
+    guard op.createMarkedText else { return false }
+
+    // Locate Point at replacement start if possible
+    let startLocation = op.selectionRangeToReplace.location
+    let point = try? pointAtStringLocation(startLocation, searchDirection: .forward, rangeCache: editor.rangeCache)
+
+    // Prepare attributed marked text with styles from owning node if available
+    var attrs: [NSAttributedString.Key: Any] = [:]
+    if let p = point, let node = pendingEditorState.nodeMap[p.key] {
+      attrs = AttributeUtils.attributedStringStyles(from: node, state: pendingEditorState, theme: editor.getTheme())
+    }
+    let markedAttr = NSAttributedString(string: op.markedTextString, attributes: attrs)
+
+    // Replace characters in storage at requested range
+    let delta = markedAttr.length - op.selectionRangeToReplace.length
+    let previousMode = textStorage.mode
+    textStorage.mode = .controllerMode
+    textStorage.beginEditing()
+    textStorage.replaceCharacters(in: op.selectionRangeToReplace, with: markedAttr)
+    textStorage.fixAttributes(in: NSRange(location: op.selectionRangeToReplace.location, length: markedAttr.length))
+    textStorage.endEditing()
+    textStorage.mode = previousMode
+
+    // Update range cache if we can resolve to a TextNode
+    if let p = point, let textNode = pendingEditorState.nodeMap[p.key] as? TextNode {
+      updateRangeCacheForTextChange(nodeKey: textNode.key, delta: delta)
+    }
+
+    // Set marked text via frontend API
+    if let p = point {
+      let startPoint = p
+      let endPoint = Point(key: p.key, offset: p.offset + markedAttr.length, type: .text)
+      try editor.frontend?.updateNativeSelection(from: RangeSelection(anchor: startPoint, focus: endPoint, format: TextFormat()))
+    }
+    editor.frontend?.setMarkedTextFromReconciler(markedAttr, selectedRange: op.markedTextInternalSelection)
+
+    // Skip selection reconcile after marked text (legacy behavior)
+    print("🔥 OPTIMIZED RECONCILER: composition fast path applied (len=\(markedAttr.length))")
     return true
   }
 

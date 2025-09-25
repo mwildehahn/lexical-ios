@@ -161,4 +161,41 @@ final class OptimizedReconcilerTests: XCTestCase {
       }
     }
   }
+
+  func testCompositionStartInsertsMarkedText() throws {
+    // Strict mode to avoid legacy fallback
+    let flags = FeatureFlags(
+      reconcilerSanityCheck: false,
+      proxyTextViewInputDelegate: false,
+      useOptimizedReconciler: true,
+      useReconcilerFenwickDelta: true,
+      useReconcilerKeyedDiff: true,
+      useReconcilerBlockRebuild: true,
+      useOptimizedReconcilerStrictMode: true
+    )
+    let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let editor = ctx.editor
+    let frontend = ctx
+
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t = createTextNode(text: "Hello")
+      try p.append([t])
+      try root.append([p])
+    }
+
+    // Start composition at end with "あ"
+    let startLoc = frontend.textStorage.length
+    let op = MarkedTextOperation(
+      createMarkedText: true,
+      selectionRangeToReplace: NSRange(location: startLoc, length: 0),
+      markedTextString: "あ",
+      markedTextInternalSelection: NSRange(location: 1, length: 0)
+    )
+    try onInsertTextFromUITextView(text: "あ", editor: editor, updateMode: UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: op))
+
+    XCTAssertTrue(frontend.textStorage.string.contains("Hello"))
+    XCTAssertTrue(frontend.textStorage.string.contains("あ"))
+  }
 }
