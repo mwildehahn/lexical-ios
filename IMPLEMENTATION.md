@@ -59,14 +59,14 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [x] Add unit tests: `FenwickTreeTests` and `DfsIndexTests` (determinism on synthetic trees).
 
 - [ ] M2 — Planning Engine (Instruction Tape)
-  - [ ] Compute per‑node part diffs (preamble/text/postamble) vs. prev; compute `totalDelta` and `bit.add(index, delta)`.
+  - [x] Compute per‑node part diffs (preamble/text/postamble) vs. prev; compute `totalDelta` (helper added; integrated for metrics and future planners).
   - [ ] Generate minimal instructions:
     - [x] Attribute‑only for single TextNode → `SetAttributes` without string edits.
     - [x] Text change for single TextNode → Delete/Insert with coalesced `fixAttributes`.
     - [x] Preamble/postamble-only single-node change → targeted replace + cache update.
-    - [ ] Text/preamble/postamble changes across multiple nodes → coalesced `Replace` segment.
+    - [x] Text/preamble/postamble changes across multiple nodes → coalesced `Replace` segment.
     - [x] Children reorder (first slice) → region rebuild; LIS-based minimal moves pending.
-  - [ ] Coalesce (merge adjacent deletes/inserts; build single attributed string where possible).
+  - [x] Coalesce (merge adjacent deletes/inserts; build single attributed string where possible).
 
 - [ ] M3 — Apply Engine
   - [ ] Execute deletes (reverse), inserts (forward), set attributes, one `fixAttributes` over minimal covering range.

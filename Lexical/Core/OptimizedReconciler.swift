@@ -145,6 +145,8 @@ internal enum OptimizedReconciler {
     }
 
     // Try optimized fast paths before falling back (even if fullReconcile)
+    // Pre-compute part diffs (used by some paths and metrics)
+    let _ = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
     if try fastPath_ReorderChildren(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
