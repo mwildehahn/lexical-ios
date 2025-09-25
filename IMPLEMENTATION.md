@@ -161,6 +161,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] 2025‑09‑25: Composition flows — implemented update/end coverage via tests. Optimized path handles repeated marked-text replacements and end-unmark parity with legacy (including multibyte). Added `OptimizedReconcilerCompositionTests`.
 - [x] 2025‑09‑25: Added contiguous multi-node replace fast path. Detects lowest common ancestor with unchanged key set and replaces its children region in one edit (coalesced). Added `OptimizedReconcilerMultiNodeReplaceTests` (optimized strict vs legacy parity). Full suite green on iOS sim.
 - [x] 2025‑09‑25: Keyed‑diff improved to prefer minimal moves when LIS ≥ 20%; emit movedChildren in metrics. Added large reorder and decorator‑interleaved parity tests. Added cross‑parent multi‑edit parity test that forces rebuild fallback. Nightly CI added for iOS simulator tests.
+- [x] 2025‑09‑25: Fenwick range aggregation for post‑reorder location rebuilds. Added `rebuildLocationsWithFenwickRanges` and integrated into reorder fast path to apply subtree shifts in O(n). Added deep nested reorder parity tests with decorators; large paragraph interleaved decorators test; LIS threshold micro‑tests deferred (skipped) to avoid coupling to internal metrics labels. Full iOS suite green; Playground builds.
 
 ## Current Flag Defaults (Tests/Playground)
 - `useOptimizedReconciler = true`
@@ -173,9 +174,9 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 
 ## Next Actions (short)
 1) Quantify perf wins with metrics: add op-count and movedChildren assertions to metrics-focused tests; expand ReconcilerBenchmarkTests corpus.
-2) Tune keyed-diff thresholds with metrics feedback; add cases for deeper nesting and larger shuffles.
+2) Tune keyed-diff thresholds with metrics feedback; expand non‑decorator large shuffles; compare operation counts.
 3) Expand shadow-compare scenario corpus (paste with attributes; decorators nested multiple levels) and monitor in nightly CI.
-4) Optional: centralize multi-delta Fenwick rebuild at end of update (aggregate all part diffs) guarded behind a feature flag for A/B.
+4) Optional: centralize multi‑delta Fenwick rebuild at end of update (aggregate all part diffs) behind a feature flag for A/B.
 
 Reminder: after every significant change, run iOS simulator tests (Lexical-Package scheme) and build the Playground app. Update this file with status and a short summary before marking subtasks done.
 
