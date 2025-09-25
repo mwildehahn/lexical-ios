@@ -683,25 +683,47 @@ internal enum Reconciler {
   }
 }
 
+@MainActor
 internal func performReconcilerSanityCheck(
   editor sanityCheckEditor: Editor,
   expectedOutput: NSAttributedString
 ) throws {
-  // TODO @amyworrall: this was commented out during the Frontend refactor. Create a new Frontend that contains
-  // a TextKit stack but no selection or UI. Use that to re-implement the reconciler.
+  // Build a full attributed string from the current editor state and theme
+  guard let root = sanityCheckEditor.getEditorState().getRootNode() as? ElementNode else { return }
+  let theme = sanityCheckEditor.getTheme()
 
-  //    // create new editor to reconcile within
-  //    let editor = Editor(
-  //      featureFlags: FeatureFlags(reconcilerSanityCheck: false),
-  //      editorConfig: EditorConfig(theme: sanityCheckEditor.getTheme(), plugins: []))
-  //    editor.textStorage = TextStorage()
-  //
-  //    try editor.setEditorState(sanityCheckEditor.getEditorState())
-  //
-  //    if let textStorage = editor.textStorage, !expectedOutput.isEqual(to: textStorage) {
-  //      throw LexicalError.sanityCheck(
-  //        errorMessage: "Failed sanity check",
-  //        textViewText: expectedOutput.string,
-  //        fullReconcileText: textStorage.string)
-  //    }
+  let built = NSMutableAttributedString()
+  for child in root.getChildrenKeys() {
+    built.append(try buildAttributedSubtree(nodeKey: child, state: sanityCheckEditor.getEditorState(), theme: theme))
+  }
+
+  if built != expectedOutput {
+    throw LexicalError.sanityCheck(
+      errorMessage: "Failed sanity check",
+      textViewText: expectedOutput.string,
+      fullReconcileText: built.string)
+  }
+}
+
+@MainActor
+private func buildAttributedSubtree(
+  nodeKey: NodeKey, state: EditorState, theme: Theme
+) throws -> NSAttributedString {
+  guard let node = state.nodeMap[nodeKey] else { return NSAttributedString() }
+  let output = NSMutableAttributedString()
+  let pre = AttributeUtils.attributedStringByAddingStyles(
+    NSAttributedString(string: node.getPreamble()), from: node, state: state, theme: theme)
+  output.append(pre)
+  if let element = node as? ElementNode {
+    for child in element.getChildrenKeys() {
+      output.append(try buildAttributedSubtree(nodeKey: child, state: state, theme: theme))
+    }
+  }
+  let text = AttributeUtils.attributedStringByAddingStyles(
+    NSAttributedString(string: node.getTextPart()), from: node, state: state, theme: theme)
+  output.append(text)
+  let post = AttributeUtils.attributedStringByAddingStyles(
+    NSAttributedString(string: node.getPostamble()), from: node, state: state, theme: theme)
+  output.append(post)
+  return output
 }
