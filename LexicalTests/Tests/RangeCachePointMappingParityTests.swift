@@ -26,68 +26,41 @@ final class RangeCachePointMappingParityTests: XCTestCase {
     return (optCtx.editor, legCtx.editor, optCtx, legCtx)
   }
 
-  func testPointAtStringLocation_Boundaries_TextNodes_Parity() throws {
-    throw XCTSkip("Mapping boundary invariants still being hardened; pointAtStringLocation can return nil at inter-node boundaries depending on pre/post rules. Keeping this as a scaffold while we complete M5 mapping checks.")
+  func testRoundTripAcrossAllLocations_Parity() throws {
     let (opt, leg, _optCtx, _legCtx) = makeEditors(centralAgg: true)
 
-    var aOpt: NodeKey = ""; var bOpt: NodeKey = ""
-    var aLeg: NodeKey = ""; var bLeg: NodeKey = ""
-
-    // Build AB in both editors
-    try opt.update {
-      guard let root = getRoot() else { return }
-      let p = createParagraphNode()
-      let a = createTextNode(text: "A"); aOpt = a.getKey()
-      let b = createTextNode(text: "B"); bOpt = b.getKey()
-      try p.append([a, b]); try root.append([p])
+    // Build: Root -> [ P1("Hello"), P2("World") ]
+    func build(on editor: Editor) throws {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "Hello") ])
+        let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "World") ])
+        try root.append([p1, p2])
+      }
     }
-    try leg.update {
-      guard let root = getRoot() else { return }
-      let p = createParagraphNode()
-      let a = createTextNode(text: "A"); aLeg = a.getKey()
-      let b = createTextNode(text: "B"); bLeg = b.getKey()
-      try p.append([a, b]); try root.append([p])
+    try build(on: opt)
+    try build(on: leg)
+
+    // Ensure caches flushed
+    try opt.update {}; try opt.update {}
+    try leg.update {}; try leg.update {}
+
+    // Strings must match first
+    XCTAssertEqual(opt.frontend?.textStorage.string, leg.frontend?.textStorage.string)
+
+    func roundTripAllLocations(editor: Editor) throws {
+      let s = editor.frontend?.textStorage.string ?? ""
+      let ns = s as NSString
+      for loc in 0...ns.length {
+        let p = try? pointAtStringLocation(loc, searchDirection: .forward, rangeCache: editor.rangeCache)
+        if let p {
+          let back = try stringLocationForPoint(p, editor: editor)
+          XCTAssertEqual(back, loc, "round-trip mismatch at loc=\(loc)")
+        }
+      }
     }
 
-    // Force a no-op reconcile to ensure rangeCache/textStorage are up to date
-    try opt.update {}
-    try leg.update {}
-    // Do a second pass to be extra sure mapping views are current
-    try opt.update {}
-    try leg.update {}
-
-    // Optimized editor: round-trip point -> location -> point
-    var pAend: Point? = nil
-    var pBstart: Point? = nil
-    try opt.update {
-      let aEndPointOpt = Point(key: aOpt, offset: 1, type: .text)
-      let bStartPointOpt = Point(key: bOpt, offset: 0, type: .text)
-      let aEndLocOpt = try stringLocationForPoint(aEndPointOpt, editor: opt)
-      let bStartLocOpt = try stringLocationForPoint(bStartPointOpt, editor: opt)
-      XCTAssertNotNil(aEndLocOpt); XCTAssertNotNil(bStartLocOpt)
-      if let aEndLocOpt { pAend = try pointAtStringLocation(aEndLocOpt, searchDirection: .forward, rangeCache: opt.rangeCache) }
-      if let bStartLocOpt { pBstart = try pointAtStringLocation(bStartLocOpt, searchDirection: .forward, rangeCache: opt.rangeCache) }
-    }
-    XCTAssertNotNil(pAend); XCTAssertNotNil(pBstart)
-    XCTAssertEqual(pAend!.type, .text); XCTAssertEqual(pBstart!.type, .text)
-    XCTAssertEqual(pAend!.key, aOpt); XCTAssertEqual(pAend!.offset, 1)
-    XCTAssertEqual(pBstart!.key, bOpt); XCTAssertEqual(pBstart!.offset, 0)
-
-    // Legacy editor: round-trip point -> location -> point
-    var pAendL: Point? = nil
-    var pBstartL: Point? = nil
-    try leg.update {
-      let aEndPointLeg = Point(key: aLeg, offset: 1, type: .text)
-      let bStartPointLeg = Point(key: bLeg, offset: 0, type: .text)
-      let aEndLocLeg = try stringLocationForPoint(aEndPointLeg, editor: leg)
-      let bStartLocLeg = try stringLocationForPoint(bStartPointLeg, editor: leg)
-      XCTAssertNotNil(aEndLocLeg); XCTAssertNotNil(bStartLocLeg)
-      if let aEndLocLeg { pAendL = try pointAtStringLocation(aEndLocLeg, searchDirection: .forward, rangeCache: leg.rangeCache) }
-      if let bStartLocLeg { pBstartL = try pointAtStringLocation(bStartLocLeg, searchDirection: .forward, rangeCache: leg.rangeCache) }
-    }
-    XCTAssertNotNil(pAendL); XCTAssertNotNil(pBstartL)
-    XCTAssertEqual(pAendL!.type, .text); XCTAssertEqual(pBstartL!.type, .text)
-    XCTAssertEqual(pAendL!.key, aLeg); XCTAssertEqual(pAendL!.offset, 1)
-    XCTAssertEqual(pBstartL!.key, bLeg); XCTAssertEqual(pBstartL!.offset, 0)
+    try roundTripAllLocations(editor: opt)
+    try roundTripAllLocations(editor: leg)
   }
 }

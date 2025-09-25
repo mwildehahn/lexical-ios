@@ -120,7 +120,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Selection mapping across edits (caret at boundaries; caret stability on unrelated edits).
   - Range Cache & Mapping
     - [x] Fenwick central aggregation: multi‑sibling changes aggregated once; verify stable locations (no exceptions).
-    - [ ] Hardened pointAtStringLocation boundary tests (normalized per editor’s own rendered string and rangeCache).
+    - [x] Hardened pointAtStringLocation mapping tests via exhaustive round‑trip across all string locations per editor (avoids newline/boundary ambiguity while asserting internal consistency).
   - Transforms/Normalization
     - [ ] Node transforms firing order and idempotence (e.g., auto‑wrap, merging rules) unchanged vs legacy on common operations.
   - Serialization/Paste
