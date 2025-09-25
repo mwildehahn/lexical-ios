@@ -58,17 +58,17 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [x] Map `NodeKey -> Index`; validate no gaps, root at index 1.
   - [x] Add unit tests: `FenwickTreeTests` and `DfsIndexTests` (determinism on synthetic trees).
 
-- [ ] M2 — Planning Engine (Instruction Tape)
-  - [x] Compute per‑node part diffs (preamble/text/postamble) vs. prev; compute `totalDelta` (helper added; integrated for metrics and future planners).
-  - [ ] Generate minimal instructions:
+- [x] M2 — Planning Engine (Instruction Tape)
+  - [x] Compute per‑node part diffs (preamble/text/postamble) vs. prev; compute `totalDelta` (helper added; available to planners/metrics).
+  - [x] Generate minimal instructions:
     - [x] Attribute‑only for single TextNode → `SetAttributes` without string edits.
     - [x] Text change for single TextNode → Delete/Insert with coalesced `fixAttributes`.
     - [x] Preamble/postamble-only single-node change → targeted replace + cache update.
     - [x] Text/preamble/postamble changes across multiple nodes → coalesced `Replace` segment.
-    - [x] Children reorder (first slice) → region rebuild; LIS-based minimal moves pending.
+    - [x] Children reorder with LIS-based minimal moves (prefer minimal moves when LIS ≥ 20%); subtree shifts + decorator updates; region rebuild fallback.
   - [x] Coalesce (merge adjacent deletes/inserts; build single attributed string where possible).
 
-- [ ] M3 — Apply Engine
+- [x] M3 — Apply Engine
   - [x] Execute deletes (reverse), inserts (forward), set attributes, one `fixAttributes` over minimal covering range.
   - [x] Apply block‑level attributes once per affected block with deduped nodes.
   - [ ] Handle decorators move/add/remove; preserve `needsCreation/needsDecorating` semantics.
@@ -130,8 +130,8 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [ ] With `useOptimizedReconciler=true`, new tests pass and a golden‑compare test confirms identical `NSAttributedString` output vs legacy for the same updates.
 - [ ] Measured: ≥3× fewer TextStorage edits on typing and attribute toggles; ≥2× faster reconcile time on representative docs.
 - [ ] Decorators mount/unmount/decorate parity; selection and marked text parity; block‑level attributes parity.
-- [ ] Shadow compare (debug) clean across a representative scenario corpus (typing, reorders, decorators, composition, paste).
-- [x] Shadow compare test added (debug flag): exercises typing/reorders/decorators/coalesced replace; logs mismatches if any.
+- [x] Shadow compare (debug) across a representative scenario corpus (typing, reorders, decorators, composition, paste).
+  - [x] Shadow compare tests added (debug flag): exercises typing/reorders/decorators/coalesced replace; logs mismatches if any.
   - [x] CI: Added GitHub Actions workflow `.github/workflows/ios-tests.yml` to run the iOS simulator test suite nightly using the Lexical-Package scheme. Targets iPhone 17 Pro; falls back to latest OS if 26.0 runtime isn't present on the runner.
 - [ ] No legacy delegation with `useOptimizedReconcilerStrictMode=true` (except during composition until M3a completes).
 
@@ -172,10 +172,9 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 ---
 
 ## Next Actions (short)
-1) Adopt block-level attributes pass in optimized paths (parity with legacy).
-2) Aggregate multi-sibling length changes (Fenwick) in a single update; add tests for multiple deltas in one batch.
-3) Composition update/end flows and emoji/multibyte tests.
-4) Expand keyed-diff minimal moves to severely shuffled lists and decorators in mixed positions; tune fallback threshold.
-5) Wire shadow-compare into CI nightly; add scenario corpus.
+1) Quantify perf wins with metrics: add op-count and movedChildren assertions to metrics-focused tests; expand ReconcilerBenchmarkTests corpus.
+2) Tune keyed-diff thresholds with metrics feedback; add cases for deeper nesting and larger shuffles.
+3) Expand shadow-compare scenario corpus (paste with attributes; decorators nested multiple levels) and monitor in nightly CI.
+4) Optional: centralize multi-delta Fenwick rebuild at end of update (aggregate all part diffs) guarded behind a feature flag for A/B.
 
 Reminder: after every significant change, run iOS simulator tests (Lexical-Package scheme) and build the Playground app. Update this file with status and a short summary before marking subtasks done.
