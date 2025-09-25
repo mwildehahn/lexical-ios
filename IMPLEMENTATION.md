@@ -133,10 +133,10 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] List plugin: insert unordered/ordered lists and remove list — string parity across optimized vs legacy; selection kept inside text node to avoid transform selection loss.
     - [ ] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings).
 
-- [ ] M6 — Performance & Rollout
-  - [ ] Benchmark tests (`ReconcilerBenchmarkTests`): common typing, paste, mass stylings.
-  - [x] Add benchmark smoke tests: typing in large doc, mass bold toggles, large reorder shuffle (non‑flaky; logs timings only).
-  - [ ] Add metrics reporting to confirm op reductions and time split improvements.
+  - [ ] M6 — Performance & Rollout
+    - [x] Benchmark tests (`ReconcilerBenchmarkTests`): typing, mass stylings, large reorder — parity asserted; timings logged.
+    - [x] Basic metrics capture (per‑run instruction counts) via a test metrics container; printed in logs for visibility.
+    - [ ] Add bounds-based assertions on metrics (non-brittle) once thresholds are established across CI hardware.
   - [ ] Ship sub‑flags off by default; enable in CI nightly; collect metrics.
   - [ ] Flip `useOptimizedReconciler` in staged environments.
   - [ ] Remove legacy delegation once composition + shadow compare are green; retain a one‑release kill switch.

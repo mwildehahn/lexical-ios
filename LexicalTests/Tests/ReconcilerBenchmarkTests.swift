@@ -4,7 +4,15 @@ import XCTest
 @MainActor
 final class ReconcilerBenchmarkTests: XCTestCase {
 
-  func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
+  final class TestMetricsContainer: EditorMetricsContainer {
+    var runs: [ReconcilerMetric] = []
+    func record(_ metric: EditorMetric) {
+      if case let .reconcilerRun(m) = metric { runs.append(m) }
+    }
+    func resetMetrics() { runs.removeAll() }
+  }
+
+  func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext, TestMetricsContainer), leg: (Editor, LexicalReadOnlyTextKitContext, TestMetricsContainer)) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
     let optFlags = FeatureFlags(
       reconcilerSanityCheck: false,
@@ -15,15 +23,17 @@ final class ReconcilerBenchmarkTests: XCTestCase {
       useReconcilerBlockRebuild: true,
       useOptimizedReconcilerStrictMode: true
     )
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: optFlags)
+    let optMetrics = TestMetricsContainer()
+    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: [], metricsContainer: optMetrics), featureFlags: optFlags)
 
     let legFlags = FeatureFlags(
       reconcilerSanityCheck: false,
       proxyTextViewInputDelegate: false,
       useOptimizedReconciler: false
     )
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legFlags)
-    return ((optCtx.editor, optCtx), (legCtx.editor, legCtx))
+    let legMetrics = TestMetricsContainer()
+    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: [], metricsContainer: legMetrics), featureFlags: legFlags)
+    return ((optCtx.editor, optCtx, optMetrics), (legCtx.editor, legCtx, legMetrics))
   }
 
   func buildDoc(editor: Editor, paragraphs: Int, width: Int) throws {
@@ -62,7 +72,12 @@ final class ReconcilerBenchmarkTests: XCTestCase {
     // Parity assertion: resulting strings equal
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
     // Note: No hard timing assert; print for diagnostics
-    print("🔥 BENCH: typing optimized=\(dtOpt)s legacy=\(dtLeg)s")
+    // Summarize metrics (counts only)
+    let optDeletes = opt.2.runs.reduce(0) { $0 + $1.deleteCount }
+    let optInserts = opt.2.runs.reduce(0) { $0 + $1.insertCount }
+    let legDeletes = leg.2.runs.reduce(0) { $0 + $1.deleteCount }
+    let legInserts = leg.2.runs.reduce(0) { $0 + $1.insertCount }
+    print("🔥 BENCH: typing optimized=\(dtOpt)s legacy=\(dtLeg)s ops(opt del=\(optDeletes) ins=\(optInserts) | leg del=\(legDeletes) ins=\(legInserts))")
   }
 
   func testMassAttributeToggleParity() throws {
