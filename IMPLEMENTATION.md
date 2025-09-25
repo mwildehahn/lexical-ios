@@ -265,6 +265,27 @@ Next steps
   - Wire plugin test targets to a testable scheme if we want plugin CI.
   - Run Playground build on simulator for a final smoke: `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`.
 
+TODO (final pass before release)
+- Gate or remove all temporary debug prints ("🔥 …")
+  - Scope: IncrementalRangeCacheUpdater, OptimizedReconciler, RangeCache, Selection utils, tests.
+  - Strategy: wrap in a dedicated debug flag (e.g., `featureFlags.selectionParityDebug` or a new `diagnosticsEnabled`) and default to off in production/tests.
+  - Verify clean logs on full iOS suite after gating.
+
+2025‑09‑25 — Inline Decorator Boundary Parity (complete)
+
+Additions
+- New tests: `LexicalTests/Phase4/InlineDecoratorBoundaryParityTests.swift`
+  - `testSpanAcrossInlineDecoratorParity`
+  - `testElementOffsetAroundInlineDecoratorParity`
+  - `testDecoratorAtParagraphStartBoundaryParity`
+
+Notes
+- Tests use retained `LexicalView` to ensure `textStorage` is present.
+- Child index lookups for the decorator are performed inside `editor.read {}` to avoid `getLatest()` fatal.
+
+Verification (iOS 26.0)
+- `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/Phase4/InlineDecoratorBoundaryParityTests test` → green.
+
 Notes & hypotheses on the remaining failures
 - Leaf length idempotence (4 vs 2): likely a composition/accumulation bug in incremental insert path outside of EditorContext. The synthetic test calls `updateRangeCache` directly with insertion deltas; in that context, `getActiveEditorState()` is nil. We now prefer `editor.getEditorState()` where possible, but for the direct‑call case child/parent relationships come only from the active (pre‑insert) state. Despite that, the leaf `textLength` should be set from `insertionData.content.length` (2) — the doubled value suggests a secondary aggregation path still touches `textLength`.
 - Parent `childrenLength` after extra text insertion: delta bump did not land; post‑pass recompute for affected parents was added, but result is still unchanged in test. This implies either (a) the affected parent set is not being populated for this scenario, or (b) the recompute binding is sourcing children keys from the old state. Needs targeted instrumentation inside `updateRangeCache` when `.nodeInsertion` hits a TextNode under existing parent.
