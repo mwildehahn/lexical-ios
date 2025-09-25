@@ -50,7 +50,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [x] Add feature flag: `useOptimizedReconciler`.
   - [x] Wire Editor to call `OptimizedReconciler.updateEditorState(...)` when flag is true.
   - [x] Add `Lexical/Core/OptimizedReconciler.swift` skeleton with identical API to legacy.
-  - [ ] Add metrics fields (op counts, instruction counts, time splits) to `ReconcilerMetric`.
+  - [x] Add metrics fields (op counts, instruction counts, time splits) to `ReconcilerMetric`.
 
 - [x] M1 — Fenwick Tree & Indexing
   - [x] Implement `FenwickTree` (Int deltas, 1‑based indexing): `init(n)`, `add(i, delta)`, `prefix(i)`.
