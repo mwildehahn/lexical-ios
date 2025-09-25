@@ -262,7 +262,10 @@ public struct EditorMetricsSnapshot: CustomStringConvertible {
   public let reconciler: ReconcilerMetricsSummary
   public let optimizedDelta: OptimizedDeltaSummary
 
-  public var description: String {
+  // Swift 6: avoid crossing main-actor isolation when printing snapshots.
+  // Snapshot fields are immutable; exposing description as nonisolated(unsafe)
+  // is safe for debug/logging and eliminates concurrency diagnostics.
+  public nonisolated(unsafe) var description: String {
     return """
     EditorMetricsSnapshot(
       reconciler: \(reconciler),
