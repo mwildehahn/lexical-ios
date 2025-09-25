@@ -88,19 +88,42 @@ internal class ReconcilerFallbackDetector {
 
 ## Feature Flags
 
-Enable/disable the optimized reconciler using feature flags:
+Preferred API (2025-09-25):
 
 ```swift
-let featureFlags = FeatureFlags(
-    optimizedReconciler: true,        // Enable optimized path
-    reconcilerMetrics: true            // Collect performance metrics
+// New structured flags
+let flags = FeatureFlags(
+  reconcilerMode: .optimized, // .legacy, .optimized, .darkLaunch
+  diagnostics: Diagnostics(
+    selectionParity: false,   // gate parity-only diagnostics
+    sanityChecks: false,      // invariants checker
+    metrics: true,            // collect performance metrics
+    verboseLogs: false        // verbose debug prints
+  )
 )
 
 let editorConfig = EditorConfig(
-    theme: theme,
-    plugins: plugins,
-    featureFlags: featureFlags
+  theme: theme,
+  plugins: plugins,
+  featureFlags: flags
 )
+```
+
+Back‑compat initializer (still supported):
+
+```swift
+// Legacy convenience init (maps to reconcilerMode/diagnostics internally)
+let flags = FeatureFlags(
+  optimizedReconciler: true,
+  reconcilerMetrics: true
+)
+```
+
+Dark‑launch example (run optimized, then restore and run legacy invisibly):
+
+```swift
+let flags = FeatureFlags(reconcilerMode: .darkLaunch,
+                         diagnostics: Diagnostics(metrics: true))
 ```
 
 ## Performance Characteristics
@@ -196,7 +219,7 @@ class TextStorageDeltaApplier {
 ### Enable Debug Logging
 
 ```swift
-editor.log(.reconciler, .info, "Reconciler message")
+editor.log(.reconciler, .message, "Reconciler message")
 ```
 
 ### Monitor Fallback Reasons

@@ -99,9 +99,10 @@ class FeatureFlagManager {
     }
 
     static func createFeatureFlags() -> FeatureFlags {
+        // New API
         return FeatureFlags(
-            optimizedReconciler: shouldUseOptimizedReconciler(),
-            reconcilerMetrics: true
+          reconcilerMode: shouldUseOptimizedReconciler() ? .optimized : .legacy,
+          diagnostics: Diagnostics(metrics: true)
         )
     }
 }
@@ -282,3 +283,12 @@ A: If you have custom TextStorage modifications or depend on specific reconcilia
 
 **Q: How do I debug reconciliation issues?**
 A: Enable debug logging and use the PerformanceTestViewController for side-by-side comparison.
+Preferred flags API (structured):
+
+```swift
+// Recommended starting point using the new API
+let flags = FeatureFlags(
+  reconcilerMode: .legacy,                   // start disabled
+  diagnostics: Diagnostics(metrics: true)    // collect metrics from day one
+)
+```

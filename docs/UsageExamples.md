@@ -12,6 +12,24 @@
 
 ## Basic Setup
 
+> Preferred flags API (2025‑09‑25)
+
+```swift
+// Structured flags using ReconcilerMode + Diagnostics
+let flags = FeatureFlags(
+  reconcilerMode: .optimized,
+  diagnostics: Diagnostics(metrics: true) // turn on metrics if desired
+)
+
+let editorConfig = EditorConfig(
+  theme: Theme(),
+  plugins: [ToolbarPlugin(), HistoryPlugin()],
+  featureFlags: flags
+)
+```
+
+Back‑compat init still works in all examples below.
+
 ### Simple Enable
 
 ```swift
@@ -24,7 +42,7 @@ class MyViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // Enable optimized reconciler
+        // Enable optimized reconciler (back‑compat init)
         let featureFlags = FeatureFlags(optimizedReconciler: true)
 
         let editorConfig = EditorConfig(
