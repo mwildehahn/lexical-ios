@@ -98,7 +98,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 
 - [ ] M4a — Shadow Compare Harness (Debug Only)
   - [ ] Run optimized reconcile and legacy reconcile on a cloned state; compare NSAttributedString output and range cache invariants.
-  - [ ] Toggle via debug flag; wire to CI/nightly scenarios to catch edge mismatches.
+  - [ ] Write unit tests to compare optimized vs. legacy states.
 
 - [ ] M5 — Tests & Parity
   - [ ] Add `LexicalTests/Phase4/OptimizedReconcilerTests.swift` with:
