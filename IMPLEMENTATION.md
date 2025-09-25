@@ -23,7 +23,7 @@ Legend: [x] done · [>] in progress · [ ] todo
 - [x] Decorator lifecycle (create/decorate/remove + movement detection) and positions cache.
 - [x] IME/marked‑text flow (create selection guard + `setMarkedTextFromReconciler`).
 - [x] Inline style changes emit `attributeChange` deltas without mutating string.
-- [>] Selection reconciliation edge cases (absolute location mapping at element/text/paragraph boundaries, multi‑paragraph ranges).
+- [x] Selection reconciliation edge cases (absolute location mapping at element/text/paragraph boundaries, multi‑paragraph ranges).
 - [ ] Placeholder visibility and controlled vs non‑controlled behavior audit.
 
 **Correctness/Robustness**
