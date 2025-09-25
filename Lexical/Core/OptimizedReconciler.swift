@@ -402,9 +402,9 @@ internal enum OptimizedReconciler {
     editor: Editor,
     shouldReconcileSelection: Bool
   ) throws -> Bool {
-    // Identify a parent whose children order changed but set of keys is identical
+    // Identify all parents whose children order changed but set of keys is identical
     // We allow multiple dirty nodes; we only check the structural condition.
-    let candidates: [NodeKey] = pendingEditorState.nodeMap.compactMap { key, node in
+    var candidates: [NodeKey] = pendingEditorState.nodeMap.compactMap { key, node in
       guard let prev = currentEditorState.nodeMap[key] as? ElementNode,
             let next = node as? ElementNode else { return nil }
       let prevChildren = prev.getChildrenKeys(fromLatest: false)
@@ -413,11 +413,20 @@ internal enum OptimizedReconciler {
       if Set(prevChildren) != Set(nextChildren) { return nil }
       return key
     }
-    guard let parentKey = candidates.first,
+    // Process candidates in document order for stability
+    candidates.sort { a, b in
+      let la = editor.rangeCache[a]?.location ?? 0
+      let lb = editor.rangeCache[b]?.location ?? 0
+      return la < lb
+    }
+
+    var appliedAny = false
+    for parentKey in candidates {
+      guard
           let parentPrev = currentEditorState.nodeMap[parentKey] as? ElementNode,
           let parentNext = pendingEditorState.nodeMap[parentKey] as? ElementNode,
           let parentPrevRange = editor.rangeCache[parentKey]
-    else { return false }
+      else { continue }
 
     let nextChildren = parentNext.getChildrenKeys(fromLatest: false)
 
@@ -489,10 +498,58 @@ internal enum OptimizedReconciler {
       textStorage.mode = previousMode
     }
 
-    // Recompute range cache for this subtree in the new order (locations only; lengths unchanged)
-    _ = recomputeRangeCacheSubtree(
-      nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location,
-      editor: editor)
+    // Rebuild locations for the reordered subtree without recomputing lengths.
+    // Compute child-level new starts using next order and shift entire subtrees accordingly.
+    // This keeps decorator-bearing subtrees intact while avoiding a full subtree recompute.
+    let prevChildrenOrder = prevChildren
+    let nextChildrenOrder = nextChildren
+
+    // Entire-range length for each direct child (unchanged by reorder)
+    var childLength: [NodeKey: Int] = [:]
+    var childOldStart: [NodeKey: Int] = [:]
+    for k in prevChildrenOrder {
+      if let item = editor.rangeCache[k] {
+        childLength[k] = item.range.length
+        childOldStart[k] = item.location
+      } else {
+        // Fallback to computing from state if cache missing (should be rare)
+        let len = subtreeTotalLength(nodeKey: k, state: currentEditorState)
+        childLength[k] = len
+        childOldStart[k] = parentPrevRange.location + parentPrevRange.preambleLength // safe base
+      }
+    }
+
+    // Compute new starts based on next order
+    var childNewStart: [NodeKey: Int] = [:]
+    var accLen = 0
+    for k in nextChildrenOrder {
+      childNewStart[k] = childrenStart + accLen
+      accLen += childLength[k] ?? 0
+    }
+
+    // Shift locations for each direct child subtree by delta, including all descendants (decorators included)
+    for k in nextChildrenOrder {
+      guard let oldStart = childOldStart[k], let newStart = childNewStart[k] else { continue }
+      let deltaShift = newStart - oldStart
+      if deltaShift == 0 { continue }
+
+      // Walk the subtree in pending state (reflects new structure) and add delta to each cached location
+      for subKey in subtreeKeysDFS(rootKey: k, state: pendingEditorState) {
+        if var item = editor.rangeCache[subKey] {
+          item.location += deltaShift
+          editor.rangeCache[subKey] = item
+        }
+      }
+
+      // Update decorator positions for any decorator nodes inside this subtree
+      if let ts = editor.textStorage {
+        for (dKey, loc) in ts.decoratorPositionCache {
+          if editor.rangeCache[dKey] != nil, subtreeContains(rootKey: k, candidateKey: dKey, state: pendingEditorState) {
+            ts.decoratorPositionCache[dKey] = (editor.rangeCache[dKey]?.location) ?? (loc + deltaShift)
+          }
+        }
+      }
+    }
 
     // Update decorator positions for keys within this subtree
     if let ts = editor.textStorage {
@@ -513,8 +570,10 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-    print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey), moved=\(movedCount), total=\(nextChildren.count))")
-    return true
+      print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey), moved=\(movedCount), total=\(nextChildren.count))")
+      appliedAny = true
+    }
+    return appliedAny
   }
 
   // Build full attributed subtree for a node in pending state (preamble + children + text + postamble)
@@ -757,5 +816,29 @@ internal enum OptimizedReconciler {
     sum += node.getTextPart().lengthAsNSString()
     sum += node.getPostamble().lengthAsNSString()
     return sum
+  }
+
+  // Collect all node keys in a subtree (DFS order), including the root key.
+  @MainActor
+  private static func subtreeKeysDFS(rootKey: NodeKey, state: EditorState) -> [NodeKey] {
+    guard let node = state.nodeMap[rootKey] else { return [] }
+    var out: [NodeKey] = [rootKey]
+    if let el = node as? ElementNode {
+      for c in el.getChildrenKeys(fromLatest: false) {
+        out.append(contentsOf: subtreeKeysDFS(rootKey: c, state: state))
+      }
+    }
+    return out
+  }
+
+  // Checks whether candidateKey is inside the subtree rooted at rootKey in the provided state.
+  @MainActor
+  private static func subtreeContains(rootKey: NodeKey, candidateKey: NodeKey, state: EditorState) -> Bool {
+    if rootKey == candidateKey { return true }
+    guard let node = state.nodeMap[rootKey] as? ElementNode else { return false }
+    for c in node.getChildrenKeys(fromLatest: false) {
+      if subtreeContains(rootKey: c, candidateKey: candidateKey, state: state) { return true }
+    }
+    return false
   }
 }

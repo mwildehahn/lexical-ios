@@ -154,6 +154,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] 2025‑09‑25: Added preamble/postamble fast path and children reorder region-rebuild; introduced subtree range cache recomputation; added robust tests using LexicalReadOnlyTextKitContext; fixed metrics actor isolation; selected tests pass on iPhone 17 Pro (iOS 26.0).
 - [x] 2025‑09‑25: Instruction coalescing apply engine; LIS stable set; minimal‑move reorder (delete+insert) with rebuild fallback; strict‑mode flag & optimized full rebuild path; tests and Playground build passing.
 - [x] 2025‑09‑25: Fenwick-based location rebuild for text/pre/post fast paths; composition (IME) start fast path; shadow-compare harness flag and hook; all iOS tests & Playground build green.
+- [x] 2025‑09‑25: Reorder fast path extended for nested/decorator-bearing subtrees. After minimal delete/insert moves, compute child-level new start positions and shift entire child subtrees (including decorators) without subtree recompute. Updated `decoratorPositionCache` inside moved subtrees. Added parity tests for decorator scenarios: paragraph with inline decorator and nested quote with decorators; both compare optimized (strict mode) vs legacy.
 
 ## Current Flag Defaults (Tests/Playground)
 - `useOptimizedReconciler = true`
@@ -165,8 +166,10 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 ---
 
 ## Next Actions (short)
-1) Add feature flag + `OptimizedReconciler.swift` skeleton.
-2) Implement `FenwickTree` + tests.
-3) Wire DFS index and delta application; rebuild nextRangeCache locations.
-4) Instruction planner (part diffs, keyed diff, coalescing) + apply engine.
-5) Full parity tests + benchmarks; enable flag in CI.
+1) Adopt block-level attributes pass in optimized paths (parity with legacy).
+2) Aggregate multi-sibling length changes (Fenwick) in a single update; add tests for multiple deltas in one batch.
+3) Composition update/end flows and emoji/multibyte tests.
+4) Expand keyed-diff minimal moves to severely shuffled lists and decorators in mixed positions; tune fallback threshold.
+5) Wire shadow-compare into CI nightly; add scenario corpus.
+
+Reminder: after every significant change, run iOS simulator tests (Lexical-Package scheme) and build the Playground app. Update this file with status and a short summary before marking subtasks done.
