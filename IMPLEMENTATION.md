@@ -4,10 +4,10 @@ Goal: ship the Optimized Reconciler as a drop‑in replacement for the legacy re
 
 Legend: [x] done · [>] in progress · [ ] todo
 
-**TL;DR (2025‑09‑24)**
-- Core parity achieved for: document ordering, block‑level attributes, decorator lifecycle, IME/marked‑text. Performance target met (see Playground Performance tab).
-- Remaining parity work centers on Selection mapping (absolute location ↔ Point) at boundaries and multi‑paragraph ranges.
-- Metrics and invariants exist; polish + docs pending. Temporary debug prints remain and should be gated/removed before default flip.
+**TL;DR (2025‑09‑25)**
+- Core parity achieved: document ordering, block‑level attributes, decorator lifecycle, IME/marked‑text, selection mapping (boundaries + multi‑paragraph). Performance target met.
+- Observability: metrics snapshot with histograms + clamped counts; invariants checker.
+- Remaining before default flip: gate/remove temporary debug prints; add short docs for flags and (optional) Playground metrics panel.
 
 **What “Legacy” Does vs “Optimized”**
 - Legacy (`Lexical/Core/Reconciler.swift:1`): tree walk computes rangesToDelete/rangesToAdd, maintains `decoratorsToAdd/Decorate/Remove`, applies to `TextStorage`, then block‑level attributes, selection, marked‑text; updates `rangeCache` in one pass.
@@ -71,8 +71,9 @@ Legend: [x] done · [>] in progress · [ ] todo
 ## Test Suites (authoritative on iOS Simulator)
 - Parity: `LexicalTests/Tests/OptimizedReconcilerParityTests.swift` (ordering, inline attributes) — green.
 - Decorators: `LexicalTests/Phase4/DecoratorLifecycleParityTests.swift` — green.
-- Selection: `LexicalTests/Phase4/SelectionParityTests.swift` — scaffolded; strict cross‑mode checks intentionally deferred until fixes land.
-- Heavy suites (`*.swift.disabled`): perf/stress/edge cases — off until parity is strict.
+- Selection: `LexicalTests/Phase4/SelectionParityTests.swift` + `InlineDecoratorBoundaryParityTests.swift` — green.
+- TextView/Placeholder: `LexicalTests/Tests/TextViewTests.swift` (incl. IME cancel placeholder) — green.
+- Heavy suites (`*.swift.disabled`): perf/stress/edge cases — kept off for now.
 
 Run (examples):
 - Unit tests: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
