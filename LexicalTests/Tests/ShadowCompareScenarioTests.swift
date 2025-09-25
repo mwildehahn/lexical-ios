@@ -60,5 +60,42 @@ final class ShadowCompareScenarioTests: XCTestCase {
     // We rely on shadowCompareOptimizedVsLegacy (enabled) to log mismatches if any.
     XCTAssertFalse(frontend.textStorage.string.isEmpty)
   }
-}
 
+  func testExpandedShadowCompareScenarios() throws {
+    let (editor, frontend) = makeShadowEditors()
+
+    // Nested elements: Quote with two paragraphs, reorder
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let quote = QuoteNode()
+      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "Q1") ])
+      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "Q2") ])
+      try quote.append([p1, p2])
+      try root.append([quote])
+    }
+    try editor.update {
+      guard let quote = getRoot()?.getFirstChild() as? QuoteNode,
+            let first = quote.getFirstChild() as? ParagraphNode,
+            let last = quote.getLastChild() as? ParagraphNode else { return }
+      _ = try first.insertAfter(nodeToInsert: last)
+    }
+
+    // Block-level attributes: Code block with spacing behaviors
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let code = CodeNode(); try code.append([ createTextNode(text: "line1"), LineBreakNode(), createTextNode(text: "line2") ])
+      try root.append([code])
+    }
+
+    // Multi-sibling length change in single update (Fenwick aggregation)
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let children = root.getChildren().compactMap { $0 as? ParagraphNode }
+      for p in children {
+        if let t = p.getFirstChild() as? TextNode { try t.setText(t.getTextPart() + "_") }
+      }
+    }
+
+    XCTAssertFalse(frontend.textStorage.string.isEmpty)
+  }
+}
