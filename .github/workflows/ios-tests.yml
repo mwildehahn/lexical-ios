@@ -1,0 +1,75 @@
+name: iOS Simulator Tests (Nightly)
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # daily at 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ios-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Print Xcode version
+        run: |
+          xcodebuild -version
+          sw_vers
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+
+      - name: Resolve simulator destination
+        id: dest
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEVICE_NAME="iPhone 17 Pro"
+          OS_VER="26.0"
+          DEST="platform=iOS Simulator,name=${DEVICE_NAME},OS=${OS_VER}"
+          if ! xcrun simctl list devices | grep -q "${DEVICE_NAME} ("; then
+            echo "Device ${DEVICE_NAME} not found; listing devices for debug:" >&2
+            xcrun simctl list devices
+          fi
+          if ! xcrun simctl list devices | grep -q "${DEVICE_NAME} (.*) \(Booted\|Shutdown\).*$OS_VER"; then
+            # Fallback to latest available runtime without OS pin if 26.0 isn't present.
+            DEST="platform=iOS Simulator,name=${DEVICE_NAME}"
+          fi
+          echo "Using DESTINATION=${DEST}"
+          echo "DEST=$DEST" >> $GITHUB_OUTPUT
+
+      - name: List available runtimes and devices (debug)
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices
+
+      - name: Build & test (Lexical-Package scheme)
+        env:
+          DEST: ${{ steps.dest.outputs.DEST }}
+        run: |
+          set -euo pipefail
+          xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace \
+            -scheme Lexical-Package \
+            -destination "$DEST" \
+            test
+
+      - name: Build Playground (sanity)
+        env:
+          DEST: ${{ steps.dest.outputs.DEST }}
+        run: |
+          set -euo pipefail
+          xcodebuild -project Playground/LexicalPlayground.xcodeproj \
+            -scheme LexicalPlayground -sdk iphonesimulator \
+            -destination "$DEST" \
+            build
+
