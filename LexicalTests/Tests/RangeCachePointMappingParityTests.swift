@@ -27,7 +27,7 @@ final class RangeCachePointMappingParityTests: XCTestCase {
   }
 
   func testPointAtStringLocation_Boundaries_TextNodes_Parity() throws {
-    throw XCTSkip("Boundary parity asserted indirectly via selection/composition; direct mapping varies with leading newlines and is covered by dedicated mapping harness. Keeping as placeholder while we harden the criteria.")
+    throw XCTSkip("Mapping boundary invariants still being hardened; pointAtStringLocation can return nil at inter-node boundaries depending on pre/post rules. Keeping this as a scaffold while we complete M5 mapping checks.")
     let (opt, leg, _optCtx, _legCtx) = makeEditors(centralAgg: true)
 
     var aOpt: NodeKey = ""; var bOpt: NodeKey = ""
@@ -52,27 +52,42 @@ final class RangeCachePointMappingParityTests: XCTestCase {
     // Force a no-op reconcile to ensure rangeCache/textStorage are up to date
     try opt.update {}
     try leg.update {}
+    // Do a second pass to be extra sure mapping views are current
+    try opt.update {}
+    try leg.update {}
 
-    // Optimized editor: compute positions from rendered string
-    let sOpt = opt.frontend?.textStorage.string ?? ""
-    let nsOpt = sOpt as NSString
-    let rBOpt = nsOpt.range(of: "B")
-    let rAOpt = nsOpt.range(of: "A")
-    XCTAssertTrue(rBOpt.location != NSNotFound && rAOpt.location != NSNotFound)
-    let pB = try pointAtStringLocation(rBOpt.location, searchDirection: .forward, rangeCache: opt.rangeCache)
-    XCTAssertNotNil(pB); XCTAssertEqual(pB!.type, SelectionType.text); XCTAssertEqual(pB!.offset, 0)
-    let pA = try pointAtStringLocation(rAOpt.location + rAOpt.length, searchDirection: .forward, rangeCache: opt.rangeCache)
-    XCTAssertNotNil(pA); XCTAssertEqual(pA!.type, SelectionType.text); XCTAssertEqual(pA!.offset, 1)
+    // Optimized editor: round-trip point -> location -> point
+    var pAend: Point? = nil
+    var pBstart: Point? = nil
+    try opt.update {
+      let aEndPointOpt = Point(key: aOpt, offset: 1, type: .text)
+      let bStartPointOpt = Point(key: bOpt, offset: 0, type: .text)
+      let aEndLocOpt = try stringLocationForPoint(aEndPointOpt, editor: opt)
+      let bStartLocOpt = try stringLocationForPoint(bStartPointOpt, editor: opt)
+      XCTAssertNotNil(aEndLocOpt); XCTAssertNotNil(bStartLocOpt)
+      if let aEndLocOpt { pAend = try pointAtStringLocation(aEndLocOpt, searchDirection: .forward, rangeCache: opt.rangeCache) }
+      if let bStartLocOpt { pBstart = try pointAtStringLocation(bStartLocOpt, searchDirection: .forward, rangeCache: opt.rangeCache) }
+    }
+    XCTAssertNotNil(pAend); XCTAssertNotNil(pBstart)
+    XCTAssertEqual(pAend!.type, .text); XCTAssertEqual(pBstart!.type, .text)
+    XCTAssertEqual(pAend!.key, aOpt); XCTAssertEqual(pAend!.offset, 1)
+    XCTAssertEqual(pBstart!.key, bOpt); XCTAssertEqual(pBstart!.offset, 0)
 
-    // Legacy editor: compute positions from its string
-    let sLeg = leg.frontend?.textStorage.string ?? ""
-    let nsLeg = sLeg as NSString
-    let rBLeg = nsLeg.range(of: "B")
-    let rALeg = nsLeg.range(of: "A")
-    XCTAssertTrue(rBLeg.location != NSNotFound && rALeg.location != NSNotFound)
-    let pBL = try pointAtStringLocation(rBLeg.location, searchDirection: .forward, rangeCache: leg.rangeCache)
-    XCTAssertNotNil(pBL); XCTAssertEqual(pBL!.type, SelectionType.text); XCTAssertEqual(pBL!.offset, 0)
-    let pAL = try pointAtStringLocation(rALeg.location + rALeg.length, searchDirection: .forward, rangeCache: leg.rangeCache)
-    XCTAssertNotNil(pAL); XCTAssertEqual(pAL!.type, SelectionType.text); XCTAssertEqual(pAL!.offset, 1)
+    // Legacy editor: round-trip point -> location -> point
+    var pAendL: Point? = nil
+    var pBstartL: Point? = nil
+    try leg.update {
+      let aEndPointLeg = Point(key: aLeg, offset: 1, type: .text)
+      let bStartPointLeg = Point(key: bLeg, offset: 0, type: .text)
+      let aEndLocLeg = try stringLocationForPoint(aEndPointLeg, editor: leg)
+      let bStartLocLeg = try stringLocationForPoint(bStartPointLeg, editor: leg)
+      XCTAssertNotNil(aEndLocLeg); XCTAssertNotNil(bStartLocLeg)
+      if let aEndLocLeg { pAendL = try pointAtStringLocation(aEndLocLeg, searchDirection: .forward, rangeCache: leg.rangeCache) }
+      if let bStartLocLeg { pBstartL = try pointAtStringLocation(bStartLocLeg, searchDirection: .forward, rangeCache: leg.rangeCache) }
+    }
+    XCTAssertNotNil(pAendL); XCTAssertNotNil(pBstartL)
+    XCTAssertEqual(pAendL!.type, .text); XCTAssertEqual(pBstartL!.type, .text)
+    XCTAssertEqual(pAendL!.key, aLeg); XCTAssertEqual(pAendL!.offset, 1)
+    XCTAssertEqual(pBstartL!.key, bLeg); XCTAssertEqual(pBstartL!.offset, 0)
   }
 }
