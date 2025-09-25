@@ -178,3 +178,27 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 4) Optional: centralize multi-delta Fenwick rebuild at end of update (aggregate all part diffs) guarded behind a feature flag for A/B.
 
 Reminder: after every significant change, run iOS simulator tests (Lexical-Package scheme) and build the Playground app. Update this file with status and a short summary before marking subtasks done.
+
+### 2025‑09‑25: Decorator removal parity (strict mode) — FIXED
+- Implemented safe pruning for `editor.rangeCache` after full/subtree recompute to drop stale keys:
+  - `pruneRangeCacheGlobally(nextState:, editor:)` (full slow path)
+  - `pruneRangeCacheUnderAncestor(ancestorKey:, prevState:, nextState:, editor:)` (coalesced replace)
+- Hardened decorator cache cleanup ordering for optimized slow path:
+  - Clear `decoratorPositionCache`/`decoratorCache` entries whose keys are not present in `rangeCache` after recompute.
+  - Root‑wide reconcile computes attached decorator sets directly from the specific EditorState (prev vs next).
+  - Defensive pass to purge detached decorators based on parent links (`isAttachedInState`).
+- Fixed failing test by targeting the actual decorator node by key (instead of assuming it was under the first paragraph, which can be the default paragraph from initialization):
+  - Updated `LexicalTests/Tests/OptimizedReconcilerDecoratorOpsTests.swift` to call `getNodeByKey(key:)` for the stored decorator key when removing.
+- Added DEBUG logs for diagnosis; will gate/trim once we finish the warnings sweep.
+- Verified: all `LexicalTests` and the full `Lexical-Package` test suite pass on iPhone 17 Pro (iOS 26.0). Playground build succeeds.
+
+### 2025‑09‑25: Warning sweep + log cleanups
+- Gated reconciler debug prints behind `useReconcilerShadowCompare` and removed remaining DEBUG-only prints in Node.remove.
+- Fixed compiler warnings:
+  - Clarified reduce trailing-closure with explicit parentheses.
+  - Removed/neutralized unused locals (`bit`, `prevNode`, `ancestorPrev`).
+  - Simplified optional downcasts when accessing root nodes.
+- Re-ran iOS simulator tests for all targets: green. Playground build: succeeded.
+
+Commit summary
+- Refactor: gate reconciler debug logs, remove DEBUG prints in Node.remove; sweep warnings; ensure decorator cache purge post-recompute; all iOS simulator tests green; Playground builds.

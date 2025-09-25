@@ -689,7 +689,7 @@ internal func performReconcilerSanityCheck(
   expectedOutput: NSAttributedString
 ) throws {
   // Build a full attributed string from the current editor state and theme
-  guard let root = sanityCheckEditor.getEditorState().getRootNode() as? ElementNode else { return }
+  guard let root = sanityCheckEditor.getEditorState().getRootNode() else { return }
   let theme = sanityCheckEditor.getTheme()
 
   let built = NSMutableAttributedString()

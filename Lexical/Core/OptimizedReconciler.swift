@@ -106,12 +106,12 @@ internal enum OptimizedReconciler {
     }
 
     // Fix attributes over the minimal covering range
-    if let cover = modifiedRanges.reduce(nil as NSRange?) { acc, r in
+    if let cover = modifiedRanges.reduce(nil as NSRange?, { acc, r in
       guard let a = acc else { return r }
       let start = min(a.location, r.location)
       let end = max(NSMaxRange(a), NSMaxRange(r))
       return NSRange(location: start, length: end - start)
-    } {
+    }) {
       textStorage.fixAttributes(in: cover)
     }
 
@@ -129,9 +129,7 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     markedTextOperation: MarkedTextOperation?
   ) throws {
-    guard let textStorage = editor.textStorage else {
-      fatalError("Cannot run optimized reconciler on an editor with no text storage")
-    }
+    guard editor.textStorage != nil else { fatalError("Cannot run optimized reconciler on an editor with no text storage") }
 
     // Composition (marked text) fast path first
     if let mto = markedTextOperation {
@@ -214,7 +212,7 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     markedTextOperation: MarkedTextOperation?
   ) throws {
-    print("🔥 OPTIMIZED RECONCILER: delegating to legacy path")
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: delegating to legacy path") }
     try Reconciler.updateEditorState(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
@@ -239,7 +237,7 @@ internal enum OptimizedReconciler {
     textStorage.beginEditing()
     // Rebuild full string from pending state (root children)
     let built = NSMutableAttributedString()
-    if let root = pendingEditorState.getRootNode() as? ElementNode {
+    if let root = pendingEditorState.getRootNode() {
       for child in root.getChildrenKeys() {
         built.append(buildAttributedSubtree(nodeKey: child, state: pendingEditorState, theme: theme))
       }
@@ -254,6 +252,38 @@ internal enum OptimizedReconciler {
 
     // Recompute entire range cache locations
     _ = recomputeRangeCacheSubtree(nodeKey: kRootNodeKey, state: pendingEditorState, startLocation: 0, editor: editor)
+
+    // Remove rangeCache entries for nodes no longer attached (prune stale keys)
+    var attachedKeys = Set(subtreeKeysDFS(rootKey: kRootNodeKey, state: pendingEditorState))
+    attachedKeys.insert(kRootNodeKey)
+    editor.rangeCache = editor.rangeCache.filter { attachedKeys.contains($0.key) }
+
+    // Purge decorator caches for keys no longer present after recompute (removals)
+    if let ts = editor.textStorage {
+      for (k, _) in ts.decoratorPositionCache where editor.rangeCache[k] == nil {
+        ts.decoratorPositionCache[k] = nil
+      }
+    }
+    for (k, _) in editor.decoratorCache where editor.rangeCache[k] == nil {
+      editor.decoratorCache.removeValue(forKey: k)
+    }
+
+    // Ensure present decorators have cache entries and positions
+    if let ts = editor.textStorage {
+      for (k, n) in pendingEditorState.nodeMap {
+        if n is DecoratorNode, n.isAttached() {
+          if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
+          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
+        }
+      }
+      // Mark dirty decorators for decorate
+      for k in editor.dirtyNodes.keys {
+        if pendingEditorState.nodeMap[k] is DecoratorNode {
+          if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view { editor.decoratorCache[k] = .needsDecorating(view) }
+          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
+        }
+      }
+    }
 
     // Update decorators positions
     if let ts = editor.textStorage {
@@ -272,7 +302,7 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-    print("🔥 OPTIMIZED RECONCILER: optimized slow path applied (full rebuild)")
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: optimized slow path applied (full rebuild)") }
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
         duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
@@ -353,7 +383,7 @@ internal enum OptimizedReconciler {
               applyDuration: 0, deleteCount: 0, insertCount: 0, setAttributesCount: 1, fixAttributesCount: 1)
             metrics.record(.reconcilerRun(metric))
           }
-          print("🔥 OPTIMIZED RECONCILER: attribute-only fast path applied")
+          if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: attribute-only fast path applied") }
           return true
         }
       }
@@ -361,12 +391,11 @@ internal enum OptimizedReconciler {
       return false
     }
 
-    // Prepare DFS order and Fenwick tree for potential multi-node location shifts
+    // Prepare DFS order for potential multi-node location shifts (Fenwick available via helper when used)
     let keysInOrder = sortedNodeKeysByLocation(rangeCache: editor.rangeCache)
     var indexOf: [NodeKey: Int] = [:]
     indexOf.reserveCapacity(keysInOrder.count)
     for (i, k) in keysInOrder.enumerated() { indexOf[k] = i + 1 }
-    var bit = FenwickTree(keysInOrder.count)
 
     // Plan minimal instructions: delete old text range, insert new attributed text
     let textStart = prevRange.location + prevRange.preambleLength + prevRange.childrenLength
@@ -434,7 +463,7 @@ internal enum OptimizedReconciler {
         setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
       metrics.record(.reconcilerRun(metric))
     }
-    print("🔥 OPTIMIZED RECONCILER: text-only fast path applied (delta=\(delta))")
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: text-only fast path applied (delta=\(delta))") }
     return true
   }
 
@@ -477,7 +506,7 @@ internal enum OptimizedReconciler {
     // Compute LIS (stable children); if almost all children are stable, moves are few
     let prevChildren = parentPrev.getChildrenKeys(fromLatest: false)
     let stableSet = computeStableChildKeys(prev: prevChildren, next: nextChildren)
-    print("🔥 OPTIMIZED RECONCILER: reorder candidates parent=\(parentKey) total=\(nextChildren.count) stable=\(stableSet.count)")
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: reorder candidates parent=\(parentKey) total=\(nextChildren.count) stable=\(stableSet.count)") }
 
     // Build attributed string for children in new order and compute subtree lengths
     let theme = editor.getTheme()
@@ -618,6 +647,20 @@ internal enum OptimizedReconciler {
           ts.decoratorPositionCache[key] = loc
         }
       }
+      // Ensure present decorators have cache entries and positions
+      for (k, n) in pendingEditorState.nodeMap {
+        if n is DecoratorNode, n.isAttached() {
+          if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
+          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
+        }
+      }
+      // Mark dirty decorators for decorate
+      for k in editor.dirtyNodes.keys {
+        if pendingEditorState.nodeMap[k] is DecoratorNode {
+          if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view { editor.decoratorCache[k] = .needsDecorating(view) }
+          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
+        }
+      }
     }
 
     // Apply block-level attributes for parent and direct children (reorder may affect paragraph boundaries)
@@ -635,7 +678,7 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-      print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey), moved=\(movedCount), total=\(nextChildren.count))")
+      if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey), moved=\(movedCount), total=\(nextChildren.count))") }
       appliedAny = true
     }
     return appliedAny
@@ -730,7 +773,7 @@ internal enum OptimizedReconciler {
     guard editor.dirtyNodes.count == 1, let dirtyKey = editor.dirtyNodes.keys.first else {
       return false
     }
-    guard let prevNode = currentEditorState.nodeMap[dirtyKey],
+    guard let _ = currentEditorState.nodeMap[dirtyKey],
           let nextNode = pendingEditorState.nodeMap[dirtyKey],
           let prevRange = editor.rangeCache[dirtyKey] else { return false }
 
@@ -827,7 +870,7 @@ internal enum OptimizedReconciler {
         setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
       metrics.record(.reconcilerRun(metric))
     }
-    print("🔥 OPTIMIZED RECONCILER: pre/post fast path applied (key=\(dirtyKey))")
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: pre/post fast path applied (key=\(dirtyKey))") }
     return true
   }
 
@@ -885,7 +928,7 @@ internal enum OptimizedReconciler {
         treatedAllNodesAsDirty: false, pathLabel: "composition-start")
       metrics.record(.reconcilerRun(metric))
     }
-    print("🔥 OPTIMIZED RECONCILER: composition fast path applied (len=\(markedAttr.length))")
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: composition fast path applied (len=\(markedAttr.length))") }
     return true
   }
 
@@ -917,7 +960,7 @@ internal enum OptimizedReconciler {
       if common?.isEmpty == true { return false }
     }
     guard let candidateAncestors = common, let ancestorKey = candidateAncestors.first,
-          let ancestorPrev = currentEditorState.nodeMap[ancestorKey] as? ElementNode,
+          let _ = currentEditorState.nodeMap[ancestorKey] as? ElementNode,
           let ancestorNext = pendingEditorState.nodeMap[ancestorKey] as? ElementNode,
           let ancestorPrevRange = editor.rangeCache[ancestorKey]
     else { return false }
@@ -995,7 +1038,7 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-    print("🔥 OPTIMIZED RECONCILER: coalesced contiguous region replace (ancestor=\(ancestorKey), dirty=\(editor.dirtyNodes.count))")
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: coalesced contiguous region replace (ancestor=\(ancestorKey), dirty=\(editor.dirtyNodes.count))") }
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
         duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
