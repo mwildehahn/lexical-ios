@@ -213,7 +213,7 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
       return location + rangeCacheItem.preambleLength + point.offset
     }
   case .element:
-    // Parity fast-path: element offset 0 maps deterministically using absolute base + preamble.
+    // Parity fast-path: element offset 0 maps deterministically using absolute base.
     if editor.featureFlags.selectionParityDebug && point.offset == 0 {
       let baseNoShift: Int
       if useOptimized {
@@ -229,7 +229,7 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
         baseNoShift = rangeCacheItem.location
       }
       let loc = useOptimized
-        ? (baseNoShift + rangeCacheItem.preambleLength)
+        ? baseNoShift
         : ((rangeCacheItem.preambleLength > 0) ? baseNoShift : (baseNoShift + rangeCacheItem.preambleLength))
       if editor.featureFlags.selectionParityDebug { print("🔥 ELEM LOC (fast): key=\(point.key) useOpt=\(useOptimized) base=\(baseNoShift) pre=\(rangeCacheItem.preambleLength) -> \(loc)") }
       return loc

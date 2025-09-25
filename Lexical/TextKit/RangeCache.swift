@@ -55,6 +55,7 @@ struct RangeCacheItem {
         leadingShift: false
       )
       if editor.featureFlags.selectionParityDebug {
+        print("🔥 LOCFF parity node=\(nodeKey) base=\(baseNoShift) pre=\(preambleLength) -> \(baseNoShift + preambleLength)")
         return baseNoShift + preambleLength
       }
       // Baseline: raw absolute base (no preamble added)
@@ -95,39 +96,6 @@ struct RangeCacheItem {
 internal func pointAtStringLocation(
   _ location: Int, searchDirection: UITextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> Point? {
-  // Fast-path (diagnostic mode only): exact element childrenStart boundary maps to element offset 0
-  if let editor = getActiveEditor(), editor.featureFlags.selectionParityDebug, editor.featureFlags.optimizedReconciler {
-    let useOptimized = editor.featureFlags.optimizedReconciler
-    let fenwickTree = editor.fenwickTree
-    for (k, item) in rangeCache {
-      if let _ = getNodeByKey(key: k) as? ElementNode {
-        let base = useOptimized
-          ? absoluteNodeStartLocation(k, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
-          : item.location
-        let childrenStart = base + item.preambleLength
-        if location == childrenStart {
-          return Point(key: k, offset: 0, type: .element)
-        }
-      }
-    }
-  }
-  // Parity fallback: if evaluateNode later fails to resolve, try mapping exact end-of-children
-  // boundary to element(offset: childCount).
-  if let editor = getActiveEditor(), editor.featureFlags.selectionParityDebug {
-    let useOptimized = editor.featureFlags.optimizedReconciler
-    let fenwickTree = editor.fenwickTree
-    for (k, item) in rangeCache {
-      guard let elem = getNodeByKey(key: k) as? ElementNode else { continue }
-      let base = useOptimized
-        ? absoluteNodeStartLocation(k, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
-        : item.location
-      let endOfChildren = base + item.preambleLength + item.childrenLength
-      if location == endOfChildren {
-        print("🔥 PARITY FALLBACK: endOfChildren match for key=\(k) -> element(offset=\(elem.getChildrenKeys().count))")
-        return Point(key: k, offset: elem.getChildrenKeys().count, type: .element)
-      }
-    }
-  }
   do {
     let searchResult = try evaluateNode(
       kRootNodeKey, stringLocation: location, searchDirection: searchDirection,
@@ -329,6 +297,12 @@ private func evaluateNode(
     }
 
     // Check exact match to each child's start location with canonical tie-breaks (takes precedence)
+    // Canonical rule (flag-independent):
+    // - If the search location equals a child's absolute start, resolve to that child directly.
+    //   • Text child   → return .text(offset: 0) for that child
+    //   • Element child→ return .element(offset: 0) for that child
+    // This mirrors legacy behavior at boundaries and avoids ambiguous parent-boundary
+    // offsets. It also removes any dependency on diagnostic flags for correctness.
     for (idx, ck) in normalOrderChildren.enumerated() {
       if let childItem = rangeCache[ck] {
         let childStart = useOptimized
@@ -342,19 +316,13 @@ private func evaluateNode(
           if editor.featureFlags.selectionParityDebug {
             print("🔥 RANGE CACHE PARITY: exact child start -> canonical tie-break. parent=\(nodeKey) child=\(ck) idx=\(idx) dir=\(searchDirection == .forward ? "fwd" : "back")")
           }
-          if searchDirection == .forward {
-            if let _ = getNodeByKey(key: ck) as? TextNode {
-              return RangeCacheSearchResult(nodeKey: ck, type: .text, offset: 0)
-            }
-            return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: idx)
+          // Canonical rule: if we land exactly at a child's start
+          // - Text child  -> map to that text child at offset 0
+          // - Element child -> map to that element at offset 0
+          if let _ = getNodeByKey(key: ck) as? TextNode {
+            return RangeCacheSearchResult(nodeKey: ck, type: .text, offset: 0)
           } else {
-            if idx > 0 {
-              let prevKey = normalOrderChildren[idx - 1]
-              if let prevItem = rangeCache[prevKey], let _ = getNodeByKey(key: prevKey) as? TextNode {
-                return RangeCacheSearchResult(nodeKey: prevKey, type: .text, offset: prevItem.textLength)
-              }
-            }
-            return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: idx)
+            return RangeCacheSearchResult(nodeKey: ck, type: .element, offset: 0)
           }
         }
       }
