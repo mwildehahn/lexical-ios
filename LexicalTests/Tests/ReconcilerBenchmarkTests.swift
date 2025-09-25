@@ -80,6 +80,88 @@ final class ReconcilerBenchmarkTests: XCTestCase {
     print("🔥 BENCH: typing optimized=\(dtOpt)s legacy=\(dtLeg)s ops(opt del=\(optDeletes) ins=\(optInserts) | leg del=\(legDeletes) ins=\(legInserts))")
   }
 
+  func testOptimizedOperationCountsWithinTolerance() throws {
+    // This test asserts non-brittle bounds on operation counts gathered via metrics,
+    // ensuring the optimized reconciler does not perform substantially more string edits
+    // than legacy on representative scenarios.
+    let (opt, leg) = makeEditors()
+
+    // Helper to sum rangesAdded+rangesDeleted across all runs
+    func opCount(_ metrics: TestMetricsContainer) -> Int {
+      metrics.runs.reduce(0) { $0 + $1.rangesAdded + $1.rangesDeleted }
+    }
+
+    // Scenario 1: Typing at end of a long document
+    try buildDoc(editor: opt.0, paragraphs: 80, width: 32)
+    try buildDoc(editor: leg.0, paragraphs: 80, width: 32)
+    opt.2.resetMetrics(); leg.2.resetMetrics()
+    for i in 0..<20 {
+      try opt.0.update {
+        guard let root = getRoot(), let last = root.getLastChild() as? ParagraphNode,
+              let t = last.getFirstChild() as? TextNode else { return }
+        try t.setText(t.getTextPart() + String(i % 10))
+      }
+      try leg.0.update {
+        guard let root = getRoot(), let last = root.getLastChild() as? ParagraphNode,
+              let t = last.getFirstChild() as? TextNode else { return }
+        try t.setText(t.getTextPart() + String(i % 10))
+      }
+    }
+    let typingOptOps = opCount(opt.2)
+    let typingLegOps = opCount(leg.2)
+    XCTAssertLessThanOrEqual(typingOptOps, Int(Double(typingLegOps) * 1.20) + 5,
+                             "optimized should not exceed legacy ops by >20% (+5 abs)")
+
+    // Scenario 2: Mass bold toggle across many paragraphs
+    try buildDoc(editor: opt.0, paragraphs: 40, width: 12)
+    try buildDoc(editor: leg.0, paragraphs: 40, width: 12)
+    opt.2.resetMetrics(); leg.2.resetMetrics()
+    try opt.0.update {
+      guard let root = getRoot() else { return }
+      for case let p as ParagraphNode in root.getChildren() {
+        for case let t as TextNode in p.getChildren() { try t.setBold(true) }
+      }
+    }
+    try leg.0.update {
+      guard let root = getRoot() else { return }
+      for case let p as ParagraphNode in root.getChildren() {
+        for case let t as TextNode in p.getChildren() { try t.setBold(true) }
+      }
+    }
+    let boldOptOps = opCount(opt.2)
+    let boldLegOps = opCount(leg.2)
+    XCTAssertLessThanOrEqual(boldOptOps, Int(Double(boldLegOps) * 1.20) + 5)
+
+    // Scenario 3: Deterministic reorder shuffle (move tail to head in blocks)
+    func buildRow(on editor: Editor, count: Int) throws -> NodeKey {
+      var parentKey: NodeKey = "";
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode(); parentKey = p.getKey()
+        var children: [Node] = []
+        for i in 0..<60 { children.append(createTextNode(text: String(UnicodeScalar(65 + (i % 26))!))) }
+        try p.append(children); try root.append([p])
+      }
+      return parentKey
+    }
+    let pkOpt = try buildRow(on: opt.0, count: 60)
+    let pkLeg = try buildRow(on: leg.0, count: 60)
+    opt.2.resetMetrics(); leg.2.resetMetrics()
+    try opt.0.update {
+      guard let p = getNodeByKey(key: pkOpt) as? ParagraphNode else { return }
+      let children = p.getChildren()
+      for node in children.suffix(20).reversed() { try node.remove(); _ = try p.insertBefore(nodeToInsert: node) }
+    }
+    try leg.0.update {
+      guard let p = getNodeByKey(key: pkLeg) as? ParagraphNode else { return }
+      let children = p.getChildren()
+      for node in children.suffix(20).reversed() { try node.remove(); _ = try p.insertBefore(nodeToInsert: node) }
+    }
+    let reorderOptOps = opCount(opt.2)
+    let reorderLegOps = opCount(leg.2)
+    XCTAssertLessThanOrEqual(reorderOptOps, Int(Double(reorderLegOps) * 1.20) + 5)
+  }
+
   func testMassAttributeToggleParity() throws {
     let (opt, leg) = makeEditors()
     try buildDoc(editor: opt.0, paragraphs: 60, width: 20)

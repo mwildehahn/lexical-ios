@@ -139,7 +139,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [ ] M6 — Performance & Rollout
     - [x] Benchmark tests (`ReconcilerBenchmarkTests`): typing, mass stylings, large reorder — parity asserted; timings logged.
     - [x] Basic metrics capture (per‑run instruction counts) via a test metrics container; printed in logs for visibility.
-    - [ ] Add bounds-based assertions on metrics (non-brittle) once thresholds are established across CI hardware.
+    - [x] Add initial non-brittle bounds on operation counts (rangesAdded+rangesDeleted) for typing, mass stylings, and reorder scenarios. Timings still logged only.
   - [ ] Ship sub‑flags off by default; enable in CI nightly; collect metrics.
   - [ ] Flip `useOptimizedReconciler` in staged environments.
   - [ ] Remove legacy delegation once composition + shadow compare are green; retain a one‑release kill switch.
