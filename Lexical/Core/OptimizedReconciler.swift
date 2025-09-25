@@ -491,7 +491,9 @@ private class DeltaGenerator {
     // Detect if this is a fresh document creation or large bulk insertion
     // When most nodes are new insertions and the cache is mostly empty, use sequential positions
     let newInsertionCount = dirtyNodes.keys.filter { rangeCache[$0] == nil }.count
-    let isFreshDocument = rangeCache.count < 5 && newInsertionCount > 10
+    // Treat an empty range cache as a fresh document build so we use
+    // sequential insertion order (stable, avoids location guesswork).
+    let isFreshDocument = rangeCache.isEmpty
     
     // Generate deltas for each dirty node
     for nodeKey in orderedDirty {

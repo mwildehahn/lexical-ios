@@ -97,8 +97,8 @@ internal class IncrementalRangeCacheUpdater {
     // Note: do not coerce leaf textLength from editor state here; callers may
     // pass a detached cache snapshot for diagnostic/idempotence checks.
 
-    // Deterministic parent recompute: rebuild childrenLength for all element nodes based on current cache.
-    do {
+    // Deterministic parent recompute: only when structure changed (insert/delete)
+    if !insertionOrder.isEmpty {
       let state = getActiveEditorState() ?? editor.getEditorState()
       // Compute a simple depth to process deepest elements first
       func depth(of key: NodeKey) -> Int {
@@ -107,9 +107,15 @@ internal class IncrementalRangeCacheUpdater {
         while let k = cur, k != kRootNodeKey, let n = state.nodeMap[k] { d += 1; cur = n.parent }
         return d
       }
-      let elementKeys = state.nodeMap.compactMap { (k, n) -> (NodeKey, Int)? in
-        (n is ElementNode) ? (k, depth(of: k)) : nil
-      }.sorted { $0.1 > $1.1 }.map { $0.0 }
+      // Recompute directly on parents of inserted nodes and their ancestors
+      var targets: Set<NodeKey> = parentsToRecompute
+      var queue = Array(parentsToRecompute)
+      while let k = queue.popLast() {
+        if let parent = state.nodeMap[k]?.parent, parent != kRootNodeKey, !targets.contains(parent) {
+          targets.insert(parent); queue.append(parent)
+        }
+      }
+      let elementKeys = targets.map { ($0, depth(of: $0)) }.sorted { $0.1 > $1.1 }.map { $0.0 }
       for p in elementKeys {
         guard var parentItem = rangeCache[p], let parentNode = state.nodeMap[p] as? ElementNode else { continue }
         var sum = 0
@@ -266,12 +272,9 @@ internal class IncrementalRangeCacheUpdater {
     // state inflating per-leaf lengths in synthetic updater tests.
     newItem.preambleLength = insertionData.preamble.length
     newItem.postambleLength = insertionData.postamble.length
-    if editor.getEditorState().nodeMap[nodeKey] is TextNode {
-      let inferred = assumedTextLengths[nodeKey]
-      newItem.textLength = inferred ?? insertionData.content.length
-    } else {
-      newItem.textLength = insertionData.content.length
-    }
+    // Prefer the actual content length for text nodes on creation to avoid
+    // under/over-estimating lengths from inferred insertion gaps.
+    newItem.textLength = insertionData.content.length
     newItem.childrenLength = 0
     if editor.featureFlags.diagnostics.verboseLogs {
       print("🔥 CACHE INSERT: NEW node=\(nodeKey) textLen=\(newItem.textLength) pre=\(newItem.preambleLength) post=\(newItem.postambleLength)")

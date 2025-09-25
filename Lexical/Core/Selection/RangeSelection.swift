@@ -1249,6 +1249,9 @@ public class RangeSelection: BaseSelection {
     {
       self.anchor = anchor
       self.focus = focus
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 APPLY NATIVE: aff=\(affinity == .forward ? "fwd" : "back") anchor=\(anchor.key)@\(anchor.offset) focus=\(focus.key)@\(focus.offset)")
+      }
     }
   }
 

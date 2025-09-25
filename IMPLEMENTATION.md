@@ -160,3 +160,64 @@ Commit summary (planned)
 
 Policy
 - For each user‑reported issue, we: (1) add a focused unit test (expected failure until fixed), (2) update this list with status and commit links, and (3) keep verbose debug prints available behind `Diagnostics.verboseLogs` to aid investigation.
+
+---
+
+## Optimized Reconciler — Parity Recovery Plan (2025‑09‑25)
+
+Goal: Make the optimized reconciler feature‑ and behavior‑identical to legacy, then keep it fast. Do this incrementally, test‑first, and without rewrites.
+
+Definition of Done
+- Hydration parity: optimized builds TextStorage identical to legacy on first attach and on mode switch.
+- Editing parity: Return/Backspace/formatting/list toggles behave exactly like legacy in all covered tests.
+- Selection parity: boundary and multi‑paragraph tests green (already enforced), plus new input/formatting tests.
+- Stability: dark‑launch mode remains available as a safety net; full iOS suite (Lexical‑Package) passes.
+
+### Roadmap (subtasks)
+
+1) Hydration (initial paint) — optimized path
+   - [ ] Fresh‑doc detection triggers sequential INSERTs in document order (runningOffset) with stable Fenwick indices.
+   - [ ] Mode‑switch hydration: when switching legacy → optimized, rebuild TextStorage from EditorState.
+   - [ ] Tests: HydrationTests (non‑empty state → optimized) and ModeSwitchHydrationTests (legacy → optimized).
+   - [ ] Playground: keep dark‑launch toggle in Debug menu as a safety fallback during rollout.
+
+2) Incremental cache hygiene (structure‑only recompute)
+   - [ ] Gate parent `childrenLength` recompute to nodeInsertion/nodeDeletion only (skip on pure text/attributes).
+   - [ ] Limit recompute scope to affected parents + their ancestors, deepest‑first; refresh each child’s pre/post from pending state.
+   - [ ] Tests: IncrementalUpdaterTextLengthTests (leaf updates don’t flip parents), StructureChangeRecomputeTests (insert/delete updates parents deterministically).
+
+3) Selection mapping at text end
+   - [ ] Canonicalize exact textRange.upperBound → `.text(offset: textLength)` independent of direction (optimized + legacy parity).
+   - [ ] Tests: SelectionUtilsTextEndMappingTests across lengths and affinities.
+
+4) Postamble/newline deltas for element boundaries
+   - [ ] Detect element postamble diffs (previous paragraph newline) between current vs pending states.
+   - [ ] Emit `textUpdate` at strict lastChildEnd (not parent sums) for both add/remove newline; verify idempotence with cache.
+   - [ ] Tests: PostambleDeltaTests and ReturnBackspaceParityTests (driven by `OptimizedInputBehaviorTests`).
+
+5) Formatting parity
+   - [ ] Ensure `attributeChange` deltas apply over current text ranges (non‑zero); confirm no accidental string edits.
+   - [ ] Tests: FormattingDeltaTests (bold/italic/underline ranges), InlineListToggleTests where relevant.
+
+6) Compare Harness (optional, high‑leverage)
+   - [ ] New third tab: **Compare** — two editors (legacy vs optimized) bound to the same EditorState; scripted operations (insert, Return, Backspace, format).
+   - [ ] “Diff” action compares attributed strings and reports first divergence (offset/range/attribute set).
+
+7) Full‑suite validation & PR
+   - [ ] Flip `OptimizedInputBehaviorTests` to strict and green.
+   - [ ] Run SelectionParityTests + SelectionParityListTests (keep green); Formatting/RangeCache suites.
+   - [ ] Prepare PR with change list, tests, and a rollback plan (dark‑launch toggle).
+
+### Status Log (update as we go)
+- 2025‑09‑25 — Setup
+  - [>] Diagnostics in place (verboseLogs); focused test added: `OptimizedInputBehaviorTests` for Return/Backspace.
+  - [ ] Hydration: planned; pending implementation and tests.
+  - [>] Incremental recompute: gating WIP (limit to structure changes only).
+  - [>] Selection text‑end mapping adjusted; verifying with diagnostics under typing flows.
+  - [ ] Postamble delta location: refining to lastChildEnd; tests pending.
+  - [ ] Formatting deltas parity: pending after hydration/recompute.
+
+### Notes & Guardrails
+- Always run the authoritative suite with the `Lexical‑Package` scheme on iOS (iPhone 17 Pro, iOS 26.0) per AGENTS.md.
+- For every user‑reported issue, add a focused unit test (expected failure allowed while iterating) and log it in “Bugs (tracked)”.
+- No commits to code until focused tests are green; documentation updates are allowed to keep plan accurate.

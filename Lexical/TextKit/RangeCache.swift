@@ -210,6 +210,10 @@ private func evaluateNode(
         return (searchDirection == .forward) ? textRange.byAddingOne() : textRange
       }
     }()
+    // Ensure caret at exact text end maps to offset == textLength regardless of direction
+    if stringLocation == textRange.upperBound {
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .text, offset: rangeCacheItem.textLength)
+    }
     if rangeToUse.contains(stringLocation) {
       let offset = stringLocation - textRange.location
       // Clamp inside [0, textLength] for safety

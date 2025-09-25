@@ -35,6 +35,8 @@ final class OptimizedInputBehaviorTests: XCTestCase {
         format: TextFormat())
     }
 
+    XCTAssertEqual(textView.text, "Hello")
+
     // Sanity: dump initial cache for the text node
     if let editor = getActiveEditor() {
       for (k, item) in editor.rangeCache { print("INIT CACHE key=\(k) pre=\(item.preambleLength) ch=\(item.childrenLength) tx=\(item.textLength) post=\(item.postambleLength)") }
