@@ -40,6 +40,7 @@ final class StyleParityTests: XCTestCase {
     }
   }
 
+
   private func attributesAt(_ i: Int, _ ts: NSTextStorage) -> [NSAttributedString.Key: Any] {
     ts.attributes(at: max(0, min(i, ts.length == 0 ? 0 : ts.length - 1)), effectiveRange: nil)
   }
