@@ -117,7 +117,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Decorator with dynamic size (invalidate layout), move while unmounted/mounted; verify position cache updates.
   - Selection & Composition
     - [x] Composition start/update/end (CJK, emoji grapheme, ZWJ family); selection gating parity.
-    - [x] Selection mapping across edits (caret at boundaries; caret stability on unrelated edits; cross-node replace parity).
+    - [x] Selection mapping across edits (caret at boundaries; caret stability on unrelated edits; cross-node replace parity; element selectStart/selectEnd parity via native range mapping).
   - Range Cache & Mapping
     - [x] Fenwick central aggregation: multi‑sibling changes aggregated once; verify stable locations (no exceptions).
     - [x] Hardened pointAtStringLocation mapping tests via exhaustive round‑trip across all string locations per editor (avoids newline/boundary ambiguity while asserting internal consistency).
