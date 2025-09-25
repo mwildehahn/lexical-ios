@@ -233,3 +233,5 @@ Commit summary
 - Wired central aggregation through text‑only and pre/post fast paths: update part lengths and parent childrenLength immediately, aggregate [nodeKey: delta], and apply a single rebuild at the end of the path when the flag is ON. Reorder path remains range‑based; contiguous replace uses subtree recompute.
 - Added test `FenwickCentralAggregationTests.testMultiSiblingTextChangesAggregatedOnce` to validate multi‑sibling edits; asserts node texts updated correctly (string parity) under central aggregation.
 - Retained Fenwick range helper semantics to match current reorder integration. Full iOS simulator tests and Playground build — PASS.
+  - Parity tests:
+    - Added `OptimizedReconcilerLegacyParityMultiEditTests` comparing optimized (central aggregation ON) vs legacy when multiple siblings are edited in one update.

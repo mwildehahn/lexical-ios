@@ -157,6 +157,38 @@ internal enum OptimizedReconciler {
     }
 
     // Text-only and attribute-only fast paths
+    // Central aggregation: handle multiple text/pre/post changes in one pass
+    if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation {
+      var anyApplied = false
+      if try fastPath_TextOnly_Multi(
+        currentEditorState: currentEditorState,
+        pendingEditorState: pendingEditorState,
+        editor: editor,
+        fenwickAggregatedDeltas: &fenwickAggregatedDeltas
+      ) { anyApplied = true }
+      if try fastPath_PreamblePostambleOnly_Multi(
+        currentEditorState: currentEditorState,
+        pendingEditorState: pendingEditorState,
+        editor: editor,
+        fenwickAggregatedDeltas: &fenwickAggregatedDeltas
+      ) { anyApplied = true }
+      if anyApplied {
+        if !fenwickAggregatedDeltas.isEmpty {
+          editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+        }
+        // One-time selection reconcile
+        let prevSelection = currentEditorState.selection
+        let nextSelection = pendingEditorState.selection
+        var selectionsAreDifferent = false
+        if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+        let needsUpdate = editor.dirtyType != .noDirtyNodes
+        if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+          try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+        }
+        return
+      }
+    }
+
     if try fastPath_TextOnly(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
@@ -445,6 +477,131 @@ internal enum OptimizedReconciler {
       metrics.record(.reconcilerRun(metric))
     }
     if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: text-only fast path applied (delta=\(delta))") }
+    return true
+  }
+
+  // Multi-text changes in one pass (central aggregation only)
+  @MainActor
+  private static func fastPath_TextOnly_Multi(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    fenwickAggregatedDeltas: inout [NodeKey: Int]
+  ) throws -> Bool {
+    guard editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation else { return false }
+    // Collect all TextNodes whose text changed
+    let candidates: [NodeKey] = editor.dirtyNodes.keys.compactMap { key in
+      guard let prev = currentEditorState.nodeMap[key] as? TextNode,
+            let next = pendingEditorState.nodeMap[key] as? TextNode,
+            let prevRange = editor.rangeCache[key] else { return nil }
+      let oldText = prev.getTextPart()
+      let newText = next.getTextPart()
+      if oldText == newText { return nil }
+      // Ensure children and pre/post unchanged
+      if prevRange.preambleLength != next.getPreamble().lengthAsNSString() { return nil }
+      if prevRange.postambleLength != next.getPostamble().lengthAsNSString() { return nil }
+      return key
+    }
+    if candidates.isEmpty { return false }
+
+    // Build instructions across all candidates based on previous ranges
+    var instructions: [Instruction] = []
+    var affected: Set<NodeKey> = []
+    for key in candidates {
+      guard let prev = currentEditorState.nodeMap[key] as? TextNode,
+            let next = pendingEditorState.nodeMap[key] as? TextNode,
+            let prevRange = editor.rangeCache[key] else { continue }
+      let oldText = prev.getTextPart(); let newText = next.getTextPart()
+      if oldText == newText { continue }
+      let theme = editor.getTheme()
+      let textStart = prevRange.location + prevRange.preambleLength + prevRange.childrenLength
+      let deleteRange = NSRange(location: textStart, length: oldText.lengthAsNSString())
+      if deleteRange.length > 0 { instructions.append(.delete(range: deleteRange)) }
+      let attr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: newText), from: next, state: pendingEditorState, theme: theme)
+      if attr.length > 0 { instructions.append(.insert(location: textStart, attrString: attr)) }
+
+      let delta = newText.lengthAsNSString() - oldText.lengthAsNSString()
+      // Update lengths and parents immediately
+      if var item = editor.rangeCache[key] { item.textLength = newText.lengthAsNSString(); editor.rangeCache[key] = item }
+      let parents = next.getParents().map { $0.getKey() }
+      for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } }
+      fenwickAggregatedDeltas[key, default: 0] += delta
+      affected.insert(key); for p in parents { affected.insert(p) }
+    }
+    if instructions.isEmpty { return false }
+    let stats = applyInstructions(instructions, editor: editor)
+
+    // Update decorator positions after location rebuild at end (done in caller)
+    // Apply block-level attributes scoped to affected nodes
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+
+    if let metrics = editor.metricsContainer {
+      let metric = ReconcilerMetric(duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "text-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
+      metrics.record(.reconcilerRun(metric))
+    }
+    return true
+  }
+
+  // Multi pre/post changes in one pass (central aggregation only)
+  @MainActor
+  private static func fastPath_PreamblePostambleOnly_Multi(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    fenwickAggregatedDeltas: inout [NodeKey: Int]
+  ) throws -> Bool {
+    guard editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation else { return false }
+    var targets: [NodeKey] = []
+    for key in editor.dirtyNodes.keys {
+      guard let next = pendingEditorState.nodeMap[key], let prevRange = editor.rangeCache[key] else { continue }
+      // children/text unchanged
+      if next.getTextPart().lengthAsNSString() != prevRange.textLength { continue }
+      var computedChildrenLen = 0
+      if let el = next as? ElementNode { for c in el.getChildrenKeys() { computedChildrenLen += subtreeTotalLength(nodeKey: c, state: pendingEditorState) } }
+      if computedChildrenLen != prevRange.childrenLength { continue }
+      let np = next.getPreamble().lengthAsNSString(); let npo = next.getPostamble().lengthAsNSString()
+      if np != prevRange.preambleLength || npo != prevRange.postambleLength { targets.append(key) }
+    }
+    if targets.isEmpty { return false }
+    var instructions: [Instruction] = []
+    var affected: Set<NodeKey> = []
+    let theme = editor.getTheme()
+    for key in targets {
+      guard let next = pendingEditorState.nodeMap[key], let prevRange = editor.rangeCache[key] else { continue }
+      let np = next.getPreamble(); let npo = next.getPostamble()
+      let nextPreLen = np.lengthAsNSString(); let nextPostLen = npo.lengthAsNSString()
+      if nextPostLen != prevRange.postambleLength {
+        let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
+        let oldR = NSRange(location: postLoc, length: prevRange.postambleLength)
+        instructions.append(.delete(range: oldR))
+        let postAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: npo), from: next, state: pendingEditorState, theme: theme)
+        if postAttr.length > 0 { instructions.append(.insert(location: postLoc, attrString: postAttr)) }
+        let delta = nextPostLen - prevRange.postambleLength
+        if var item = editor.rangeCache[key] { item.postambleLength = nextPostLen; editor.rangeCache[key] = item }
+        if let n = pendingEditorState.nodeMap[key] { let parents = n.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } ; for p in parents { affected.insert(p) } }
+        fenwickAggregatedDeltas[key, default: 0] += delta
+      }
+      if nextPreLen != prevRange.preambleLength {
+        let preLoc = prevRange.location
+        let oldR = NSRange(location: preLoc, length: prevRange.preambleLength)
+        instructions.append(.delete(range: oldR))
+        let preAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: np), from: next, state: pendingEditorState, theme: theme)
+        if preAttr.length > 0 { instructions.append(.insert(location: preLoc, attrString: preAttr)) }
+        let delta = nextPreLen - prevRange.preambleLength
+        let preSpecial = np.lengthAsNSString(includingCharacters: ["\u{200B}"])
+        if var item = editor.rangeCache[key] { item.preambleLength = nextPreLen; item.preambleSpecialCharacterLength = preSpecial; editor.rangeCache[key] = item }
+        if let n = pendingEditorState.nodeMap[key] { let parents = n.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } ; for p in parents { affected.insert(p) } }
+        fenwickAggregatedDeltas[key, default: 0] += delta
+      }
+      affected.insert(key)
+    }
+    if instructions.isEmpty { return false }
+    let stats = applyInstructions(instructions, editor: editor)
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+    if let metrics = editor.metricsContainer {
+      let metric = ReconcilerMetric(duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "prepost-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
+      metrics.record(.reconcilerRun(metric))
+    }
     return true
   }
 
