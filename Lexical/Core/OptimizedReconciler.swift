@@ -222,6 +222,12 @@ internal enum OptimizedReconciler {
         }
       }
 
+      // Optional metrics snapshot dump for Playground debugging
+      if editor.featureFlags.reconcilerMetrics, let mc = editor.metricsContainer {
+        let snap = mc.snapshot
+        print("🔥 METRICS SNAPSHOT: \(snap)")
+      }
+
       // Record metrics if enabled
       if editor.featureFlags.reconcilerMetrics {
         recordOptimizedReconciliationMetrics(

@@ -344,6 +344,14 @@ public class Editor: NSObject {
     }
   }
 
+  // MARK: - Metrics Snapshot (debug)
+  @MainActor
+  public func dumpMetricsSnapshot() {
+    guard featureFlags.reconcilerMetrics, let mc = metricsContainer else { return }
+    let snap = mc.snapshot
+    print("🔥 METRICS SNAPSHOT (manual): \(snap)")
+  }
+
   /// Registers a handler to be called whenever a certain command is dispatched.
   /// - Parameters:
   ///   - type: The command you want to listen for. (This can be a built in command or a custom one added by your plugin.)

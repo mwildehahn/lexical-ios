@@ -34,6 +34,9 @@ public struct ReconcilerMetricsSummary {
   public let p99Duration: TimeInterval
   public let averageNodesProcessed: Double
   public let averageTextStorageMutations: Double
+  // Optional histograms (ms buckets for durations, counts for fenwick ops)
+  public let durationHistogramMs: [String: Int]
+  public let fenwickOpsHistogram: [String: Int]
 
   public init(metrics: [ReconcilerMetric]) {
     self.totalMetrics = metrics.count
@@ -47,6 +50,8 @@ public struct ReconcilerMetricsSummary {
       self.p99Duration = 0
       self.averageNodesProcessed = 0
       self.averageTextStorageMutations = 0
+      self.durationHistogramMs = [:]
+      self.fenwickOpsHistogram = [:]
       return
     }
 
@@ -61,6 +66,43 @@ public struct ReconcilerMetricsSummary {
 
     self.averageNodesProcessed = metrics.map { Double($0.nodesProcessed) }.reduce(0, +) / Double(metrics.count)
     self.averageTextStorageMutations = metrics.map { Double($0.textStorageMutations) }.reduce(0, +) / Double(metrics.count)
+
+    // Build histograms
+    func bucketize<T: BinaryInteger>(_ value: T, _ edges: [T]) -> Int {
+      for (i, e) in edges.enumerated() { if value <= e { return i } }
+      return edges.count
+    }
+
+    // Duration buckets in milliseconds
+    let durationEdgesMs: [Int] = [1, 5, 10, 20, 50, 100, 200] // last bucket = >200ms
+    var durationCounts: [String: Int] = [:]
+    for d in durations { // durations already sorted
+      let ms = Int((d * 1000).rounded())
+      let idx = bucketize(ms, durationEdgesMs)
+      let label: String
+      if idx == 0 { label = "<=1ms" }
+      else if idx == durationEdgesMs.count { label = ">\(durationEdgesMs.last!)ms" }
+      else { label = "\(durationEdgesMs[idx-1]+1)-\(durationEdgesMs[idx])ms" }
+      durationCounts[label, default: 0] += 1
+    }
+    self.durationHistogramMs = durationCounts
+
+    // Fenwick operations buckets (0, 1-5, 6-20, >20)
+    let fenwickEdges: [Int] = [0, 5, 20]
+    var fenwickCounts: [String: Int] = [:]
+    for m in metrics {
+      let v = m.fenwickOperations
+      let idx = bucketize(v, fenwickEdges)
+      let label: String
+      switch idx {
+      case 0: label = "0"
+      case 1: label = "1-5"
+      case 2: label = "6-20"
+      default: label = ">20"
+      }
+      fenwickCounts[label, default: 0] += 1
+    }
+    self.fenwickOpsHistogram = fenwickCounts
   }
 
   private static func percentile(_ sortedArray: [TimeInterval], _ percentile: Double) -> TimeInterval {
@@ -206,8 +248,33 @@ extension ReconcilerMetricsSummary: CustomStringConvertible {
       avgDuration: \(String(format: "%.3fms", averageDuration * 1000)),
       p50: \(String(format: "%.3fms", p50Duration * 1000)),
       p95: \(String(format: "%.3fms", p95Duration * 1000)),
-      p99: \(String(format: "%.3fms", p99Duration * 1000))
+      p99: \(String(format: "%.3fms", p99Duration * 1000)),
+      durHist: \(durationHistogramMs), fenwickHist: \(fenwickOpsHistogram)
     )
     """
+  }
+}
+
+// MARK: - Snapshot
+
+@MainActor
+public struct EditorMetricsSnapshot: CustomStringConvertible {
+  public let reconciler: ReconcilerMetricsSummary
+  public let optimizedDelta: OptimizedDeltaSummary
+
+  public var description: String {
+    return """
+    EditorMetricsSnapshot(
+      reconciler: \(reconciler),
+      optimizedDelta: applied=\(optimizedDelta.appliedTotal), failed=\(optimizedDelta.failedTotal), clamped=\(optimizedDelta.clampedInsertions), appliedByType=\(optimizedDelta.appliedByType)
+    )
+    """
+  }
+}
+
+extension EditorMetricsContainer {
+  @MainActor
+  public var snapshot: EditorMetricsSnapshot {
+    EditorMetricsSnapshot(reconciler: self.reconcilerMetrics.summary, optimizedDelta: self.optimizedDeltaSummary)
   }
 }
