@@ -80,4 +80,40 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
     XCTAssertEqual(final.trimmingCharacters(in: .newlines), "Hello漢字")
     XCTAssertNil(view.markedTextRange)
   }
+
+  func testCompositionEmojiGraphemeCluster() throws {
+    // Validate that composing a multi-scalar emoji preserves grapheme integrity
+    // Example: thumbs up + medium skin tone modifier
+    let flags = FeatureFlags(
+      reconcilerSanityCheck: false,
+      proxyTextViewInputDelegate: false,
+      useOptimizedReconciler: true,
+      useReconcilerFenwickDelta: true,
+      useReconcilerKeyedDiff: true,
+      useReconcilerBlockRebuild: true,
+      useOptimizedReconcilerStrictMode: true
+    )
+    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let editor = view.editor
+
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "Hello")
+      try p.append([t]); try root.append([p])
+    }
+
+    // Place caret at end and compose emoji
+    let len = view.textView.attributedText?.length ?? 0
+    view.textView.selectedRange = NSRange(location: len, length: 0)
+
+    // Start composition with base emoji 👍
+    view.textView.setMarkedText("👍", selectedRange: NSRange(location: 1, length: 0))
+    // Update composition to 👍🏽 (adds skin tone modifier)
+    view.textView.setMarkedText("👍🏽", selectedRange: NSRange(location: 2, length: 0))
+    // End composition
+    view.textView.unmarkText()
+
+    let final = view.textView.attributedText?.string ?? ""
+    XCTAssertEqual(final.trimmingCharacters(in: .newlines), "Hello👍🏽")
+  }
 }
