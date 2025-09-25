@@ -469,12 +469,14 @@ internal enum OptimizedReconciler {
 
     // Decide whether to do minimal moves or full region rebuild
     let movedCount = nextChildren.filter { !stableSet.contains($0) }.count
+    let lisLen = stableSet.count
+    let preferMinimalMoves = lisLen >= max(2, nextChildren.count / 5) // if at least 20% stable, do minimal moves
     if movedCount == 0 {
       // Nothing to do beyond cache recompute
       _ = recomputeRangeCacheSubtree(
         nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location,
         editor: editor)
-    } else if movedCount < max(2, nextChildren.count / 2) {
+    } else if preferMinimalMoves {
       // Minimal move plan: delete moved child ranges, then insert them at target positions in next order
       var instructions: [Instruction] = []
       // Delete moved children in descending location order
