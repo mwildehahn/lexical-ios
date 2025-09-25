@@ -160,6 +160,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] 2025‑09‑25: Integrated block-level attributes pass into optimized paths (text-only, pre/post, reorder) and optimized slow path. Added test `OptimizedReconcilerBlockAttributesTests` to assert parity vs legacy for code block margin/padding behavior. All iOS simulator tests (Lexical-Package) pass on iPhone 17 Pro (iOS 26.0).
 - [x] 2025‑09‑25: Composition flows — implemented update/end coverage via tests. Optimized path handles repeated marked-text replacements and end-unmark parity with legacy (including multibyte). Added `OptimizedReconcilerCompositionTests`.
 - [x] 2025‑09‑25: Added contiguous multi-node replace fast path. Detects lowest common ancestor with unchanged key set and replaces its children region in one edit (coalesced). Added `OptimizedReconcilerMultiNodeReplaceTests` (optimized strict vs legacy parity). Full suite green on iOS sim.
+- [x] 2025‑09‑25: Keyed‑diff improved to prefer minimal moves when LIS ≥ 20%; emit movedChildren in metrics. Added large reorder and decorator‑interleaved parity tests. Added cross‑parent multi‑edit parity test that forces rebuild fallback. Nightly CI added for iOS simulator tests.
 
 ## Current Flag Defaults (Tests/Playground)
 - `useOptimizedReconciler = true`

@@ -537,7 +537,7 @@ internal enum OptimizedReconciler {
           duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
           treatedAllNodesAsDirty: false, pathLabel: "reorder-minimal", planningDuration: 0,
           applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
-          setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
+          setAttributesCount: stats.sets, fixAttributesCount: stats.fixes, movedChildren: movedCount)
         metrics.record(.reconcilerRun(metric))
       }
     } else {
@@ -553,7 +553,7 @@ internal enum OptimizedReconciler {
       if let metrics = editor.metricsContainer {
         let metric = ReconcilerMetric(
           duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
-          treatedAllNodesAsDirty: false, pathLabel: "reorder-rebuild")
+          treatedAllNodesAsDirty: false, pathLabel: "reorder-rebuild", movedChildren: movedCount)
         metrics.record(.reconcilerRun(metric))
       }
     }

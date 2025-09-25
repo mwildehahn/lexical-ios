@@ -32,6 +32,7 @@ public struct ReconcilerMetric {
   public let insertCount: Int
   public let setAttributesCount: Int
   public let fixAttributesCount: Int
+  public let movedChildren: Int
 
   public init(
     duration: TimeInterval,
@@ -45,7 +46,8 @@ public struct ReconcilerMetric {
     deleteCount: Int = 0,
     insertCount: Int = 0,
     setAttributesCount: Int = 0,
-    fixAttributesCount: Int = 0
+    fixAttributesCount: Int = 0,
+    movedChildren: Int = 0
   ) {
     self.duration = duration
     self.dirtyNodes = dirtyNodes
@@ -59,6 +61,7 @@ public struct ReconcilerMetric {
     self.insertCount = insertCount
     self.setAttributesCount = setAttributesCount
     self.fixAttributesCount = fixAttributesCount
+    self.movedChildren = movedChildren
   }
 }
 
