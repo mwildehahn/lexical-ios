@@ -250,47 +250,12 @@ internal enum OptimizedReconciler {
     applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: nil, treatAllNodesAsDirty: true)
     textStorage.mode = previousMode
 
-    // Recompute entire range cache locations
+    // Recompute entire range cache locations and prune stale entries
     _ = recomputeRangeCacheSubtree(nodeKey: kRootNodeKey, state: pendingEditorState, startLocation: 0, editor: editor)
+    pruneRangeCacheGlobally(nextState: pendingEditorState, editor: editor)
 
-    // Remove rangeCache entries for nodes no longer attached (prune stale keys)
-    var attachedKeys = Set(subtreeKeysDFS(rootKey: kRootNodeKey, state: pendingEditorState))
-    attachedKeys.insert(kRootNodeKey)
-    editor.rangeCache = editor.rangeCache.filter { attachedKeys.contains($0.key) }
-
-    // Purge decorator caches for keys no longer present after recompute (removals)
-    if let ts = editor.textStorage {
-      for (k, _) in ts.decoratorPositionCache where editor.rangeCache[k] == nil {
-        ts.decoratorPositionCache[k] = nil
-      }
-    }
-    for (k, _) in editor.decoratorCache where editor.rangeCache[k] == nil {
-      editor.decoratorCache.removeValue(forKey: k)
-    }
-
-    // Ensure present decorators have cache entries and positions
-    if let ts = editor.textStorage {
-      for (k, n) in pendingEditorState.nodeMap {
-        if n is DecoratorNode, n.isAttached() {
-          if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
-          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
-        }
-      }
-      // Mark dirty decorators for decorate
-      for k in editor.dirtyNodes.keys {
-        if pendingEditorState.nodeMap[k] is DecoratorNode {
-          if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view { editor.decoratorCache[k] = .needsDecorating(view) }
-          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
-        }
-      }
-    }
-
-    // Update decorators positions
-    if let ts = editor.textStorage {
-      for (key, _) in ts.decoratorPositionCache {
-        if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
-      }
-    }
+    // Reconcile decorators for the entire document (add/remove/decorate + positions)
+    reconcileDecoratorOpsForSubtree(ancestorKey: kRootNodeKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
 
     // Selection reconcile
     let prevSelection = currentEditorState.selection
@@ -638,12 +603,8 @@ internal enum OptimizedReconciler {
       editor.rangeCache = rebuildLocationsWithFenwickRanges(prev: editor.rangeCache, ranges: rangeShifts)
     }
 
-    // Update decorator positions for keys within this subtree
-    if let ts = editor.textStorage {
-      for (key, _) in ts.decoratorPositionCache {
-        if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
-      }
-    }
+    // Reconcile decorators within this subtree (moves preserve cache; dirty -> needsDecorating)
+    reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
 
     // Apply block-level attributes for parent and direct children (reorder may affect paragraph boundaries)
     var affected: Set<NodeKey> = [parentKey]
@@ -993,17 +954,12 @@ internal enum OptimizedReconciler {
       _ = changed // placeholder for potential future thresholds
     }
 
-    // Recompute the range cache for this subtree (locations and lengths)
+    // Recompute the range cache for this subtree (locations and lengths) and reconcile decorators
     _ = recomputeRangeCacheSubtree(
       nodeKey: ancestorKey, state: pendingEditorState, startLocation: ancestorPrevRange.location,
       editor: editor)
-
-    // Update decorator positions for this subtree
-    if let ts = editor.textStorage {
-      for (key, _) in ts.decoratorPositionCache {
-        if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
-      }
-    }
+    pruneRangeCacheUnderAncestor(ancestorKey: ancestorKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
+    reconcileDecoratorOpsForSubtree(ancestorKey: ancestorKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
 
     // Block-level attributes for ancestor + its parents
     var affected: Set<NodeKey> = [ancestorKey]
@@ -1105,5 +1061,71 @@ internal enum OptimizedReconciler {
       if subtreeContains(rootKey: c, candidateKey: candidateKey, state: state) { return true }
     }
     return false
+  }
+
+  // MARK: - RangeCache pruning helpers
+  @MainActor
+  private static func pruneRangeCacheGlobally(nextState: EditorState, editor: Editor) {
+    var attached = Set(subtreeKeysDFS(rootKey: kRootNodeKey, state: nextState))
+    attached.insert(kRootNodeKey)
+    editor.rangeCache = editor.rangeCache.filter { attached.contains($0.key) }
+  }
+
+  @MainActor
+  private static func pruneRangeCacheUnderAncestor(
+    ancestorKey: NodeKey, prevState: EditorState, nextState: EditorState, editor: Editor
+  ) {
+    // Compute keys previously under ancestor
+    let prevKeys = Set(subtreeKeysDFS(rootKey: ancestorKey, state: prevState))
+    let nextKeys = Set(subtreeKeysDFS(rootKey: ancestorKey, state: nextState))
+    let toRemove = prevKeys.subtracting(nextKeys)
+    if toRemove.isEmpty { return }
+    editor.rangeCache = editor.rangeCache.filter { !toRemove.contains($0.key) }
+  }
+
+  // MARK: - Decorator reconciliation
+  @MainActor
+  private static func reconcileDecoratorOpsForSubtree(
+    ancestorKey: NodeKey,
+    prevState: EditorState,
+    nextState: EditorState,
+    editor: Editor
+  ) {
+    guard let textStorage = editor.textStorage else { return }
+
+    func decoratorKeys(in state: EditorState, under root: NodeKey) -> Set<NodeKey> {
+      let keys = subtreeKeysDFS(rootKey: root, state: state)
+      var out: Set<NodeKey> = []
+      for k in keys { if state.nodeMap[k] is DecoratorNode { out.insert(k) } }
+      return out
+    }
+
+    let prevDecos = decoratorKeys(in: prevState, under: ancestorKey)
+    let nextDecos = decoratorKeys(in: nextState, under: ancestorKey)
+
+    // Removals: purge position + cache and destroy views
+    let removed = prevDecos.subtracting(nextDecos)
+    for k in removed {
+      decoratorView(forKey: k, createIfNecessary: false)?.removeFromSuperview()
+      destroyCachedDecoratorView(forKey: k)
+      textStorage.decoratorPositionCache[k] = nil
+    }
+
+    // Additions: ensure cache entry exists and set position
+    let added = nextDecos.subtracting(prevDecos)
+    for k in added {
+      if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
+      if let loc = editor.rangeCache[k]?.location { textStorage.decoratorPositionCache[k] = loc }
+    }
+
+    // Persist positions for all present decorators in next subtree and mark dirty ones for decorating
+    for k in nextDecos {
+      if let loc = editor.rangeCache[k]?.location { textStorage.decoratorPositionCache[k] = loc }
+      if editor.dirtyNodes[k] != nil {
+        if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view {
+          editor.decoratorCache[k] = .needsDecorating(view)
+        }
+      }
+    }
   }
 }

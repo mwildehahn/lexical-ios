@@ -71,7 +71,12 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] M3 — Apply Engine
   - [x] Execute deletes (reverse), inserts (forward), set attributes, one `fixAttributes` over minimal covering range.
   - [x] Apply block‑level attributes once per affected block with deduped nodes.
-  - [ ] Handle decorators move/add/remove; preserve `needsCreation/needsDecorating` semantics.
+  - [x] Handle decorators move/add/remove; preserve `needsCreation/needsDecorating` semantics.
+    - Implemented subtree pruning and decorator reconciliation helpers; integrated into slow path, keyed‑reorder, and coalesced replace.
+    - Added tests:
+      - `OptimizedReconcilerDecoratorOpsTests` (add/dirty/remove + cross‑parent move preserves cache/view)
+      - `OptimizedReconcilerDecoratorParityTests` (nested/deep reorders with decorators)
+    - Verified on iOS simulator (iPhone 17 Pro, iOS 26.0): full `Lexical-Package` tests PASS; Playground build PASS.
 
 - [ ] M3a — Composition (Marked Text) in Optimized Reconciler
   - [ ] Mirror legacy marked‑text sequence: start (createMarkedText), update (internal selection), confirm/cancel.
@@ -203,3 +208,16 @@ Reminder: after every significant change, run iOS simulator tests (Lexical-Packa
 
 Commit summary
 - Refactor: gate reconciler debug logs, remove DEBUG prints in Node.remove; sweep warnings; ensure decorator cache purge post-recompute; all iOS simulator tests green; Playground builds.
+
+### 2025‑09‑25: Decorator ops — move/add/remove semantics wired in optimized paths
+- Added subtree utilities in `OptimizedReconciler`:
+  - `pruneRangeCacheGlobally(nextState:, editor:)` and `pruneRangeCacheUnderAncestor(ancestorKey:, prevState:, nextState:, editor:)` to drop stale `rangeCache` keys after rebuilds.
+  - `reconcileDecoratorOpsForSubtree(ancestorKey:, prevState:, nextState:, editor:)` to handle add/remove/decorate and position updates while preserving cache states (no spurious `needsCreation` on moves; dirty → `needsDecorating`).
+- Integrated calls:
+  - Slow path: prune globally, then reconcile decorators for the whole tree.
+  - Reorder fast path: reconcile under the parent (marks dirty decorators `needsDecorating`, updates positions; no add/remove since keyset unchanged).
+  - Coalesced replace: recompute subtree, prune under ancestor, then reconcile decorators in that subtree.
+- Tests (iOS simulator):
+  - `OptimizedReconcilerDecoratorOpsTests` (add/dirty/remove) — PASS.
+  - `OptimizedReconcilerDecoratorParityTests` (reorders with decorators) — PASS.
+- Playground build — PASS (iPhone 17 Pro, iOS 26.0).
