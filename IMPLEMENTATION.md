@@ -44,6 +44,10 @@ Updates in this patch (2025‑09‑25)
 **Observability**
 - [x] Invariants checker (gated by `reconcilerSanityCheck`).
 - [x] Metrics polish (aggregate histograms, clamped counts summary).
+- [x] Debug print hygiene: gate all temporary "🔥" logs behind feature flags
+  - Parity diagnostics → `selectionParityDebug`
+  - General verbose traces (reconciler, delta applier, range cache updater) → `diagnostics.verboseLogs`
+  - Metrics snapshot dump → `reconcilerMetrics` or manual `editor.dumpMetricsSnapshot()`
 
 **Migration & Safety**
 - [x] Feature flags guard optimized path; dark‑launch mode runs optimized then restores and runs legacy for comparison.
@@ -57,8 +61,12 @@ Updates in this patch (2025‑09‑25)
   - [x] Unify `SelectionUtils.stringLocationForPoint` Fenwick vs absolute paths so absolute locations match legacy.
   - [x] Ensure multi‑paragraph range lengths and absolute locations match.
 
-- [ ] Debug print hygiene
-  - [ ] Gate or remove all temporary "🔥" logs (keep behind flags only).
+- [x] Debug print hygiene
+  - [x] Gated/removed direct `print` calls in:
+    - `OptimizedReconciler`: before/after apply, success/partial, queued textUpdate (now behind `verboseLogs`)
+    - `TextStorageDeltaApplier`: delta handling, insert clamping, post-insert length (behind `verboseLogs`)
+    - `IncrementalRangeCacheUpdater`: insertion/remaining passes, cache insert, parent updates (behind `verboseLogs`)
+    - Parity-only traces in `RangeCache`, `AbsoluteLocation`, `SelectionUtils` remain behind `selectionParityDebug`.
 
 - [x] Metrics polish
   - [x] Aggregate histograms (durations, Fenwick ops) and clamped counts summary; expose snapshot API and gated console dump.
@@ -70,7 +78,7 @@ Updates in this patch (2025‑09‑25)
 
 ## Immediate Work (Next)
 - [x] Selection parity strictness (boundaries, multi‑paragraph) with incremental, test‑first patches.
-- [ ] Gate/remove debug prints; keep opt‑in debug via flags only.
+- [x] Gate/remove debug prints; keep opt‑in debug via flags only.
 - [ ] Metrics polish visibility in Playground
   - [x] Provide snapshot API and console dump (gated by `reconcilerMetrics`).
   - [ ] Add lightweight metrics panel in Playground to render snapshot.

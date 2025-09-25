@@ -118,7 +118,9 @@ internal class TextStorageDeltaApplier {
     to textStorage: NSTextStorage
   ) throws -> DeltaApplicationSingleResult {
 
-    print("🔥 DELTA APPLIER: handling delta \(delta.type)")
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 DELTA APPLIER: handling delta \(delta.type)")
+    }
 
     switch delta.type {
     case .textUpdate(let nodeKey, let newText, let range):
@@ -187,13 +189,15 @@ internal class TextStorageDeltaApplier {
     let clampedLocation = min(max(location, 0), textStorage.length)
 
     if clampedLocation != location {
-      print("🔥 DELTA APPLIER: clamped insertion for node \(nodeKey) from \(location) to \(clampedLocation) (text length \(textStorage.length))")
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 DELTA APPLIER: clamped insertion for node \(nodeKey) from \(location) to \(clampedLocation) (text length \(textStorage.length))")
+      }
       if let mc = editor.metricsContainer {
         let key = "optimized.clampedInsertions"
         let current = (mc.metricsData[key] as? Int) ?? 0
         mc.metricsData[key] = current + 1
       }
-    } else {
+    } else if editor.featureFlags.diagnostics.verboseLogs {
       print("🔥 DELTA APPLIER: inserting node \(nodeKey) at \(clampedLocation) (text length \(textStorage.length))")
     }
 
@@ -205,7 +209,9 @@ internal class TextStorageDeltaApplier {
 
     // Insert into TextStorage
     textStorage.insert(completeString, at: clampedLocation)
-    print("🔥 DELTA APPLIER: post-insert text length \(textStorage.length)")
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 DELTA APPLIER: post-insert text length \(textStorage.length)")
+    }
 
     // Update FenwickTree only for nodes that contribute text content.
     var fenwickUpdates = 0

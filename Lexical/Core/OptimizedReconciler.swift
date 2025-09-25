@@ -116,7 +116,9 @@ internal enum OptimizedReconciler {
       }
     }
 
-    print("🔥 OPTIMIZED RECONCILER: textStorage length before apply: \(textStorage.length)")
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 OPTIMIZED RECONCILER: textStorage length before apply: \(textStorage.length)")
+    }
 
     let previousMode = textStorage.mode
     textStorage.mode = .controllerMode
@@ -140,11 +142,15 @@ internal enum OptimizedReconciler {
     // Apply deltas
     let applicationResult = deltaApplier.applyDeltaBatch(deltaBatch, to: textStorage)
 
-    print("🔥 OPTIMIZED RECONCILER: textStorage length after apply: \(textStorage.length)")
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 OPTIMIZED RECONCILER: textStorage length after apply: \(textStorage.length)")
+    }
 
     switch applicationResult {
     case .success(let appliedDeltas, let fenwickUpdates):
-      print("🔥 OPTIMIZED RECONCILER: delta application success (applied=\(appliedDeltas), fenwick=\(fenwickUpdates))")
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 OPTIMIZED RECONCILER: delta application success (applied=\(appliedDeltas), fenwick=\(fenwickUpdates))")
+      }
       // Update range cache incrementally
       let cacheUpdater = IncrementalRangeCacheUpdater(editor: editor, fenwickTree: editor.fenwickTree)
       try cacheUpdater.updateRangeCache(
@@ -257,7 +263,9 @@ internal enum OptimizedReconciler {
     case .partialSuccess(let appliedDeltas, let failedDeltas, let reason):
       // Log but continue - we applied what we could
       editor.log(.reconciler, .warning, "Partial delta application: \(appliedDeltas) applied, \(failedDeltas.count) failed: \(reason)")
-      print("🔥 OPTIMIZED RECONCILER: delta application partial (applied=\(appliedDeltas), failed=\(failedDeltas.count)) reason=\(reason)")
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 OPTIMIZED RECONCILER: delta application partial (applied=\(appliedDeltas), failed=\(failedDeltas.count)) reason=\(reason)")
+      }
 
     case .failure(let reason):
       // This is a real failure - throw an error
@@ -599,7 +607,9 @@ private class DeltaGenerator {
           )
           deltas.append(ReconcilerDelta(type: deltaType, metadata: DeltaMetadata(sourceUpdate: metadata.sourceUpdate, fenwickTreeIndex: metadata.fenwickTreeIndex, originalRange: metadata.originalRange, orderIndex: seq)))
           seq += 1
-          print("🔥 OPTIMIZED RECONCILER: queued textUpdate for node \(nodeKey) range=\(textRange) old='\(currentTextNode.getText_dangerousPropertyAccess())' new='\(pendingTextNode.getText_dangerousPropertyAccess())'")
+          if editor.featureFlags.diagnostics.verboseLogs {
+            print("🔥 OPTIMIZED RECONCILER: queued textUpdate for node \(nodeKey) range=\(textRange) old='\(currentTextNode.getText_dangerousPropertyAccess())' new='\(pendingTextNode.getText_dangerousPropertyAccess())'")
+          }
         }
 
         // Inline attribute (format) changes without text change

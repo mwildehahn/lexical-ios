@@ -31,8 +31,10 @@ internal class IncrementalRangeCacheUpdater {
 
     // Group deltas by node for efficient processing
     let deltasByNode = groupDeltasByNode(deltas)
-    print("🔥 RANGE CACHE UPDATER: applying deltas for \(deltasByNode.keys.count) nodes")
-    print("🔥 RANGE CACHE UPDATER: cache keys before=\(Array(rangeCache.keys).sorted())")
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 RANGE CACHE UPDATER: applying deltas for \(deltasByNode.keys.count) nodes")
+      print("🔥 RANGE CACHE UPDATER: cache keys before=\(Array(rangeCache.keys).sorted())")
+    }
 
     // Establish a document-order pass for newly inserted nodes based on their insertion locations
     // Also collect affected parents so we can deterministically recompute childrenLength post-pass.
@@ -74,7 +76,9 @@ internal class IncrementalRangeCacheUpdater {
     for (key, _) in insertionOrder {
       if visited.contains(key) { continue }
       if let nodeDeltas = deltasByNode[key] {
-        print("🔥 RANGE CACHE UPDATER: insertion-first node=\(key) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
+        if editor.featureFlags.diagnostics.verboseLogs {
+          print("🔥 RANGE CACHE UPDATER: insertion-first node=\(key) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
+        }
         let createdSet = Set(insertionOrder.map { $0.0 })
         try updateNodeInRangeCache(&rangeCache, nodeKey: key, deltas: nodeDeltas, createdThisBatch: createdSet, assumedTextLengths: assumedTextLengths)
         visited.insert(key)
@@ -83,7 +87,9 @@ internal class IncrementalRangeCacheUpdater {
 
     // Then process any remaining nodes (updates/attributes/deletions)
     for (nodeKey, nodeDeltas) in deltasByNode where !visited.contains(nodeKey) {
-      print("🔥 RANGE CACHE UPDATER: remaining node=\(nodeKey) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 RANGE CACHE UPDATER: remaining node=\(nodeKey) deltas=\(nodeDeltas.map{ String(describing: $0.type) })")
+      }
       let createdSet = Set(insertionOrder.map { $0.0 })
       try updateNodeInRangeCache(&rangeCache, nodeKey: nodeKey, deltas: nodeDeltas, createdThisBatch: createdSet, assumedTextLengths: assumedTextLengths)
     }
@@ -253,7 +259,9 @@ internal class IncrementalRangeCacheUpdater {
       newItem.textLength = insertionData.content.length
     }
     newItem.childrenLength = 0
-    print("🔥 CACHE INSERT: NEW node=\(nodeKey) textLen=\(newItem.textLength) pre=\(newItem.preambleLength) post=\(newItem.postambleLength)")
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 CACHE INSERT: NEW node=\(nodeKey) textLen=\(newItem.textLength) pre=\(newItem.preambleLength) post=\(newItem.postambleLength)")
+    }
 
     // Assign a stable node index for the Fenwick tree
     newItem.nodeIndex = getOrAssignFenwickIndex(for: nodeKey)
@@ -261,8 +269,10 @@ internal class IncrementalRangeCacheUpdater {
     _ = fenwickTree.ensureCapacity(for: newItem.nodeIndex)
 
     rangeCache[nodeKey] = newItem
-    if let tn = editor.getEditorState().nodeMap[nodeKey] as? TextNode {
-      print("🔥 CACHE INSERT TEXT: key=\(nodeKey) text='\(tn.getText_dangerousPropertyAccess())' len=\(tn.getText_dangerousPropertyAccess().lengthAsNSString()) insLen=\(insertionData.content.length)")
+    if editor.featureFlags.diagnostics.verboseLogs {
+      if let tn = editor.getEditorState().nodeMap[nodeKey] as? TextNode {
+        print("🔥 CACHE INSERT TEXT: key=\(nodeKey) text='\(tn.getText_dangerousPropertyAccess())' len=\(tn.getText_dangerousPropertyAccess().lengthAsNSString()) insLen=\(insertionData.content.length)")
+      }
     }
 
     // Bump ancestors' childrenLength by the full contribution of this node
@@ -353,7 +363,9 @@ internal class IncrementalRangeCacheUpdater {
         let before = item.childrenLength
         item.childrenLength = max(0, item.childrenLength + delta)
         let after = item.childrenLength
-        print("🔥 RANGE CACHE UPDATER: parent=\(p) childrenLength: \(before) -> \(after) (delta=\(delta))")
+        if editor.featureFlags.diagnostics.verboseLogs {
+          print("🔥 RANGE CACHE UPDATER: parent=\(p) childrenLength: \(before) -> \(after) (delta=\(delta))")
+        }
         rangeCache[p] = item
       }
       currentParentKey = state.nodeMap[p]?.parent
