@@ -16,7 +16,7 @@ final class SelectionParityListTests: XCTestCase {
     // Legacy context with ListPlugin to register nodes
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: [ListPlugin()]),
-      featureFlags: FeatureFlags(optimizedReconciler: false)
+      featureFlags: FeatureFlags(optimizedReconciler: false, selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
 
@@ -35,7 +35,7 @@ final class SelectionParityListTests: XCTestCase {
     // Optimized context with ListPlugin
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: [ListPlugin()]),
-      featureFlags: FeatureFlags(optimizedReconciler: true)
+      featureFlags: FeatureFlags(optimizedReconciler: true, selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     var optItem2: NodeKey = ""
@@ -78,7 +78,7 @@ final class SelectionParityListTests: XCTestCase {
     // Legacy editor with nested list under second item
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: [ListPlugin()]),
-      featureFlags: FeatureFlags(optimizedReconciler: false)
+      featureFlags: FeatureFlags(optimizedReconciler: false, selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
     var nestedLegacyListKey: NodeKey = ""
@@ -101,7 +101,7 @@ final class SelectionParityListTests: XCTestCase {
     // Optimized editor mirror
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: [ListPlugin()]),
-      featureFlags: FeatureFlags(optimizedReconciler: true)
+      featureFlags: FeatureFlags(optimizedReconciler: true, selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     var nestedOptListKey: NodeKey = ""
@@ -148,7 +148,7 @@ final class SelectionParityListTests: XCTestCase {
     // Legacy
     let legacyCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: [ListPlugin()]),
-      featureFlags: FeatureFlags(optimizedReconciler: false)
+      featureFlags: FeatureFlags(optimizedReconciler: false, selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
     var legacyItemKey: NodeKey = ""
@@ -165,7 +165,7 @@ final class SelectionParityListTests: XCTestCase {
     // Optimized
     let optCtx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: [ListPlugin()]),
-      featureFlags: FeatureFlags(optimizedReconciler: true)
+      featureFlags: FeatureFlags(optimizedReconciler: true, selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     var optItemKey: NodeKey = ""
