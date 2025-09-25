@@ -36,12 +36,29 @@ struct RangeCacheItem {
   @MainActor
   func locationFromFenwick(using fenwickTree: FenwickTree) -> Int {
     // For element nodes, the caller (tests) expects this to return the element's
-    // absolute start. Compute via absolute accumulation since a single-index
+    // position depending on diagnostics mode.
+    // Parity mode:
+    //  - If element has preamble (e.g., list bullet), anchor to absolute base.
+    //  - Otherwise, anchor to childrenStart (base + preambleLength).
+    // Baseline: raw absolute base.
+    // Compute via absolute accumulation since a single-index
     // Fenwick representation cannot encode both pre/post positions.
     if let _ = getNodeByKey(key: nodeKey) as? ElementNode,
        let editor = getActiveEditor() {
-      let base = absoluteNodeStartLocation(nodeKey, rangeCache: editor.rangeCache, useOptimized: true, fenwickTree: editor.fenwickTree, leadingShift: false)
-      return base
+      // Parity rule: anchor element offset 0 to childrenStart (base + preamble),
+      // not a root-leading shift heuristic. This matches legacy rc.location.
+      let baseNoShift = absoluteNodeStartLocation(
+        nodeKey,
+        rangeCache: editor.rangeCache,
+        useOptimized: true,
+        fenwickTree: editor.fenwickTree,
+        leadingShift: false
+      )
+      if editor.featureFlags.selectionParityDebug {
+        return baseNoShift + preambleLength
+      }
+      // Baseline: raw absolute base (no preamble added)
+      return baseNoShift
     }
     return fenwickTree.getNodeOffset(nodeIndex: nodeIndex)
   }
@@ -91,6 +108,23 @@ internal func pointAtStringLocation(
         if location == childrenStart {
           return Point(key: k, offset: 0, type: .element)
         }
+      }
+    }
+  }
+  // Parity fallback: if evaluateNode later fails to resolve, try mapping exact end-of-children
+  // boundary to element(offset: childCount).
+  if let editor = getActiveEditor(), editor.featureFlags.selectionParityDebug {
+    let useOptimized = editor.featureFlags.optimizedReconciler
+    let fenwickTree = editor.fenwickTree
+    for (k, item) in rangeCache {
+      guard let elem = getNodeByKey(key: k) as? ElementNode else { continue }
+      let base = useOptimized
+        ? absoluteNodeStartLocation(k, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
+        : item.location
+      let endOfChildren = base + item.preambleLength + item.childrenLength
+      if location == endOfChildren {
+        print("🔥 PARITY FALLBACK: endOfChildren match for key=\(k) -> element(offset=\(elem.getChildrenKeys().count))")
+        return Point(key: k, offset: elem.getChildrenKeys().count, type: .element)
       }
     }
   }

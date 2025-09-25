@@ -258,21 +258,9 @@ extension ReconcilerMetricsSummary: CustomStringConvertible {
 // MARK: - Snapshot
 
 @MainActor
-public struct EditorMetricsSnapshot: CustomStringConvertible {
+public struct EditorMetricsSnapshot {
   public let reconciler: ReconcilerMetricsSummary
   public let optimizedDelta: OptimizedDeltaSummary
-
-  // Swift 6: avoid crossing main-actor isolation when printing snapshots.
-  // Snapshot fields are immutable; exposing description as nonisolated(unsafe)
-  // is safe for debug/logging and eliminates concurrency diagnostics.
-  public nonisolated(unsafe) var description: String {
-    return """
-    EditorMetricsSnapshot(
-      reconciler: \(reconciler),
-      optimizedDelta: applied=\(optimizedDelta.appliedTotal), failed=\(optimizedDelta.failedTotal), clamped=\(optimizedDelta.clampedInsertions), appliedByType=\(optimizedDelta.appliedByType)
-    )
-    """
-  }
 }
 
 extension EditorMetricsContainer {

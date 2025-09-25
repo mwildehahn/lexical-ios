@@ -209,8 +209,9 @@ final class SelectionParityListTests: XCTestCase {
     }
     try optEditor.read {
       guard let rc = optEditor.rangeCache[optItemKey] else { return }
-      let base = rc.locationFromFenwick(using: optEditor.fenwickTree)
-      oEnd = base + rc.preambleLength + rc.childrenLength
+      // Use childrenRangeFromFenwick for parity-consistent end calculation
+      let end = rc.childrenRangeFromFenwick(using: optEditor.fenwickTree).upperBound
+      oEnd = end
     }
 
     var lF: Point? = nil, lB: Point? = nil

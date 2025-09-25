@@ -18,6 +18,24 @@ Updates in this patch (2025‑09‑25)
   - Focused suites: SelectionParityTests (key case), InlineDecoratorBoundaryParityTests, IncrementalUpdaterTextLengthTests — green.
   - Build‑for‑testing succeeds for the Lexical‑Package test scheme.
 
+Addendum (2025‑09‑25, afternoon)
+- Selection parity (strict) — fixes and confirmations
+  - Element start parity: `RangeCacheItem.locationFromFenwick` now returns childrenStart (base + preamble) in parity mode; SelectionUtils’ fast path uses absolute base + preamble for optimized, and base for legacy when preamble>0. Empty paragraph and list boundaries now match legacy strictly.
+  - End‑of‑children parity: `stringLocationForPoint(.element, offset = childrenCount)` uses raw absolute base to avoid double‑adding preamble in optimized mode. Added parity fallback in `pointAtStringLocation` to map exact end-of-children to `element(offset: childCount)` when the evaluator returns a boundary.
+  - Out‑of‑read safety: parity fast‑path avoids `getActiveEditor()` by falling back to cache for legacy and to absolute accumulation when available; tests that call outside `editor.read` were updated to wrap calls.
+  - Plugin lists: SelectionParityListTests updated to compute optimized end using `childrenRangeFromFenwick.upperBound`; start/end tests are green.
+
+- Debug print hygiene
+  - Removed temporary prints from core tests; kept parity diagnostics gated under `selectionParityDebug` only.
+
+- Swift 6 actor isolation
+  - Removed CustomStringConvertible conformance from `EditorMetricsSnapshot` to avoid crossing main actor. Call sites can print fields explicitly. Warning about `nonisolated(unsafe)` resolved.
+
+- Results
+  - Green: `LexicalTests/SelectionParityTests`, `LexicalListPluginTests/SelectionParityListTests` under `Lexical-Package` on iOS 26.0.
+  - Verified via:
+    `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/SelectionParityTests -only-testing:LexicalListPluginTests/SelectionParityListTests test`
+
 **What “Legacy” Does vs “Optimized”**
 - Legacy (`Lexical/Core/Reconciler.swift:1`): tree walk computes rangesToDelete/rangesToAdd, maintains `decoratorsToAdd/Decorate/Remove`, applies to `TextStorage`, then block‑level attributes, selection, marked‑text; updates `rangeCache` in one pass.
 - Optimized (`Lexical/Core/OptimizedReconciler.swift:1`): diff → deltas → apply with Fenwick‑backed offsets, incrementally updates `rangeCache`, then block‑level attributes, decorator lifecycle, optional marked‑text; metrics + invariants hooks.

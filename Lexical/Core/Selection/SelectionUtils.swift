@@ -213,10 +213,25 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
       return location + rangeCacheItem.preambleLength + point.offset
     }
   case .element:
-    // Parity fast-path: element offset 0 maps to element base without requiring node lookups.
+    // Parity fast-path: element offset 0 maps deterministically using absolute base + preamble.
     if editor.featureFlags.selectionParityDebug && point.offset == 0 {
-      let loc = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
-      if editor.featureFlags.selectionParityDebug { print("🔥 ELEM LOC (fast): key=\(point.key) useOpt=\(useOptimized) -> \(loc)") }
+      let baseNoShift: Int
+      if useOptimized {
+        if getActiveEditor() == nil {
+          // Outside editor.read: fall back to cached absolute location (legacy) + preamble
+          baseNoShift = rangeCacheItem.location
+        } else {
+          baseNoShift = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
+        }
+      } else {
+        // Legacy parity: if element has a preamble (e.g., list bullet),
+        // element offset 0 anchors to the element's absolute base; otherwise use childrenStart.
+        baseNoShift = rangeCacheItem.location
+      }
+      let loc = useOptimized
+        ? (baseNoShift + rangeCacheItem.preambleLength)
+        : ((rangeCacheItem.preambleLength > 0) ? baseNoShift : (baseNoShift + rangeCacheItem.preambleLength))
+      if editor.featureFlags.selectionParityDebug { print("🔥 ELEM LOC (fast): key=\(point.key) useOpt=\(useOptimized) base=\(baseNoShift) pre=\(rangeCacheItem.preambleLength) -> \(loc)") }
       return loc
     }
     guard let node = getNodeByKey(key: point.key) as? ElementNode else { return nil }
@@ -227,18 +242,24 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
     }
 
     if point.offset == childrenKeys.count {
-      let location = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
-      return location + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
+      if useOptimized {
+        // Use raw absolute base to avoid double-adding preamble when computing end-of-children.
+        let baseNoShift: Int
+        if getActiveEditor() == nil {
+          baseNoShift = rangeCacheItem.location
+        } else {
+          baseNoShift = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
+        }
+        return baseNoShift + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
+      } else {
+        return rangeCacheItem.location + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength
+      }
     }
 
     if useOptimized {
-      // Parity mode: element offset 0 anchors to element base (absolute start).
-      var loc: Int
-      if editor.featureFlags.selectionParityDebug {
-        loc = rangeCacheItem.locationFromFenwick(using: fenwickTree)
-      } else {
-        loc = rangeCacheItem.locationFromFenwick(using: fenwickTree) + rangeCacheItem.preambleLength
-      }
+      // Compute element base deterministically via absolute accumulation.
+      let baseNoShift = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
+      var loc = baseNoShift + rangeCacheItem.preambleLength
       for idx in 0..<point.offset {
         let k = childrenKeys[idx]
         if let s = rangeCache[k] { loc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }

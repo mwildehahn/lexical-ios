@@ -264,10 +264,18 @@ final class SelectionParityTests: XCTestCase {
       } catch { optEF = nil; optEB = nil }
     }
     func aloc(_ p: Point?, _ ed: Editor) throws -> Int? { guard let p else { return nil }; return try stringLocationForPoint(p, editor: ed) }
-    let legacyEFLoc = try aloc(legacyEF, legacyEditor)
-    let legacyEBLoc = try aloc(legacyEB, legacyEditor)
-    let optEFLoc = try aloc(optEF, optEditor)
-    let optEBLoc = try aloc(optEB, optEditor)
+    var legacyEFLoc: Int? = nil
+    var legacyEBLoc: Int? = nil
+    var optEFLoc: Int? = nil
+    var optEBLoc: Int? = nil
+    try legacyEditor.read {
+      legacyEFLoc = try aloc(legacyEF, legacyEditor)
+      legacyEBLoc = try aloc(legacyEB, legacyEditor)
+    }
+    try optEditor.read {
+      optEFLoc = try aloc(optEF, optEditor)
+      optEBLoc = try aloc(optEB, optEditor)
+    }
     if let lfl = legacyEFLoc, let lbl = legacyEBLoc {
       XCTAssertEqual(lfl, legacyStart)
       XCTAssertEqual(lbl, legacyStart)
@@ -351,10 +359,18 @@ final class SelectionParityTests: XCTestCase {
     }
 
     func aloc(_ p: Point?, _ ed: Editor) throws -> Int? { guard let p else { return nil }; return try stringLocationForPoint(p, editor: ed) }
-    let legacyFLoc = try aloc(legacyF, legacyEditor)
-    let legacyBLoc = try aloc(legacyB, legacyEditor)
-    let optFLoc = try aloc(optF, optEditor)
-    let optBLoc = try aloc(optB, optEditor)
+    var legacyFLoc: Int? = nil
+    var legacyBLoc: Int? = nil
+    var optFLoc: Int? = nil
+    var optBLoc: Int? = nil
+    try legacyEditor.read {
+      legacyFLoc = try aloc(legacyF, legacyEditor)
+      legacyBLoc = try aloc(legacyB, legacyEditor)
+    }
+    try optEditor.read {
+      optFLoc = try aloc(optF, optEditor)
+      optBLoc = try aloc(optB, optEditor)
+    }
     if optEditor.featureFlags.selectionParityDebug {
       if let of = optF { print("🔥 OPT FORWARD POINT: key=\(of.key) type=\(of.type) off=\(of.offset)") }
       if let ob = optB { print("🔥 OPT BACKWARD POINT: key=\(ob.key) type=\(ob.type) off=\(ob.offset)") }
