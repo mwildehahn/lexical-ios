@@ -155,6 +155,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] 2025‑09‑25: Instruction coalescing apply engine; LIS stable set; minimal‑move reorder (delete+insert) with rebuild fallback; strict‑mode flag & optimized full rebuild path; tests and Playground build passing.
 - [x] 2025‑09‑25: Fenwick-based location rebuild for text/pre/post fast paths; composition (IME) start fast path; shadow-compare harness flag and hook; all iOS tests & Playground build green.
 - [x] 2025‑09‑25: Reorder fast path extended for nested/decorator-bearing subtrees. After minimal delete/insert moves, compute child-level new start positions and shift entire child subtrees (including decorators) without subtree recompute. Updated `decoratorPositionCache` inside moved subtrees. Added parity tests for decorator scenarios: paragraph with inline decorator and nested quote with decorators; both compare optimized (strict mode) vs legacy.
+- [x] 2025‑09‑25: Integrated block-level attributes pass into optimized paths (text-only, pre/post, reorder) and optimized slow path. Added test `OptimizedReconcilerBlockAttributesTests` to assert parity vs legacy for code block margin/padding behavior. All iOS simulator tests (Lexical-Package) pass on iPhone 17 Pro (iOS 26.0).
 
 ## Current Flag Defaults (Tests/Playground)
 - `useOptimizedReconciler = true`
