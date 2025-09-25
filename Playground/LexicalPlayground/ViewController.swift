@@ -55,6 +55,11 @@ class ViewController: UIViewController, UIToolbarDelegate {
     let linkPlugin = LinkPlugin()
 
     let theme = Theme()
+    // Explicit base styling so both reconciler modes use the same appearance.
+    theme.paragraph = [
+      .font: UIFont(name: "Helvetica", size: 15.0) ?? UIFont.systemFont(ofSize: 15.0),
+      .foregroundColor: UIColor.label
+    ]
     theme.setBlockLevelAttributes(.heading, value: BlockLevelAttributes(marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 20))
     theme.indentSize = 40.0
     theme.link = [

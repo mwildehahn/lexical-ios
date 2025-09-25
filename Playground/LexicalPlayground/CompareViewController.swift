@@ -33,9 +33,15 @@ final class CompareViewController: UIViewController {
     // Editors with a basic toolbar (undo/redo etc.) for visibility
     let hist1 = EditorHistoryPlugin(); let tb1 = ToolbarPlugin(viewControllerForPresentation: self, historyPlugin: hist1)
     let hist2 = EditorHistoryPlugin(); let tb2 = ToolbarPlugin(viewControllerForPresentation: self, historyPlugin: hist2)
-    legacyView = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [tb1, hist1]),
+    // Ensure both editors share an explicit base theme (font + dynamic color)
+    let sharedTheme = Theme()
+    sharedTheme.paragraph = [
+      .font: UIFont(name: "Helvetica", size: 15.0) ?? UIFont.systemFont(ofSize: 15.0),
+      .foregroundColor: UIColor.label
+    ]
+    legacyView = LexicalView(editorConfig: EditorConfig(theme: sharedTheme, plugins: [tb1, hist1]),
                              featureFlags: FeatureFlags(reconcilerMode: .legacy))
-    optimizedView = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [tb2, hist2]),
+    optimizedView = LexicalView(editorConfig: EditorConfig(theme: sharedTheme, plugins: [tb2, hist2]),
                                 featureFlags: FeatureFlags(reconcilerMode: .optimized,
                                                            diagnostics: Diagnostics(selectionParity: false, sanityChecks: false, metrics: false, verboseLogs: false)))
 
