@@ -78,10 +78,15 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
       - `OptimizedReconcilerDecoratorParityTests` (nested/deep reorders with decorators)
     - Verified on iOS simulator (iPhone 17 Pro, iOS 26.0): full `Lexical-Package` tests PASS; Playground build PASS.
 
-- [ ] M3a — Composition (Marked Text) in Optimized Reconciler
-  - [ ] Mirror legacy marked‑text sequence: start (createMarkedText), update (internal selection), confirm/cancel.
-  - [ ] Preserve selection gating constraints; ensure `pointAtStringLocation` validity during IME.
-  - [ ] Unit tests for CJK/emoji composition and selection continuity.
+- [x] M3a — Composition (Marked Text) in Optimized Reconciler
+  - [x] Mirror legacy marked‑text sequence: start (createMarkedText), update (internal selection), confirm/cancel.
+  - [x] Preserve selection gating constraints; ensure `pointAtStringLocation` validity during IME.
+  - [x] Unit tests for CJK/emoji composition and selection continuity.
+    - Added and verified: `OptimizedReconcilerCompositionTests.testCompositionUpdateReplacesMarkedRange` (CJK update) and `testCompositionEndUnmarksAndKeepsText`.
+  - Implementation notes:
+    - `fastPath_Composition` handles replace-at-marked-range for both start and subsequent updates; co-styles marked text using owning node attributes and skips selection reconcile during IME.
+    - End-of-composition flows through TextView.unmarkText(), marking affected nodes dirty; optimized reconciler handles reconciliation normally.
+  - Status: iOS simulator tests PASS; Playground build PASS.
 
 - [ ] M4 — RangeCache & Selection
   - [ ] Rebuild `nextRangeCache.location` via cumulative Fenwick deltas in a single pass.
