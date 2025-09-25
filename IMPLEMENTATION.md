@@ -184,11 +184,11 @@ Findings (current hypothesis)
 - Styled boundary mismatch appears to be absolute location drift between legacy and optimized range caches (not tie‑break). Second TextNode start differs (legacy=3, optimized=2). Suspect incremental range cache over‑count on sibling contributions or paragraph childrenLength under optimized path.
 - Empty element start mismatch suggests element absolute start computation via `absoluteNodeStartLocation` returns 1 in optimized path, likely due to an extra preamble/child contribution at the root/paragraph boundary.
 
-Next Actions
-- Instrument absolute start calculation for elements/text (guarded by `selectionParityDebug`) to dump parent/children contributions.
-- Audit IncrementalRangeCacheUpdater ancestor bumps for `.nodeInsertion` vs `.attributeChange` on siblings; ensure no double‑count of TextNode lengths on initial insert + attribute.
-- Add idempotence guard for `.nodeInsertion` within batch (skip re‑applying textLength when item was created earlier in the same batch). Re‑run idempotence tests.
-- If ancestor childrenLength inflation is confirmed, patch bump logic and re‑verify styled boundary and element boundary parity.
+Next Actions — Status (2025‑09‑25): Completed
+- [x] Instrumented absolute start calculation for elements/text (guarded by `selectionParityDebug`) — “🔥 ABS‑START …” logs present in RangeCache.
+- [x] Audited and fixed IncrementalRangeCacheUpdater ancestor bumps; no EditorContext calls; added deterministic bottom‑up recompute to eliminate inflation.
+- [x] Added `.nodeInsertion` idempotence guard (and in‑batch adjust) — repeated inserts for the same node converge to correct leaf lengths; tests green.
+- [x] Patched childrenLength handling (ancestor bump + authoritative recompute) — verified parity at styled/element/paragraph boundaries and multi‑paragraph ranges.
 Debugging Strategy
 - Add guarded (selectionParityDebug) “🔥 EVAL …” prints in evaluateNode for:
   - node type, base starts, pre/child/text/post lengths
