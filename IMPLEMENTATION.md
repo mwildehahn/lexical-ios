@@ -157,6 +157,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] 2025‑09‑25: Reorder fast path extended for nested/decorator-bearing subtrees. After minimal delete/insert moves, compute child-level new start positions and shift entire child subtrees (including decorators) without subtree recompute. Updated `decoratorPositionCache` inside moved subtrees. Added parity tests for decorator scenarios: paragraph with inline decorator and nested quote with decorators; both compare optimized (strict mode) vs legacy.
 - [x] 2025‑09‑25: Integrated block-level attributes pass into optimized paths (text-only, pre/post, reorder) and optimized slow path. Added test `OptimizedReconcilerBlockAttributesTests` to assert parity vs legacy for code block margin/padding behavior. All iOS simulator tests (Lexical-Package) pass on iPhone 17 Pro (iOS 26.0).
 - [x] 2025‑09‑25: Composition flows — implemented update/end coverage via tests. Optimized path handles repeated marked-text replacements and end-unmark parity with legacy (including multibyte). Added `OptimizedReconcilerCompositionTests`.
+- [x] 2025‑09‑25: Added contiguous multi-node replace fast path. Detects lowest common ancestor with unchanged key set and replaces its children region in one edit (coalesced). Added `OptimizedReconcilerMultiNodeReplaceTests` (optimized strict vs legacy parity). Full suite green on iOS sim.
 
 ## Current Flag Defaults (Tests/Playground)
 - `useOptimizedReconciler = true`
