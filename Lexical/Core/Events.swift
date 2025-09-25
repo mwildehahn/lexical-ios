@@ -37,6 +37,13 @@ internal func onInsertTextFromUITextView(
       try rangeSelection.applyNativeSelection(nativeSel)
     }
 
+    if editor.featureFlags.diagnostics.verboseLogs {
+      let ns = editor.getNativeSelection()
+      let loc = ns.range?.location ?? -1
+      let len = ns.range?.length ?? -1
+      print("🔥 INPUT onInsertText: text='\(text.replacingOccurrences(of: "\n", with: "\\n"))' native=[\(loc),\(len)]")
+    }
+
     if let markedTextOperation = updateMode.markedTextOperation,
       markedTextOperation.createMarkedText == true,
       let rangeSelection = selection as? RangeSelection

@@ -130,3 +130,33 @@ Migration note
 Commit summary (planned)
 - Tests: drop deprecated FeatureFlags args; documentation updates.
 - No behavior change under existing feature configurations; parity tests remain green.
+
+---
+
+## Bugs (tracked)
+
+- B-0001: Infinite recursion between `absoluteNodeStartLocation` and `RangeCacheItem.locationFromFenwick`
+  - Status: Fixed
+  - Symptom: Hang/stack overflow when mapping absolute locations under optimized mode (stack trace alternates between both functions).
+  - Fix: Use `fenwickTree.getNodeOffset(nodeIndex:)` in AbsoluteLocation fallback; avoid calling back into `locationFromFenwick`.
+  - Commit: 5b61d6f
+
+- B-0002: Optimized input — Return/Backspace mismatch vs legacy
+  - Status: Repro added; partial fixes landed; off‑by‑one at text‑end still under investigation.
+  - Repro Test: `LexicalTests/Phase4/OptimizedInputBehaviorTests.testInsertNewlineAndBackspaceInOptimizedMode` (uses `XCTExpectFailure`).
+  - Changes so far:
+    - Always normalize previous‑sibling postamble on insert (was parity‑gated).
+    - Deterministic parent recompute refreshes each child’s pre/post from pending state after updates.
+    - Sync model selection with native selection before text insertion.
+  - Next steps:
+    - Audit text‑end tie‑breaks in `pointAtStringLocation` for non‑parity mapping.
+    - Verify delta generator emits `nodeInsertion` for split pieces during paragraph creation.
+  - Commits: 08be794 (+ follow‑up debug print commits)
+
+- B-0003: Playground mode switch not visible on Editor tab
+  - Status: Fixed
+  - Change: Dedicated bar above editor toolbar hosts the segmented control.
+  - Commit: 4564f90
+
+Policy
+- For each user‑reported issue, we: (1) add a focused unit test (expected failure until fixed), (2) update this list with status and commit links, and (3) keep verbose debug prints available behind `Diagnostics.verboseLogs` to aid investigation.

@@ -132,6 +132,9 @@ internal class IncrementalRangeCacheUpdater {
         if sum != parentItem.childrenLength {
           parentItem.childrenLength = sum
           rangeCache[p] = parentItem
+          if editor.featureFlags.diagnostics.verboseLogs {
+            print("🔥 RANGE CACHE UPDATER: parent=\(p) recompute childrenLength=\(sum)")
+          }
         }
       }
     }

@@ -870,6 +870,9 @@ public class RangeSelection: BaseSelection {
 
   @MainActor
   public func insertParagraph() throws {
+    if let ed = getActiveEditor(), ed.featureFlags.diagnostics.verboseLogs {
+      print("🔥 INSERT PARAGRAPH: anchor=\(anchor.key)@\(anchor.offset) type=\(anchor.type) focus=\(focus.key)@\(focus.offset) type=\(focus.type)")
+    }
     if !isCollapsed() {
       try removeText()
     }

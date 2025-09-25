@@ -87,7 +87,9 @@ internal enum OptimizedReconciler {
           if lhs.location != rhs.location { return lhs.location < rhs.location }
           return l < r
         }
-
+        if editor.featureFlags.diagnostics.verboseLogs {
+          print("🔥 OPT RECON: inserted order=\(inserted)")
+        }
         for (key, _) in inserted {
           if editor.fenwickIndexMap[key] == nil {
             let idx = editor.nextFenwickIndex
@@ -106,13 +108,21 @@ internal enum OptimizedReconciler {
     for (index, delta) in deltaBatch.deltas.enumerated() {
       switch delta.type {
       case .nodeInsertion(let nodeKey, let insertionData, let location):
-        editor.log(.reconciler, .message, "Delta \(index): INSERT node \(nodeKey) at \(location), content length: \(insertionData.content.length)")
+        if editor.featureFlags.diagnostics.verboseLogs {
+          print("🔥 DELTA GEN: [\(index)] INSERT key=\(nodeKey) loc=\(location) pre=\(insertionData.preamble.length) tx=\(insertionData.content.length) post=\(insertionData.postamble.length)")
+        }
       case .textUpdate(let nodeKey, let newText, let range):
-        editor.log(.reconciler, .message, "Delta \(index): UPDATE node \(nodeKey) text: '\(newText.prefix(20))...' at \(range)")
+        if editor.featureFlags.diagnostics.verboseLogs {
+          print("🔥 DELTA GEN: [\(index)] UPDATE key=\(nodeKey) range=\(NSStringFromRange(range)) new='\(String(newText.prefix(20)))'")
+        }
       case .nodeDeletion(let nodeKey, let range):
-        editor.log(.reconciler, .message, "Delta \(index): DELETE node \(nodeKey) at \(range)")
+        if editor.featureFlags.diagnostics.verboseLogs {
+          print("🔥 DELTA GEN: [\(index)] DELETE key=\(nodeKey) range=\(NSStringFromRange(range))")
+        }
       case .attributeChange(let nodeKey, _, let range):
-        editor.log(.reconciler, .message, "Delta \(index): ATTR node \(nodeKey) at \(range)")
+        if editor.featureFlags.diagnostics.verboseLogs {
+          print("🔥 DELTA GEN: [\(index)] ATTR key=\(nodeKey) range=\(NSStringFromRange(range))")
+        }
       }
     }
 
