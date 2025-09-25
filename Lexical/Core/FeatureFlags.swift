@@ -14,6 +14,7 @@ import Foundation
   let useReconcilerFenwickDelta: Bool
   let useReconcilerKeyedDiff: Bool
   let useReconcilerBlockRebuild: Bool
+  let useOptimizedReconcilerStrictMode: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
@@ -21,7 +22,8 @@ import Foundation
     useOptimizedReconciler: Bool = false,
     useReconcilerFenwickDelta: Bool = false,
     useReconcilerKeyedDiff: Bool = false,
-    useReconcilerBlockRebuild: Bool = false
+    useReconcilerBlockRebuild: Bool = false,
+    useOptimizedReconcilerStrictMode: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -29,6 +31,7 @@ import Foundation
     self.useReconcilerFenwickDelta = useReconcilerFenwickDelta
     self.useReconcilerKeyedDiff = useReconcilerKeyedDiff
     self.useReconcilerBlockRebuild = useReconcilerBlockRebuild
+    self.useOptimizedReconcilerStrictMode = useOptimizedReconcilerStrictMode
     super.init()
   }
 }

@@ -128,8 +128,8 @@ internal enum OptimizedReconciler {
       fatalError("Cannot run optimized reconciler on an editor with no text storage")
     }
 
-    // Skip optimized paths when composition is active or full reconcile requested
-    if markedTextOperation != nil || editor.dirtyType == .fullReconcile {
+    // Skip optimized paths when composition is active
+    if markedTextOperation != nil {
       return try delegateToLegacy(
         currentEditorState: currentEditorState,
         pendingEditorState: pendingEditorState,
@@ -139,7 +139,7 @@ internal enum OptimizedReconciler {
       )
     }
 
-    // M1/M2: integrate DFS index + Fenwick deltas; optimized fast paths
+    // Try optimized fast paths before falling back (even if fullReconcile)
     if try fastPath_ReorderChildren(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
@@ -169,13 +169,23 @@ internal enum OptimizedReconciler {
     }
 
     // Fallback to legacy until additional optimized planners are implemented
-    try delegateToLegacy(
-      currentEditorState: currentEditorState,
-      pendingEditorState: pendingEditorState,
-      editor: editor,
-      shouldReconcileSelection: shouldReconcileSelection,
-      markedTextOperation: markedTextOperation
-    )
+    // If still here, fallback
+    if editor.featureFlags.useOptimizedReconcilerStrictMode {
+      try optimizedSlowPath(
+        currentEditorState: currentEditorState,
+        pendingEditorState: pendingEditorState,
+        editor: editor,
+        shouldReconcileSelection: shouldReconcileSelection
+      )
+    } else {
+      try delegateToLegacy(
+        currentEditorState: currentEditorState,
+        pendingEditorState: pendingEditorState,
+        editor: editor,
+        shouldReconcileSelection: shouldReconcileSelection,
+        markedTextOperation: markedTextOperation
+      )
+    }
   }
 
   // MARK: - Legacy delegate
@@ -195,6 +205,55 @@ internal enum OptimizedReconciler {
       shouldReconcileSelection: shouldReconcileSelection,
       markedTextOperation: markedTextOperation
     )
+  }
+
+  // MARK: - Optimized slow path fallback (no legacy)
+  @MainActor
+  private static func optimizedSlowPath(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    shouldReconcileSelection: Bool
+  ) throws {
+    guard let textStorage = editor.textStorage else { return }
+    let theme = editor.getTheme()
+    let previousMode = textStorage.mode
+    textStorage.mode = .controllerMode
+    textStorage.beginEditing()
+    // Rebuild full string from pending state (root children)
+    let built = NSMutableAttributedString()
+    if let root = pendingEditorState.getRootNode() as? ElementNode {
+      for child in root.getChildrenKeys() {
+        built.append(buildAttributedSubtree(nodeKey: child, state: pendingEditorState, theme: theme))
+      }
+    }
+    let fullRange = NSRange(location: 0, length: textStorage.string.lengthAsNSString())
+    textStorage.replaceCharacters(in: fullRange, with: built)
+    textStorage.fixAttributes(in: NSRange(location: 0, length: built.length))
+    textStorage.endEditing()
+    textStorage.mode = previousMode
+
+    // Recompute entire range cache locations
+    _ = recomputeRangeCacheSubtree(nodeKey: kRootNodeKey, state: pendingEditorState, startLocation: 0, editor: editor)
+
+    // Update decorators positions
+    if let ts = editor.textStorage {
+      for (key, _) in ts.decoratorPositionCache {
+        if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
+      }
+    }
+
+    // Selection reconcile
+    let prevSelection = currentEditorState.selection
+    let nextSelection = pendingEditorState.selection
+    var selectionsAreDifferent = false
+    if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+    let needsUpdate = editor.dirtyType != .noDirtyNodes
+    if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+      try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+    }
+
+    print("🔥 OPTIMIZED RECONCILER: optimized slow path applied (full rebuild)")
   }
 
   // MARK: - Fast path: single TextNode content change
@@ -376,14 +435,53 @@ internal enum OptimizedReconciler {
       return false
     }
 
-    guard let textStorage = editor.textStorage else { return false }
-    let previousMode = textStorage.mode
-    textStorage.mode = .controllerMode
-    textStorage.beginEditing()
-    textStorage.replaceCharacters(in: childrenRange, with: built)
-    textStorage.fixAttributes(in: NSRange(location: childrenRange.location, length: built.length))
-    textStorage.endEditing()
-    textStorage.mode = previousMode
+    // Decide whether to do minimal moves or full region rebuild
+    let movedCount = nextChildren.filter { !stableSet.contains($0) }.count
+    if movedCount == 0 {
+      // Nothing to do beyond cache recompute
+      _ = recomputeRangeCacheSubtree(
+        nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location,
+        editor: editor)
+    } else if movedCount < max(2, nextChildren.count / 2) {
+      // Minimal move plan: delete moved child ranges, then insert them at target positions in next order
+      var instructions: [Instruction] = []
+      // Delete moved children in descending location order
+      let movedKeys = prevChildren.filter { !stableSet.contains($0) }
+      let movedDeleteRanges: [NSRange] = movedKeys.compactMap { k in editor.rangeCache[k]?.range }
+      for r in movedDeleteRanges.sorted(by: { $0.location > $1.location }) {
+        instructions.append(.delete(range: r))
+      }
+
+      // Compute pending lengths for all children
+      var nextLen: [NodeKey: Int] = [:]
+      for k in nextChildren {
+        nextLen[k] = subtreeTotalLength(nodeKey: k, state: pendingEditorState)
+      }
+      // Insert moved children at target positions based on next order
+      var acc = 0
+      for k in nextChildren {
+        if stableSet.contains(k) {
+          acc += nextLen[k] ?? 0
+        } else {
+          let insertLoc = childrenStart + acc
+          let attr = buildAttributedSubtree(nodeKey: k, state: pendingEditorState, theme: theme)
+          instructions.append(.insert(location: insertLoc, attrString: attr))
+          acc += attr.length
+        }
+      }
+
+      applyInstructions(instructions, editor: editor)
+    } else {
+      // Region rebuild fallback when many moves
+      guard let textStorage = editor.textStorage else { return false }
+      let previousMode = textStorage.mode
+      textStorage.mode = .controllerMode
+      textStorage.beginEditing()
+      textStorage.replaceCharacters(in: childrenRange, with: built)
+      textStorage.fixAttributes(in: NSRange(location: childrenRange.location, length: built.length))
+      textStorage.endEditing()
+      textStorage.mode = previousMode
+    }
 
     // Recompute range cache for this subtree in the new order (locations only; lengths unchanged)
     _ = recomputeRangeCacheSubtree(
@@ -409,7 +507,7 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-    print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey))")
+    print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey), moved=\(movedCount), total=\(nextChildren.count))")
     return true
   }
 

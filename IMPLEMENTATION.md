@@ -73,11 +73,20 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [ ] Apply block‑level attributes once per affected block with deduped nodes.
   - [ ] Handle decorators move/add/remove; preserve `needsCreation/needsDecorating` semantics.
 
+- [ ] M3a — Composition (Marked Text) in Optimized Reconciler
+  - [ ] Mirror legacy marked‑text sequence: start (createMarkedText), update (internal selection), confirm/cancel.
+  - [ ] Preserve selection gating constraints; ensure `pointAtStringLocation` validity during IME.
+  - [ ] Unit tests for CJK/emoji composition and selection continuity.
+
 - [ ] M4 — RangeCache & Selection
   - [ ] Rebuild `nextRangeCache.location` via cumulative Fenwick deltas in a single pass.
   - [ ] Update part lengths for changed nodes; update ancestor `childrenLength` using parent keys.
   - [ ] Ensure `pointAtStringLocation` returns valid results; parity with legacy on edge cases.
   - [x] Integrate selection reconciliation in fast path; preserve current constraints.
+
+- [ ] M4a — Shadow Compare Harness (Debug Only)
+  - [ ] Run optimized reconcile and legacy reconcile on a cloned state; compare NSAttributedString output and range cache invariants.
+  - [ ] Toggle via debug flag; wire to CI/nightly scenarios to catch edge mismatches.
 
 - [ ] M5 — Tests & Parity
   - [ ] Add `LexicalTests/Phase4/OptimizedReconcilerTests.swift` with:
@@ -95,17 +104,34 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [ ] Add metrics reporting to confirm op reductions and time split improvements.
   - [ ] Ship sub‑flags off by default; enable in CI nightly; collect metrics.
   - [ ] Flip `useOptimizedReconciler` in staged environments.
+  - [ ] Remove legacy delegation once composition + shadow compare are green; retain a one‑release kill switch.
 
 ## Engineering Notes
 - We index nodes (not individual parts) in the Fenwick tree; per‑part changes roll up to a single node `totalDelta`. This is sufficient to shift positions of all subsequent nodes. Parent `childrenLength` is updated separately along ancestor chains, bounded by tree depth.
 - For large documents, we accept one O(n) pass to rebuild locations (no tree traversal; just array walk with cumulative delta). Lazy delta mapping can be introduced later if needed.
 - Keyed diff (LIS) avoids destroy+create pairs for pure moves; for leaf moves we aim to avoid any text re‑emission when spans are identical.
 
+### Strict Mode and Fallback Policy
+- We will run the optimized reconciler in “strict mode”: no legacy delegation for non‑composition paths.
+- Feature flag: `useOptimizedReconcilerStrictMode` (added). When true and not composing, optimized reconciler performs either fast paths or an optimized full rebuild (no legacy call).
+- Composition (IME) is temporarily delegated to legacy until M3a lands; after M3a, remove delegation entirely.
+
+### Shadow Compare (Debug)
+- A debug‑only harness will run both legacy and optimized on a cloned state and compare final `NSAttributedString` and key range cache invariants.
+- This stays on in CI/nightly until we retire the legacy reconciler.
+
+### Metrics to Track
+- Operation counts: deletes, inserts, attribute sets; total edited characters.
+- Time splits: planning vs apply vs attributes; fast‑path hit rate; region rebuild frequency.
+- Reorder specifics: moved vs stable children ratio; minimal‑move vs rebuild decision rate.
+
 ## Acceptance Criteria
 - [ ] All existing Lexical tests pass with `useOptimizedReconciler=false` (baseline).
 - [ ] With `useOptimizedReconciler=true`, new tests pass and a golden‑compare test confirms identical `NSAttributedString` output vs legacy for the same updates.
 - [ ] Measured: ≥3× fewer TextStorage edits on typing and attribute toggles; ≥2× faster reconcile time on representative docs.
 - [ ] Decorators mount/unmount/decorate parity; selection and marked text parity; block‑level attributes parity.
+- [ ] Shadow compare (debug) clean across a representative scenario corpus (typing, reorders, decorators, composition, paste).
+- [ ] No legacy delegation with `useOptimizedReconcilerStrictMode=true` (except during composition until M3a completes).
 
 ## Validation
 - Build package:
@@ -126,6 +152,14 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] 2025‑09‑25: Plan created; pending scaffolding (feature flag, stubs, tests skeletons).
 - [x] 2025‑09‑25: M0 mostly complete — feature flag, Editor wiring, OptimizedReconciler entry added; FenwickTree + tests and DFS index helper + tests added; implemented optimized fast paths for single TextNode (text replace and attribute‑only) with decorator and selection handling; baseline iOS test coverage added (no macOS).
 - [x] 2025‑09‑25: Added preamble/postamble fast path and children reorder region-rebuild; introduced subtree range cache recomputation; added robust tests using LexicalReadOnlyTextKitContext; fixed metrics actor isolation; selected tests pass on iPhone 17 Pro (iOS 26.0).
+- [x] 2025‑09‑25: Instruction coalescing apply engine; LIS stable set; minimal‑move reorder (delete+insert) with rebuild fallback; strict‑mode flag & optimized full rebuild path; tests and Playground build passing.
+
+## Current Flag Defaults (Tests/Playground)
+- `useOptimizedReconciler = true`
+- `useOptimizedReconcilerStrictMode = true` (no legacy fallback except composition temporarily)
+- `useReconcilerFenwickDelta = true` (planning groundwork in place; full rebuild in M4)
+- `useReconcilerKeyedDiff = true` (LIS planning active)
+- `useReconcilerBlockRebuild = true` (fallback guarded by ratio)
 
 ---
 
