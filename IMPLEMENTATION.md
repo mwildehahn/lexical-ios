@@ -153,6 +153,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] 2025‑09‑25: M0 mostly complete — feature flag, Editor wiring, OptimizedReconciler entry added; FenwickTree + tests and DFS index helper + tests added; implemented optimized fast paths for single TextNode (text replace and attribute‑only) with decorator and selection handling; baseline iOS test coverage added (no macOS).
 - [x] 2025‑09‑25: Added preamble/postamble fast path and children reorder region-rebuild; introduced subtree range cache recomputation; added robust tests using LexicalReadOnlyTextKitContext; fixed metrics actor isolation; selected tests pass on iPhone 17 Pro (iOS 26.0).
 - [x] 2025‑09‑25: Instruction coalescing apply engine; LIS stable set; minimal‑move reorder (delete+insert) with rebuild fallback; strict‑mode flag & optimized full rebuild path; tests and Playground build passing.
+- [x] 2025‑09‑25: Fenwick-based location rebuild for text/pre/post fast paths; composition (IME) start fast path; shadow-compare harness flag and hook; all iOS tests & Playground build green.
 
 ## Current Flag Defaults (Tests/Playground)
 - `useOptimizedReconciler = true`

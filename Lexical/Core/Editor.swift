@@ -776,6 +776,13 @@ public class Editor: NSObject {
               shouldReconcileSelection: !mode.suppressReconcilingSelection,
               markedTextOperation: mode.markedTextOperation
             )
+            if featureFlags.useReconcilerShadowCompare && compositionKey == nil {
+              shadowCompareOptimizedVsLegacy(
+                activeEditor: self,
+                currentEditorState: editorState,
+                pendingEditorState: pendingEditorState
+              )
+            }
           } else {
             try Reconciler.updateEditorState(
               currentEditorState: editorState,
