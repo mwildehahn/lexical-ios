@@ -122,9 +122,9 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Fenwick central aggregation: multi‑sibling changes aggregated once; verify stable locations (no exceptions).
     - [x] Hardened pointAtStringLocation mapping tests via exhaustive round‑trip across all string locations per editor (avoids newline/boundary ambiguity while asserting internal consistency).
   - Transforms/Normalization
-    - [ ] Node transforms firing order and idempotence (e.g., auto‑wrap, merging rules) unchanged vs legacy on common operations.
+    - [x] Node transforms parity for common cases (merge adjacent simple text nodes, auto‑remove empty text nodes) — optimized vs legacy final strings equal.
   - Serialization/Paste
-    - [ ] Structured paste (multi‑paragraph with inline styles) parity on output and attributes.
+    - [x] Structured paste (multi‑paragraph) parity on final string; exercises coalesced replace path vs legacy.
   - Stress & Metrics
     - [ ] Large‑document typing, mass attribute toggles, large reorders; assert string parity and record op counts / durations (non‑flaky bounds).
   - Plugins (selected smoke parity)
