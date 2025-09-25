@@ -24,8 +24,10 @@ final class ListStyleParityTests: XCTestCase {
   }
 
   func testBulletItemAttributesParity() throws {
-    let legacy = makeView(optimized: false).editor
-    let opt = makeView(optimized: true).editor
+    let legacyView = makeView(optimized: false)
+    let optView = makeView(optimized: true)
+    let legacy = legacyView.editor
+    let opt = optView.editor
 
     try legacy.update {
       guard let root = getActiveEditorState()?.getRootNode() else { return }
@@ -50,4 +52,3 @@ final class ListStyleParityTests: XCTestCase {
     XCTAssertNotNil(oa[.listItem])
   }
 }
-

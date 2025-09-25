@@ -146,6 +146,10 @@ Verification
   - Focused tests:
     - `LexicalTests/StyleParityTests/testIndentAndBlockAttributesParity` — green after fixes.
     - `LexicalTests/StyleParityTests/testHydrationStyleParity` and `testTextUpdateFormattingParity` — green.
+  - Plugin parity tests:
+    - `Plugins/LexicalLinkPlugin/LexicalLinkPluginTests/LinkStyleParityTests.swift`
+    - `Plugins/LexicalListPlugin/LexicalListPluginTests/ListStyleParityTests.swift`
+    - Run via `Lexical-Package` scheme (see scripts below).
   - Playground build: `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build` — succeeded.
 
 Notes
@@ -155,6 +159,9 @@ Notes
 Follow‑up (Compare screen & base attributes)
 - CompareViewController now includes ListPlugin and LinkPlugin for both editors and sets Theme.link color; bullets and links render in both Legacy and Optimized.
 - Added base-attribute top‑up after both fresh hydration and regular optimized reconcile: any ranges missing .font or .foregroundColor get the theme’s base values (does not override existing attributes). This removes “black text until you type”.
+
+Convenience runner
+- scripts/run_ios_tests.sh runs core (Lexical) + plugin parity tests (Lexical‑Package) on iOS 26.0.
 
 ---
 
