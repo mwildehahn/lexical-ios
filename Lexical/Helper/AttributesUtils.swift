@@ -101,6 +101,14 @@ enum AttributeUtils {
       combinedAttributes[.paragraphSpacingBefore_internal] = paragraphStyle.paragraphSpacingBefore
       combinedAttributes[.paragraphSpacing_internal] = paragraphStyle.paragraphSpacing
     }
+    // Fallback: if indent is present but no paragraphStyle was produced, synthesize a minimal style for indentation.
+    if combinedAttributes[.paragraphStyle] == nil, let indent = combinedAttributes[.indent_internal] as? Int, indent > 0 {
+      let ps = NSMutableParagraphStyle()
+      let left = CGFloat(indent) * CGFloat(theme.indentSize)
+      ps.firstLineHeadIndent = left
+      ps.headIndent = left
+      combinedAttributes[.paragraphStyle] = ps
+    }
 
     if combinedAttributes[.foregroundColor] == nil {
       combinedAttributes[.foregroundColor] = LexicalConstants.defaultColor
@@ -210,11 +218,26 @@ enum AttributeUtils {
     _ attributes: BlockLevelAttributes, cacheItem: RangeCacheItem, textStorage: TextStorage,
     nodeKey: NodeKey, lastDescendentAttributes: [NSAttributedString.Key: Any], fenwickTree: FenwickTree
   ) {
+    // Skip nodes that have no children or text content (newline-only/postamble-only blocks).
+    // Legacy reconciler effectively avoids coating these with paragraph styles, so
+    // do the same here to maintain parity (prevents indent at index 0 when a
+    // newline-only sibling exists at the start of the document).
+    if cacheItem.childrenLength == 0 && cacheItem.textLength == 0 {
+      return
+    }
+    if let ed = getActiveEditor(), ed.featureFlags.diagnostics.verboseLogs {
+      let loc = cacheItem.locationFromFenwick(using: fenwickTree)
+      let len = cacheItem.preambleLength + cacheItem.childrenLength + cacheItem.textLength + cacheItem.postambleLength
+      print("🔥 BLOCK ATTR: key=\(nodeKey) loc=\(loc) len=\(len) children=\(cacheItem.childrenLength) text=\(cacheItem.textLength) post=\(cacheItem.postambleLength)")
+    }
 
     // for more information about the extraLineFragment, see NSLayoutManager docs
     let extraLineFragmentIsPresent = extraLineFragmentIsPresent(textStorage)
-    // This is called from legacy reconciler, so use the direct range property
-    let range = cacheItem.range
+    // Compute the paragraph application range.
+    // Use Fenwick-based range when optimized reconciler is active; otherwise use the cached absolute range.
+    let range: NSRange = (getActiveEditor()?.featureFlags.optimizedReconciler ?? false)
+      ? cacheItem.rangeFromFenwick(using: fenwickTree)
+      : cacheItem.range
     let startTouchesExtraLineFragment =
       (extraLineFragmentIsPresent && range.length == 0
         && range.location == textStorage.length)
@@ -276,6 +299,11 @@ enum AttributeUtils {
       extraLineFragmentAttributes[.paragraphStyle] = firstMutableParaStyle
     case .range(_, let enclosing):
       textStorage.addAttribute(.paragraphStyle, value: firstMutableParaStyle, range: enclosing)
+      if getActiveEditor()?.featureFlags.diagnostics.verboseLogs == true {
+        let at = enclosing.location
+        let applied = textStorage.attribute(.paragraphStyle, at: at, effectiveRange: nil) as Any
+        print("🔥 PARA FIRST: applied at=\(at) style=\(applied)")
+      }
     }
 
     // Now do the same for 'last'. This may involve reading back out the para style we just set for first, and modifying it further.
@@ -311,7 +339,22 @@ enum AttributeUtils {
       extraLineFragmentAttributes[.paragraphStyle] = lastMutableParaStyle
     case .range(_, let enclosing):
       textStorage.addAttribute(.paragraphStyle, value: lastMutableParaStyle, range: enclosing)
+      if getActiveEditor()?.featureFlags.diagnostics.verboseLogs == true {
+        let at = enclosing.location
+        let applied = textStorage.attribute(.paragraphStyle, at: at, effectiveRange: nil) as Any
+        print("🔥 PARA LAST: applied at=\(at) style=\(applied)")
+      }
     }
+
+    // Special case: single-paragraph block — apply a unified style carrying both spacingBefore and spacing
+    if case let .range(_, enclosingFirst) = first, case let .range(_, enclosingLast) = last,
+       enclosingFirst.location == enclosingLast.location && enclosingFirst.length == enclosingLast.length {
+      let unified = (firstMutableParaStyle.mutableCopy() as? NSMutableParagraphStyle) ?? firstMutableParaStyle
+      unified.paragraphSpacing = lastMutableParaStyle.paragraphSpacing
+      textStorage.addAttribute(.paragraphStyle, value: unified, range: enclosingFirst)
+    }
+
+    // No fallback coating at index 0 — keep styles applied to real paragraph ranges only.
 
     if extraLineFragmentIsPresent {
       textStorage.extraLineFragmentAttributes = extraLineFragmentAttributes

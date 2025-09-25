@@ -1097,6 +1097,7 @@ public class Editor: NSObject {
     }
   }
 
+  @MainActor
   internal func parseEditorState(json: Data, migrations: [EditorStateMigration] = []) throws
     -> EditorState
   {
@@ -1147,7 +1148,23 @@ public class Editor: NSObject {
           throw LexicalError.internal("Failed to decode RootNode")
         }
 
-        try rootNode.append(serializedRootNode.getChildren())
+        // Append top-level children
+        let topChildren = serializedRootNode.getChildren()
+        try rootNode.append(topChildren)
+        // Register all descendants so that pending state has a complete nodeMap for traversal
+        @MainActor
+        func registerSubtree(_ node: Node) {
+          // Register this node if not already present
+          if editorState.nodeMap[node.key] == nil {
+            editorState.nodeMap[node.key] = node
+          }
+          if let elem = node as? ElementNode {
+            if let decoded = elem.decodedChildNodes {
+              for child in decoded { registerSubtree(child) }
+            }
+          }
+        }
+        for child in topChildren { registerSubtree(child) }
         try rootNode.setDirection(direction: serializedRootNode.direction)
       },
       mode: UpdateBehaviourModificationMode(

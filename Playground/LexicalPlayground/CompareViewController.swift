@@ -8,6 +8,8 @@
 import UIKit
 import Lexical
 import EditorHistoryPlugin
+import LexicalListPlugin
+import LexicalLinkPlugin
 
 final class CompareViewController: UIViewController {
   private var legacyView: LexicalView!
@@ -33,17 +35,23 @@ final class CompareViewController: UIViewController {
     // Editors with a basic toolbar (undo/redo etc.) for visibility
     let hist1 = EditorHistoryPlugin(); let tb1 = ToolbarPlugin(viewControllerForPresentation: self, historyPlugin: hist1)
     let hist2 = EditorHistoryPlugin(); let tb2 = ToolbarPlugin(viewControllerForPresentation: self, historyPlugin: hist2)
-    // Ensure both editors share an explicit base theme (font + dynamic color)
+    let list1 = ListPlugin(); let list2 = ListPlugin()
+    let link1 = LinkPlugin(); let link2 = LinkPlugin()
+    // Ensure both editors share an explicit base theme (font + dynamic color) and link color
     let sharedTheme = Theme()
     sharedTheme.paragraph = [
       .font: UIFont(name: "Helvetica", size: 15.0) ?? UIFont.systemFont(ofSize: 15.0),
       .foregroundColor: UIColor.label
     ]
-    legacyView = LexicalView(editorConfig: EditorConfig(theme: sharedTheme, plugins: [tb1, hist1]),
+    sharedTheme.indentSize = 40.0
+    sharedTheme.link = [ .foregroundColor: UIColor.systemBlue ]
+    legacyView = LexicalView(editorConfig: EditorConfig(theme: sharedTheme, plugins: [tb1, hist1, list1, link1]),
                              featureFlags: FeatureFlags(reconcilerMode: .legacy))
-    optimizedView = LexicalView(editorConfig: EditorConfig(theme: sharedTheme, plugins: [tb2, hist2]),
+    optimizedView = LexicalView(editorConfig: EditorConfig(theme: sharedTheme, plugins: [tb2, hist2, list2, link2]),
                                 featureFlags: FeatureFlags(reconcilerMode: .optimized,
                                                            diagnostics: Diagnostics(selectionParity: false, sanityChecks: false, metrics: false, verboseLogs: false)))
+    link1.lexicalView = legacyView
+    link2.lexicalView = optimizedView
 
     // Layout (two stacked editors)
     legacyLabel.text = "Legacy"

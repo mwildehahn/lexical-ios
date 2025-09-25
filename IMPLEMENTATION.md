@@ -125,6 +125,37 @@ Updates in this patch (2025‑09‑25 evening)
 - [ ] Documentation & flags
   - [ ] Document `darkLaunchOptimized`, `reconcilerSanityCheck`, `selectionParityDebug`, `reconcilerMetrics` with example toggles. (Deprecated flags removed.)
 
+2025-09-25 — Styling parity + Playground fixes
+
+Summary
+- Fixed optimized vs legacy styling drift at the start of documents (indent applied to the leading newline).
+- Ensured Playground’s Editor screen uses the same base theme when toggling reconciler modes (prevents black text in dark appearance on Optimized).
+- Added targeted parity logic for postamble insertions so the inserted newline does not inherit paragraphStyle.
+
+Changes
+- Lexical/Core/TextStorageDeltaApplier.swift
+  - In `applyTextUpdate` (non-TextNode branch), after inserting characters (e.g., a postamble "\n"), explicitly remove `.paragraphStyle` for the inserted range to avoid inheriting indent/baseline attributes from the paragraph content. This matches legacy reconcile behavior and fixes StyleParityTests’ indent-at-index-0 mismatch.
+- Lexical/Helper/AttributesUtils.swift
+  - Guard in `applyBlockLevelAttributes` to skip applying paragraph styles to blocks with no text or children (newline-only/postamble-only). This avoids coating the very first character when it’s just a newline.
+  - Added verbose diagnostics for applied paragraph styles (gated by `diagnostics.verboseLogs`).
+- Playground/LexicalPlayground/ViewController.swift
+  - Rebuild path now sets `theme.paragraph` (Helvetica 15 + `UIColor.label`) to match the initial configuration in `viewDidLoad`. Fixes Optimized tab rendering black text on dark background.
+
+Verification
+- iOS Simulator (iPhone 17 Pro, iOS 26.0)
+  - Focused tests:
+    - `LexicalTests/StyleParityTests/testIndentAndBlockAttributesParity` — green after fixes.
+    - `LexicalTests/StyleParityTests/testHydrationStyleParity` and `testTextUpdateFormattingParity` — green.
+  - Playground build: `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build` — succeeded.
+
+Notes
+- The paragraph-style removal is scoped only to non-TextNode text updates (e.g., element postamble insertion) and maintains inline styling for real text updates.
+- Diagnostics prints remain behind feature flags and can be trimmed after stabilization.
+
+Follow‑up (Compare screen & base attributes)
+- CompareViewController now includes ListPlugin and LinkPlugin for both editors and sets Theme.link color; bullets and links render in both Legacy and Optimized.
+- Added base-attribute top‑up after both fresh hydration and regular optimized reconcile: any ranges missing .font or .foregroundColor get the theme’s base values (does not override existing attributes). This removes “black text until you type”.
+
 ---
 
 ## Immediate Work (Next)
@@ -154,6 +185,8 @@ Final verification (2025‑09‑25)
 
 Summary of latest fixes
 - Fresh hydration parity: DecoratorNode pre/post are emitted into textStorage and cache; Fenwick indices assigned for text only; post‑coerce parity guard retained (gated by diagnostics).
+  - Hydration now applies block‑level attributes (paragraph/heading/quote) immediately after building the styled buffer, ensuring paragraphStyle/indent parity with legacy.
+  - The legacy‑serialization coercion step is now gated behind `selectionParityDebug` to avoid stripping attributes in normal runs.
 - Mapper‑level tie‑breaks: `stringLocationForPoint` resolves inline‑decorator adjacency to previous text end when appropriate; createNativeSelection only adds +1 across a single inline decorator on the right (parity mode) to match legacy counts.
 - Incremental updater hygiene: element pre/post `textUpdate` detection, correct ancestor childrenLength propagation, and exclusivity‑safe base computations.
 - Debug logs: noisy prints gated under `diagnostics.verboseLogs` or `selectionParityDebug`; metrics snapshot printing only when both metrics + verbose logs are enabled.
@@ -309,6 +342,11 @@ Definition of Done
   - [ ] Postamble delta location: refining to strict lastChildEnd; tests pending.
   - [ ] Formatting deltas parity: pending after hydration/recompute.
   - [>] Optimized‑only gating: caret mapping guardrails and paragraph collapse helpers gated; legacy paths unchanged.
+  - [x] Lists: Backspace at start of a list item now merges the item into the previous item (ListItemNode.collapseAtStart) instead of dropping its content, fixing `ListItemNodeTests.testCollapseListItemNodesWithContent`.
+
+ - 2025‑09‑25 — Styling parity sweep
+   - [x] StyleParityTests added (font/color/paragraphStyle); discovered optimized hydration attributes being wiped by unconditional string coercion. Fixed by gating and by applying block‑level attributes during hydration.
+   - [>] Remaining: StyleParityTests still red in CI env; next step is to dump per‑index attributes for both editors to pinpoint the divergence (likely missing foregroundColor/font on optimized runs in headless context). Add temporary diagnostics and iterate.
 
 Open Tasks
 - Compare UI: Consolidate toolbar at top; display all actions (no menus) and ensure they fit. Keep it simple and visible on compact widths.

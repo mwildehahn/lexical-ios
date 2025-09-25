@@ -19,6 +19,8 @@ open class ElementNode: Node {
   var children: [NodeKey] = []
   var direction: Direction?
   var indent: Int = 0
+  // Holds decoded subtree during JSON parsing to allow reconstruction before nodes are fully attached to an editor.
+  internal var decodedChildNodes: [Node]? = nil
 
   open func getDirection() -> Direction? {
     return direction
@@ -76,6 +78,9 @@ open class ElementNode: Node {
     self.direction = try container.decodeIfPresent(Direction.self, forKey: .direction)
     self.indent = try container.decodeIfPresent(Int.self, forKey: .indent) ?? 0
     try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
+
+    // Preserve decoded children so that parseEditorState can register the subtree before nodeMap is populated.
+    self.decodedChildNodes = childNodes
 
     for node in childNodes {
       node.parent = self.key

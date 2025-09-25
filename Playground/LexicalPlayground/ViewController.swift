@@ -81,6 +81,10 @@ class ViewController: UIViewController, UIToolbarDelegate {
     self.hierarchyView = hierarchyView
 
     self.restoreEditorState()
+    // Debug snapshot of attributes (only when verbose logs on)
+    if diags.verboseLogs, let editor = lexicalView.editor as Editor? {
+      debugDumpAttributes(editor: editor, title: "Editor(viewDidLoad)")
+    }
 
     view.addSubview(lexicalView)
     view.addSubview(toolbar)
@@ -361,6 +365,13 @@ class ViewController: UIViewController, UIToolbarDelegate {
     // Build config based on persisted flags
     let (mode, diags) = readPersistedFlags()
     let theme = Theme()
+    // Ensure base paragraph styling matches initial load so both modes render
+    // with the same font and dynamic color. This fixes cases where toggling
+    // modes produced black text in dark appearance for the optimized tab.
+    theme.paragraph = [
+      .font: UIFont(name: "Helvetica", size: 15.0) ?? UIFont.systemFont(ofSize: 15.0),
+      .foregroundColor: UIColor.label
+    ]
     theme.setBlockLevelAttributes(.heading, value: BlockLevelAttributes(marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 20))
     theme.indentSize = 40.0
     theme.link = [ .foregroundColor: UIColor.systemBlue ]
@@ -379,6 +390,9 @@ class ViewController: UIViewController, UIToolbarDelegate {
 
     // Restore state & add to hierarchy
     restoreEditorState()
+    if diags.verboseLogs, let editor = newLexicalView.editor as Editor? {
+      debugDumpAttributes(editor: editor, title: "Editor(rebuild)")
+    }
     view.addSubview(newLexicalView)
     view.addSubview(toolbar)
     view.addSubview(hierarchyView)
@@ -414,5 +428,21 @@ class ViewController: UIViewController, UIToolbarDelegate {
         }
       })
     }
+  }
+
+  // MARK: - Debug helpers
+  private func debugDumpAttributes(editor: Editor, title: String) {
+    guard let ts = self.lexicalView?.textView.textStorage else { return }
+    let n = min(ts.length, 16)
+    var out: [String] = []
+    for i in 0..<n {
+      let a = ts.attributes(at: i, effectiveRange: nil)
+      let color = (a[.foregroundColor] as? UIColor) != nil
+      let font = (a[.font] as? UIFont) != nil
+      let para = (a[.paragraphStyle] as? NSParagraphStyle) != nil
+      let link = (a[.link] != nil)
+      out.append("\(i):f=\(font ? 1:0)c=\(color ? 1:0)p=\(para ? 1:0)l=\(link ? 1:0)")
+    }
+    print("🔥 EDITOR ATTR [\(title)]: len=\(ts.length) \(out.joined(separator: ", "))")
   }
 }

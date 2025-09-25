@@ -170,9 +170,17 @@ internal class TextStorageDeltaApplier {
         theme: theme)
       textStorage.replaceCharacters(in: range, with: styled)
     } else {
-      // Non-text nodes (e.g., element pre/post updates) can use plain replacement;
-      // block-level pass will restyle paragraphs after reconcile.
+      // Non-text nodes (e.g., element pre/post updates) use plain replacement.
+      // Important parity fix: when inserting a lone newline (postamble) before
+      // a paragraph, NSTextStorage may inherit the surrounding paragraphStyle
+      // (e.g., indent) for the inserted character. Legacy reconcile ends up with
+      // no paragraphStyle at that leading location. To match, clear any
+      // paragraphStyle on the newly inserted characters.
       textStorage.replaceCharacters(in: range, with: newText)
+      if newText.count > 0 && range.length == 0 {
+        let insertedRange = NSRange(location: range.location, length: (newText as NSString).length)
+        textStorage.removeAttribute(.paragraphStyle, range: insertedRange)
+      }
     }
 
     // Update FenwickTree if there's a length change
@@ -223,11 +231,26 @@ internal class TextStorageDeltaApplier {
     completeString.append(insertionData.content)
     completeString.append(insertionData.postamble)
 
+    if editor.featureFlags.diagnostics.verboseLogs {
+      let contentAttrs = insertionData.content.length > 0 ? insertionData.content.attributes(at: 0, effectiveRange: nil) : [:]
+      print("🔥 INSERT PRE-ATTRS: key=\(nodeKey) pre=\(insertionData.preamble.length) content=\(insertionData.content.length) post=\(insertionData.postamble.length) keys=\(Array(contentAttrs.keys)) font=\(String(describing: contentAttrs[.font])) color=\(String(describing: contentAttrs[.foregroundColor]))")
+    }
+
     // Insert into TextStorage
-    textStorage.insert(completeString, at: clampedLocation)
+    // Use replaceCharacters to ensure our NSTextStorage subclass override preserves attributes in controller mode
+    textStorage.beginEditing()
+    textStorage.replaceCharacters(in: NSRange(location: clampedLocation, length: 0), with: completeString)
+    textStorage.endEditing()
     if editor.featureFlags.diagnostics.verboseLogs {
       print("🔥 DELTA APPLIER: post-insert text length \(textStorage.length)")
+      let checkLoc = clampedLocation + insertionData.preamble.length
+      if checkLoc < textStorage.length {
+        let tsAttrs = textStorage.attributes(at: checkLoc, effectiveRange: nil)
+        print("🔥 INSERT POST-ATTRS: at=\(checkLoc) keys=\(Array(tsAttrs.keys)) font=\(String(describing: tsAttrs[.font])) color=\(String(describing: tsAttrs[.foregroundColor]))")
+      }
     }
+
+    // Do not overlay additional attributes here; insertionData already carries styled content.
 
     // Update FenwickTree only for nodes that contribute text content.
     var fenwickUpdates = 0

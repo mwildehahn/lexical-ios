@@ -198,12 +198,36 @@ internal enum OptimizedReconciler {
 
       // Apply block-level attributes (parity with legacy reconciler)
       if let textStorage = editor.textStorage {
+        // Build a focused set of impacted nodes: nodes mentioned in deltas and all their ancestors.
+        var impacted: Set<NodeKey> = []
+        func addAncestors(_ key: NodeKey) {
+          var cur: NodeKey? = key
+          while let k = cur, let n = pendingEditorState.nodeMap[k] {
+            if impacted.contains(k) { break }
+            impacted.insert(k)
+            cur = n.parent
+          }
+        }
+        for d in deltaBatch.deltas {
+          switch d.type {
+          case .nodeInsertion(let nk, _, _): addAncestors(nk)
+          case .nodeDeletion(let nk, _): addAncestors(nk)
+          case .textUpdate(let nk, _, _): addAncestors(nk)
+          case .attributeChange(let nk, _, _): addAncestors(nk)
+          }
+        }
+        var dirty: DirtyNodeMap = [:]
+        for k in impacted { dirty[k] = .editorInitiated }
         applyBlockLevelAttributes(
           editor: editor,
           pendingState: pendingEditorState,
-          dirtyNodes: editor.dirtyNodes,
+          dirtyNodes: dirty,
           textStorage: textStorage
         )
+
+        // After block-level application, top up any ranges missing base font/color so
+        // newly inserted pre/postamble and empty segments render with the theme color.
+        fillMissingBaseInlineAttributes(editor: editor)
       }
 
       // Prune stale range cache entries for nodes that no longer exist in pending state
@@ -377,116 +401,133 @@ internal enum OptimizedReconciler {
     editor.nextFenwickIndex = 0
     editor.fenwickTree = FenwickTree(size: max(1024, pendingState.nodeMap.count * 2))
 
-    // Prepare builders
-    let theme = editor.getTheme()
-    let buffer = NSMutableAttributedString()
-    var newCache: [NodeKey: RangeCacheItem] = [:]
-
-    func styled(_ string: String, from node: Node) -> NSAttributedString {
-      return AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: string), from: node, state: pendingState, theme: theme)
+    if editor.featureFlags.diagnostics.verboseLogs {
+      var counts: [String:Int] = [:]
+      for (_, node) in pendingState.nodeMap {
+        let t: String
+        if node is TextNode { t = "Text" }
+        else if node is ElementNode { t = "Element" }
+        else if node is DecoratorNode { t = "Decorator" }
+        else { t = String(describing: type(of: node)) }
+        counts[t, default: 0] += 1
+      }
+      print("🔥 HYDRATE: nodeMap counts=\(counts) rootChildren=\(pendingState.nodeMap[kRootNodeKey] as? ElementNode != nil ? (pendingState.nodeMap[kRootNodeKey] as! ElementNode).getChildrenKeys().count : -1)")
     }
 
-    @discardableResult
-    func visit(_ key: NodeKey) -> (totalLen: Int, item: RangeCacheItem) {
-      guard let node = pendingState.nodeMap[key] else { return (0, RangeCacheItem()) }
-      var item = RangeCacheItem()
-      item.nodeKey = key
-
-      var contributed = 0
-      if let elem = node as? ElementNode {
-        let pre = elem.getPreamble()
-        if !pre.isEmpty {
-          let s = styled(pre, from: elem); buffer.append(s); contributed += s.length
-          item.preambleLength = s.length
-        }
-        var childrenTotal = 0
-        for child in elem.getChildrenKeys(fromLatest: false) {
-          let (len, _) = visit(child)
-          childrenTotal += len
-        }
-        item.childrenLength = childrenTotal
-        contributed += childrenTotal
-        let post = elem.getPostamble()
-        if !post.isEmpty {
-          let s = styled(post, from: elem); buffer.append(s); contributed += s.length
-          item.postambleLength = s.length
-        }
-      } else if let text = node as? TextNode {
-        let content = text.getText_dangerousPropertyAccess()
-        if !content.isEmpty {
-          let s = styled(content, from: text); buffer.append(s); contributed += s.length
-          item.textLength = s.length
-          // Assign Fenwick index and update with content length
-          let idx = editor.nextFenwickIndex; editor.nextFenwickIndex += 1
-          editor.fenwickIndexMap[key] = idx
-          item.nodeIndex = idx
-          _ = editor.fenwickTree.ensureCapacity(for: idx)
-          editor.fenwickTree.update(index: idx, delta: s.length)
-        }
-      } else if let deco = node as? DecoratorNode {
-        let pre = deco.getPreamble()
-        if !pre.isEmpty {
-          let s = styled(pre, from: deco); buffer.append(s); contributed += s.length
-          item.preambleLength = s.length
-        }
-        let post = deco.getPostamble()
-        if !post.isEmpty {
-          let s = styled(post, from: deco); buffer.append(s); contributed += s.length
-          item.postambleLength = s.length
+    // Build INSERT-only batch and apply with full styling
+    let batch = generateHydrationBatch(pendingState: pendingState, editor: editor)
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 HYDRATE: deltas=\(batch.deltas.count)")
+      for d in batch.deltas.prefix(10) {
+        switch d.type {
+        case .nodeInsertion(let nk, let ins, _):
+          print("  • INS nk=\(nk) pre=\(ins.preamble.length) content=\(ins.content.length) post=\(ins.postamble.length)")
+        default:
+          print("  • delta \(d.type)")
         }
       }
-
-      newCache[key] = item
-      return (contributed, item)
     }
-
-    // Ensure root exists in cache
-    var rootItem = RangeCacheItem(); rootItem.nodeKey = kRootNodeKey; newCache[kRootNodeKey] = rootItem
-    if let root = pendingState.nodeMap[kRootNodeKey] { _ = visit(root.getKey()) }
-
-    // Replace text storage in controller mode
+    let deltaApplier = TextStorageDeltaApplier(editor: editor, fenwickTree: editor.fenwickTree)
     let previousMode = textStorage.mode
     textStorage.mode = .controllerMode
-    textStorage.beginEditing()
-    textStorage.replaceCharacters(
-      in: NSRange(location: 0, length: textStorage.string.lengthAsNSString()),
-      with: buffer)
-    textStorage.endEditing()
+    let applyResult = deltaApplier.applyDeltaBatch(batch, to: textStorage)
     textStorage.mode = previousMode
-    // Apply block-level attributes and decorator bookkeeping so the hydrated
-    // document visually matches legacy immediately (font, paragraph styling, etc.).
-    Self.applyBlockLevelAttributes(editor: editor,
-                                   pendingState: pendingState,
-                                   dirtyNodes: editor.dirtyNodes,
-                                   textStorage: textStorage)
-    Self.updateDecoratorPositions(editor: editor,
-                                  pendingState: pendingState)
-    if editor.featureFlags.diagnostics.verboseLogs {
-      let s = textStorage.string
-      let preview = String(s.prefix(120)).replacingOccurrences(of: "\n", with: "\\n")
-      let newlines = s.filter { $0 == "\n" }.count
-      let paras = s.components(separatedBy: "\n").filter { !$0.isEmpty }.count
-      print("🔥 HYDRATE FULL: builtLen=\(buffer.length) tsLen=\(textStorage.length) cacheKeys=\(newCache.count) newlines=\(newlines) paras=\(paras) preview='\(preview)'")
+    switch applyResult {
+    case .failure(let reason):
+      throw LexicalError.invariantViolation("Hydration failed: \(reason)")
+    default: break
     }
+
+    // Rebuild range cache with lengths and attach Fenwick indices assigned during insertion
+    var newCache: [NodeKey: RangeCacheItem] = [:]
+    func computeItem(_ key: NodeKey) -> Int {
+      guard let node = pendingState.nodeMap[key] else { return 0 }
+      var item = newCache[key] ?? RangeCacheItem(); item.nodeKey = key
+      if let elem = node as? ElementNode {
+        item.preambleLength = elem.getPreamble().lengthAsNSString()
+        item.postambleLength = elem.getPostamble().lengthAsNSString()
+        var total = 0
+        for c in elem.getChildrenKeys(fromLatest: false) { total += computeItem(c) }
+        item.childrenLength = total
+      } else if node is TextNode {
+        item.textLength = (node as! TextNode).getText_dangerousPropertyAccess().lengthAsNSString()
+        if let idx = editor.fenwickIndexMap[key] { item.nodeIndex = idx; _ = editor.fenwickTree.ensureCapacity(for: idx) }
+      } else if let deco = node as? DecoratorNode {
+        item.preambleLength = deco.getPreamble().lengthAsNSString()
+        item.postambleLength = deco.getPostamble().lengthAsNSString()
+      }
+      newCache[key] = item
+      return item.preambleLength + item.childrenLength + item.textLength + item.postambleLength
+    }
+    var rootItem = RangeCacheItem(); rootItem.nodeKey = kRootNodeKey; newCache[kRootNodeKey] = rootItem
+    if let root = pendingState.nodeMap[kRootNodeKey] { _ = computeItem(root.getKey()) }
 
     // Swap cache
     editor.rangeCache = newCache
 
-    // Parity safeguard: ensure fresh-doc string exactly matches legacy serialization
-    // Compute expected legacy serialization under a read scope for the pending state.
-    let expected = (try? getEditorStateTextContent(editorState: pendingState)) ?? ""
-    if let ts = editor.textStorage, ts.string != expected {
-      let previousMode2 = ts.mode
-      ts.mode = .controllerMode
-      ts.beginEditing()
-      ts.replaceCharacters(in: NSRange(location: 0, length: ts.string.lengthAsNSString()), with: expected)
-      ts.endEditing()
-      ts.mode = previousMode2
-      if editor.featureFlags.diagnostics.verboseLogs {
-        let prev = String(expected.prefix(120)).replacingOccurrences(of: "\n", with: "\\n")
-        print("🔥 HYDRATE FULL: coerced to legacy serialization preview='\(prev)'")
+    // Apply block-level attributes and update decorator bookkeeping so the hydrated document visually matches legacy.
+    var allDirty: DirtyNodeMap = [:]
+    for (key, _) in pendingState.nodeMap { allDirty[key] = .editorInitiated }
+    Self.applyBlockLevelAttributes(editor: editor,
+                                   pendingState: pendingState,
+                                   dirtyNodes: allDirty,
+                                   textStorage: textStorage)
+    Self.updateDecoratorPositions(editor: editor, pendingState: pendingState)
+
+    // Ensure inline text runs carry explicit font and foregroundColor matching theme (safety net).
+    let prevModeAttrs = textStorage.mode
+    textStorage.mode = .controllerMode
+    for (key, node) in pendingState.nodeMap {
+      guard let text = node as? TextNode, let item = editor.rangeCache[key] else { continue }
+      let start = item.locationFromFenwick(using: editor.fenwickTree) + item.preambleLength
+      let length = item.textLength
+      if length <= 0 { continue }
+      let range = NSRange(location: start, length: length)
+      let styles = AttributeUtils.attributedStringStyles(from: text, state: pendingState, theme: editor.getTheme())
+      var attrs: [NSAttributedString.Key: Any] = [:]
+      if let f = styles[.font] { attrs[.font] = f }
+      if let c = styles[.foregroundColor] { attrs[.foregroundColor] = c }
+      if !attrs.isEmpty { textStorage.addAttributes(attrs, range: range) }
+    }
+    textStorage.mode = prevModeAttrs
+
+    // Fill any missing base attributes (font/color) across the entire buffer. This only
+    // adds attributes where missing and won't override links or styled runs.
+    Self.fillMissingBaseInlineAttributes(editor: editor)
+
+    // Parity safeguard (optional): ensure fresh-doc string exactly matches legacy serialization.
+    // Disabled by default to avoid stripping attributes; enable only under selectionParityDebug.
+    if editor.featureFlags.selectionParityDebug {
+      let expected = (try? getEditorStateTextContent(editorState: pendingState)) ?? ""
+      if let ts = editor.textStorage, ts.string != expected {
+        let previousMode2 = ts.mode
+        ts.mode = .controllerMode
+        ts.beginEditing()
+        ts.replaceCharacters(in: NSRange(location: 0, length: ts.string.lengthAsNSString()), with: expected)
+        ts.endEditing()
+        ts.mode = previousMode2
+        if editor.featureFlags.diagnostics.verboseLogs {
+          let prev = String(expected.prefix(120)).replacingOccurrences(of: "\n", with: "\\n")
+          print("🔥 HYDRATE FULL: coerced to legacy serialization preview='\(prev)'")
+        }
       }
     }
+  }
+
+  /// Add base font/foregroundColor to any ranges missing them.
+  private static func fillMissingBaseInlineAttributes(editor: Editor) {
+    guard let ts = editor.textStorage else { return }
+    let theme = editor.getTheme()
+    let baseFont = theme.paragraph?[.font] as? UIFont ?? LexicalConstants.defaultFont
+    let baseColor = theme.paragraph?[.foregroundColor] as? UIColor ?? LexicalConstants.defaultColor
+    let prev = ts.mode; ts.mode = .controllerMode; ts.beginEditing()
+    ts.enumerateAttributes(in: NSRange(location: 0, length: ts.length), options: []) { attrs, range, _ in
+      var toAdd: [NSAttributedString.Key: Any] = [:]
+      if attrs[.font] == nil { toAdd[.font] = baseFont }
+      if attrs[.foregroundColor] == nil { toAdd[.foregroundColor] = baseColor }
+      if !toAdd.isEmpty { ts.addAttributes(toAdd, range: range) }
+    }
+    ts.endEditing(); ts.mode = prev
   }
 
   /// Build a complete INSERT-only batch for a fresh document using document order.

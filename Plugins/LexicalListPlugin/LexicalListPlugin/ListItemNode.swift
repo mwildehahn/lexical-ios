@@ -285,7 +285,18 @@ public class ListItemNode: ElementNode {
         }
       }
     } else {
-      try self.remove()
+      // Multiple items in the list: merge this item's contents into the previous item
+      if let prevItem = self.getPreviousSibling() as? ListItemNode {
+        for child in children {
+          try prevItem.append([child])
+        }
+        // Remove current item after moving its children and place caret at end of the merged item
+        try self.remove()
+        _ = try prevItem.selectEnd()
+      } else {
+        // No previous item to merge into; fall back to removing this item
+        try self.remove()
+      }
     }
 
     return true
