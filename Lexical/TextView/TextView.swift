@@ -83,7 +83,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       selectionParity: featureFlags.selectionParityDebug,
       sanityChecks: reconcilerSanityCheck,
       metrics: featureFlags.reconcilerMetrics,
-      verboseLogs: false
+      verboseLogs: featureFlags.diagnostics.verboseLogs
     )
     let adjustedFeatureFlags = FeatureFlags(
       reconcilerMode: mode,

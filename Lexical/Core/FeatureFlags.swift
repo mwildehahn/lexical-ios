@@ -22,7 +22,7 @@ import Foundation
   @objc public init(selectionParity: Bool = false,
                     sanityChecks: Bool = false,
                     metrics: Bool = false,
-                    verboseLogs: Bool = false) {
+                    verboseLogs: Bool = true) {
     self.selectionParity = selectionParity
     self.sanityChecks = sanityChecks
     self.metrics = metrics

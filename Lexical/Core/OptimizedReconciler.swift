@@ -658,6 +658,9 @@ private class DeltaGenerator {
     if let root = pendingState.nodeMap[kRootNodeKey] { visit(root.getKey()) }
     // Fallback: if some dirty nodes were not reachable (shouldn't happen), append them
     for (k, _) in dirty where !result.contains(k) { result.append(k) }
+    if getActiveEditor()?.featureFlags.diagnostics.verboseLogs == true {
+      print("🔥 OPT RECON: ordered dirty=\(result)")
+    }
     return result
   }
 

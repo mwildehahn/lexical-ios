@@ -114,7 +114,18 @@ internal class IncrementalRangeCacheUpdater {
         guard var parentItem = rangeCache[p], let parentNode = state.nodeMap[p] as? ElementNode else { continue }
         var sum = 0
         for ck in parentNode.getChildrenKeys(fromLatest: false) {
-          if let c = rangeCache[ck] {
+          if var c = rangeCache[ck], let childNode = state.nodeMap[ck] {
+            // Refresh pre/post from pending state to capture boundary changes (e.g., paragraph newlines)
+            let newPre = childNode.getPreamble().lengthAsNSString()
+            let newPost = childNode.getPostamble().lengthAsNSString()
+            if c.preambleLength != newPre || c.postambleLength != newPost {
+              if editor.featureFlags.diagnostics.verboseLogs {
+                print("🔥 RANGE CACHE UPDATER: child pre/post normalize key=\(ck) pre \(c.preambleLength)->\(newPre) post \(c.postambleLength)->\(newPost)")
+              }
+              c.preambleLength = newPre
+              c.postambleLength = newPost
+              rangeCache[ck] = c
+            }
             sum += c.preambleLength + c.childrenLength + c.textLength + c.postambleLength
           }
         }
@@ -284,8 +295,7 @@ internal class IncrementalRangeCacheUpdater {
     // Post-insert sibling normalization: if this node has a previous sibling element,
     // its postamble may depend on the presence of a next sibling (e.g., paragraph newline).
     // Recompute and propagate any delta so absolute starts remain consistent.
-    if editor.featureFlags.selectionParityDebug,
-       let node = getNodeByKey(key: nodeKey),
+    if let node = getNodeByKey(key: nodeKey),
        let parent = node.getParent(),
        let prevSibling = node.getPreviousSibling() {
       if var prevItem = rangeCache[prevSibling.getKey()] {
@@ -297,7 +307,7 @@ internal class IncrementalRangeCacheUpdater {
           if delta != 0 {
             adjustAncestorsChildrenLength(&rangeCache, nodeKey: prevSibling.getKey(), delta: delta)
           }
-          if editor.featureFlags.selectionParityDebug {
+          if editor.featureFlags.diagnostics.verboseLogs {
             print("🔥 RANGE CACHE UPDATER: prevSibling postamble normalize key=\(prevSibling.getKey()) Δ=\(delta)")
           }
         }

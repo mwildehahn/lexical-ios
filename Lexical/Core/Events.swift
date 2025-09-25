@@ -27,6 +27,16 @@ internal func onInsertTextFromUITextView(
       return
     }
 
+    // Ensure the model selection is in sync with the UITextView's native selection
+    // right before we mutate the tree. This avoids edge cases where a previous
+    // numeric→Point round‑trip produced an off‑by‑one at text boundaries and
+    // ensures operations like insertParagraph/delete apply at the caret the
+    // user currently sees.
+    if let rangeSelection = selection as? RangeSelection {
+      let nativeSel = editor.getNativeSelection()
+      try rangeSelection.applyNativeSelection(nativeSel)
+    }
+
     if let markedTextOperation = updateMode.markedTextOperation,
       markedTextOperation.createMarkedText == true,
       let rangeSelection = selection as? RangeSelection
