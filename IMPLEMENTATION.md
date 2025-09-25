@@ -9,6 +9,15 @@ Legend: [x] done · [>] in progress · [ ] todo
 - Observability: metrics snapshot with histograms + clamped counts; invariants checker.
 - Remaining before default flip: gate/remove temporary debug prints; add short docs for flags and (optional) Playground metrics panel.
 
+Updates in this patch (2025‑09‑25)
+- Simplified FeatureFlags API and updated tests:
+  - Removed deprecated flags: `decoratorSiblingRedecorate`, `leadingNewlineBaselineShift`.
+  - Tests now use the back‑compat FeatureFlags initializer (reconcilerSanityCheck, proxyTextViewInputDelegate, optimizedReconciler, reconcilerMetrics, darkLaunchOptimized, selectionParityDebug) or the new `reconcilerMode`/`diagnostics` under the hood.
+  - Adjusted docs: feature flags quick reference no longer lists removed flags.
+- Verification (iOS 26.0, iPhone 17 Pro):
+  - Focused suites: SelectionParityTests (key case), InlineDecoratorBoundaryParityTests, IncrementalUpdaterTextLengthTests — green.
+  - Build‑for‑testing succeeds for the Lexical scheme.
+
 **What “Legacy” Does vs “Optimized”**
 - Legacy (`Lexical/Core/Reconciler.swift:1`): tree walk computes rangesToDelete/rangesToAdd, maintains `decoratorsToAdd/Decorate/Remove`, applies to `TextStorage`, then block‑level attributes, selection, marked‑text; updates `rangeCache` in one pass.
 - Optimized (`Lexical/Core/OptimizedReconciler.swift:1`): diff → deltas → apply with Fenwick‑backed offsets, incrementally updates `rangeCache`, then block‑level attributes, decorator lifecycle, optional marked‑text; metrics + invariants hooks.
@@ -55,7 +64,7 @@ Legend: [x] done · [>] in progress · [ ] todo
   - [x] Aggregate histograms (durations, Fenwick ops) and clamped counts summary; expose snapshot API and gated console dump.
 
 - [ ] Documentation & flags
-  - [ ] Document `darkLaunchOptimized`, `reconcilerSanityCheck`, `decoratorSiblingRedecorate`, `selectionParityDebug` with example toggles.
+  - [ ] Document `darkLaunchOptimized`, `reconcilerSanityCheck`, `selectionParityDebug`, `reconcilerMetrics` with example toggles. (Deprecated flags removed.)
 
 ---
 
@@ -86,5 +95,12 @@ Run (examples):
 - `darkLaunchOptimized`: run optimized, restore snapshot, run legacy (comparison without user impact).
 - `reconcilerSanityCheck`: invariants validator.
 - `reconcilerMetrics`: per‑delta and per‑run metrics collection.
-- `decoratorSiblingRedecorate`: conservative redecorate on sibling changes (diagnostic).
 - `selectionParityDebug`: verbose logs for selection boundary evaluation.
+
+Migration note
+- Internally, flags are represented via `ReconcilerMode { legacy, optimized, darkLaunch }` and `Diagnostics { selectionParity, sanityChecks, metrics, verboseLogs }`.
+- The convenience initializer preserves the previous call sites; removed flags are no‑ops and should not be passed any more.
+
+Commit summary (planned)
+- Tests: drop deprecated FeatureFlags args; documentation updates.
+- No behavior change under existing feature configurations; parity tests remain green.

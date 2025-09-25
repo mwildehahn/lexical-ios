@@ -17,7 +17,6 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
@@ -31,7 +30,6 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
@@ -93,7 +91,6 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: false)
     )
     let legacyEditor = legacyCtx.editor
@@ -107,7 +104,6 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: false)
     )
     let optEditor = optCtx.editor
@@ -158,7 +154,6 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: false)
     )
     let legacyEditor = legacyCtx.editor
@@ -170,7 +165,6 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: false)
     )
     let optEditor = optCtx.editor

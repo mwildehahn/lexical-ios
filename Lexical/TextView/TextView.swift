@@ -78,14 +78,17 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     #endif
 
     // Create new feature flags with possibly modified reconcilerSanityCheck
+    let mode: ReconcilerMode = featureFlags.darkLaunchOptimized ? .darkLaunch : (featureFlags.optimizedReconciler ? .optimized : .legacy)
+    let diags = Diagnostics(
+      selectionParity: featureFlags.selectionParityDebug,
+      sanityChecks: reconcilerSanityCheck,
+      metrics: featureFlags.reconcilerMetrics,
+      verboseLogs: false
+    )
     let adjustedFeatureFlags = FeatureFlags(
-      reconcilerSanityCheck: reconcilerSanityCheck,
+      reconcilerMode: mode,
       proxyTextViewInputDelegate: featureFlags.proxyTextViewInputDelegate,
-      optimizedReconciler: featureFlags.optimizedReconciler,
-      reconcilerMetrics: featureFlags.reconcilerMetrics,
-      darkLaunchOptimized: featureFlags.darkLaunchOptimized,
-      decoratorSiblingRedecorate: featureFlags.decoratorSiblingRedecorate,
-      selectionParityDebug: featureFlags.selectionParityDebug
+      diagnostics: diags
     )
 
     editor = Editor(

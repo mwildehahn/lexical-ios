@@ -44,7 +44,6 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
@@ -59,9 +58,7 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
-        selectionParityDebug: true,
-        leadingNewlineBaselineShift: false)
+        selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     let (optT1, optT2) = try buildSimpleTwoTextNodesDocument(editor: optEditor)
@@ -137,7 +134,6 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
@@ -163,9 +159,7 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
-        selectionParityDebug: true,
-        leadingNewlineBaselineShift: false)
+        selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     var optT2: NodeKey = ""
@@ -229,7 +223,6 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: false)
     )
     let legacyEditor = legacyCtx.editor
@@ -243,9 +236,7 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
-        selectionParityDebug: true,
-        leadingNewlineBaselineShift: false)
+        selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     let optP = try buildEmptyParagraphDoc(optEditor)
@@ -301,7 +292,6 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: false)
     )
     let legacyEditor = legacyCtx.editor
@@ -325,9 +315,7 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
-        selectionParityDebug: true,
-        leadingNewlineBaselineShift: true)
+        selectionParityDebug: true)
     )
     let optEditor = optCtx.editor
     var optP2: NodeKey = ""
@@ -459,7 +447,6 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: false,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: true)
     )
     let legacyEditor = legacyCtx.editor
@@ -473,7 +460,6 @@ final class SelectionParityTests: XCTestCase {
         optimizedReconciler: true,
         reconcilerMetrics: false,
         darkLaunchOptimized: false,
-        decoratorSiblingRedecorate: false,
         selectionParityDebug: true)
     )
     let optEditor = optCtx.editor

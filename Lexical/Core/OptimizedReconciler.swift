@@ -367,37 +367,7 @@ internal enum OptimizedReconciler {
     }
 
     // Optional heuristic: redecorate decorators when siblings in the same parent changed
-    var siblingTriggered: Set<NodeKey> = []
-    if editor.featureFlags.decoratorSiblingRedecorate {
-      // Build set of changed node keys
-      var changed: Set<NodeKey> = []
-      for delta in appliedDeltas {
-        switch delta.type {
-        case .textUpdate(let key, _, _): changed.insert(key)
-        case .nodeInsertion(let key, _, _): changed.insert(key)
-        case .nodeDeletion(let key, _): changed.insert(key)
-        case .attributeChange(let key, _, _): changed.insert(key)
-        }
-      }
-      // For each changed node, find its parent (from pending for insert/updates/attr; from current for deletions)
-      func addSiblingDecorators(fromParentOf key: NodeKey) {
-        if let node = pendingState.nodeMap[key], let parentKey = node.parent, let parent = pendingState.nodeMap[parentKey] as? ElementNode {
-          for child in parent.getChildrenKeys(fromLatest: false) {
-            if let _ = pendingState.nodeMap[child] as? DecoratorNode, isAttachedInState(child, state: pendingState) {
-              siblingTriggered.insert(child)
-            }
-          }
-        } else if let oldNode = currentState.nodeMap[key], let parentKey = oldNode.parent, let parent = currentState.nodeMap[parentKey] as? ElementNode {
-          // For deletions
-          for child in parent.getChildrenKeys(fromLatest: false) {
-            if let _ = pendingState.nodeMap[child] as? DecoratorNode, isAttachedInState(child, state: pendingState) {
-              siblingTriggered.insert(child)
-            }
-          }
-        }
-      }
-      for c in changed { addSiblingDecorators(fromParentOf: c) }
-    }
+    let siblingTriggered: Set<NodeKey> = []
 
     // Handle removals: remove view if present, drop caches
     for key in removed {

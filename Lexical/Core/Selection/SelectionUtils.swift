@@ -203,7 +203,7 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   case .text:
     if useOptimized {
       // Absolute start of this text node based on parent/siblings accumulation
-      let base = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+      let base = absoluteNodeStartLocation(point.key, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
       if editor.featureFlags.selectionParityDebug {
         print("🔥 PARITY TEXT LOC: key=\(point.key) base=\(base) pre=\(rangeCacheItem.preambleLength) off=\(point.offset)")
       }

@@ -40,7 +40,7 @@ struct RangeCacheItem {
     // Fenwick representation cannot encode both pre/post positions.
     if let _ = getNodeByKey(key: nodeKey) as? ElementNode,
        let editor = getActiveEditor() {
-      let base = absoluteNodeStartLocation(nodeKey, rangeCache: editor.rangeCache, useOptimized: true, fenwickTree: editor.fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+      let base = absoluteNodeStartLocation(nodeKey, rangeCache: editor.rangeCache, useOptimized: true, fenwickTree: editor.fenwickTree, leadingShift: false)
       return base
     }
     return fenwickTree.getNodeOffset(nodeIndex: nodeIndex)
@@ -85,7 +85,7 @@ internal func pointAtStringLocation(
     for (k, item) in rangeCache {
       if let _ = getNodeByKey(key: k) as? ElementNode {
         let base = useOptimized
-          ? absoluteNodeStartLocation(k, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+          ? absoluteNodeStartLocation(k, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
           : item.location
         let childrenStart = base + item.preambleLength
         if location == childrenStart {
@@ -137,7 +137,7 @@ private func evaluateNode(
 
   if let parentKey = node.parent, let parentRangeCacheItem = rangeCache[parentKey] {
     let parentLocation = useOptimized
-      ? absoluteNodeStartLocation(parentKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+      ? absoluteNodeStartLocation(parentKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
       : parentRangeCacheItem.location
     if stringLocation == parentLocation
       && parentRangeCacheItem.preambleSpecialCharacterLength == 0
@@ -153,7 +153,7 @@ private func evaluateNode(
 
   // Compute absolute start using unified logic, then derive ranges from cached lengths.
   let nodeStart = useOptimized
-    ? absoluteNodeStartLocation(nodeKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+    ? absoluteNodeStartLocation(nodeKey, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
     : rangeCacheItem.location
   let entireRange = NSRange(location: nodeStart, length: rangeCacheItem.preambleLength + rangeCacheItem.childrenLength + rangeCacheItem.textLength + rangeCacheItem.postambleLength)
   if !entireRange.byAddingOne().contains(stringLocation) {
@@ -233,7 +233,7 @@ private func evaluateNode(
       print("🔥 EVAL element=\(nodeKey) parentStart=\(parentStart) childrenStart=\(childrenStart) childrenEnd=\(childrenEnd) childCount=\(normalOrderChildren.count)")
       for ck in normalOrderChildren {
         if let c = rangeCache[ck] {
-          let cStart = useOptimized ? absoluteNodeStartLocation(ck, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift) : c.location
+          let cStart = useOptimized ? absoluteNodeStartLocation(ck, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false) : c.location
           let cType = (getNodeByKey(key: ck) is TextNode) ? "Text" : "Elem"
           print("  🔹 child key=\(ck) type=\(cType) start=\(cStart) pre=\(c.preambleLength) ch=\(c.childrenLength) tx=\(c.textLength) post=\(c.postambleLength)")
         }
@@ -256,7 +256,7 @@ private func evaluateNode(
     for (idx, ck) in normalOrderChildren.enumerated() {
       if let childItem = rangeCache[ck] {
         let childStart = useOptimized
-          ? absoluteNodeStartLocation(ck, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor.featureFlags.leadingNewlineBaselineShift)
+          ? absoluteNodeStartLocation(ck, rangeCache: rangeCache, useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
           : childItem.location
         if stringLocation == childStart {
           if editor.featureFlags.selectionParityDebug {
@@ -367,7 +367,7 @@ extension RangeCacheItem {
   @MainActor
   func entireRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
     let editor = getActiveEditor()
-    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
     return NSRange(location: start, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 
@@ -375,7 +375,7 @@ extension RangeCacheItem {
   func textRangeFromFenwick(using fenwickTree: FenwickTree, leadingShift: Bool = false, rangeCache cache: [NodeKey: RangeCacheItem]? = nil) -> NSRange {
     let editor = getActiveEditor()
     let rc = cache ?? editor?.rangeCache ?? [:]
-    let useShift = leadingShift || (editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    let useShift = false
     let start = absoluteNodeStartLocation(nodeKey, rangeCache: rc, useOptimized: true, fenwickTree: fenwickTree, leadingShift: useShift)
     return NSRange(location: start + preambleLength + childrenLength, length: textLength)
   }
@@ -383,14 +383,14 @@ extension RangeCacheItem {
   @MainActor
   func childrenRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
     let editor = getActiveEditor()
-    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
     return NSRange(location: start + preambleLength, length: childrenLength)
   }
 
   @MainActor
   func selectableRangeFromFenwick(using fenwickTree: FenwickTree) -> NSRange {
     let editor = getActiveEditor()
-    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: editor?.featureFlags.leadingNewlineBaselineShift ?? false)
+    let start = absoluteNodeStartLocation(nodeKey, rangeCache: editor?.rangeCache ?? [:], useOptimized: true, fenwickTree: fenwickTree, leadingShift: false)
     return NSRange(location: start, length: preambleLength + childrenLength + textLength + postambleLength - preambleSpecialCharacterLength)
   }
 }
