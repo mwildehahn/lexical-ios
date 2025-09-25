@@ -73,4 +73,40 @@ final class SelectionMappingParityTests: XCTestCase {
     // Final rendered strings must match
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
+
+  func testCrossNodeReplaceSelectionParity() throws {
+    let (opt, leg) = makeEditors()
+    // Build: Root -> [ P("Hello","World") ]
+    func build(on editor: Editor) throws -> (NodeKey, NodeKey) {
+      var aKey: NodeKey = ""; var bKey: NodeKey = ""
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode()
+        let a = createTextNode(text: "Hello"); aKey = a.getKey()
+        let b = createTextNode(text: "World"); bKey = b.getKey()
+        try p.append([a, b]); try root.append([p])
+      }
+      return (aKey, bKey)
+    }
+    let (aOpt, bOpt) = try build(on: opt.0)
+    let (aLeg, bLeg) = try build(on: leg.0)
+
+    func replaceAcross(on editor: Editor, a: NodeKey, b: NodeKey) throws {
+      try editor.update {
+        guard let ta = getNodeByKey(key: a) as? TextNode,
+              let tb = getNodeByKey(key: b) as? TextNode else { return }
+        // Select from A offset 2 to B offset 3 and replace with "X"
+        var sel = try getSelection() as? RangeSelection ?? createEmptyRangeSelection()
+        sel.anchor.updatePoint(key: ta.getKey(), offset: 2, type: .text)
+        sel.focus.updatePoint(key: tb.getKey(), offset: 3, type: .text)
+        sel.dirty = true
+        try sel.insertText("X")
+      }
+    }
+
+    try replaceAcross(on: opt.0, a: aOpt, b: bOpt)
+    try replaceAcross(on: leg.0, a: aLeg, b: bLeg)
+
+    XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
+  }
 }
