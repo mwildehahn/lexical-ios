@@ -35,7 +35,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // Create tab bar controller
     let tabBarController = UITabBarController()
     tabBarController.viewControllers = [editorNavController, performanceNavController, compareNavController]
-    tabBarController.selectedIndex = 2
+    tabBarController.selectedIndex = 0 // Preselect Editor tab on launch
 
     window.rootViewController = tabBarController
     return true
