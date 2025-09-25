@@ -30,7 +30,7 @@ final class RangeCacheStaleEntriesTests: XCTestCase {
     func assertNoStale(_ ed: Editor, _ p: NodeKey, _ k1: NodeKey, _ k2: NodeKey) throws {
       try ed.read {
         guard let para = getNodeByKey(key: p) as? ElementNode else { return XCTFail("no paragraph") }
-        let keys = para.getChildren().compactMap{ ($0 as? Node)?.getKey() }
+        let keys = para.getChildrenKeys()
         if keys.count == 1 {
           let survivor = keys[0]
           let removed = (survivor == k1) ? k2 : k1
@@ -49,4 +49,3 @@ final class RangeCacheStaleEntriesTests: XCTestCase {
     try assertNoStale(opt, op, ot1, ot2)
   }
 }
-

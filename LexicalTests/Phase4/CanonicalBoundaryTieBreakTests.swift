@@ -59,7 +59,7 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
     try optEditor.update {}
 
     try legacyEditor.read {
-      if let p = legacyEditor.rangeCache.first(where: { k,v in (try? (getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) == true })?.value {
+      if let p = legacyEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         print("🔥 LEGACY P: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) loc=\(p.location)")
       }
       if let n1 = legacyEditor.rangeCache[lT1], let n2 = legacyEditor.rangeCache[lT2] {
@@ -68,7 +68,7 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
       }
     }
     try optEditor.read {
-      if let p = optEditor.rangeCache.first(where: { k,v in (try? (getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) == true })?.value {
+      if let p = optEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         let pr = p.entireRangeFromFenwick(using: optEditor.fenwickTree)
         print("🔥 OPT P: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) idx=\(p.nodeIndex) fenStart=\(pr.location)")
       }
@@ -108,7 +108,7 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
     )
     let optEditor = optCtx.editor
 
-    var lT1 = "", lT2 = "", oT1 = "", oT2 = ""
+    var lT2 = "", oT2 = ""
     try legacyEditor.update {
       guard let root = getActiveEditorState()?.getRootNode() else { return }
       let p = ParagraphNode()
@@ -117,7 +117,7 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
       try n2.setBold(true)
       try p.append([n1, n2])
       try root.append([p])
-      lT1 = n1.getKey(); lT2 = n2.getKey()
+      _ = n1.getKey(); lT2 = n2.getKey()
     }
     try optEditor.update {
       guard let root = getActiveEditorState()?.getRootNode() else { return }
@@ -127,7 +127,7 @@ final class CanonicalBoundaryTieBreakTests: XCTestCase {
       try n2.setBold(true)
       try p.append([n1, n2])
       try root.append([p])
-      oT1 = n1.getKey(); oT2 = n2.getKey()
+      _ = n1.getKey(); oT2 = n2.getKey()
     }
     try legacyEditor.update {}
     try optEditor.update {}

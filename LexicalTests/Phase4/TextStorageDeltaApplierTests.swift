@@ -249,7 +249,7 @@ class TextStorageDeltaApplierTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(fenwickUpdates, 0, "Should track Fenwick updates")
     case .failure(let reason):
       XCTFail("Delta batch application failed: \(reason)")
-    case .partialSuccess(let appliedDeltas, let fenwickUpdates, let reason):
+    case .partialSuccess(let appliedDeltas, _, let reason):
       print("Partial success: \(appliedDeltas) deltas applied, reason: \(reason)")
       XCTAssertGreaterThan(appliedDeltas, 0, "Should apply at least some deltas")
     }

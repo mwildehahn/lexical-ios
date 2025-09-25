@@ -70,7 +70,7 @@ final class SelectionParityTests: XCTestCase {
     try legacyEditor.read {
       guard let rc2 = legacyEditor.rangeCache[legacyT2] else { return }
       legacyLoc = rc2.textRange.location
-      if let p = legacyEditor.rangeCache.first(where: { k,v in (try? (getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) == true })?.value {
+      if let p = legacyEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         print("🔥 LEGACY p: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) loc=\(p.location)")
       }
       if let n1 = legacyEditor.rangeCache[legacyT1], let n2 = legacyEditor.rangeCache[legacyT2] {
@@ -91,7 +91,7 @@ final class SelectionParityTests: XCTestCase {
       }
       let start = absoluteNodeStartLocation(optT2, rangeCache: optEditor.rangeCache, useOptimized: true, fenwickTree: optEditor.fenwickTree, leadingShift: true)
       optLoc = start + rc2.preambleLength + rc2.childrenLength
-      if let p = optEditor.rangeCache.first(where: { k,v in (try? (getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) == true })?.value {
+      if let p = optEditor.rangeCache.first(where: { _, v in ((getNodeByKey(key: v.nodeKey) as? ParagraphNode) != nil) })?.value {
         print("🔥 OPT p: pre=\(p.preambleLength) ch=\(p.childrenLength) tx=\(p.textLength) post=\(p.postambleLength) idx=\(p.nodeIndex)")
       }
       if let n1 = optEditor.rangeCache[optT1], let n2 = optEditor.rangeCache[optT2] {
@@ -197,8 +197,8 @@ final class SelectionParityTests: XCTestCase {
     if let oB { XCTAssertEqual(loc(oB, optEditor), optLoc) }
     // Cross-mode strict equality
     XCTAssertEqual(legacyLoc, optLoc)
-    if let lF, let oF { XCTAssertEqual(try loc(lF, legacyEditor), try loc(oF, optEditor)) }
-    if let lB, let oB { XCTAssertEqual(try loc(lB, legacyEditor), try loc(oB, optEditor)) }
+    if let lF, let oF { XCTAssertEqual(loc(lF, legacyEditor), loc(oF, optEditor)) }
+    if let lB, let oB { XCTAssertEqual(loc(lB, legacyEditor), loc(oB, optEditor)) }
   }
 
   func testElementBoundaryParity() throws {

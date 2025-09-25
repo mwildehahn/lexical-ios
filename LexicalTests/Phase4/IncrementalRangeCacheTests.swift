@@ -22,7 +22,6 @@ class IncrementalRangeCacheTests: XCTestCase {
 
     // Create initial document with known structure
     var nodeKey1: NodeKey!
-    var nodeKey2: NodeKey!
 
     try editor.update {
       guard let rootNode = getActiveEditorState()?.getRootNode() else { return }
@@ -37,7 +36,6 @@ class IncrementalRangeCacheTests: XCTestCase {
       let textNode2 = TextNode(text: "Second paragraph", key: nil)
       try paragraph2.append([textNode2])
       try rootNode.append([paragraph2])
-      nodeKey2 = textNode2.key
     }
 
     // Get initial range cache state
@@ -304,7 +302,7 @@ class IncrementalRangeCacheTests: XCTestCase {
 
     // Verify initial cache consistency
     var totalLength = 0
-    for (nodeKey, cacheItem) in rangeCache {
+    for (_, cacheItem) in rangeCache {
       XCTAssertGreaterThanOrEqual(cacheItem.nodeIndex, 0, "Node index should be non-negative")
       XCTAssertGreaterThanOrEqual(cacheItem.textLength, 0, "Text length should be non-negative")
       totalLength += cacheItem.textLength
@@ -333,7 +331,7 @@ class IncrementalRangeCacheTests: XCTestCase {
 
     // Verify cache consistency after updates
     var updatedTotalLength = 0
-    for (nodeKey, cacheItem) in rangeCache {
+    for (_, cacheItem) in rangeCache {
       XCTAssertGreaterThanOrEqual(cacheItem.nodeIndex, 0, "Node index should remain non-negative")
       XCTAssertGreaterThanOrEqual(cacheItem.textLength, 0, "Text length should remain non-negative")
       updatedTotalLength += cacheItem.textLength

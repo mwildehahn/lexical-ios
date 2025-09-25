@@ -20,14 +20,13 @@ final class FenwickIndexStabilityTests: XCTestCase {
 
     var p1: ParagraphNode = ParagraphNode()
     var p2: ParagraphNode = ParagraphNode()
-    var t1Key: NodeKey = ""
 
     try editor.update {
       guard let root = getActiveEditorState()?.getRootNode() else { return }
       let pA = ParagraphNode(); let tA = TextNode(text: "A", key: nil); try pA.append([tA])
       let pB = ParagraphNode(); let tB = TextNode(text: "B", key: nil); try pB.append([tB])
       try root.append([pA, pB])
-      p1 = pA; p2 = pB; t1Key = tA.getKey()
+      p1 = pA; p2 = pB; _ = tA.getKey()
     }
     try editor.update {}
 
@@ -64,4 +63,3 @@ final class FenwickIndexStabilityTests: XCTestCase {
     }
   }
 }
-
