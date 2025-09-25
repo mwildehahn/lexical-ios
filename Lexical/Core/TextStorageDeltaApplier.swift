@@ -159,8 +159,21 @@ internal class TextStorageDeltaApplier {
     let newLength = (newText as NSString).length
     let lengthDelta = newLength - oldLength
 
-    // Apply the text change
-    textStorage.replaceCharacters(in: range, with: newText)
+    // Apply the text change with styling for TextNodes so colors/fonts match theme.
+    if let textNode: TextNode = getNodeByKey(key: nodeKey) {
+      let theme = editor.getTheme()
+      let state = getActiveEditorState()
+      let styled = AttributeUtils.attributedStringByAddingStyles(
+        NSAttributedString(string: newText),
+        from: textNode,
+        state: state ?? editor.getEditorState(),
+        theme: theme)
+      textStorage.replaceCharacters(in: range, with: styled)
+    } else {
+      // Non-text nodes (e.g., element pre/post updates) can use plain replacement;
+      // block-level pass will restyle paragraphs after reconcile.
+      textStorage.replaceCharacters(in: range, with: newText)
+    }
 
     // Update FenwickTree if there's a length change
     var fenwickUpdates = 0
