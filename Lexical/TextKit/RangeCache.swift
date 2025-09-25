@@ -236,6 +236,44 @@ internal func updateRangeCacheForTextChange(nodeKey: NodeKey, delta: Int) {
 }
 
 @MainActor
+internal func updateRangeCacheForNodePartChange(
+  nodeKey: NodeKey,
+  part: NodePart,
+  newPartLength: Int,
+  preambleSpecialCharacterLength: Int? = nil,
+  delta: Int
+) {
+  guard let editor = getActiveEditor(), let node = getNodeByKey(key: nodeKey) else {
+    fatalError()
+  }
+
+  // Update this node's cached lengths for the part that changed
+  if editor.rangeCache[nodeKey] == nil {
+    editor.rangeCache[nodeKey] = RangeCacheItem()
+  }
+  if part == .preamble {
+    editor.rangeCache[nodeKey]?.preambleLength = newPartLength
+    if let special = preambleSpecialCharacterLength {
+      editor.rangeCache[nodeKey]?.preambleSpecialCharacterLength = special
+    }
+  } else if part == .postamble {
+    editor.rangeCache[nodeKey]?.postambleLength = newPartLength
+  } else {
+    editor.rangeCache[nodeKey]?.textLength = newPartLength
+  }
+
+  // propagate delta to parents' childrenLength, since a child grew/shrank in total length
+  let parentKeys = node.getParents().map { $0.getKey() }
+  for parentKey in parentKeys {
+    editor.rangeCache[parentKey]?.childrenLength += delta
+  }
+
+  updateNodeLocationFor(
+    nodeKey: kRootNodeKey, nodeIsAfterChangedNode: false, changedNodeKey: nodeKey,
+    changedNodeParents: parentKeys, delta: delta)
+}
+
+@MainActor
 private func updateNodeLocationFor(
   nodeKey: NodeKey, nodeIsAfterChangedNode: Bool, changedNodeKey: NodeKey,
   changedNodeParents: [NodeKey], delta: Int

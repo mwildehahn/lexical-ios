@@ -768,10 +768,23 @@ public class Editor: NSObject {
         }
 
         if !headless {
-          try Reconciler.updateEditorState(
-            currentEditorState: editorState, pendingEditorState: pendingEditorState, editor: self,
-            shouldReconcileSelection: !mode.suppressReconcilingSelection,
-            markedTextOperation: mode.markedTextOperation)
+          if featureFlags.useOptimizedReconciler {
+            try OptimizedReconciler.updateEditorState(
+              currentEditorState: editorState,
+              pendingEditorState: pendingEditorState,
+              editor: self,
+              shouldReconcileSelection: !mode.suppressReconcilingSelection,
+              markedTextOperation: mode.markedTextOperation
+            )
+          } else {
+            try Reconciler.updateEditorState(
+              currentEditorState: editorState,
+              pendingEditorState: pendingEditorState,
+              editor: self,
+              shouldReconcileSelection: !mode.suppressReconcilingSelection,
+              markedTextOperation: mode.markedTextOperation
+            )
+          }
         }
         self.isUpdating = previouslyUpdating
         garbageCollectDetachedNodes(

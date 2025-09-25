@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 public protocol EditorMetricsContainer: AnyObject {
   func record(_ metric: EditorMetric)
   func resetMetrics()
@@ -38,6 +39,7 @@ public enum EditorMetric {
   case reconcilerRun(ReconcilerMetric)
 }
 
+@MainActor
 public final class NullEditorMetricsContainer: EditorMetricsContainer {
   public init() {}
 

@@ -11,6 +11,7 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 
 ## Build, Test, and Development Commands (iOS Only)
 - Always target iOS Simulator (iPhone 17 Pro, iOS 26.0). Do not build/test for macOS.
+- Never run macOS builds or tests. Use iOS Simulator destinations only (Xcodebuild or SwiftPM with iphonesimulator SDK).
 
 - SwiftPM (CLI):
   ```bash
@@ -58,14 +59,16 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 
 ## Post-Change Verification
 - Always verify locally after making significant changes:
-  - Package build: `swift build`
+  - Package build (iOS Simulator only):
+    - x86_64: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "x86_64-apple-ios16.0-simulator"`
+    - arm64: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "arm64-apple-ios16.0-simulator"`
   - Run all tests on iOS simulator (authoritative; use Lexical-Package scheme):
     `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
     - Filter example:
       `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
   - Build Playground app on simulator:
     `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
-  - Note: `swift test` targets macOS and may fail due to UIKit/TextKit iOS-only APIs; prefer the Xcode iOS simulator command above.
+  - Never use `swift test` (macOS). It targets macOS by default and will fail due to UIKit/TextKit iOS‑only APIs. Always use the Xcode iOS simulator command above.
   - Never pass `-quiet` to `xcodebuild` for tests or builds; keep output visible for diagnosis and CI logs.
 - After each significant change, ensure all tests pass and the Playground build succeeds on the iPhone 17 Pro (iOS 26.0) simulator. Do not commit unless these checks pass.
 
@@ -82,6 +85,8 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - After completing a listed task, mark it done and add a short summary (what changed, key files, test/build status). Include commit SHA and PR link if available.
   - If scope or approach changes, reflect it in `IMPLEMENTATION.md` so the plan stays accurate.
   - Aim to update after each significant milestone to avoid stale status.
+  - Reminder: update `IMPLEMENTATION.md` frequently (every 1–2 changes) and before each commit once tests pass and the Playground build succeeds.
+  - Before you mark a task as “done”, run the iOS simulator test suite (Lexical-Package scheme) and verify the Playground build. Do not mark complete if either fails.
 
 ## Agent MCP Usage
 - XcodeBuildMCP (preferred; iOS only):
@@ -152,6 +157,7 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
 - Use imperative, scoped subjects: `Optimized reconciler: emit attributeChange deltas`, `Fix build: …`, `Refactor: …`.
 - Keep body concise with bullet points for rationale/impact.
 - PRs: describe change, link issues, note user impact, and include screenshots of the Playground UI when relevant.
+- Commit cadence: commit often. After completing a change, only commit once all unit tests pass on the iOS simulator and the Playground project builds successfully for iPhone 17 Pro (iOS 26.0). Repeat this cycle for each incremental change to keep history clear and bisectable.
 - Ensure before commit/PR:
   - Package builds: `swift build`
   - All tests pass on iOS simulator (Xcode):
