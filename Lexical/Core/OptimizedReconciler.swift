@@ -168,6 +168,16 @@ internal enum OptimizedReconciler {
       return
     }
 
+    // Coalesced contiguous multi-node replace (e.g., paste across multiple nodes)
+    if try fastPath_ContiguousMultiNodeReplace(
+      currentEditorState: currentEditorState,
+      pendingEditorState: pendingEditorState,
+      editor: editor,
+      shouldReconcileSelection: shouldReconcileSelection
+    ) {
+      return
+    }
+
     // Fallback to legacy until additional optimized planners are implemented
     // If still here, fallback
     if editor.featureFlags.useOptimizedReconcilerStrictMode {
@@ -819,6 +829,104 @@ internal enum OptimizedReconciler {
 
     // Skip selection reconcile after marked text (legacy behavior)
     print("🔥 OPTIMIZED RECONCILER: composition fast path applied (len=\(markedAttr.length))")
+    return true
+  }
+
+  // MARK: - Fast path: contiguous multi-node region replace under a common ancestor
+  @MainActor
+  private static func fastPath_ContiguousMultiNodeReplace(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    shouldReconcileSelection: Bool
+  ) throws -> Bool {
+    // Require 2+ dirty nodes and no marked text handling pending
+    guard editor.dirtyNodes.count >= 2 else { return false }
+
+    // Find lowest common ancestor (LCA) element in pending state for all dirty nodes
+    let dirtyKeys = Array(editor.dirtyNodes.keys)
+    func ancestors(of key: NodeKey) -> [NodeKey] {
+      var list: [NodeKey] = []
+      var k: NodeKey? = key
+      while let cur = k, let node = pendingEditorState.nodeMap[cur] {
+        if let p = node.parent { list.append(p); k = p } else { break }
+      }
+      return list
+    }
+    var common: Set<NodeKey>? = nil
+    for k in dirtyKeys {
+      let a = Set(ancestors(of: k))
+      common = (common == nil) ? a : common!.intersection(a)
+      if common?.isEmpty == true { return false }
+    }
+    guard let candidateAncestors = common, let ancestorKey = candidateAncestors.first,
+          let ancestorPrev = currentEditorState.nodeMap[ancestorKey] as? ElementNode,
+          let ancestorNext = pendingEditorState.nodeMap[ancestorKey] as? ElementNode,
+          let ancestorPrevRange = editor.rangeCache[ancestorKey]
+    else { return false }
+
+    // Ensure no creates/deletes inside ancestor (same key set prev vs next)
+    func collectDescendants(state: EditorState, root: NodeKey) -> Set<NodeKey> {
+      guard let node = state.nodeMap[root] else { return [] }
+      var out: Set<NodeKey> = []
+      if let el = node as? ElementNode {
+        for c in el.getChildrenKeys(fromLatest: false) {
+          out.insert(c)
+          out.formUnion(collectDescendants(state: state, root: c))
+        }
+      }
+      return out
+    }
+    let prevSet = collectDescendants(state: currentEditorState, root: ancestorKey)
+    let nextSet = collectDescendants(state: pendingEditorState, root: ancestorKey)
+    if prevSet != nextSet { return false }
+
+    // Build attributed content for ancestor's children in next order
+    let theme = editor.getTheme()
+    let nextChildren = ancestorNext.getChildrenKeys(fromLatest: false)
+    let built = NSMutableAttributedString()
+    for child in nextChildren { built.append(buildAttributedSubtree(nodeKey: child, state: pendingEditorState, theme: theme)) }
+
+    // Replace the children region for the ancestor
+    guard let textStorage = editor.textStorage else { return false }
+    let previousMode = textStorage.mode
+    let childrenStart = ancestorPrevRange.location + ancestorPrevRange.preambleLength
+    let childrenRange = NSRange(location: childrenStart, length: ancestorPrevRange.childrenLength)
+    textStorage.mode = .controllerMode
+    textStorage.beginEditing()
+    textStorage.replaceCharacters(in: childrenRange, with: built)
+    textStorage.fixAttributes(in: NSRange(location: childrenRange.location, length: built.length))
+    textStorage.endEditing()
+    textStorage.mode = previousMode
+
+    // Recompute the range cache for this subtree (locations and lengths)
+    _ = recomputeRangeCacheSubtree(
+      nodeKey: ancestorKey, state: pendingEditorState, startLocation: ancestorPrevRange.location,
+      editor: editor)
+
+    // Update decorator positions for this subtree
+    if let ts = editor.textStorage {
+      for (key, _) in ts.decoratorPositionCache {
+        if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
+      }
+    }
+
+    // Block-level attributes for ancestor + its parents
+    var affected: Set<NodeKey> = [ancestorKey]
+    if let ancNode = pendingEditorState.nodeMap[ancestorKey] { for p in ancNode.getParents() { affected.insert(p.getKey()) } }
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+
+    // Selection reconcile
+    let prevSelection = currentEditorState.selection
+    let nextSelection = pendingEditorState.selection
+    var selectionsAreDifferent = false
+    if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+    let needsUpdate = editor.dirtyType != .noDirtyNodes
+    if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+      try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+    }
+
+    print("🔥 OPTIMIZED RECONCILER: coalesced contiguous region replace (ancestor=\(ancestorKey), dirty=\(editor.dirtyNodes.count))")
     return true
   }
 
