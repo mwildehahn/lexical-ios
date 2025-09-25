@@ -956,6 +956,18 @@ internal enum OptimizedReconciler {
     textStorage.endEditing()
     textStorage.mode = previousMode
 
+    // Metrics (planning timing and diff counts)
+    if let metrics = editor.metricsContainer {
+      let diffs = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
+      let changed = diffs.count
+      let metric = ReconcilerMetric(
+        duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 1, rangesDeleted: 1,
+        treatedAllNodesAsDirty: false, pathLabel: "coalesced-replace", planningDuration: 0,
+        applyDuration: 0, deleteCount: 1, insertCount: 1, setAttributesCount: 0, fixAttributesCount: 1)
+      metrics.record(.reconcilerRun(metric))
+      _ = changed // placeholder for potential future thresholds
+    }
+
     // Recompute the range cache for this subtree (locations and lengths)
     _ = recomputeRangeCacheSubtree(
       nodeKey: ancestorKey, state: pendingEditorState, startLocation: ancestorPrevRange.location,

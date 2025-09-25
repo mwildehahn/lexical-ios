@@ -69,8 +69,8 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [x] Coalesce (merge adjacent deletes/inserts; build single attributed string where possible).
 
 - [ ] M3 — Apply Engine
-  - [ ] Execute deletes (reverse), inserts (forward), set attributes, one `fixAttributes` over minimal covering range.
-  - [ ] Apply block‑level attributes once per affected block with deduped nodes.
+  - [x] Execute deletes (reverse), inserts (forward), set attributes, one `fixAttributes` over minimal covering range.
+  - [x] Apply block‑level attributes once per affected block with deduped nodes.
   - [ ] Handle decorators move/add/remove; preserve `needsCreation/needsDecorating` semantics.
 
 - [ ] M3a — Composition (Marked Text) in Optimized Reconciler
