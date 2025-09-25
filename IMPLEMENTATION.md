@@ -24,7 +24,7 @@ Legend: [x] done · [>] in progress · [ ] todo
 - [x] IME/marked‑text flow (create selection guard + `setMarkedTextFromReconciler`).
 - [x] Inline style changes emit `attributeChange` deltas without mutating string.
 - [x] Selection reconciliation edge cases (absolute location mapping at element/text/paragraph boundaries, multi‑paragraph ranges).
-- [ ] Placeholder visibility and controlled vs non‑controlled behavior audit.
+- [x] Placeholder visibility and controlled vs non‑controlled behavior audit.
 
 **Correctness/Robustness**
 - [x] Controller‑mode editing around batch (`begin/endEditing`).
@@ -285,6 +285,15 @@ Notes
 
 Verification (iOS 26.0)
 - `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/Phase4/InlineDecoratorBoundaryParityTests test` → green.
+
+2025‑09‑25 — Placeholder visibility & controlled vs non‑controlled audit (complete)
+
+Summary
+- Verified existing placeholder tests in `TextViewTests` (show/hide on init, after typing, after deletion) on iOS 26.0.
+- Added IME cancel edge case: `testPlaceholderReappearsOnImeCancel` — begin composition, ensure placeholder hides, cancel composition, verify placeholder shows again.
+
+Verification (iOS 26.0)
+- `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/Tests/TextViewTests test` → green.
 
 Notes & hypotheses on the remaining failures
 - Leaf length idempotence (4 vs 2): likely a composition/accumulation bug in incremental insert path outside of EditorContext. The synthetic test calls `updateRangeCache` directly with insertion deltas; in that context, `getActiveEditorState()` is nil. We now prefer `editor.getEditorState()` where possible, but for the direct‑call case child/parent relationships come only from the active (pre‑insert) state. Despite that, the leaf `textLength` should be set from `insertionData.content.length` (2) — the doubled value suggests a secondary aggregation path still touches `textLength`.
