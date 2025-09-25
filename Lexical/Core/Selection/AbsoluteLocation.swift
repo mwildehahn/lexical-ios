@@ -18,14 +18,23 @@ internal func absoluteNodeStartLocation(
   if key == kRootNodeKey { return 0 }
   guard let node = getNodeByKey(key: key) else {
     // Fallback to what we know from cache when node has been GC'd or missing
-    if useOptimized, let item = rangeCache[key] { return item.locationFromFenwick(using: fenwickTree) }
+    if useOptimized, let item = rangeCache[key] {
+      // Important: do not call back into RangeCacheItem.locationFromFenwick here,
+      // as that path may in turn call absoluteNodeStartLocation for elements and
+      // create mutual recursion. Use the Fenwick tree directly for a safe
+      // best‑effort absolute base.
+      return fenwickTree.getNodeOffset(nodeIndex: item.nodeIndex)
+    }
     return rangeCache[key]?.location ?? 0
   }
   // If no parent, fall back to cache-provided location
   guard let parentKey = node.parent,
         let parentItem = rangeCache[parentKey],
         let parent = getNodeByKey(key: parentKey) as? ElementNode else {
-    if useOptimized, let item = rangeCache[key] { return item.locationFromFenwick(using: fenwickTree) }
+    if useOptimized, let item = rangeCache[key] {
+      // Avoid mutual recursion with locationFromFenwick (see note above).
+      return fenwickTree.getNodeOffset(nodeIndex: item.nodeIndex)
+    }
     return rangeCache[key]?.location ?? 0
   }
 
