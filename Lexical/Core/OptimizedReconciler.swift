@@ -356,14 +356,20 @@ internal enum OptimizedReconciler {
 
     applyInstructions(instructions, editor: editor)
 
-    // Update Fenwick and RangeCache for the single-node text delta
+    // Update RangeCache using Fenwick when enabled, otherwise fallback helper
     let delta = newTextLen - oldTextLen
-    if let idx = indexOf[dirtyKey], delta != 0 {
-      bit.add(idx, delta)
+    if editor.featureFlags.useReconcilerFenwickDelta {
+      // Update lengths in cache without walking tree
+      if var item = editor.rangeCache[dirtyKey] { item.textLength = newTextLen; editor.rangeCache[dirtyKey] = item }
+      // Update ancestors' childrenLength
+      if let node = pendingEditorState.nodeMap[dirtyKey] as? TextNode {
+        let parentKeys = node.getParents().map { $0.getKey() }
+        for pk in parentKeys { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } }
+      }
+      editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+    } else {
+      updateRangeCacheForTextChange(nodeKey: dirtyKey, delta: delta)
     }
-
-    // Use existing range cache updater to propagate lengths and locations safely
-    updateRangeCacheForTextChange(nodeKey: dirtyKey, delta: delta)
 
     // Update decorator positions to match new locations
     if let ts = editor.textStorage {
@@ -635,8 +641,13 @@ internal enum OptimizedReconciler {
         theme: theme)
       if postAttr.length > 0 { applied.append(.insert(location: postLoc, attrString: postAttr)) }
       let delta = nextPostLen - prevRange.postambleLength
-      updateRangeCacheForNodePartChange(
-        nodeKey: dirtyKey, part: .postamble, newPartLength: nextPostLen, delta: delta)
+      if editor.featureFlags.useReconcilerFenwickDelta {
+        if var item = editor.rangeCache[dirtyKey] { item.postambleLength = nextPostLen; editor.rangeCache[dirtyKey] = item }
+        if let node = pendingEditorState.nodeMap[dirtyKey] { let parents = node.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } }
+        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+      } else {
+        updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .postamble, newPartLength: nextPostLen, delta: delta)
+      }
     }
 
     // Apply preamble second (lower location)
@@ -650,9 +661,13 @@ internal enum OptimizedReconciler {
       if preAttr.length > 0 { applied.append(.insert(location: preLoc, attrString: preAttr)) }
       let delta = nextPreLen - prevRange.preambleLength
       let preSpecial = nextNode.getPreamble().lengthAsNSString(includingCharacters: ["\u{200B}"])
-      updateRangeCacheForNodePartChange(
-        nodeKey: dirtyKey, part: .preamble, newPartLength: nextPreLen,
-        preambleSpecialCharacterLength: preSpecial, delta: delta)
+      if editor.featureFlags.useReconcilerFenwickDelta {
+        if var item = editor.rangeCache[dirtyKey] { item.preambleLength = nextPreLen; item.preambleSpecialCharacterLength = preSpecial; editor.rangeCache[dirtyKey] = item }
+        if let node = pendingEditorState.nodeMap[dirtyKey] { let parents = node.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } }
+        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+      } else {
+        updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .preamble, newPartLength: nextPreLen, preambleSpecialCharacterLength: preSpecial, delta: delta)
+      }
     }
     applyInstructions(applied, editor: editor)
 
