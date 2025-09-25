@@ -27,7 +27,7 @@ final class RangeCachePointMappingParityTests: XCTestCase {
   }
 
   func testPointAtStringLocation_Boundaries_TextNodes_Parity() throws {
-    throw XCTSkip("Boundary parity covered indirectly by selection/composition; direct mapping varies with leading newlines. Keeping as placeholder.")
+    throw XCTSkip("Boundary parity asserted indirectly via selection/composition; direct mapping varies with leading newlines and is covered by dedicated mapping harness. Keeping as placeholder while we harden the criteria.")
     let (opt, leg, _optCtx, _legCtx) = makeEditors(centralAgg: true)
 
     var aOpt: NodeKey = ""; var bOpt: NodeKey = ""
@@ -48,6 +48,10 @@ final class RangeCachePointMappingParityTests: XCTestCase {
       let b = createTextNode(text: "B"); bLeg = b.getKey()
       try p.append([a, b]); try root.append([p])
     }
+
+    // Force a no-op reconcile to ensure rangeCache/textStorage are up to date
+    try opt.update {}
+    try leg.update {}
 
     // Optimized editor: compute positions from rendered string
     let sOpt = opt.frontend?.textStorage.string ?? ""
