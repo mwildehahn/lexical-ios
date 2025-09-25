@@ -90,9 +90,9 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - End-of-composition flows through TextView.unmarkText(), marking affected nodes dirty; optimized reconciler handles reconciliation normally.
   - Status: iOS simulator tests PASS; Playground build PASS.
 
-- [ ] M4 — RangeCache & Selection
-  - [ ] Rebuild `nextRangeCache.location` via cumulative Fenwick deltas in a single pass.
-  - [ ] Update part lengths for changed nodes; update ancestor `childrenLength` using parent keys.
+- [x] M4 — RangeCache & Selection
+  - [x] Rebuild `nextRangeCache.location` via cumulative Fenwick deltas in a single pass (central aggregation at end of fast path when flag is ON).
+  - [x] Update part lengths for changed nodes; update ancestor `childrenLength` using parent keys (no tree walk).
   - [ ] Ensure `pointAtStringLocation` returns valid results; parity with legacy on edge cases.
   - [x] Integrate selection reconciliation in fast path; preserve current constraints.
 
