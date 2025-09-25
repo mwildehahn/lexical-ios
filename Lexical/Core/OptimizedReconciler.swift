@@ -231,6 +231,8 @@ internal enum OptimizedReconciler {
     textStorage.replaceCharacters(in: fullRange, with: built)
     textStorage.fixAttributes(in: NSRange(location: 0, length: built.length))
     textStorage.endEditing()
+    // Apply block-level attributes for all nodes (parity with legacy slow path)
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: nil, treatAllNodesAsDirty: true)
     textStorage.mode = previousMode
 
     // Recompute entire range cache locations
@@ -379,6 +381,11 @@ internal enum OptimizedReconciler {
         }
       }
     }
+
+    // Block-level attributes: apply for this node and its ancestors only (optimized scope)
+    var affected: Set<NodeKey> = [dirtyKey]
+    if let node = pendingEditorState.nodeMap[dirtyKey] { for p in node.getParents() { affected.insert(p.getKey()) } }
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
 
     // Reconcile selection similarly to legacy when requested
     let prevSelection = currentEditorState.selection
@@ -560,6 +567,11 @@ internal enum OptimizedReconciler {
       }
     }
 
+    // Apply block-level attributes for parent and direct children (reorder may affect paragraph boundaries)
+    var affected: Set<NodeKey> = [parentKey]
+    for k in nextChildren { affected.insert(k) }
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+
     // Selection handling
     let prevSelection = currentEditorState.selection
     let nextSelection = pendingEditorState.selection
@@ -739,6 +751,11 @@ internal enum OptimizedReconciler {
       }
     }
 
+    // Block-level attributes: apply for this node and its ancestors only (optimized scope)
+    var affected: Set<NodeKey> = [dirtyKey]
+    if let node = pendingEditorState.nodeMap[dirtyKey] { for p in node.getParents() { affected.insert(p.getKey()) } }
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+
     // Selection handling
     let prevSelection = currentEditorState.selection
     let nextSelection = pendingEditorState.selection
@@ -816,6 +833,46 @@ internal enum OptimizedReconciler {
     sum += node.getTextPart().lengthAsNSString()
     sum += node.getPostamble().lengthAsNSString()
     return sum
+  }
+
+  // MARK: - Block-level attributes pass (parity with legacy)
+  @MainActor
+  private static func applyBlockAttributesPass(
+    editor: Editor,
+    pendingEditorState: EditorState,
+    affectedKeys: Set<NodeKey>?,
+    treatAllNodesAsDirty: Bool
+  ) {
+    guard let textStorage = editor.textStorage else { return }
+    let theme = editor.getTheme()
+
+    // Build node set to apply
+    var nodesToApply: Set<NodeKey> = []
+    if treatAllNodesAsDirty {
+      nodesToApply = Set(pendingEditorState.nodeMap.keys)
+    } else {
+      nodesToApply = Set(editor.dirtyNodes.keys)
+      // include parents of each dirty node
+      for k in editor.dirtyNodes.keys {
+        if let n = pendingEditorState.nodeMap[k] { for p in n.getParents() { nodesToApply.insert(p.getKey()) } }
+      }
+      if let affectedKeys { nodesToApply.formUnion(affectedKeys) }
+    }
+
+    let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(theme: theme) ?? [:]
+
+    let previousMode = textStorage.mode
+    textStorage.mode = .controllerMode
+    textStorage.beginEditing()
+    let rangeCache = editor.rangeCache
+    for nodeKey in nodesToApply {
+      guard let node = getNodeByKey(key: nodeKey), node.isAttached(), let cacheItem = rangeCache[nodeKey], let attributes = node.getBlockLevelAttributes(theme: theme) else { continue }
+      AttributeUtils.applyBlockLevelAttributes(
+        attributes, cacheItem: cacheItem, textStorage: textStorage, nodeKey: nodeKey,
+        lastDescendentAttributes: lastDescendentAttributes)
+    }
+    textStorage.endEditing()
+    textStorage.mode = previousMode
   }
 
   // Collect all node keys in a subtree (DFS order), including the root key.
