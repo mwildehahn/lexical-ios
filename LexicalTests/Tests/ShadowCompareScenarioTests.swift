@@ -98,4 +98,26 @@ final class ShadowCompareScenarioTests: XCTestCase {
 
     XCTAssertFalse(frontend.textStorage.string.isEmpty)
   }
+
+  func testMixedParentEditsShadowCompare() throws {
+    let (editor, frontend) = makeShadowEditors()
+
+    // Build: Root -> [ P1("One"), P2("Two") ]
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "One") ])
+      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "Two") ])
+      try root.append([p1, p2])
+    }
+
+    // One update: change P1 text and append P3("X") after P2
+    try editor.update {
+      guard let root = getRoot(), let p1 = root.getFirstChild() as? ParagraphNode else { return }
+      if let t = p1.getFirstChild() as? TextNode { try t.setText("One!") }
+      let p3 = createParagraphNode(); try p3.append([ createTextNode(text: "X") ])
+      try root.append([p3])
+    }
+
+    XCTAssertFalse(frontend.textStorage.string.isEmpty)
+  }
 }

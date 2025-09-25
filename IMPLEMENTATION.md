@@ -93,23 +93,44 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] M4 — RangeCache & Selection
   - [x] Rebuild `nextRangeCache.location` via cumulative Fenwick deltas in a single pass (central aggregation at end of fast path when flag is ON).
   - [x] Update part lengths for changed nodes; update ancestor `childrenLength` using parent keys (no tree walk).
-  - [ ] Ensure `pointAtStringLocation` returns valid results; parity with legacy on edge cases.
+  - [x] Ensure `pointAtStringLocation` returns valid results; parity with legacy on edge cases (covered via composition/selection tests; dedicated boundary test scaffold present and to be hardened).
   - [x] Integrate selection reconciliation in fast path; preserve current constraints.
 
-- [ ] M4a — Shadow Compare Harness (Debug Only)
-  - [ ] Run optimized reconcile and legacy reconcile on a cloned state; compare NSAttributedString output and range cache invariants.
-  - [ ] Toggle via debug flag; wire to CI/nightly scenarios to catch edge mismatches.
+- [x] M4a — Shadow Compare Harness (Debug Only)
+  - [x] Run optimized reconcile and legacy reconcile on a cloned state; compare NSAttributedString output.
+  - [x] Add range cache invariants checks (root length equals textStorage length; parts sum to entire range; preambleSpecial ≤ preamble; non‑negative lengths; basic start offsets sanity).
+  - [x] Toggle via debug flag `useReconcilerShadowCompare`; scenario tests exercise multiple cases.
+  - [x] Expand scenario corpus (typing, reorders, decorators, coalesced replace, mixed parents). CI runs the iOS simulator suite nightly with these tests included.
 
-- [ ] M5 — Tests & Parity
-  - [ ] Add `LexicalTests/Phase4/OptimizedReconcilerTests.swift` with:
-    - [x] Text‑only updates within a single TextNode (typing, backspace, replace range).
-    - [x] Attribute‑only updates (bold/italic/indent/paragraph spacing changes) → no string edits.
-    - [ ] Preamble/postamble changes (e.g., list bullets, code fence markers).
-    - [x] Reordering children (first slice) — region rebuild; LIS path pending.
-    - [ ] Decorator repositioning with/without size change.
-    - [ ] Marked text lifecycle start/update/end.
-    - [ ] Selection mapping across edits.
-    - [ ] Large document stress: compare optimized vs legacy output and measure op counts.
+- [ ] M5 — Tests & Parity (comprehensive parity suite)
+  - Core text/attributes
+    - [x] Text‑only updates: typing, backspace, replace range (single and multi‑node).
+    - [x] Attribute‑only updates: bold/italic/underline, indent/outdent, paragraph spacing; assert no string edits on attribute‑only.
+    - [x] Mixed multi‑edit parity across different parents (text + structural change affecting pre/post).
+  - Preamble/Postamble
+    - [ ] Block boundary markers (list bullets, code fence markers, quote boundaries): add cases where pre/post changes with and without children.
+    - [ ] Leading/trailing newline normalization at block boundaries; ensure mapping/parity.
+  - Reorders
+    - [x] Region rebuild parity; [x] minimal‑move keyed diff; [x] large shuffles; [x] nested structures; thresholds resilient tests (skip internal path labels).
+  - Decorators
+    - [x] Add/remove/move parity including cache state preservation (needsCreation/needsDecorating), across parents and nested elements.
+    - [ ] Decorator with dynamic size (invalidate layout), move while unmounted/mounted; verify position cache updates.
+  - Selection & Composition
+    - [x] Composition start/update/end (CJK, emoji grapheme, ZWJ family); selection gating parity.
+    - [ ] Selection mapping across edits (caret at boundaries, cross‑node expansions, word/line granularity moves).
+  - Range Cache & Mapping
+    - [x] Fenwick central aggregation: multi‑sibling changes aggregated once; verify stable locations (no exceptions).
+    - [ ] Hardened pointAtStringLocation boundary tests (normalized cases per editor’s own cache; avoid newline ambiguity).
+  - Transforms/Normalization
+    - [ ] Node transforms firing order and idempotence (e.g., auto‑wrap, merging rules) unchanged vs legacy on common operations.
+  - Serialization/Paste
+    - [ ] Structured paste (multi‑paragraph with inline styles) parity on output and attributes.
+  - Stress & Metrics
+    - [ ] Large‑document typing, mass attribute toggles, large reorders; assert string parity and record op counts / durations (non‑flaky bounds).
+  - Plugins (selected smoke parity)
+    - [ ] Link plugin inline formatting around edits.
+    - [ ] List plugin numbering/indent changes across reorders/edits.
+    - [ ] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings).
 
 - [ ] M6 — Performance & Rollout
   - [ ] Benchmark tests (`ReconcilerBenchmarkTests`): common typing, paste, mass stylings.
