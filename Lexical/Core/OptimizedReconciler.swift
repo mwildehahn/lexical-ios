@@ -622,6 +622,54 @@ private class DeltaGenerator {
           }
         }
 
+        // Element postamble change (e.g., paragraph gains/removes trailing newline when a sibling is inserted/deleted)
+        if let _ = currentNode as? ElementNode,
+           let _ = pendingNode as? ElementNode,
+           let rangeCacheItem = rangeCache[nodeKey] {
+          // Compute postamble strings using the provided editor states (not active state)
+          func postambleString(for key: NodeKey, in state: EditorState) -> String {
+            guard let node = state.nodeMap[key] else { return "" }
+            guard let elem = node as? ElementNode else { return "" }
+            let inline = elem.isInline()
+            if let parentKey = node.parent, let parent = state.nodeMap[parentKey] as? ElementNode,
+               let idx = parent.children.firstIndex(of: key) {
+              let hasNext = (idx + 1) < parent.children.count
+              if inline {
+                if hasNext, let next = state.nodeMap[parent.children[idx + 1]] as? ElementNode { return next.isInline() ? "" : "\n" }
+                return ""
+              } else {
+                return hasNext ? "\n" : ""
+              }
+            }
+            // Root or detached
+            return ""
+          }
+          let oldPost = postambleString(for: nodeKey, in: currentState)
+          let newPost = postambleString(for: nodeKey, in: pendingState)
+          if oldPost != newPost {
+            // Prefer to position at the end of the element's last child (more robust than relying on
+            // the element's cached childrenLength in differential states).
+            var postLoc = rangeCacheItem.locationFromFenwick(using: editor.fenwickTree) + rangeCacheItem.preambleLength + rangeCacheItem.childrenLength + rangeCacheItem.textLength
+            if let parentElem = currentState.nodeMap[nodeKey] as? ElementNode,
+               let lastChildKey = parentElem.getChildrenKeys(fromLatest: false).last,
+               let childItem = rangeCache[lastChildKey] {
+              let childBase = childItem.locationFromFenwick(using: editor.fenwickTree)
+              postLoc = childBase + childItem.preambleLength + childItem.childrenLength + childItem.textLength
+            }
+            let postRange = NSRange(location: postLoc, length: rangeCacheItem.postambleLength)
+            let deltaType = ReconcilerDeltaType.textUpdate(
+              nodeKey: nodeKey,
+              newText: newPost,
+              range: postRange
+            )
+            deltas.append(ReconcilerDelta(type: deltaType, metadata: DeltaMetadata(sourceUpdate: "Postamble update", fenwickTreeIndex: nil, originalRange: postRange, orderIndex: seq)))
+            seq += 1
+            if editor.featureFlags.diagnostics.verboseLogs {
+              print("🔥 DELTA GEN: POSTAMBLE key=\(nodeKey) loc=\(postLoc) new='\(newPost.replacingOccurrences(of: "\n", with: "\\n"))'")
+            }
+          }
+        }
+
         // Inline attribute (format) changes without text change
         if let currentTextNode = currentNode as? TextNode,
            let pendingTextNode = pendingNode as? TextNode,

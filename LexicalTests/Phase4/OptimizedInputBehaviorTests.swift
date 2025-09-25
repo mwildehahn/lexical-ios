@@ -11,9 +11,7 @@ import XCTest
 final class OptimizedInputBehaviorTests: XCTestCase {
 
   func testInsertNewlineAndBackspaceInOptimizedMode() throws {
-    if #available(iOS 16.0, *) {
-      XCTExpectFailure("Optimized newline/backspace parity: off-by-one at text-end; tracked in IMPLEMENTATION.md (B-0002)")
-    }
+    if #available(iOS 16.0, *) { XCTExpectFailure("B-0002: Optimized newline/backspace parity — tracking while fixing") }
     let flags = FeatureFlags(reconcilerMode: .optimized,
                              diagnostics: Diagnostics(selectionParity: true,
                                                        sanityChecks: false,
