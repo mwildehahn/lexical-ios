@@ -14,24 +14,17 @@ The main entry point for optimized reconciliation.
 ```swift
 @MainActor
 internal enum OptimizedReconciler {
-    static func attemptOptimizedReconciliation(
-        currentEditorState: EditorState,
-        pendingEditorState: EditorState,
-        editor: Editor,
-        shouldReconcileSelection: Bool,
-        markedTextOperation: MarkedTextOperation?
-    ) throws -> Bool
+  static func reconcile(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    shouldReconcileSelection: Bool,
+    markedTextOperation: MarkedTextOperation?
+  ) throws
 }
 ```
 
-**Parameters:**
-- `currentEditorState`: The current state of the editor
-- `pendingEditorState`: The new state to reconcile to
-- `editor`: The editor instance
-- `shouldReconcileSelection`: Whether to reconcile selection changes
-- `markedTextOperation`: Optional marked text operation (IME)
-
-**Returns:** `true` if optimized reconciliation was used, `false` if it fell back to legacy
+The reconciler does not auto‑fallback; choose mode via `FeatureFlags.reconcilerMode` or use `.darkLaunch` to run optimized and legacy back‑to‑back in debug scenarios.
 
 #### 2. FenwickTree
 A binary indexed tree for efficient range sum queries and updates.
@@ -57,34 +50,16 @@ Represents a single change to be applied to the text storage.
 
 ```swift
 enum ReconcilerDeltaType {
-    case textUpdate(nodeKey: NodeKey, newText: String, range: NSRange)
-    case nodeInsertion(nodeKey: NodeKey, insertionData: NodeInsertionData, location: Int)
-    case nodeDeletion(nodeKey: NodeKey, range: NSRange)
-    case attributeUpdate(nodeKey: NodeKey, attributes: [NSAttributedString.Key: Any], range: NSRange)
-    case anchorUpdate(nodeKey: NodeKey, preambleLocation: Int, postambleLocation: Int)
+  case textUpdate(nodeKey: NodeKey, newText: String, range: NSRange)
+  case nodeInsertion(nodeKey: NodeKey, insertionData: NodeInsertionData, location: Int)
+  case nodeDeletion(nodeKey: NodeKey, range: NSRange)
+  case attributeChange(nodeKey: NodeKey, attributes: [NSAttributedString.Key: Any], range: NSRange)
 }
 ```
-
-#### 4. ReconcilerFallbackDetector
-Determines when to fallback to legacy reconciliation for safety.
-
-```swift
-@MainActor
-internal class ReconcilerFallbackDetector {
-    func shouldFallbackToFullReconciliation(
-        for deltas: [ReconcilerDelta],
-        textStorage: NSTextStorage,
-        context: ReconcilerContext
-    ) -> FallbackDecision
-}
-```
-
-**Fallback Triggers:**
-- More than 100 deltas in a batch
-- More than 50 structural changes
-- Consecutive optimization failures
-- Anchor corruption detected
-- Memory pressure conditions
+Associated types:
+- `NodeInsertionData(preamble: NSAttributedString, content: NSAttributedString, postamble: NSAttributedString, nodeKey: NodeKey)`
+- `DeltaBatch(deltas: [ReconcilerDelta], batchMetadata: BatchMetadata)`
+- `BatchMetadata(expectedTextStorageLength: Int, isFreshDocument: Bool)`
 
 ## Feature Flags
 
@@ -176,19 +151,25 @@ let editorConfig = EditorConfig(
 // - .optimizedReconcilerRun(OptimizedReconcilerMetric)
 ```
 
-### Custom Fallback Thresholds
+### Delta Application
 
-The fallback detector uses these default thresholds:
+`TextStorageDeltaApplier` applies a batch of deltas and returns a result:
 
 ```swift
-struct FallbackThresholds {
-    static let maxDeltasPerBatch = 100
-    static let maxStructuralChanges = 50
-    static let maxConsecutiveFailures = 3
+enum DeltaApplicationResult {
+  case success(appliedDeltas: Int, fenwickTreeUpdates: Int)
+  case partialSuccess(appliedDeltas: Int, failedDeltas: [ReconcilerDelta], reason: String)
+  case failure(reason: String)
+}
+
+final class TextStorageDeltaApplier {
+  func applyDeltaBatch(_ batch: DeltaBatch, to textStorage: NSTextStorage) -> DeltaApplicationResult
 }
 ```
 
-To customize, modify `ReconcilerFallbackDetector.swift`.
+Notes:
+- Fresh documents preserve generator order; otherwise deltas are applied in a stable order that avoids index drift.
+- Fenwick updates reflect text content only (preamble/postamble excluded).
 
 ## Integration Points
 
@@ -222,9 +203,11 @@ class TextStorageDeltaApplier {
 editor.log(.reconciler, .message, "Reconciler message")
 ```
 
-### Monitor Fallback Reasons
+### Diagnostics & Logging
 
-Check metrics for `OptimizedReconcilerMetric.fallbackReason` to understand why fallbacks occur.
+- Enable metrics via `diagnostics.metrics` and read `EditorMetric` events.
+- Verbose debug prints are gated by `diagnostics.verboseLogs`.
+- Parity diagnostics are gated by `diagnostics.selectionParity` and should be used only in focused tests.
 
 ### Performance Comparison
 
@@ -233,15 +216,15 @@ Use the `PerformanceTestViewController` in LexicalPlayground to compare legacy v
 ## Best Practices
 
 1. **Start with Feature Flag Off**: Test thoroughly before enabling in production
-2. **Monitor Metrics**: Watch for excessive fallbacks
+2. **Monitor Metrics**: Track durations and Fenwick ops; watch for outliers
 3. **Batch Updates**: Group related changes in single `editor.update()` calls
-4. **Avoid Massive Structural Changes**: These trigger fallback for safety
+4. **Large Changes**: Prefer chunking huge, unrelated structural mutations
 5. **Test with Large Documents**: Ensure performance scales as expected
 
 ## Limitations
 
-- Marked text operations (IME) are not yet supported in optimized path
-- Some plugins may not be optimized-path aware
+- Marked text operations (IME) are supported via `markedTextOperation` handling in reconcile().
+- Ensure custom plugins that manipulate TextStorage directly are audited for optimized mode.
 
 ## Migration Guide
 

@@ -9,7 +9,7 @@ This guide helps you migrate from the legacy reconciler to the optimized reconci
 ### Phase 1: Testing (Weeks 1-2)
 - Enable optimized reconciler in development builds
 - Run performance benchmarks
-- Monitor metrics and fallback rates
+- Monitor metrics (durations, Fenwick ops) and correctness tests
 
 ### Phase 2: Beta Rollout (Weeks 3-4)
 - Enable for 5% of beta users
@@ -165,11 +165,11 @@ class PerformanceComparison {
 
 ## Common Issues and Solutions
 
-### Issue 1: Excessive Fallbacks
+### Issue 1: Large batch performance regressions
 
-**Symptom:** High fallback rate in metrics
+**Symptom:** Slow reconciliations on very large, unrelated batches
 
-**Solution:**
+**Solution:** Chunk the batch into smaller updates
 ```swift
 // Check for large batch operations
 if nodes.count > 50 {
@@ -236,17 +236,12 @@ Key metrics to monitor:
 
 1. **Performance Metrics**
    - P50/P95/P99 reconciliation times
-   - Operations per second
-   - Time to interactive
+   - Fenwick operations per batch
+   - Document size (nodes, storage length)
 
-2. **Fallback Metrics**
-   - Fallback rate
-   - Fallback reasons
-   - Consecutive failures
-
-3. **Error Metrics**
+2. **Correctness / Error Metrics**
    - Reconciliation failures
-   - Anchor corruption events
+   - Sanity check violations (if enabled)
    - Memory pressure events
 
 ## Testing Checklist
