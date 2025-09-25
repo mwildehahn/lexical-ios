@@ -125,6 +125,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Node transforms parity for common cases (merge adjacent simple text nodes, auto‑remove empty text nodes) — optimized vs legacy final strings equal.
   - Serialization/Paste
     - [x] Structured paste (multi‑paragraph) parity on final string; exercises coalesced replace path vs legacy.
+    - [x] Formatted paste: bold/italic inline styles — attribute sampling parity at representative positions.
   - Stress & Metrics
     - [ ] Large‑document typing, mass attribute toggles, large reorders; assert string parity and record op counts / durations (non‑flaky bounds).
   - Plugins (selected smoke parity)
@@ -134,6 +135,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 
 - [ ] M6 — Performance & Rollout
   - [ ] Benchmark tests (`ReconcilerBenchmarkTests`): common typing, paste, mass stylings.
+  - [x] Add benchmark smoke tests: typing in large doc, mass bold toggles, large reorder shuffle (non‑flaky; logs timings only).
   - [ ] Add metrics reporting to confirm op reductions and time split improvements.
   - [ ] Ship sub‑flags off by default; enable in CI nightly; collect metrics.
   - [ ] Flip `useOptimizedReconciler` in staged environments.
