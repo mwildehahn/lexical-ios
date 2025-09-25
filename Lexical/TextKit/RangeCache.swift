@@ -103,12 +103,47 @@ internal func pointAtStringLocation(
     }
 
     switch searchResult.type {
-    case .endBoundary, .startBoundary, .illegal:
-      throw LexicalError.internal("Failed to find node for location: \(location)")
     case .text:
-      return Point(key: searchResult.nodeKey, offset: offset, type: .text)
+      let p = Point(key: searchResult.nodeKey, offset: offset, type: .text)
+      if let ed = getActiveEditor(), ed.featureFlags.selectionParityDebug {
+        print("🔥 POINT RES: key=\(p.key) type=text off=\(p.offset)")
+      }
+      return p
     case .element:
-      return Point(key: searchResult.nodeKey, offset: offset, type: .element)
+      let p = Point(key: searchResult.nodeKey, offset: offset, type: .element)
+      if let ed = getActiveEditor(), ed.featureFlags.selectionParityDebug {
+        print("🔥 POINT RES: key=\(p.key) type=element off=\(p.offset)")
+      }
+      return p
+    case .startBoundary, .endBoundary, .illegal:
+      // Parity fallback: prefer the deepest element whose absolute start equals the location.
+      if let editor = getActiveEditor(), editor.featureFlags.selectionParityDebug {
+        func depth(_ key: NodeKey) -> Int {
+          var d = 0; var cur: NodeKey? = key
+          while let k = cur, k != kRootNodeKey, let n = getNodeByKey(key: k) { d += 1; cur = n.parent }
+          return d
+        }
+        var best: (NodeKey, Int)? = nil
+        for (k, item) in rangeCache {
+          guard getNodeByKey(key: k) is ElementNode else { continue }
+          let base = editor.featureFlags.optimizedReconciler ? item.locationFromFenwick(using: editor.fenwickTree) : item.location
+          if base == location {
+            let d = depth(k)
+            if best == nil || d > (best!.1) { best = (k, d) }
+          }
+        }
+        if let (ekey, _) = best, let elem: ElementNode = getNodeByKey(key: ekey) {
+          let off = (searchResult.type == .endBoundary) ? elem.getChildrenKeys().count : 0
+          return Point(key: ekey, offset: off, type: .element)
+        }
+        // Fallback to mapping on the reported element boundary
+        if let elem: ElementNode = getNodeByKey(key: searchResult.nodeKey) {
+          let childrenCount = elem.getChildrenKeys().count
+          let off = (searchResult.type == .startBoundary) ? 0 : childrenCount
+          return Point(key: searchResult.nodeKey, offset: off, type: .element)
+        }
+      }
+      throw LexicalError.internal("Failed to find node for location: \(location)")
     }
   } catch LexicalError.rangeCacheSearch {
     return nil
@@ -182,6 +217,13 @@ private func evaluateNode(
   }
 
   if let node = node as? ElementNode {
+    // Parity: exact element absolute start maps to element offset 0, even if preamble > 0.
+    if editor.featureFlags.selectionParityDebug && stringLocation == nodeStart {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: element absolute start (parity) -> element offset 0 for node=\(nodeKey)")
+      }
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
+    }
     let childrenArray =
       (searchDirection == .forward) ? node.getChildrenKeys() : node.getChildrenKeys().reversed()
 
@@ -306,7 +348,14 @@ private func evaluateNode(
 
   let itemLocation = nodeStart
   if stringLocation == itemLocation {
-    if rangeCacheItem.preambleLength == 0 && node is ElementNode {
+    // Only map to element offset 0 at exact start when there are no children.
+    if editor.featureFlags.selectionParityDebug, node is ElementNode, rangeCacheItem.childrenLength == 0 {
+      if editor.featureFlags.selectionParityDebug {
+        print("🔥 RANGE CACHE PARITY: element at absolute start (no children) -> element offset 0 for node=\(nodeKey)")
+      }
+      return RangeCacheSearchResult(nodeKey: nodeKey, type: .element, offset: 0)
+    }
+    if rangeCacheItem.preambleLength == 0 && node is ElementNode && rangeCacheItem.childrenLength == 0 {
       if editor.featureFlags.selectionParityDebug {
         print("🔥 RANGE CACHE PARITY: element at start with no preamble -> element offset 0 for node=\(nodeKey)")
       }

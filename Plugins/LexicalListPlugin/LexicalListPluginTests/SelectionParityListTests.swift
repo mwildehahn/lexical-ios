@@ -61,12 +61,23 @@ final class SelectionParityListTests: XCTestCase {
       optLoc = rc.locationFromFenwick(using: optEditor.fenwickTree)
     }
 
-    let lF = try? pointAtStringLocation(legacyLoc, searchDirection: .forward, rangeCache: legacyEditor.rangeCache)
-    let lB = try? pointAtStringLocation(legacyLoc, searchDirection: .backward, rangeCache: legacyEditor.rangeCache)
-    let oF = try? pointAtStringLocation(optLoc, searchDirection: .forward, rangeCache: optEditor.rangeCache)
-    let oB = try? pointAtStringLocation(optLoc, searchDirection: .backward, rangeCache: optEditor.rangeCache)
+    var lF: Point? = nil, lB: Point? = nil
+    try legacyEditor.read {
+      lF = try? pointAtStringLocation(legacyLoc, searchDirection: .forward, rangeCache: legacyEditor.rangeCache)
+      lB = try? pointAtStringLocation(legacyLoc, searchDirection: .backward, rangeCache: legacyEditor.rangeCache)
+    }
+    var oF: Point? = nil, oB: Point? = nil
+    try optEditor.read {
+      oF = try? pointAtStringLocation(optLoc, searchDirection: .forward, rangeCache: optEditor.rangeCache)
+      oB = try? pointAtStringLocation(optLoc, searchDirection: .backward, rangeCache: optEditor.rangeCache)
+    }
 
-    func loc(_ p: Point?, _ ed: Editor) -> Int? { guard let p else { return nil }; return try? stringLocationForPoint(p, editor: ed) }
+    func loc(_ p: Point?, _ ed: Editor) -> Int? {
+      guard let p else { return nil }
+      var out: Int? = nil
+      try? ed.read { out = try stringLocationForPoint(p, editor: ed) }
+      return out
+    }
     XCTAssertNotNil(lF); XCTAssertNotNil(lB); XCTAssertNotNil(oF); XCTAssertNotNil(oB)
     XCTAssertEqual(loc(lF, legacyEditor), legacyLoc)
     XCTAssertEqual(loc(lB, legacyEditor), legacyLoc)
@@ -131,12 +142,23 @@ final class SelectionParityListTests: XCTestCase {
       oLoc = rc.locationFromFenwick(using: optEditor.fenwickTree)
     }
 
-    let lF = try? pointAtStringLocation(lLoc, searchDirection: .forward, rangeCache: legacyEditor.rangeCache)
-    let lB = try? pointAtStringLocation(lLoc, searchDirection: .backward, rangeCache: legacyEditor.rangeCache)
-    let oF = try? pointAtStringLocation(oLoc, searchDirection: .forward, rangeCache: optEditor.rangeCache)
-    let oB = try? pointAtStringLocation(oLoc, searchDirection: .backward, rangeCache: optEditor.rangeCache)
+    var lF: Point? = nil, lB: Point? = nil
+    try legacyEditor.read {
+      lF = try? pointAtStringLocation(lLoc, searchDirection: .forward, rangeCache: legacyEditor.rangeCache)
+      lB = try? pointAtStringLocation(lLoc, searchDirection: .backward, rangeCache: legacyEditor.rangeCache)
+    }
+    var oF: Point? = nil, oB: Point? = nil
+    try optEditor.read {
+      oF = try? pointAtStringLocation(oLoc, searchDirection: .forward, rangeCache: optEditor.rangeCache)
+      oB = try? pointAtStringLocation(oLoc, searchDirection: .backward, rangeCache: optEditor.rangeCache)
+    }
 
-    func loc(_ p: Point?, _ ed: Editor) -> Int? { guard let p else { return nil }; return try? stringLocationForPoint(p, editor: ed) }
+    func loc(_ p: Point?, _ ed: Editor) -> Int? {
+      guard let p else { return nil }
+      var out: Int? = nil
+      try? ed.read { out = try stringLocationForPoint(p, editor: ed) }
+      return out
+    }
     XCTAssertNotNil(lF); XCTAssertNotNil(lB); XCTAssertNotNil(oF); XCTAssertNotNil(oB)
     XCTAssertEqual(loc(lF, legacyEditor), lLoc)
     XCTAssertEqual(loc(lB, legacyEditor), lLoc)
@@ -191,12 +213,23 @@ final class SelectionParityListTests: XCTestCase {
       oEnd = base + rc.preambleLength + rc.childrenLength
     }
 
-    let lF = try? pointAtStringLocation(lEnd, searchDirection: .forward, rangeCache: legacyEditor.rangeCache)
-    let lB = try? pointAtStringLocation(lEnd, searchDirection: .backward, rangeCache: legacyEditor.rangeCache)
-    let oF = try? pointAtStringLocation(oEnd, searchDirection: .forward, rangeCache: optEditor.rangeCache)
-    let oB = try? pointAtStringLocation(oEnd, searchDirection: .backward, rangeCache: optEditor.rangeCache)
+    var lF: Point? = nil, lB: Point? = nil
+    try legacyEditor.read {
+      lF = try? pointAtStringLocation(lEnd, searchDirection: .forward, rangeCache: legacyEditor.rangeCache)
+      lB = try? pointAtStringLocation(lEnd, searchDirection: .backward, rangeCache: legacyEditor.rangeCache)
+    }
+    var oF: Point? = nil, oB: Point? = nil
+    try optEditor.read {
+      oF = try? pointAtStringLocation(oEnd, searchDirection: .forward, rangeCache: optEditor.rangeCache)
+      oB = try? pointAtStringLocation(oEnd, searchDirection: .backward, rangeCache: optEditor.rangeCache)
+    }
 
-    func loc2(_ p: Point?, _ ed: Editor) -> Int? { guard let p else { return nil }; return try? stringLocationForPoint(p, editor: ed) }
+    func loc2(_ p: Point?, _ ed: Editor) -> Int? {
+      guard let p else { return nil }
+      var out: Int? = nil
+      try? ed.read { out = try stringLocationForPoint(p, editor: ed) }
+      return out
+    }
     XCTAssertNotNil(lF); XCTAssertNotNil(lB); XCTAssertNotNil(oF); XCTAssertNotNil(oB)
     XCTAssertEqual(loc2(lF, legacyEditor), lEnd)
     XCTAssertEqual(loc2(lB, legacyEditor), lEnd)

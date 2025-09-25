@@ -213,6 +213,12 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
       return location + rangeCacheItem.preambleLength + point.offset
     }
   case .element:
+    // Parity fast-path: element offset 0 maps to element base without requiring node lookups.
+    if editor.featureFlags.selectionParityDebug && point.offset == 0 {
+      let loc = useOptimized ? rangeCacheItem.locationFromFenwick(using: fenwickTree) : rangeCacheItem.location
+      if editor.featureFlags.selectionParityDebug { print("🔥 ELEM LOC (fast): key=\(point.key) useOpt=\(useOptimized) -> \(loc)") }
+      return loc
+    }
     guard let node = getNodeByKey(key: point.key) as? ElementNode else { return nil }
 
     let childrenKeys = node.getChildrenKeys()
@@ -226,11 +232,10 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
     }
 
     if useOptimized {
-      // Parity mode anchors element offset 0 to childrenStart; baseline uses element base + preamble.
-      let editor = getActiveEditor()
+      // Parity mode: element offset 0 anchors to element base (absolute start).
       var loc: Int
-      if editor?.featureFlags.selectionParityDebug == true {
-        loc = rangeCacheItem.childrenRangeFromFenwick(using: fenwickTree).location
+      if editor.featureFlags.selectionParityDebug {
+        loc = rangeCacheItem.locationFromFenwick(using: fenwickTree)
       } else {
         loc = rangeCacheItem.locationFromFenwick(using: fenwickTree) + rangeCacheItem.preambleLength
       }
@@ -238,8 +243,10 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
         let k = childrenKeys[idx]
         if let s = rangeCache[k] { loc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength }
       }
+      if editor.featureFlags.selectionParityDebug { print("🔥 ELEM LOC (opt): key=\(point.key) off=\(point.offset) -> \(loc)") }
       return loc
     } else {
+      if editor.featureFlags.selectionParityDebug && point.offset == 0 { if editor.featureFlags.selectionParityDebug { print("🔥 ELEM LOC (leg): key=\(point.key) off=0 -> \(rangeCacheItem.location)") }; return rangeCacheItem.location }
       guard let childRangeCacheItem = rangeCache[childrenKeys[point.offset]] else { return nil }
       return childRangeCacheItem.location
     }
