@@ -114,7 +114,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Region rebuild parity; [x] minimal‑move keyed diff; [x] large shuffles; [x] nested structures; thresholds resilient tests (skip internal path labels).
   - Decorators
     - [x] Add/remove/move parity including cache state preservation (needsCreation/needsDecorating), across parents and nested elements.
-    - [ ] Decorator with dynamic size (invalidate layout), move while unmounted/mounted; verify position cache updates.
+    - [x] Decorator with dynamic size (invalidate layout), move while unmounted/mounted; verify position cache updates.
   - Selection & Composition
     - [x] Composition start/update/end (CJK, emoji grapheme, ZWJ family); selection gating parity.
     - [x] Selection mapping across edits (caret at boundaries; caret stability on unrelated edits).
