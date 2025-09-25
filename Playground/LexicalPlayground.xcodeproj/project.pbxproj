@@ -25,6 +25,7 @@
 		06F7CF962A545C7C0024CD5A /* lexical-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 06F7CF952A545C7C0024CD5A /* lexical-logo.png */; };
 		3C48FEE42B04F2C5009BBFA2 /* LexicalMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = 3C48FEE32B04F2C5009BBFA2 /* LexicalMarkdown */; };
 		DC61EDB02E816F6D0074A1B9 /* PerformanceTestViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC61EDAF2E816F6D0074A1B9 /* PerformanceTestViewController.swift */; };
+        DC61EDB12E816F6D0074A1BA /* CompareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC61EDB12E816F6D0074A1B8 /* CompareViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeHierarchyViewPlugin.swift; sourceTree = "<group>"; };
 		06F7CF952A545C7C0024CD5A /* lexical-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "lexical-logo.png"; sourceTree = "<group>"; };
 		DC61EDAF2E816F6D0074A1B9 /* PerformanceTestViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceTestViewController.swift; sourceTree = "<group>"; };
+        DC61EDB12E816F6D0074A1B8 /* CompareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,6 +90,7 @@
 				069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */,
 				0656CF8F29D1ED8F009CA08F /* ToolbarPlugin.swift */,
 				06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */,
+				DC61EDB12E816F6D0074A1B8 /* CompareViewController.swift */,
 				DC61EDAF2E816F6D0074A1B9 /* PerformanceTestViewController.swift */,
 				0656CF8129D1E439009CA08F /* Assets.xcassets */,
 				06F7CF952A545C7C0024CD5A /* lexical-logo.png */,
@@ -198,6 +201,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0656CF7D29D1E438009CA08F /* ViewController.swift in Sources */,
+				DC61EDB12E816F6D0074A1BA /* CompareViewController.swift in Sources */,
 				DC61EDB02E816F6D0074A1B9 /* PerformanceTestViewController.swift in Sources */,
 				0656CF7929D1E438009CA08F /* AppDelegate.swift in Sources */,
 				0656CF9029D1ED8F009CA08F /* ToolbarPlugin.swift in Sources */,

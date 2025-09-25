@@ -46,6 +46,11 @@ final class OptimizedReconcilerParityTests: XCTestCase {
     let legacyString = legacy.textStorage?.string ?? ""
     let optimizedString = optimized.textStorage?.string ?? ""
 
+    if optimizedString != legacyString {
+      let oPrev = String(optimizedString.prefix(120)).replacingOccurrences(of: "\n", with: "\\n")
+      let lPrev = String(legacyString.prefix(120)).replacingOccurrences(of: "\n", with: "\\n")
+      print("🔥 PARITY MISMATCH: optLen=\(optimizedString.count) legLen=\(legacyString.count) optPrev='\(oPrev)' legPrev='\(lPrev)'")
+    }
     XCTAssertEqual(optimizedString, legacyString, "Optimized reconciler must preserve paragraph order on fresh document")
   }
 
@@ -77,4 +82,3 @@ final class OptimizedReconcilerParityTests: XCTestCase {
     XCTAssertEqual(before, after, "Inline attribute change should not alter string content")
   }
 }
-

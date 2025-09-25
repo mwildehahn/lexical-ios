@@ -124,6 +124,9 @@ internal class TextStorageDeltaApplier {
 
     switch delta.type {
     case .textUpdate(let nodeKey, let newText, let range):
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 APPLY TEXT-UPDATE: key=\(nodeKey) range=\(NSStringFromRange(range)) new='\(newText.replacingOccurrences(of: "\n", with: "\\n"))'")
+      }
       return try applyTextUpdate(nodeKey: nodeKey, newText: newText, range: range, to: textStorage)
 
     case .nodeInsertion(let nodeKey, let insertionData, let location):
@@ -265,8 +268,29 @@ internal class TextStorageDeltaApplier {
       throw DeltaApplicationError.invalidRange(range, textStorageLength: textStorage.length)
     }
 
-    // Apply attributes
-    textStorage.addAttributes(attributes, range: range)
+    // Apply attributes; also synthesize a correct UIFont from bold/italic flags so rendering reflects changes.
+    var attrsToApply = attributes
+    if editor.featureFlags.diagnostics.verboseLogs {
+      print("🔥 ATTR-CHANGE: range=\(NSStringFromRange(range)) keys=\(Array(attrsToApply.keys))")
+    }
+    let baseFont = (textStorage.attribute(.font, at: max(0, range.location - 1), effectiveRange: nil) as? UIFont) ?? LexicalConstants.defaultFont
+    let desc = baseFont.fontDescriptor
+    var traits = desc.symbolicTraits
+    if let isBold = attributes[.bold] as? Bool {
+      traits = isBold ? traits.union([.traitBold]) : traits.subtracting([.traitBold])
+    }
+    if let isItalic = attributes[.italic] as? Bool {
+      traits = isItalic ? traits.union([.traitItalic]) : traits.subtracting([.traitItalic])
+    }
+    if let updatedDesc = desc.withSymbolicTraits(traits) {
+      let newFont = UIFont(descriptor: updatedDesc, size: 0)
+      attrsToApply[.font] = newFont
+    }
+    textStorage.addAttributes(attrsToApply, range: range)
+    if editor.featureFlags.diagnostics.verboseLogs {
+      let check = textStorage.attributes(at: range.location, effectiveRange: nil)
+      print("🔥 ATTR-APPLIED: at=\(range.location) keys=\(Array(check.keys)) underline=\(String(describing: check[.underlineStyle]))")
+    }
 
     // Attribute changes don't affect length or FenwickTree
     return DeltaApplicationSingleResult(fenwickUpdates: 0, lengthDelta: 0)
@@ -279,6 +303,9 @@ internal class TextStorageDeltaApplier {
     // Check expected length
     if textStorage.length != batch.batchMetadata.expectedTextStorageLength {
       editor.log(.reconciler, .warning, "TextStorage length mismatch: expected \(batch.batchMetadata.expectedTextStorageLength), got \(textStorage.length)")
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 DELTA APPLIER: precondition fail (len expected=\(batch.batchMetadata.expectedTextStorageLength) actual=\(textStorage.length) fresh=\(batch.batchMetadata.isFreshDocument))")
+      }
       return false
     }
 

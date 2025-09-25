@@ -1034,6 +1034,45 @@ public class RangeSelection: BaseSelection {
       let anchor = self.anchor
       let focus = self.focus
       var anchorNode: Node? = try anchor.getNode()
+      // Optimized fast-path: avoid relying on native backward-extend mapping at text boundaries.
+      if let ed = getActiveEditor(), ed.featureFlags.optimizedReconciler, isBackwards,
+         anchor.type == .text, let tnode = anchorNode as? TextNode, anchor.offset > 0 {
+        _ = try tnode.spliceText(offset: anchor.offset - 1, delCount: 1, newText: "", moveSelection: true)
+        // If this emptied the node, move caret to start of its parent element so the next
+        // backspace merges paragraphs by removing the newline rather than a letter.
+        if tnode.getTextPartSize() == 0, let p = try? tnode.getParentOrThrow() as ElementNode {
+          _ = try? p.select(anchorOffset: 0, focusOffset: 0)
+        }
+        return
+      }
+      if let ed = getActiveEditor(), ed.featureFlags.diagnostics.verboseLogs {
+        print("🔥 DEL-CHAR: collapsed=\(wasCollapsed) dir=\(isBackwards ? "back" : "fwd") anchor=\(anchor.key)@\(anchor.offset) type=\(anchor.type)")
+      }
+      // Keep default Lexical path; merges will be handled by collapseAtStart()/insertParagraph logic.
+      // Special case: backspace at end of text before a paragraph boundary
+      if isBackwards, anchor.type == .text, let tnode = anchorNode as? TextNode,
+         anchor.offset == tnode.getTextPartSize() {
+        let parent = try tnode.getParentOrThrow()
+        if let nextElem = parent.getNextSibling() as? ElementNode {
+          // Merge next paragraph into current one
+          let children = nextElem.getChildren()
+          for child in children {
+            try parent.append([child])
+          }
+          try nextElem.remove()
+          _ = try parent.selectEnd()
+          return
+        }
+      }
+      if isBackwards, anchor.type == .text, let tnode = anchorNode as? TextNode, anchor.offset == 0 {
+        // New optimized-safe special case: backspace at start of a text node.
+        // Merge current element into previous sibling via collapseAtStart.
+        let elemParent = try tnode.getParentOrThrow()
+        if try elemParent.collapseAtStart(selection: self) {
+          return
+        }
+      }
+
       if !isBackwards {
         if let anchorNode = anchorNode as? ElementNode,
           anchor.type == .element,
@@ -1055,6 +1094,8 @@ public class RangeSelection: BaseSelection {
           }
         }
       }
+
+      // No extra manual merge here; rely on selection extension + removeText.
 
       // Handle the deletion around decorators.
       let adjacentNode = try getAdjacentNode(focus: focus, isBackward: isBackwards)
@@ -1151,9 +1192,41 @@ public class RangeSelection: BaseSelection {
         // Special handling around rich text nodes
         let element =
           anchor.type == .element ? try anchor.getNode() : try anchor.getNode().getParentOrThrow()
-        if let element = element as? ElementNode, try element.collapseAtStart(selection: self) {
+        if let element = element as? ElementNode {
+          if let ed = getActiveEditor(), ed.featureFlags.diagnostics.verboseLogs {
+            let prev = element.getPreviousSibling()
+            print("🔥 DEL-CHAR: at elem start, elem=\(element.getKey()) prev=\(prev?.getKey() ?? "nil")")
+          }
+          if try element.collapseAtStart(selection: self) {
           return
+          }
         }
+      } else if isBackwards && anchor.type == .text {
+        // After native selection modification, if we are still at the end of a text node
+        // with a following paragraph, merge forward by removing the intervening newline.
+        if let t = try? anchor.getNode() as? TextNode, anchor.offset == t.getTextPartSize() {
+          if let p = try? t.getParentOrThrow(),
+             let _ = p.getNextSibling() as? ElementNode {
+            // Merge next paragraph into current
+            let children = (p.getNextSibling() as? ElementNode)?.getChildren() ?? []
+            for child in children {
+              try? p.append([child])
+            }
+            try? p.getNextSibling()?.remove()
+            _ = try? p.selectEnd()
+            return
+          }
+        }
+      }
+    }
+
+    // Final fallback: if still collapsed, coerce a one-character range in the model
+    // so that removeText() reliably deletes a character at the caret.
+    if isCollapsed() {
+      if anchor.type == .text, anchor.offset > 0 {
+        focus.updatePoint(key: anchor.key, offset: anchor.offset, type: .text)
+        anchor.updatePoint(key: anchor.key, offset: anchor.offset - 1, type: .text)
+        dirty = true
       }
     }
 
@@ -1223,14 +1296,32 @@ public class RangeSelection: BaseSelection {
         swapPoints()
       }
     }
+
+    // Safety net (optimized only): if an extend-by-character operation failed to create a non-collapsed
+    // selection (due to boundary tie-breaks), manually coerce a one-character range
+    // at the caret and re-apply.
+    if let ed = getActiveEditor(), ed.featureFlags.optimizedReconciler,
+       alter == .extend, granularity == .character, isCollapsed() {
+      let ns = editor.getNativeSelection()
+      if let r = ns.range {
+        let loc = r.location
+        let coerced = isBackward ? NSRange(location: max(0, loc - 1), length: 1) : NSRange(location: loc, length: min(1, max(0, (editor.textStorage?.length ?? 0) - loc)))
+        try applySelectionRange(coerced, affinity: .forward)
+      }
+    }
   }
 
   // This method is the equivalent of applyDOMRange()
   @MainActor
   public func applyNativeSelection(_ nativeSelection: NativeSelection) throws {
     guard let range = nativeSelection.range else { return }
-    try applySelectionRange(
-      range, affinity: range.length == 0 ? .backward : nativeSelection.affinity)
+    // Prefer forward affinity for caret only when optimized reconciler is active
+    let preferForward: Bool = {
+      if let ed = getActiveEditor() { return ed.featureFlags.optimizedReconciler && range.length == 0 }
+      return false
+    }()
+    let aff: UITextStorageDirection = preferForward ? .forward : nativeSelection.affinity
+    try applySelectionRange(range, affinity: aff)
   }
 
   @MainActor
@@ -1260,7 +1351,8 @@ public class RangeSelection: BaseSelection {
     guard let range = nativeSelection.range, let editor = getActiveEditor(),
       !nativeSelection.selectionIsNodeOrObject
     else { return nil }
-    let affinity = range.length == 0 ? .backward : nativeSelection.affinity
+    // Use forward affinity for caret selections to keep caret at text end when mapping.
+    let affinity = range.length == 0 ? .forward : nativeSelection.affinity
 
     let anchorOffset = affinity == .forward ? range.location : range.location + range.length
     let focusOffset = affinity == .forward ? range.location + range.length : range.location

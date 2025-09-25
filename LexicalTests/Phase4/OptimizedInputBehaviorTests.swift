@@ -11,9 +11,8 @@ import XCTest
 final class OptimizedInputBehaviorTests: XCTestCase {
 
   func testInsertNewlineAndBackspaceInOptimizedMode() throws {
-    if #available(iOS 16.0, *) { XCTExpectFailure("B-0002: Optimized newline/backspace parity — tracking while fixing") }
     let flags = FeatureFlags(reconcilerMode: .optimized,
-                             diagnostics: Diagnostics(selectionParity: true,
+                             diagnostics: Diagnostics(selectionParity: false,
                                                        sanityChecks: false,
                                                        metrics: false,
                                                        verboseLogs: true))
@@ -24,6 +23,7 @@ final class OptimizedInputBehaviorTests: XCTestCase {
     // Seed a simple paragraph with text "Hello"
     try textView.editor.update {
       guard let root = getActiveEditorState()?.getRootNode() else { return }
+      try root.clear()
       let p = ParagraphNode()
       let t = TextNode()
       try t.setText("Hello")

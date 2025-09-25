@@ -210,9 +210,15 @@ private func evaluateNode(
         return (searchDirection == .forward) ? textRange.byAddingOne() : textRange
       }
     }()
-    // Ensure caret at exact text end maps to offset == textLength regardless of direction
+    // At exact text end (upperBound), prefer direction-aware mapping:
+    // - forward: keep caret on this text node at offset == textLength
+    // - backward: treat as end boundary so parent can resolve to element/postamble position
     if stringLocation == textRange.upperBound {
-      return RangeCacheSearchResult(nodeKey: nodeKey, type: .text, offset: rangeCacheItem.textLength)
+      if searchDirection == .forward {
+        return RangeCacheSearchResult(nodeKey: nodeKey, type: .text, offset: rangeCacheItem.textLength)
+      } else {
+        return RangeCacheSearchResult(nodeKey: nodeKey, type: .endBoundary, offset: nil)
+      }
     }
     if rangeToUse.contains(stringLocation) {
       let offset = stringLocation - textRange.location

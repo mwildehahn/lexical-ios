@@ -32,7 +32,7 @@ internal func onInsertTextFromUITextView(
     // numeric→Point round‑trip produced an off‑by‑one at text boundaries and
     // ensures operations like insertParagraph/delete apply at the caret the
     // user currently sees.
-    if let rangeSelection = selection as? RangeSelection {
+    if editor.featureFlags.optimizedReconciler, let rangeSelection = selection as? RangeSelection {
       let nativeSel = editor.getNativeSelection()
       try rangeSelection.applyNativeSelection(nativeSel)
     }
@@ -59,6 +59,8 @@ internal func onInsertTextFromUITextView(
       // do not seem to use this way of ending marked text.
       try rangeSelection.applySelectionRange(markedRange, affinity: .forward)
     }
+
+    // (Removed) caret coercion guardrail: keep selection derived solely from applyNativeSelection
 
     if text == "\n" || text == "\u{2029}" {
       try selection.insertParagraph()
@@ -107,10 +109,100 @@ internal func onDeleteBackwardsFromUITextView(editor: Editor) throws {
   guard let editor = getActiveEditor(), let selection = try getSelection() else {
     throw LexicalError.invariantViolation("No editor or selection")
   }
-
+  if editor.featureFlags.diagnostics.verboseLogs {
+    let t = editor.textStorage?.string ?? "<nil>"
+    print("🔥 DEL EVT: before='\(t.replacingOccurrences(of: "\n", with: "\\n"))' sel=\(editor.getNativeSelection().range?.debugDescription ?? "nil")")
+  }
+  // Optimized-only deterministic boundary handling:
+  // If caret is logically at the start of a paragraph (element offset 0, or
+  // text offset 0 inside that paragraph), merge with previous paragraph by
+  // collapsing at start. This avoids relying on native backward-extend mapping
+  // which can land on the previous character in tricky tie-break cases.
+  if editor.featureFlags.optimizedReconciler, let rs = selection as? RangeSelection, rs.isCollapsed() {
+    let a = rs.anchor
+    // Find the paragraph element to consider
+    var elem: ElementNode?
+    if a.type == .element, let e = try? a.getNode() as? ElementNode { elem = e }
+    else if a.type == .text, let n = try? a.getNode(), let p = try? n.getParentOrThrow() as ElementNode { elem = p }
+    if let e = elem, a.offset == 0, e.getPreviousSibling() != nil {
+      try editor.update {
+        let prev = e.getPreviousSibling() as? ElementNode
+        if try e.collapseAtStart(selection: rs) {
+          if let p = prev { internallyMarkNodeAsDirty(node: p, cause: .userInitiated) }
+          if let p = prev { editor.pendingPostambleCleanup.insert(p.getKey()) }
+          // Directly remove the trailing newline in TextStorage at survivor's lastChildEnd
+          if let p = prev, let fe = editor.frontend, let ts = editor.textStorage {
+            // Compute deletion index robustly: prefer the character just before the caret
+            // if it is a newline; otherwise fall back to survivor's lastChildEnd.
+            var idxToDelete: Int? = nil
+            // Derive numeric from model selection (rs) to avoid stale UI selection.
+            if let modelNS = try? createNativeSelection(from: rs, editor: editor),
+               let ns = modelNS.range, ns.length == 0, ns.location > 0 {
+              let idxLeft = ns.location - 1
+              if idxLeft >= 0 && idxLeft < ts.length {
+                let ch = (ts.string as NSString).substring(with: NSRange(location: idxLeft, length: 1))
+                if ch == "\n" { idxToDelete = idxLeft }
+              }
+            }
+            if idxToDelete == nil, let item = editor.rangeCache[p.getKey()] {
+              let loc = item.locationFromFenwick(using: editor.fenwickTree)
+                + item.preambleLength + item.childrenLength + item.textLength
+              let idx = max(0, min(loc, max(0, ts.length - 1)))
+              if idx < ts.length {
+                let ch = (ts.string as NSString).substring(with: NSRange(location: idx, length: 1))
+                if ch == "\n" { idxToDelete = idx }
+              }
+            }
+            if let delIdx = idxToDelete {
+              ts.beginEditing()
+              ts.replaceCharacters(in: NSRange(location: delIdx, length: 1), with: "")
+              ts.endEditing()
+              // Update cache postamble and ancestor children lengths conservatively
+              var prevItem = editor.rangeCache[p.getKey()] ?? RangeCacheItem()
+              if prevItem.postambleLength > 0 { prevItem.postambleLength = max(0, prevItem.postambleLength - 1) }
+              editor.rangeCache[p.getKey()] = prevItem
+              var parentKey = p.getParent()?.getKey()
+              while let pk = parentKey {
+                if var it = editor.rangeCache[pk] { it.childrenLength = max(0, it.childrenLength - 1); editor.rangeCache[pk] = it }
+                parentKey = getNodeByKey(key: pk)?.parent
+              }
+            } else if ts.length > 0 {
+              // Final safe fallback: if last character in the string is a newline, remove it.
+              let lastIdx = ts.length - 1
+              let ch = (ts.string as NSString).substring(with: NSRange(location: lastIdx, length: 1))
+              if ch == "\n" {
+                ts.beginEditing(); ts.replaceCharacters(in: NSRange(location: lastIdx, length: 1), with: ""); ts.endEditing()
+                // Update cache conservatively like above
+                var prevItem = editor.rangeCache[p.getKey()] ?? RangeCacheItem()
+                if prevItem.postambleLength > 0 { prevItem.postambleLength = max(0, prevItem.postambleLength - 1) }
+                editor.rangeCache[p.getKey()] = prevItem
+                var parentKey = p.getParent()?.getKey()
+                while let pk = parentKey {
+                  if var it = editor.rangeCache[pk] { it.childrenLength = max(0, it.childrenLength - 1); editor.rangeCache[pk] = it }
+                  parentKey = getNodeByKey(key: pk)?.parent
+                }
+              }
+            }
+            try fe.updateNativeSelection(from: rs)
+          } else {
+            if let fe = editor.frontend { try fe.updateNativeSelection(from: rs) }
+          }
+        }
+      }
+      if editor.featureFlags.diagnostics.verboseLogs {
+        let t2 = editor.textStorage?.string ?? "<nil>"
+        print("🔥 DEL EVT: collapsed-at-start; after='\(t2.replacingOccurrences(of: "\n", with: "\\n"))'")
+      }
+      return
+    }
+  }
   try selection.deleteCharacter(isBackwards: true)
 
   editor.frontend?.showPlaceholderText()
+  if editor.featureFlags.diagnostics.verboseLogs {
+    let t = editor.textStorage?.string ?? "<nil>"
+    print("🔥 DEL EVT: after='\(t.replacingOccurrences(of: "\n", with: "\\n"))' sel=\(editor.getNativeSelection().range?.debugDescription ?? "nil")")
+  }
 }
 
 @MainActor

@@ -126,7 +126,9 @@ internal class IncrementalRangeCacheUpdater {
             let newPost = childNode.getPostamble().lengthAsNSString()
             if c.preambleLength != newPre || c.postambleLength != newPost {
               if editor.featureFlags.diagnostics.verboseLogs {
-                print("🔥 RANGE CACHE UPDATER: child pre/post normalize key=\(ck) pre \(c.preambleLength)->\(newPre) post \(c.postambleLength)->\(newPost)")
+            if editor.featureFlags.diagnostics.verboseLogs {
+              print("🔥 RANGE CACHE UPDATER: child pre/post normalize key=\(ck) pre \(c.preambleLength)->\(newPre) post \(c.postambleLength)->\(newPost)")
+            }
               }
               c.preambleLength = newPre
               c.postambleLength = newPost
@@ -139,7 +141,9 @@ internal class IncrementalRangeCacheUpdater {
           parentItem.childrenLength = sum
           rangeCache[p] = parentItem
           if editor.featureFlags.diagnostics.verboseLogs {
+          if editor.featureFlags.diagnostics.verboseLogs {
             print("🔥 RANGE CACHE UPDATER: parent=\(p) recompute childrenLength=\(sum)")
+          }
           }
         }
       }
@@ -191,14 +195,55 @@ internal class IncrementalRangeCacheUpdater {
     // Apply each delta to update the range cache item
     for delta in deltas {
       switch delta.type {
-      case .textUpdate(let key, let newText, _):
+      case .textUpdate(let key, let newText, let range):
         if key == nodeKey {
-          // Update text length directly to the new text length
-          // Note: range.length is the length being replaced, not the total text length
-          let old = updatedItem.textLength
-          let newLen = newText.lengthAsNSString()
-          updatedItem.textLength = newLen
-          childrenDeltaAccumulator += (newLen - old)
+          // Distinguish between TextNode text updates and ElementNode pre/post updates.
+          if getNodeByKey(key: nodeKey) is TextNode {
+            let old = updatedItem.textLength
+            let newLen = newText.lengthAsNSString()
+            updatedItem.textLength = newLen
+            childrenDeltaAccumulator += (newLen - old)
+          } else if let _ = getNodeByKey(key: nodeKey) as? ElementNode {
+            // Infer whether this textUpdate targets the element's preamble or postamble
+            // by comparing the provided range to the cached segment ranges.
+            // Avoid reading editor.rangeCache while mutating it to satisfy Swift
+            // exclusivity rules. Use Fenwick offset directly for the absolute base.
+            let base = editor.featureFlags.optimizedReconciler
+              ? fenwickTree.getNodeOffset(nodeIndex: updatedItem.nodeIndex)
+              : updatedItem.location
+            let preRange = NSRange(location: base, length: updatedItem.preambleLength)
+            let textRange = NSRange(location: base + updatedItem.preambleLength + updatedItem.childrenLength,
+                                    length: updatedItem.textLength)
+            let postRange = NSRange(location: base + updatedItem.preambleLength + updatedItem.childrenLength + updatedItem.textLength,
+                                     length: updatedItem.postambleLength)
+
+            let newLen = newText.lengthAsNSString()
+            if range.location == preRange.location && range.length == preRange.length {
+              let delta = newLen - updatedItem.preambleLength
+              updatedItem.preambleLength = newLen
+              childrenDeltaAccumulator += delta
+            } else if range.location == postRange.location && range.length == postRange.length {
+              let delta = newLen - updatedItem.postambleLength
+              updatedItem.postambleLength = newLen
+              childrenDeltaAccumulator += delta
+            } else if range.location == textRange.location && range.length == textRange.length {
+              // Extremely rare for Element nodes; keep consistency if ever used.
+              let delta = newLen - updatedItem.textLength
+              updatedItem.textLength = newLen
+              childrenDeltaAccumulator += delta
+            } else {
+              // Unknown subrange on element; default to adjusting postamble (common case for newline).
+              let delta = newLen - updatedItem.postambleLength
+              updatedItem.postambleLength = newLen
+              childrenDeltaAccumulator += delta
+            }
+          } else {
+            // Unknown node type – fall back to textLength update
+            let old = updatedItem.textLength
+            let newLen = newText.lengthAsNSString()
+            updatedItem.textLength = newLen
+            childrenDeltaAccumulator += (newLen - old)
+          }
         }
 
       case .nodeInsertion(let key, let insertionData, _):
@@ -206,7 +251,11 @@ internal class IncrementalRangeCacheUpdater {
           // Idempotence guard: if this node was created earlier in this batch,
           // skip re-applying insertion lengths here to avoid double counting.
           let inCreated = createdThisBatch.contains(nodeKey)
-          print("🔥 RANGE CACHE UPDATER: nodeInsertion key=\(nodeKey) inCreated=\(inCreated) currentItemExists=true contentLen=\(insertionData.content.length)")
+          if editor.featureFlags.diagnostics.verboseLogs {
+          if editor.featureFlags.diagnostics.verboseLogs {
+            print("🔥 RANGE CACHE UPDATER: nodeInsertion key=\(nodeKey) inCreated=\(inCreated) currentItemExists=true contentLen=\(insertionData.content.length)")
+          }
+          }
           if inCreated {
             // If we already created the cache item earlier in this batch but a subsequent
             // insertion delta carries a more specific (often shorter) leaf content length,
@@ -250,7 +299,9 @@ internal class IncrementalRangeCacheUpdater {
 
     rangeCache[nodeKey] = updatedItem
     if childrenDeltaAccumulator != 0 {
-      print("🔥 RANGE CACHE UPDATER: bumping ancestors of \(nodeKey) by \(childrenDeltaAccumulator)")
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("🔥 RANGE CACHE UPDATER: bumping ancestors of \(nodeKey) by \(childrenDeltaAccumulator)")
+      }
       adjustAncestorsChildrenLength(&rangeCache, nodeKey: nodeKey, delta: childrenDeltaAccumulator)
     }
   }

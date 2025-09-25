@@ -96,7 +96,11 @@ public class EditorHistory {
 
       externalHistoryState = historyState
     } catch {
-      print("Failed to get mergeAction: \(error.localizedDescription)")
+      // Only log in verbose diagnostics to avoid noisy console spam when
+      // selection is temporarily unavailable during hydration/initialization.
+      if editor.featureFlags.diagnostics.verboseLogs {
+        print("Failed to get mergeAction: \(error.localizedDescription)")
+      }
     }
   }
 
@@ -308,7 +312,8 @@ func getChangeType(
   guard let nextSelection = nextEditorState.selection,
     let prevSelection = prevEditorState.selection
   else {
-    throw LexicalError.internal("Failed to find selection")
+    // Treat unknown/absent selections as a non-mergeable change instead of throwing.
+    return .other
   }
 
   guard let nextSelection = nextSelection as? RangeSelection,
@@ -355,7 +360,7 @@ func getChangeType(
     let prevDirtyNode = prevDirtyNode as? TextNode,
     let nextDirtyNode = nextDirtyNode as? TextNode
   else {
-    throw LexicalError.internal("prev/nextDirtyNode is not TextNode")
+    return .other
   }
 
   if prevDirtyNode.getMode_dangerousPropertyAccess()

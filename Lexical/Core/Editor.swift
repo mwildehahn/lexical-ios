@@ -128,6 +128,9 @@ public class Editor: NSObject {
   // See description in RangeCache.swift.
   internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
   internal var dirtyNodes: DirtyNodeMap = [:]
+  // Optimized reconciler helper: request a postamble (newline) cleanup for specific
+  // element keys on the next reconcile pass.
+  internal var pendingPostambleCleanup: Set<NodeKey> = []
   internal var cloneNotNeeded: Set<NodeKey> = Set()
   internal var normalizedNodes: Set<NodeKey> = Set()
 
@@ -144,7 +147,7 @@ public class Editor: NSObject {
   // Used to help co-ordinate selection and events
   internal var compositionKey: NodeKey?
   public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
-  internal var featureFlags: FeatureFlags = FeatureFlags()
+  public var featureFlags: FeatureFlags = FeatureFlags()
 
   // Phase 3: FenwickTree for optimized reconciliation
   internal var fenwickTree: FenwickTree
@@ -591,11 +594,45 @@ public class Editor: NSObject {
       compositionKey = nil
     }
 
+    // Fast path: if optimized reconciler is enabled and the frontend is empty, perform a full hydration
+    if featureFlags.optimizedReconciler,
+       let ts = textStorage,
+       ts.length == 0,
+       rangeCache.count == 1,
+       rangeCache[kRootNodeKey]?.preambleLength == 0,
+       rangeCache[kRootNodeKey]?.childrenLength == 0,
+       rangeCache[kRootNodeKey]?.textLength == 0,
+       rangeCache[kRootNodeKey]?.postambleLength == 0,
+       let pending = pendingEditorState {
+      print("🔥 HYDRATE FASTPATH: tsLen=\(ts.length) rcKeys=\(rangeCache.count)")
+      try OptimizedReconciler.hydrateFreshDocumentFully(pendingState: pending, editor: self)
+      let hydratedLen = textStorage?.length ?? -1
+      print("🔥 HYDRATE FASTPATH: after hydration tsLen=\(hydratedLen)")
+      // If hydration produced content, commit and finish; otherwise fall back to normal update path
+      if hydratedLen > 0 {
+        for (_, node) in pending.nodeMap { node.didMoveTo(newEditor: self) }
+        editorState = pending
+        self.pendingEditorState = nil
+        dirtyNodes.removeAll(); dirtyType = .noDirtyNodes; cloneNotNeeded.removeAll()
+        return
+      } else {
+        print("🔥 HYDRATE FASTPATH: empty result, falling back to reconcile")
+      }
+    }
+
     try beginUpdate({}, mode: UpdateBehaviourModificationMode(), reason: .setState)
   }
 
   internal func testing_getPendingEditorState() -> EditorState? {
     pendingEditorState
+  }
+
+  // Test helper: forces a reconciliation pass even when no explicit dirty nodes are present.
+  // This is useful in unit tests to ensure TextStorage is populated synchronously after
+  // programmatic state changes.
+  internal func testing_forceReconcile() throws {
+    dirtyType = .fullReconcile
+    try beginUpdate({}, mode: UpdateBehaviourModificationMode(), reason: .update)
   }
 
   internal func focus(callbackFn: (() -> Void)?) throws {

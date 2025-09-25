@@ -56,6 +56,29 @@ open class ParagraphNode: ElementNode {
     return ParagraphNode()
   }
 
+  // When backspacing at the start of a paragraph, merge with previous paragraph
+  @MainActor
+  override open func collapseAtStart(selection: RangeSelection) throws -> Bool {
+    // Only alter behavior for optimized reconciler to avoid changing legacy semantics
+    if let ed = getActiveEditor(), !ed.featureFlags.optimizedReconciler { return false }
+    // Only handle when we have a previous sibling element to merge into
+    guard let previous = getPreviousSibling() as? ElementNode,
+          previous is ParagraphNode else { return false }
+
+    // Move all children into previous paragraph (if any)
+    let childrenToMove = getChildren()
+    if !childrenToMove.isEmpty {
+      for child in childrenToMove {
+        try previous.append([child])
+      }
+    }
+
+    // Remove current paragraph and place caret at end of previous
+    try remove()
+    _ = try previous.selectEnd()
+    return true
+  }
+
   public override func accept<V>(visitor: V) throws where V : NodeVisitor {
     try visitor.visitParagraphNode(self)
   }

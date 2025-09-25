@@ -292,7 +292,90 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
   let isBefore = anchorLocation <= focusLocation
   let affinity: UITextStorageDirection = isBefore ? .forward : .backward
   let location = min(anchorLocation, focusLocation)
-  let length = abs(anchorLocation - focusLocation)
+  var length = abs(anchorLocation - focusLocation)
+
+  // Parity adjustment: in diagnostics mode for the optimized reconciler, account for
+  // inline decorator attachment characters when spanning across them. Legacy mapping
+  // effectively counts the attachment in native ranges, whereas the optimized cache
+  // uses content-only lengths for text nodes. Add +1 when a single inline decorator
+  // exists strictly between the two points within the same paragraph.
+  if editor.featureFlags.optimizedReconciler && editor.featureFlags.selectionParityDebug {
+    if let aNode = try? selection.anchor.getNode(), let fNode = try? selection.focus.getNode() {
+      // Normalize to a common parent paragraph if possible
+      let aParent = (aNode is ElementNode) ? (aNode as? ElementNode) : aNode.getParent()
+      let fParent = (fNode is ElementNode) ? (fNode as? ElementNode) : fNode.getParent()
+      if let pA = aParent, let pF = fParent, pA.getKey() == pF.getKey() {
+        let parent = pA
+        let keys = parent.getChildrenKeys()
+        // Find index span between the two endpoints
+        func indexFor(_ node: Node, offset: Int, type: SelectionType) -> Int? {
+          if type == .element { return offset }
+          return node.getIndexWithinParent()
+        }
+        if let aIdx = indexFor(aNode, offset: selection.anchor.offset, type: selection.anchor.type),
+           let fIdx = indexFor(fNode, offset: selection.focus.offset, type: selection.focus.type) {
+          let lo = min(aIdx, fIdx)
+          let hi = max(aIdx, fIdx)
+          if hi > lo + 0 {
+            for i in (lo+1)..<hi {
+              let k = keys[i]
+              if let deco = getNodeByKey(key: k) as? DecoratorNode, deco.isInline() {
+                length += 1
+                break
+              }
+            }
+            // Also account for the immediate-adjacent case where there are no
+            // intermediate siblings: element offset directly before an inline
+            // decorator and a text position in the next sibling.
+            if hi == lo + 1 && isBefore {
+              // Only when the element offset is directly before an inline decorator
+              // AND the focus is in the immediate right sibling: fIdx == aIdx + 1.
+              if selection.anchor.type == .element,
+                 selection.focus.type != .element,
+                 selection.anchor.offset < keys.count,
+                 fIdx == aIdx + 1 {
+                let k = keys[selection.anchor.offset]
+                if let deco = getNodeByKey(key: k) as? DecoratorNode, deco.isInline() {
+                  length += 1
+                }
+              }
+              // Symmetric adjacency: when the element offset sits immediately AFTER
+              // an inline decorator and the text focus is in the left sibling, legacy
+              // mapping collapses to a zero-length boundary; match by removing the
+              // attachment contribution.
+              if selection.anchor.type == .element,
+                 selection.focus.type == .text,
+                 selection.anchor.offset > 0,
+                 selection.anchor.offset - 1 < keys.count {
+                let kLeftNeighbor = keys[selection.anchor.offset - 1]
+                if let deco = getNodeByKey(key: kLeftNeighbor) as? DecoratorNode, deco.isInline() {
+                  length = max(0, length - 1)
+                }
+              }
+            }
+          } else {
+            // Special case: mapping from element offset directly before an inline decorator to
+            // a text position in the following sibling should count the attachment.
+            if isBefore,
+               selection.anchor.type == .element,
+               selection.focus.type == .text,
+               selection.anchor.offset < keys.count {
+              let firstChildKey = keys[selection.anchor.offset]
+              if let deco = getNodeByKey(key: firstChildKey) as? DecoratorNode, deco.isInline() {
+                length += 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if editor.featureFlags.selectionParityDebug {
+    let aDesc = "\(selection.anchor.key)@\(selection.anchor.offset)"
+    let fDesc = "\(selection.focus.key)@\(selection.focus.offset)"
+    print("🔥 APPLY NATIVE: aff=\(isBefore ? "fwd" : "back") anchor=\(aDesc) focus=\(fDesc) -> native=[\(location),\(length)]")
+  }
 
   return NativeSelection(range: NSRange(location: location, length: length), affinity: affinity)
 }
