@@ -119,4 +119,98 @@ final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
 
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
+
+  func testDeepNestedReorderWithDecoratorsMultiLevel() throws {
+    let (opt, leg) = makeEditors()
+    try registerDecoratorNode(on: opt.0)
+    try registerDecoratorNode(on: leg.0)
+
+    // Build: Quote -> [ P1[A,D1,B], Quote2 -> [ P2[C,D2,D], P3[E,D3,F] ] ]
+    try opt.0.update {
+      guard let root = getRoot() else { return }
+      let quote = QuoteNode()
+      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
+      let quote2 = QuoteNode()
+      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "C"), TestDecoratorNode(), createTextNode(text: "D") ])
+      let p3 = createParagraphNode(); try p3.append([ createTextNode(text: "E"), TestDecoratorNode(), createTextNode(text: "F") ])
+      try quote2.append([p2, p3])
+      try quote.append([p1, quote2])
+      try root.append([quote])
+    }
+    try leg.0.update {
+      guard let root = getRoot() else { return }
+      let quote = QuoteNode()
+      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
+      let quote2 = QuoteNode()
+      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "C"), TestDecoratorNode(), createTextNode(text: "D") ])
+      let p3 = createParagraphNode(); try p3.append([ createTextNode(text: "E"), TestDecoratorNode(), createTextNode(text: "F") ])
+      try quote2.append([p2, p3])
+      try quote.append([p1, quote2])
+      try root.append([quote])
+    }
+
+    // Reorders: within inner quote swap P2 and P3; move decorator to end in P3
+    try opt.0.update {
+      guard let quote = getRoot()?.getFirstChild() as? QuoteNode,
+            let inner = quote.getLastChild() as? QuoteNode,
+            let p2 = inner.getFirstChild() as? ParagraphNode,
+            let p3 = inner.getLastChild() as? ParagraphNode else { return }
+      _ = try p2.insertBefore(nodeToInsert: p3) // [P3,P2]
+      if let d = p3.getChildAtIndex(index: 1) as? DecoratorNode, let last = p3.getLastChild() {
+        _ = try last.insertAfter(nodeToInsert: d)
+      }
+    }
+    try leg.0.update {
+      guard let quote = getRoot()?.getFirstChild() as? QuoteNode,
+            let inner = quote.getLastChild() as? QuoteNode,
+            let p2 = inner.getFirstChild() as? ParagraphNode,
+            let p3 = inner.getLastChild() as? ParagraphNode else { return }
+      _ = try p2.insertBefore(nodeToInsert: p3)
+      if let d = p3.getChildAtIndex(index: 1) as? DecoratorNode, let last = p3.getLastChild() {
+        _ = try last.insertAfter(nodeToInsert: d)
+      }
+    }
+    XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
+  }
+
+  func testLargeParagraphReorderWithInterleavedDecorators() throws {
+    let (opt, leg) = makeEditors()
+    try registerDecoratorNode(on: opt.0)
+    try registerDecoratorNode(on: leg.0)
+
+    // Build paragraph with interleaved Text and Decorator nodes: T0,D0,T1,D1,...,T4,D4
+    try opt.0.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      var nodes: [Node] = []
+      for i in 0..<5 { nodes.append(createTextNode(text: "T\(i)")); nodes.append(TestDecoratorNode()) }
+      try p.append(nodes); try root.append([p])
+    }
+    try leg.0.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      var nodes: [Node] = []
+      for i in 0..<5 { nodes.append(createTextNode(text: "T\(i)")); nodes.append(TestDecoratorNode()) }
+      try p.append(nodes); try root.append([p])
+    }
+
+    // Move the last 3 children to the front, preserving their relative order
+    try opt.0.update {
+      guard let p = getRoot()?.getFirstChild() as? ParagraphNode else { return }
+      let children = p.getChildren()
+      for node in children.suffix(3) {
+        try node.remove()
+        _ = try p.insertBefore(nodeToInsert: node)
+      }
+    }
+    try leg.0.update {
+      guard let p = getRoot()?.getFirstChild() as? ParagraphNode else { return }
+      let children = p.getChildren()
+      for node in children.suffix(3) {
+        try node.remove()
+        _ = try p.insertBefore(nodeToInsert: node)
+      }
+    }
+    XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
+  }
 }

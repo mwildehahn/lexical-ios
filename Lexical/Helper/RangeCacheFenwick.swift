@@ -37,3 +37,35 @@ internal func rebuildLocationsWithFenwick(
   return next
 }
 
+/// Rebuilds rangeCache locations by applying range-based shifts using a Fenwick tree.
+/// Each range is defined as [startKey, endKeyExclusive) in the DFS/location order.
+/// Passing `nil` for endKeyExclusive means the shift applies until the end.
+@MainActor
+internal func rebuildLocationsWithFenwickRanges(
+  prev: [NodeKey: RangeCacheItem],
+  ranges: [(startKey: NodeKey, endKeyExclusive: NodeKey?, delta: Int)]
+) -> [NodeKey: RangeCacheItem] {
+  if ranges.isEmpty { return prev }
+  let ordered = prev.map { $0 }.sorted { a, b in
+    if a.value.location != b.value.location { return a.value.location < b.value.location }
+    return a.value.range.length > b.value.range.length
+  }
+  let keys = ordered.map { $0.key }
+  var indexOf: [NodeKey: Int] = [:]
+  for (i, k) in keys.enumerated() { indexOf[k] = i + 1 }
+  var bit = FenwickTree(keys.count)
+  for (s, e, d) in ranges {
+    if d == 0 { continue }
+    if let si = indexOf[s] { bit.add(si, d) }
+    if let e, let ei = indexOf[e] { bit.add(ei, -d) }
+  }
+  var next = prev
+  for (i, k) in keys.enumerated() {
+    let shift = bit.prefixSum(i)
+    if var item = next[k] {
+      item.location = max(0, prev[k]!.location + shift)
+      next[k] = item
+    }
+  }
+  return next
+}

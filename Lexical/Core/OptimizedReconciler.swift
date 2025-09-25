@@ -616,50 +616,32 @@ internal enum OptimizedReconciler {
       accLen += childLength[k] ?? 0
     }
 
-    // Shift locations for each direct child subtree by delta, including all descendants (decorators included)
+    // Shift locations for each direct child subtree via Fenwick range adds
+    var rangeShifts: [(NodeKey, NodeKey?, Int)] = []
+    // Build DFS/location order indices from current cache
+    let orderedKeys = sortedNodeKeysByLocation(rangeCache: editor.rangeCache)
+    var indexOf: [NodeKey: Int] = [:]; indexOf.reserveCapacity(orderedKeys.count)
+    for (i, k) in orderedKeys.enumerated() { indexOf[k] = i + 1 }
+
     for k in nextChildrenOrder {
       guard let oldStart = childOldStart[k], let newStart = childNewStart[k] else { continue }
       let deltaShift = newStart - oldStart
       if deltaShift == 0 { continue }
-
-      // Walk the subtree in pending state (reflects new structure) and add delta to each cached location
-      for subKey in subtreeKeysDFS(rootKey: k, state: pendingEditorState) {
-        if var item = editor.rangeCache[subKey] {
-          item.location += deltaShift
-          editor.rangeCache[subKey] = item
-        }
-      }
-
-      // Update decorator positions for any decorator nodes inside this subtree
-      if let ts = editor.textStorage {
-        for (dKey, loc) in ts.decoratorPositionCache {
-          if editor.rangeCache[dKey] != nil, subtreeContains(rootKey: k, candidateKey: dKey, state: pendingEditorState) {
-            ts.decoratorPositionCache[dKey] = (editor.rangeCache[dKey]?.location) ?? (loc + deltaShift)
-          }
-        }
-      }
+      // Determine subtree end (exclusive) in orderedKeys
+      let subKeys = subtreeKeysDFS(rootKey: k, state: pendingEditorState)
+      var maxIdx = 0
+      for sk in subKeys { if let idx = indexOf[sk], idx > maxIdx { maxIdx = idx } }
+      let endExclusive: NodeKey? = (maxIdx < orderedKeys.count) ? orderedKeys[maxIdx] : nil
+      rangeShifts.append((k, endExclusive, deltaShift))
+    }
+    if !rangeShifts.isEmpty {
+      editor.rangeCache = rebuildLocationsWithFenwickRanges(prev: editor.rangeCache, ranges: rangeShifts)
     }
 
     // Update decorator positions for keys within this subtree
     if let ts = editor.textStorage {
       for (key, _) in ts.decoratorPositionCache {
-        if let loc = editor.rangeCache[key]?.location {
-          ts.decoratorPositionCache[key] = loc
-        }
-      }
-      // Ensure present decorators have cache entries and positions
-      for (k, n) in pendingEditorState.nodeMap {
-        if n is DecoratorNode, n.isAttached() {
-          if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
-          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
-        }
-      }
-      // Mark dirty decorators for decorate
-      for k in editor.dirtyNodes.keys {
-        if pendingEditorState.nodeMap[k] is DecoratorNode {
-          if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view { editor.decoratorCache[k] = .needsDecorating(view) }
-          if let loc = editor.rangeCache[k]?.location { ts.decoratorPositionCache[k] = loc }
-        }
+        if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
       }
     }
 
