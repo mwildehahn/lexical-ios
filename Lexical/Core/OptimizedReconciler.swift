@@ -453,6 +453,14 @@ internal enum OptimizedReconciler {
       with: buffer)
     textStorage.endEditing()
     textStorage.mode = previousMode
+    // Apply block-level attributes and decorator bookkeeping so the hydrated
+    // document visually matches legacy immediately (font, paragraph styling, etc.).
+    Self.applyBlockLevelAttributes(editor: editor,
+                                   pendingState: pendingState,
+                                   dirtyNodes: editor.dirtyNodes,
+                                   textStorage: textStorage)
+    Self.updateDecoratorPositions(editor: editor,
+                                  pendingState: pendingState)
     if editor.featureFlags.diagnostics.verboseLogs {
       let s = textStorage.string
       let preview = String(s.prefix(120)).replacingOccurrences(of: "\n", with: "\\n")
