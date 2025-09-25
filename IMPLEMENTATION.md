@@ -235,3 +235,4 @@ Commit summary
 - Retained Fenwick range helper semantics to match current reorder integration. Full iOS simulator tests and Playground build — PASS.
   - Parity tests:
     - Added `OptimizedReconcilerLegacyParityMultiEditTests` comparing optimized (central aggregation ON) vs legacy when multiple siblings are edited in one update.
+    - Expanded with mixed edits across different parents: text update in one paragraph and structural change affecting pre/post in another (appending a sibling). Strings match.

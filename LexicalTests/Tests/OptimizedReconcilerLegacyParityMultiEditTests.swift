@@ -52,4 +52,41 @@ final class OptimizedReconcilerLegacyParityMultiEditTests: XCTestCase {
 
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
+
+  func testMixedPrePostAndTextAcrossDifferentParentsParity() throws {
+    let (opt, leg) = makeEditors()
+    // Build: Root -> [ P1("One"), P2("Two") ]
+    func build(on editor: Editor) throws -> (NodeKey, NodeKey) {
+      var p1Key: NodeKey = ""; var p2Key: NodeKey = ""
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p1 = createParagraphNode(); p1Key = p1.getKey(); try p1.append([ createTextNode(text: "One") ])
+        let p2 = createParagraphNode(); p2Key = p2.getKey(); try p2.append([ createTextNode(text: "Two") ])
+        try root.append([p1, p2])
+      }
+      return (p1Key, p2Key)
+    }
+    let (p1o, p2o) = try build(on: opt.0)
+    let (p1l, p2l) = try build(on: leg.0)
+
+    // Mixed edits in one update:
+    // - Change text of P1 (direct child of root)
+    // - Append a new paragraph P3("X") after P2, causing P2's postamble to change (none -> newline)
+    try opt.0.update {
+      if let t = (getNodeByKey(key: p1o) as? ParagraphNode)?.getFirstChild() as? TextNode {
+        t.setText_dangerousPropertyAccess("One!")
+      }
+      let p3 = createParagraphNode(); try p3.append([ createTextNode(text: "X") ])
+      if let root = getRoot() { try root.append([p3]) }
+    }
+    try leg.0.update {
+      if let t = (getNodeByKey(key: p1l) as? ParagraphNode)?.getFirstChild() as? TextNode {
+        t.setText_dangerousPropertyAccess("One!")
+      }
+      let p3 = createParagraphNode(); try p3.append([ createTextNode(text: "X") ])
+      if let root = getRoot() { try root.append([p3]) }
+    }
+
+    XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
+  }
 }
