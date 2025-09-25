@@ -131,6 +131,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [ ] Measured: ≥3× fewer TextStorage edits on typing and attribute toggles; ≥2× faster reconcile time on representative docs.
 - [ ] Decorators mount/unmount/decorate parity; selection and marked text parity; block‑level attributes parity.
 - [ ] Shadow compare (debug) clean across a representative scenario corpus (typing, reorders, decorators, composition, paste).
+  - [x] Shadow compare test added (debug flag): exercises typing/reorders/decorators/coalesced replace; logs mismatches if any.
 - [ ] No legacy delegation with `useOptimizedReconcilerStrictMode=true` (except during composition until M3a completes).
 
 ## Validation
