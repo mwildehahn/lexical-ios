@@ -84,6 +84,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [x] Unit tests for CJK/emoji composition and selection continuity.
     - Added and verified: `OptimizedReconcilerCompositionTests.testCompositionUpdateReplacesMarkedRange` (CJK update) and `testCompositionEndUnmarksAndKeepsText`.
     - Added emoji grapheme test: `testCompositionEmojiGraphemeCluster` (👍 → 👍🏽), ensuring grapheme integrity and final text parity.
+    - Added ZWJ family emoji test: `testCompositionEmojiZWJFamilyCluster` (👨‍👩‍👧‍👦), verifying multi-emoji ZWJ sequence composition.
   - Implementation notes:
     - `fastPath_Composition` handles replace-at-marked-range for both start and subsequent updates; co-styles marked text using owning node attributes and skips selection reconcile during IME.
     - End-of-composition flows through TextView.unmarkText(), marking affected nodes dirty; optimized reconciler handles reconciliation normally.

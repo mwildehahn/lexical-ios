@@ -116,4 +116,39 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
     let final = view.textView.attributedText?.string ?? ""
     XCTAssertEqual(final.trimmingCharacters(in: .newlines), "Hello👍🏽")
   }
+
+  func testCompositionEmojiZWJFamilyCluster() throws {
+    // Validate composing a ZWJ family emoji (multiple emoji joined by U+200D)
+    let flags = FeatureFlags(
+      reconcilerSanityCheck: false,
+      proxyTextViewInputDelegate: false,
+      useOptimizedReconciler: true,
+      useReconcilerFenwickDelta: true,
+      useReconcilerKeyedDiff: true,
+      useReconcilerBlockRebuild: true,
+      useOptimizedReconcilerStrictMode: true
+    )
+    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let editor = view.editor
+
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "Hello")
+      try p.append([t]); try root.append([p])
+    }
+
+    let base = "👨"                   // U+1F468
+    let family = "👨‍👩‍👧‍👦"            // man ZWJ woman ZWJ girl ZWJ boy
+
+    // Place caret at end and compose family emoji via marked text updates
+    let len = view.textView.attributedText?.length ?? 0
+    view.textView.selectedRange = NSRange(location: len, length: 0)
+
+    view.textView.setMarkedText(base, selectedRange: NSRange(location: base.lengthAsNSString(), length: 0))
+    view.textView.setMarkedText(family, selectedRange: NSRange(location: family.lengthAsNSString(), length: 0))
+    view.textView.unmarkText()
+
+    let final = view.textView.attributedText?.string ?? ""
+    XCTAssertEqual(final.trimmingCharacters(in: .newlines), "Hello\(family)")
+  }
 }
