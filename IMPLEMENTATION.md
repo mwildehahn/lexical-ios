@@ -60,9 +60,11 @@ Legend: [x] done · [>] in progress · [ ] todo
 ---
 
 ## Immediate Work (Next)
-1. Selection parity strictness (boundaries, multi‑paragraph) with incremental, test‑first patches. [>]
-2. Gate/remove debug prints; keep opt‑in debug via flags only. [ ]
-3. Metrics summary + brief docs; integrate a lightweight panel in Playground. [ ]
+- [x] Selection parity strictness (boundaries, multi‑paragraph) with incremental, test‑first patches.
+- [ ] Gate/remove debug prints; keep opt‑in debug via flags only.
+- [ ] Metrics polish visibility in Playground
+  - [x] Provide snapshot API and console dump (gated by `reconcilerMetrics`).
+  - [ ] Add lightweight metrics panel in Playground to render snapshot.
 
 ---
 
