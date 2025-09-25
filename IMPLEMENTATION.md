@@ -132,6 +132,7 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Link plugin inline formatting around edits (toggle link on selection, remove link) — string parity across optimized vs legacy.
     - [x] List plugin: insert unordered/ordered lists and remove list — string parity across optimized vs legacy; selection kept inside text node to avoid transform selection loss.
     - [x] Markdown export parity for common constructs (headings, quotes, code block, inline bold/italic). Exported Markdown strings equal.
+    - [x] Indent/Outdent commands parity — element indent levels match across optimized vs legacy; strings unchanged.
     - [ ] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings).
 
   - [ ] M6 — Performance & Rollout
