@@ -56,15 +56,18 @@ final class PerformanceViewController: UIViewController {
   private var currentPreset: Preset = .quick
   private var isRunning = false
   private var prePostWrapped = false
+  private var presetHeader: UIStackView?
+  private var presetControl: UISegmentedControl?
 
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .systemBackground
     title = "Performance"
 
+    // Build header first so content can anchor below it
+    configurePresetControl()
     configureUI()
     buildEditors()
-    configurePresetControl()
     configureRunButton()
   }
 
@@ -103,13 +106,14 @@ final class PerformanceViewController: UIViewController {
       view.addSubview(v)
     }
 
+    let contentTop = presetHeader?.bottomAnchor ?? view.safeAreaLayoutGuide.topAnchor
     NSLayoutConstraint.activate([
       // Top labels
-      legacyLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+      legacyLabel.topAnchor.constraint(equalTo: contentTop, constant: 12),
       legacyLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
       legacyLabel.trailingAnchor.constraint(equalTo: view.centerXAnchor, constant: -4),
 
-      optimizedLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+      optimizedLabel.topAnchor.constraint(equalTo: contentTop, constant: 12),
       optimizedLabel.leadingAnchor.constraint(equalTo: view.centerXAnchor, constant: 4),
       optimizedLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
 
@@ -160,8 +164,11 @@ final class PerformanceViewController: UIViewController {
     view.addSubview(stack)
     NSLayoutConstraint.activate([
       stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-      stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12)
+      stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+      stack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -12)
     ])
+    self.presetHeader = stack
+    self.presetControl = control
   }
 
   private func configureRunButton() {
