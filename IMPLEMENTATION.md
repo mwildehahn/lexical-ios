@@ -355,12 +355,17 @@ Reminder: after every significant change, run iOS simulator tests (Lexical-Packa
 - Verified on iOS simulator; Playground app build PASS.
 
 ### 2025‑09‑26: Insert‑block fast path — Fenwick ancestor delta
-- Finalized insert‑block Fenwick path behind `useReconcilerInsertBlockFenwick`:
+- Finalized insert‑block Fenwick path and made it default whenever `useReconcilerFenwickDelta` is ON:
   - Single Insert for new block at exact string position
   - Update part lengths and parent `childrenLength` (O(depth))
   - Apply range‑based Fenwick shift to following siblings; recompute only inserted subtree range cache
   - Reconcile decorator positions after rebuild
 - Tests: `InsertParityTests` (top/mid/end) — PASS; boundary/multi‑insert batching planned.
+
+### 2025‑09‑26: Insert‑block micro‑optimizations
+- Skip `fixAttributes` for insert‑block combined inserts (we build a fully styled attributed string).
+- Speed up `firstKey(afterOrAt:)` using binary search over ordered keys.
+- Result: lower apply time and reduced attribute churn for insert‑block on Opt‑Base.
 
 ### 2025‑09‑26: Pre/Post‑only refinements — attribute‑only path
 - When pre/post lengths are unchanged, emit `SetAttributes + FixAttributes` (no delete/insert churn).
