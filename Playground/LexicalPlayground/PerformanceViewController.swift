@@ -43,6 +43,9 @@ final class PerformanceViewController: UIViewController {
   private var progress = UIProgressView(progressViewStyle: .default)
   private var statusLabel = UILabel()
   private var copyButton = UIButton(type: .system)
+  // Matrix (text-based) aggregation
+  private var scenarioNames: [String] = []
+  private var matrixResults: [String: [String: (deltaPct: Double, tk2Avg: TimeInterval?, applyPlusTk2: TimeInterval?)]] = [:]
 
   // MARK: - Editors & Views
   private var legacyView: LexicalView!
@@ -183,9 +186,8 @@ final class PerformanceViewController: UIViewController {
   }
 
   private func configureRunButton() {
-    let run = UIBarButtonItem(title: "Run", style: .plain, target: self, action: #selector(runTapped))
-    let runVar = UIBarButtonItem(title: "Run Variations", style: .plain, target: self, action: #selector(runVariationsTapped))
-    navigationItem.rightBarButtonItems = [run, runVar]
+    let runVar = UIBarButtonItem(title: "Run Matrix", style: .plain, target: self, action: #selector(runVariationsTapped))
+    navigationItem.rightBarButtonItems = [runVar]
   }
 
   @objc private func onPresetChanged(_ sender: UISegmentedControl) {
@@ -207,7 +209,8 @@ final class PerformanceViewController: UIViewController {
     optimizedMetrics.resetMetrics()
 
     let legacyFlags = FeatureFlags()
-    let optimizedFlags = FlagsStore.shared.makeFeatureFlags()
+    // Default to Opt-Base profile in the live view; matrix runner will swap flags per-variation
+    let optimizedFlags = FeatureFlags(useOptimizedReconciler: true, useReconcilerFenwickDelta: true, useOptimizedReconcilerStrictMode: true)
 
     func makeConfig(metrics: EditorMetricsContainer) -> EditorConfig {
       let theme = Theme()
@@ -243,7 +246,7 @@ final class PerformanceViewController: UIViewController {
     seedDocument(editor: optimized.editor, paragraphs: 100)
 
     // Optional: TextKit 2 frontend A/B — mirror optimized content into a TK2 UITextView
-    if FlagsStore.shared.tk2 {
+    if optimizedFlags.useTextKit2Experimental {
       let t = UITextView(usingTextLayoutManager: true)
       t.isEditable = false
       t.backgroundColor = .clear
@@ -327,6 +330,8 @@ final class PerformanceViewController: UIViewController {
         let line = NSAttributedString(string: String(format: "Fastest TOP insert: %@ (avg %.2f ms)\n\n", best.name, best.avg*1000), attributes: [.font: mono, .foregroundColor: UIColor.systemGreen])
         self.summary.append(line)
       }
+      // Render a compact matrix table into the summary
+      self.renderMatrixSummary(variations: variations.map { $0.0 })
       self.activity.stopAnimating(); self.statusLabel.text = "Done"; self.copyButton.isEnabled = true; self.isRunning = false; self.refreshSummaryView(); self.recordingVariations = false
     }
   }
@@ -522,6 +527,18 @@ final class PerformanceViewController: UIViewController {
           self.bestTopInsert = (self.currentVariationName ?? "?", avg)
         }
       }
+      // Accumulate matrix result for this scenario & variation
+      if self.recordingVariations, let varName = self.currentVariationName {
+        let legacyAvg = self.legacyMetrics.runs.isEmpty ? 0 : legacyDur / Double(self.legacyMetrics.runs.count)
+        let optAvg = self.optimizedMetrics.runs.isEmpty ? 0 : optDur / Double(self.optimizedMetrics.runs.count)
+        let deltaPct = (legacyAvg > 0 && optAvg > 0) ? ((legacyAvg - optAvg) / legacyAvg * 100.0) : 0
+        let applyAvg = self.optimizedMetrics.runs.isEmpty ? 0 : (self.optimizedMetrics.runs.reduce(0) { $0 + $1.applyDuration } / Double(self.optimizedMetrics.runs.count))
+        let applyPlus = (tk2Avg ?? 0) + applyAvg
+        var row = self.matrixResults[scenario.name] ?? [:]
+        row[varName] = (deltaPct: deltaPct, tk2Avg: tk2Avg, applyPlusTk2: applyPlus)
+        self.matrixResults[scenario.name] = row
+        if !self.scenarioNames.contains(scenario.name) { self.scenarioNames.append(scenario.name) }
+      }
       self.refreshSummaryView()
       // Reset documents between scenarios and continue
       self.resetDocuments(paragraphs: config(for: currentPreset).seedParas)
@@ -567,6 +584,32 @@ final class PerformanceViewController: UIViewController {
     guard let t = tk2View else { return }
     t.attributedText = optimizedView.textView.attributedText
     t.layoutIfNeeded()
+  }
+
+  private func renderMatrixSummary(variations: [String]) {
+    guard !scenarioNames.isEmpty else { return }
+    let mono = UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+    func pad(_ s: String, _ w: Int) -> String { let str = s; let n = max(0, w - str.count); return str + String(repeating: " ", count: n) }
+    let colW = 14
+    var header = pad("Scenario", 24)
+    for v in variations { header += pad(v, colW) }
+    header += "\n"
+    var body = ""
+    for name in scenarioNames.sorted() {
+      var line = pad(String(name.prefix(24)), 24)
+      let row = matrixResults[name] ?? [:]
+      for v in variations {
+        if let r = row[v] {
+          let pct = String(format: "%+.1f%%", r.deltaPct)
+          line += pad(pct, colW)
+        } else {
+          line += pad("—", colW)
+        }
+      }
+      body += line + "\n"
+    }
+    summary.append(NSAttributedString(string: header, attributes: [.font: mono, .foregroundColor: UIColor.label]))
+    summary.append(NSAttributedString(string: body + "\n", attributes: [.font: mono, .foregroundColor: UIColor.secondaryLabel]))
   }
 
   private func appendLog(_ line: String) {

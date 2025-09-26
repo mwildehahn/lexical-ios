@@ -18,14 +18,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     editorVC.tabBarItem = UITabBarItem(title: "Editor", image: UIImage(systemName: "doc.text"), selectedImage: UIImage(systemName: "doc.text.fill"))
     let perfVC = PerformanceViewController()
     perfVC.tabBarItem = UITabBarItem(title: "Perf", image: UIImage(systemName: "speedometer"), selectedImage: UIImage(systemName: "speedometer"))
-    let flagsVC = FlagsViewController()
-    flagsVC.tabBarItem = UITabBarItem(title: "Flags", image: UIImage(systemName: "switch.2"), selectedImage: UIImage(systemName: "switch.2"))
 
     let editorNav = UINavigationController(rootViewController: editorVC)
     let perfNav = UINavigationController(rootViewController: perfVC)
 
     let tab = UITabBarController()
-    tab.viewControllers = [editorNav, perfNav, flagsVC]
+    tab.viewControllers = [editorNav, perfNav]
 
     window.rootViewController = tab
     self.window = window
