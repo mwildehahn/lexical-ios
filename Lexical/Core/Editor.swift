@@ -178,6 +178,11 @@ public class Editor: NSObject {
   // from restoring the pending state's string on the very next reconcile.
   internal var pendingImeCancel: Bool = false
 
+  // IME/marked-text: last known numeric marked range (absolute in textStorage)
+  // for cases where UITextView.markedTextRange is temporarily nil but we still
+  // need to resolve cancel semantics. Cleared on unmark.
+  internal var lastMarkedRange: NSRange? = nil
+
   // MARK: - Initialisation
 
   /// Initialises a new Editor.

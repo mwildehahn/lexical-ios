@@ -322,7 +322,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       return
     }
 
-    if markedText.isEmpty, let markedRange = editor.getNativeSelection().markedRange {
+    if markedText.isEmpty, let markedRange = (editor.getNativeSelection().markedRange ?? editor.lastMarkedRange) {
       // Mark that we've performed an IME cancel by empty replacement so the
       // optimized reconciler does not immediately parity-coerce the buffer
       // back to the pending state's string.
@@ -339,6 +339,10 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       selectionRangeToReplace: editor.getNativeSelection().markedRange ?? self.selectedRange,
       markedTextString: markedText,
       markedTextInternalSelection: selectedRange)
+
+    // Record the last intended marked range so cancel can succeed even if the
+    // native marked range becomes temporarily unavailable.
+    editor.lastMarkedRange = markedTextOperation.selectionRangeToReplace
 
     let behaviourModificationMode = UpdateBehaviourModificationMode(
       suppressReconcilingSelection: true, suppressSanityCheck: true,
@@ -387,7 +391,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
   override public func unmarkText() {
     editor.log(.UITextView, .verbose)
-    let previousMarkedRange = editor.getNativeSelection().markedRange
+    let previousMarkedRange = editor.getNativeSelection().markedRange ?? editor.lastMarkedRange
     let oldIsUpdatingNative = isUpdatingNativeSelection
     isUpdatingNativeSelection = true
     super.unmarkText()
@@ -424,8 +428,9 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
           }
 
           editor.compositionKey = nil
-          // Clear cancel flag after we processed it.
+          // Clear cancel flag and stored numeric range after we processed it.
           editor.pendingImeCancel = false
+          editor.lastMarkedRange = nil
         }
       } catch {}
     }
