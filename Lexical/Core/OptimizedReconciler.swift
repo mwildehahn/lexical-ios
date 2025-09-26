@@ -587,9 +587,17 @@ internal enum OptimizedReconciler {
 
     var nodesToApply: Set<NodeKey> = []
     for (nodeKey, _) in dirtyNodes { nodesToApply.insert(nodeKey) }
-    // Also include parents of dirty nodes (attributes can affect paragraph containers)
+    // Also include parents of dirty nodes (attributes can affect paragraph containers).
+    // IMPORTANT: Walk parent keys via pendingState.nodeMap to avoid calling Node APIs
+    // that require an active EditorState (e.g., getLatest/getParent).
     for (nodeKey, _) in dirtyNodes {
-      if let node = pendingState.nodeMap[nodeKey] { for p in node.getParentKeys() { nodesToApply.insert(p) } }
+      if let node = pendingState.nodeMap[nodeKey] {
+        var pKey = node.parent
+        while let current = pKey {
+          nodesToApply.insert(current)
+          pKey = pendingState.nodeMap[current]?.parent
+        }
+      }
     }
 
     let rangeCache = editor.rangeCache

@@ -56,9 +56,9 @@ final class TypingAttributesParityTests: XCTestCase {
       let p = ParagraphNode(); let t = TextNode(text: "Hello", key: nil); try p.append([t]); try root.append([p]); _ = try p.selectStart()
     }
 
-    // Force typing attributes recompute at caret
-    legacyView.resetTypingAttributes(for: (try getActiveEditorState()?.getRootNode())!)
-    optView.resetTypingAttributes(for: (try getActiveEditorState()?.getRootNode())!)
+    // Force typing attributes recompute at the caret by numeric position
+    legacyView.textView.resetTypingAttributes(for: NSRange(location: 0, length: 0))
+    optView.textView.resetTypingAttributes(for: NSRange(location: 0, length: 0))
 
     let la = legacyView.textView.typingAttributes
     let oa = optView.textView.typingAttributes
@@ -70,4 +70,3 @@ final class TypingAttributesParityTests: XCTestCase {
     XCTAssertTrue(paragraphStylesEqual(lp, op))
   }
 }
-
