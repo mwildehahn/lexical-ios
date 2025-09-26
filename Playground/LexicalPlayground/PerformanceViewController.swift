@@ -73,6 +73,7 @@ final class PerformanceViewController: UIViewController {
   // TK2 layout timing per scenario
   private var tk2LayoutAccum: TimeInterval = 0
   private var tk2LayoutCount: Int = 0
+  private var tk2LayoutPerBatch: Bool = false
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -262,9 +263,12 @@ final class PerformanceViewController: UIViewController {
       self.tk2View = t
       // Keep LexicalView present for updates but hide it so only TK2 renders
       optimized.isHidden = true
+      // Per-batch TK2 layout experiment toggle
+      tk2LayoutPerBatch = optimizedFlags.useTextKit2LayoutPerBatch
       syncTK2FromOptimized()
     } else {
       self.tk2View = nil
+      tk2LayoutPerBatch = false
     }
   }
 
@@ -312,7 +316,7 @@ final class PerformanceViewController: UIViewController {
         useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
         useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
         useReconcilerShadowCompare: false, useTextKit2Experimental: true,
-        useReconcilerInsertBlockFenwick: true
+        useReconcilerInsertBlockFenwick: true, useTextKit2LayoutPerBatch: true
       )),
       ("All toggles", FeatureFlags(
         reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
@@ -573,7 +577,7 @@ final class PerformanceViewController: UIViewController {
       // Execute batch synchronously on main to respect Editor's threading model
       for _ in completed..<end {
         step()
-        if tk2View != nil {
+        if tk2View != nil && !tk2LayoutPerBatch {
           let s = CFAbsoluteTimeGetCurrent()
           syncTK2FromOptimized()
           tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
@@ -592,6 +596,12 @@ final class PerformanceViewController: UIViewController {
         // Yield to run loop so UI stays responsive
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { runNextBatch() }
       } else {
+        if tk2View != nil && tk2LayoutPerBatch {
+          let s = CFAbsoluteTimeGetCurrent()
+          syncTK2FromOptimized()
+          tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
+          tk2LayoutCount += 1
+        }
         completion()
       }
     }
