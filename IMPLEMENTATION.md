@@ -170,6 +170,19 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Basic metrics capture (per‑run instruction counts) via a test metrics container; printed in logs for visibility.
     - [x] Add initial non-brittle bounds on operation counts (rangesAdded+rangesDeleted) for typing, mass stylings, and reorder scenarios. Timings still logged only.
   - [ ] Ship sub‑flags off by default; enable in CI nightly; collect metrics.
+
+- [ ] M6a — Platform bump + Text stack options (iOS 16+)
+  - [x] Bump SPM minimum to iOS 16 in Package.swift (enables TextKit 2 APIs at compile time).
+  - [x] Enable `NSLayoutManager.allowsNonContiguousLayout` for TextKit 1 to reduce full relayout on large inserts (UIKit NSLayoutManager property).
+  - [ ] Add feature flag `useTextKit2Experimental` and prototype a TextKit 2 path (UITextView.textLayoutManager) in a sandbox editor for A/B. Docs: UITextView.textLayoutManager (iOS 16+), NSTextLayoutManager (iOS 15+).
+  - [ ] Investigate `NSTextViewportLayoutController` (iOS 15+) for viewport‑only layout on large docs.
+  - [ ] Measure before/after on block inserts at TOP/MIDDLE/END with viewport controller enabled.
+
+- [ ] M7 — Insert‑block fast path (structural)
+  - [ ] Compose attributed block once; single Insert at string position.
+  - [ ] Update part lengths and parent `childrenLength` + aggregate Fenwick deltas; one Fenwick rebuild.
+  - [ ] Apply block‑level attributes only for inserted node; avoid region rebuild.
+  - [ ] Tests: inserts at top/mid/end; parity + perf assertions; selection mapping parity.
   - [ ] Flip `useOptimizedReconciler` in staged environments.
   - [ ] Remove legacy delegation once composition + shadow compare are green; retain a one‑release kill switch.
 

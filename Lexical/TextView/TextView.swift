@@ -55,6 +55,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   init(editorConfig: EditorConfig, featureFlags: FeatureFlags) {
     let textStorage = TextStorage()
     let layoutManager = LayoutManager()
+    layoutManager.allowsNonContiguousLayout = true
     layoutManagerDelegate = LayoutManagerDelegate()
     layoutManager.delegate = layoutManagerDelegate
 

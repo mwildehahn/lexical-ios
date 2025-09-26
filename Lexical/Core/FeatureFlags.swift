@@ -17,6 +17,7 @@ import Foundation
   let useOptimizedReconcilerStrictMode: Bool
   let useReconcilerFenwickCentralAggregation: Bool
   let useReconcilerShadowCompare: Bool
+  let useTextKit2Experimental: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
@@ -27,7 +28,8 @@ import Foundation
     useReconcilerBlockRebuild: Bool = false,
     useOptimizedReconcilerStrictMode: Bool = false,
     useReconcilerFenwickCentralAggregation: Bool = false,
-    useReconcilerShadowCompare: Bool = false
+    useReconcilerShadowCompare: Bool = false,
+    useTextKit2Experimental: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -38,6 +40,7 @@ import Foundation
     self.useOptimizedReconcilerStrictMode = useOptimizedReconcilerStrictMode
     self.useReconcilerFenwickCentralAggregation = useReconcilerFenwickCentralAggregation
     self.useReconcilerShadowCompare = useReconcilerShadowCompare
+    self.useTextKit2Experimental = useTextKit2Experimental
     super.init()
   }
 }
