@@ -330,9 +330,12 @@ final class PerformanceViewController: UIViewController {
         let line = NSAttributedString(string: String(format: "Fastest TOP insert: %@ (avg %.2f ms)\n\n", best.name, best.avg*1000), attributes: [.font: mono, .foregroundColor: UIColor.systemGreen])
         self.summary.append(line)
       }
-      // Render a compact matrix table into the summary
-      self.renderMatrixSummary(variations: variations.map { $0.0 })
+      // Open results screen with full matrix view
+      let scenarioList = self.scenarioNames.sorted()
+      let profileNames = variations.map { $0.0 }
+      let vc = ResultsViewController(scenarios: scenarioList, profiles: profileNames, results: self.matrixResults, seedParas: self.seedParasCurrent, fastestTop: self.bestTopInsert.map { ($0.name, $0.avg*1000) })
       self.activity.stopAnimating(); self.statusLabel.text = "Done"; self.copyButton.isEnabled = true; self.isRunning = false; self.refreshSummaryView(); self.recordingVariations = false
+      self.navigationController?.pushViewController(vc, animated: true)
     }
   }
 

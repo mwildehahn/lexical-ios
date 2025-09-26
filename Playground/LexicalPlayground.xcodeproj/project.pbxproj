@@ -28,6 +28,7 @@
 		06F7CF962A545C7C0024CD5A /* lexical-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 06F7CF952A545C7C0024CD5A /* lexical-logo.png */; };
 		3C48FEE42B04F2C5009BBFA2 /* LexicalMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = 3C48FEE32B04F2C5009BBFA2 /* LexicalMarkdown */; };
 		06D0BEEF2B1A000200AABBCC /* PerformanceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D0BEEF2B1A000100AABBCC /* PerformanceViewController.swift */; };
+ 		06BB77112B1A400100AABBCC /* ResultsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06BB77102B1A400100AABBCC /* ResultsViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 		06CB47B329DE0139005AC7BD /* NodeHierarchyViewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeHierarchyViewPlugin.swift; sourceTree = "<group>"; };
 		06F7CF952A545C7C0024CD5A /* lexical-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "lexical-logo.png"; sourceTree = "<group>"; };
 		06D0BEEF2B1A000100AABBCC /* PerformanceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceViewController.swift; sourceTree = "<group>"; };
+ 		06BB77102B1A400100AABBCC /* ResultsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +93,7 @@
 			children = (
 				0656CF7829D1E438009CA08F /* AppDelegate.swift */,
 				06AA55EE2B1A100000AABBCC /* SceneDelegate.swift */,
+ 				06BB77102B1A400100AABBCC /* ResultsViewController.swift */,
 				06AA55F22B1A101000AABBCC /* FlagsStore.swift */,
 				06AA55F32B1A101000AABBCC /* FlagsViewController.swift */,
 				0656CF7C29D1E438009CA08F /* ViewController.swift */,
@@ -215,6 +218,7 @@
 				06CB47B429DE0139005AC7BD /* NodeHierarchyViewPlugin.swift in Sources */,
 				06D0BEEF2B1A000200AABBCC /* PerformanceViewController.swift in Sources */,
 				06AA55F02B1A101000AABBCC /* FlagsStore.swift in Sources */,
+ 				06BB77112B1A400100AABBCC /* ResultsViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
