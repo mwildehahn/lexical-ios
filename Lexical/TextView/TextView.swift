@@ -328,6 +328,9 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       // back to the pending state's string.
       editor.pendingImeCancel = true
       textStorage.replaceCharacters(in: markedRange, with: "")
+      // Call unmarkText to clear UIKit's marked range and to update the model
+      // via our cancel-aware path in unmarkText().
+      unmarkText()
       return
     }
 
