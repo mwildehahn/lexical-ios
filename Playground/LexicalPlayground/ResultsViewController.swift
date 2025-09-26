@@ -16,7 +16,10 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
   private let fastestTop: (name: String, avgMs: Double)?
 
   private let headerStack = UIStackView()
+  private let profileControl = UISegmentedControl(items: [])
   private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+  private var showMatrixMode = false
+  private var activeProfileIndex = 0
 
   init(scenarios: [String], profiles: [String], results: [String: [String: (Double, TimeInterval?, TimeInterval?)]], seedParas: Int, fastestTop: (String, Double)?) {
     self.scenarios = scenarios
@@ -47,25 +50,37 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
       headerStack.addArrangedSubview(tileView(title: "Fastest TOP", value: "\(fastestTop.name) · \(v)", accent: .systemGreen))
     }
 
+    // Profile selector (pager)
+    profiles.forEach { profileControl.insertSegment(withTitle: $0, at: profileControl.numberOfSegments, animated: false) }
+    if profiles.count > 0 { profileControl.selectedSegmentIndex = 0 }
+    profileControl.addTarget(self, action: #selector(onProfileChanged), for: .valueChanged)
+    profileControl.translatesAutoresizingMaskIntoConstraints = false
+
     tableView.dataSource = self
     tableView.delegate = self
     tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
     tableView.translatesAutoresizingMaskIntoConstraints = false
 
     view.addSubview(headerStack)
+    view.addSubview(profileControl)
     view.addSubview(tableView)
     NSLayoutConstraint.activate([
       headerStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
       headerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
       headerStack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -12),
 
-      tableView.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 8),
+      profileControl.topAnchor.constraint(equalTo: headerStack.bottomAnchor, constant: 8),
+      profileControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+      profileControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+
+      tableView.topAnchor.constraint(equalTo: profileControl.bottomAnchor, constant: 8),
       tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
       tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
       tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
     ])
-
-    navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Export", style: .plain, target: self, action: #selector(exportTapped))
+    let export = UIBarButtonItem(title: "Export", style: .plain, target: self, action: #selector(exportTapped))
+    let toggle = UIBarButtonItem(title: "Matrix", style: .plain, target: self, action: #selector(toggleMatrixMode))
+    navigationItem.rightBarButtonItems = [export, toggle]
   }
 
   private func tileView(title: String, value: String, accent: UIColor = .secondaryLabel) -> UIView {
@@ -84,53 +99,73 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
     let name = scenarios[indexPath.row]
     let row = results[name] ?? [:]
 
-    // Build horizontal stack: scenario label + columns
-    let stack = UIStackView(); stack.axis = .horizontal; stack.spacing = 8; stack.alignment = .center
-    let sLabel = UILabel(); sLabel.text = name; sLabel.font = .systemFont(ofSize: 12, weight: .regular); sLabel.numberOfLines = 2
-    stack.addArrangedSubview(spacerWrap(sLabel, width: 160))
+    // Clean cell
+    cell.contentView.subviews.forEach { $0.removeFromSuperview() }
 
-    for p in profiles {
-      let l = UILabel(); l.font = .monospacedSystemFont(ofSize: 12, weight: .regular); l.textAlignment = .center; l.numberOfLines = 2
-      var colorView = UIView()
-      var bg: UIColor = .clear
+    if showMatrixMode {
+      // Matrix mode: scenario + columns (as before)
+      let stack = UIStackView(); stack.axis = .horizontal; stack.spacing = 8; stack.alignment = .center
+      let sLabel = UILabel(); sLabel.text = name; sLabel.font = .systemFont(ofSize: 12, weight: .regular); sLabel.numberOfLines = 2
+      stack.addArrangedSubview(spacerWrap(sLabel, width: 160))
+      for p in profiles {
+        let l = UILabel(); l.font = .monospacedSystemFont(ofSize: 12, weight: .regular); l.textAlignment = .center; l.numberOfLines = 2
+        var colorView = UIView(); var bg: UIColor = .clear
+        if let r = row[p] {
+          let pct = String(format: "%+.1f%%", r.deltaPct)
+          var txt = pct
+          if let tk = r.tk2Avg { txt += String(format: "\nTK2 %.2fms", tk*1000) }
+          if let ap = r.applyPlusTk2 { txt += String(format: "  +%.2fms", ap*1000) }
+          l.text = txt
+          let magnitude = min(1.0, abs(r.deltaPct) / 25.0)
+          if r.deltaPct > 0.5 { bg = UIColor.systemGreen.withAlphaComponent(0.15 + 0.30 * magnitude); l.textColor = .label }
+          else if r.deltaPct < -0.5 { bg = UIColor.systemRed.withAlphaComponent(0.15 + 0.30 * magnitude); l.textColor = .label }
+          else { bg = UIColor.systemGray5; l.textColor = .secondaryLabel }
+        } else { l.text = "—"; l.textColor = .tertiaryLabel; bg = .clear }
+        colorView = spacerWrap(l, width: 130)
+        colorView.backgroundColor = bg; colorView.layer.cornerRadius = 6; colorView.clipsToBounds = true
+        stack.addArrangedSubview(colorView)
+      }
+      cell.contentView.addSubview(stack)
+      stack.translatesAutoresizingMaskIntoConstraints = false
+      NSLayoutConstraint.activate([
+        stack.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor, constant: 12),
+        stack.trailingAnchor.constraint(lessThanOrEqualTo: cell.contentView.trailingAnchor, constant: -12),
+        stack.topAnchor.constraint(equalTo: cell.contentView.topAnchor, constant: 6),
+        stack.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor, constant: -6)
+      ])
+    } else {
+      // Profile pager mode: scenario + active profile metrics
+      let stack = UIStackView(); stack.axis = .horizontal; stack.spacing = 8; stack.alignment = .center
+      let sLabel = UILabel(); sLabel.text = name; sLabel.font = .systemFont(ofSize: 12, weight: .regular); sLabel.numberOfLines = 2
+      stack.addArrangedSubview(spacerWrap(sLabel, width: 160))
+
+      let p = profiles[min(max(0, activeProfileIndex), profiles.count - 1)]
+      let l = UILabel(); l.font = .monospacedSystemFont(ofSize: 13, weight: .medium); l.textAlignment = .center; l.numberOfLines = 2
+      var colorView = UIView(); var bg: UIColor = .clear
       if let r = row[p] {
         let pct = String(format: "%+.1f%%", r.deltaPct)
         var txt = pct
         if let tk = r.tk2Avg { txt += String(format: "\nTK2 %.2fms", tk*1000) }
         if let ap = r.applyPlusTk2 { txt += String(format: "  +%.2fms", ap*1000) }
         l.text = txt
-        // Color scale by delta: green positive, red negative, gray near 0
-        let magnitude = min(1.0, abs(r.deltaPct) / 25.0) // 25% => max intensity
-        if r.deltaPct > 0.5 {
-          bg = UIColor.systemGreen.withAlphaComponent(0.15 + 0.30 * magnitude)
-          l.textColor = .label
-        } else if r.deltaPct < -0.5 {
-          bg = UIColor.systemRed.withAlphaComponent(0.15 + 0.30 * magnitude)
-          l.textColor = .label
-        } else {
-          bg = UIColor.systemGray5
-          l.textColor = .secondaryLabel
-        }
-      } else {
-        l.text = "—"; l.textColor = .tertiaryLabel
-        bg = .clear
-      }
-      colorView = spacerWrap(l, width: 130)
-      colorView.backgroundColor = bg
-      colorView.layer.cornerRadius = 6
-      colorView.clipsToBounds = true
+        let magnitude = min(1.0, abs(r.deltaPct) / 25.0)
+        if r.deltaPct > 0.5 { bg = UIColor.systemGreen.withAlphaComponent(0.18 + 0.30 * magnitude); l.textColor = .label }
+        else if r.deltaPct < -0.5 { bg = UIColor.systemRed.withAlphaComponent(0.18 + 0.30 * magnitude); l.textColor = .label }
+        else { bg = UIColor.systemGray5; l.textColor = .secondaryLabel }
+      } else { l.text = "—"; l.textColor = .tertiaryLabel; bg = .clear }
+      colorView = spacerWrap(l, width: 180)
+      colorView.backgroundColor = bg; colorView.layer.cornerRadius = 8; colorView.clipsToBounds = true
       stack.addArrangedSubview(colorView)
-    }
 
-    cell.contentView.subviews.forEach { $0.removeFromSuperview() }
-    cell.contentView.addSubview(stack)
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    NSLayoutConstraint.activate([
-      stack.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor, constant: 12),
-      stack.trailingAnchor.constraint(lessThanOrEqualTo: cell.contentView.trailingAnchor, constant: -12),
-      stack.topAnchor.constraint(equalTo: cell.contentView.topAnchor, constant: 6),
-      stack.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor, constant: -6)
-    ])
+      cell.contentView.addSubview(stack)
+      stack.translatesAutoresizingMaskIntoConstraints = false
+      NSLayoutConstraint.activate([
+        stack.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor, constant: 12),
+        stack.trailingAnchor.constraint(lessThanOrEqualTo: cell.contentView.trailingAnchor, constant: -12),
+        stack.topAnchor.constraint(equalTo: cell.contentView.topAnchor, constant: 6),
+        stack.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor, constant: -6)
+      ])
+    }
     return cell
   }
 
@@ -153,6 +188,16 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
     let alert = UIAlertController(title: "Exported", message: "Matrix copied as CSV to clipboard.", preferredStyle: .alert)
     alert.addAction(UIAlertAction(title: "OK", style: .default))
     present(alert, animated: true)
+  }
+
+  @objc private func toggleMatrixMode() {
+    showMatrixMode.toggle()
+    tableView.reloadData()
+  }
+
+  @objc private func onProfileChanged() {
+    activeProfileIndex = profileControl.selectedSegmentIndex
+    tableView.reloadData()
   }
 
   private func exportCSV() -> String {
