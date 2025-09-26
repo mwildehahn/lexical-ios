@@ -103,13 +103,14 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [x] Expand scenario corpus (typing, reorders, decorators, coalesced replace, mixed parents). CI runs the iOS simulator suite nightly with these tests included.
 
 - [ ] M5 — Tests & Parity (comprehensive parity suite)
+- [x] M5 — Tests & Parity (comprehensive parity suite)
   - Core text/attributes
     - [x] Text‑only updates: typing, backspace, replace range (single and multi‑node).
     - [x] Attribute‑only updates: bold/italic/underline, indent/outdent, paragraph spacing; assert no string edits on attribute‑only.
     - [x] Mixed multi‑edit parity across different parents (text + structural change affecting pre/post).
   - Preamble/Postamble
-    - [ ] Block boundary markers (list bullets, code fence markers, quote boundaries): add cases where pre/post changes with and without children.
-    - [ ] Leading/trailing newline normalization at block boundaries; ensure mapping/parity.
+    - [x] Block boundary markers (list bullets, code fence markers, quote boundaries): added cases where pre/post changes with and without children.
+    - [x] Leading/trailing newline normalization at block boundaries; ensured parity via list + paragraph insertion scenarios.
   - Reorders
     - [x] Region rebuild parity; [x] minimal‑move keyed diff; [x] large shuffles; [x] nested structures; thresholds resilient tests (skip internal path labels).
   - Decorators
@@ -127,14 +128,14 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Structured paste (multi‑paragraph) parity on final string; exercises coalesced replace path vs legacy.
     - [x] Formatted paste: bold/italic inline styles — attribute sampling parity at representative positions.
   - Stress & Metrics
-    - [ ] Large‑document typing, mass attribute toggles, large reorders; assert string parity and record op counts / durations (non‑flaky bounds).
+    - [x] Large‑document typing, mass attribute toggles, large reorders; assert string parity and record op counts / durations (non‑flaky bounds) — covered in ReconcilerBenchmarkTests.
   - Plugins (selected smoke parity)
     - [x] Link plugin inline formatting around edits (toggle link on selection, remove link) — string parity across optimized vs legacy.
     - [x] List plugin: insert unordered/ordered lists and remove list — string parity across optimized vs legacy; selection kept inside text node to avoid transform selection loss.
     - [x] Markdown export parity for common constructs (headings, quotes, code block, inline bold/italic). Exported Markdown strings equal.
     - [x] HTML export parity (core nodes + inline bold/italic) using LexicalHTML utilities — exported HTML identical.
     - [x] Indent/Outdent commands parity — element indent levels match across optimized vs legacy; strings unchanged.
-    - [ ] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings).
+    - [~] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings). Note: Import is not currently implemented in LexicalMarkdown; we validated export parity and left import round‑trip as N/A pending feature support.
 
   - [ ] M6 — Performance & Rollout
     - [x] Benchmark tests (`ReconcilerBenchmarkTests`): typing, mass stylings, large reorder — parity asserted; timings logged.
