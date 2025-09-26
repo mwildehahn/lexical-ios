@@ -41,6 +41,8 @@ final class PerformanceViewController: UIViewController {
   private var optimizedMetrics = PerfMetricsContainer()
   private var didRunOnce = false
   private var attrToggleBoldState = true
+  private var totalSteps: Int = 0
+  private var completedSteps: Int = 0
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -172,9 +174,9 @@ final class PerformanceViewController: UIViewController {
       optimized.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor),
     ])
 
-    // Seed both documents with identical content
-    seedDocument(editor: legacy.editor, paragraphs: 200)
-    seedDocument(editor: optimized.editor, paragraphs: 200)
+    // Seed both documents with identical content (keep modest for UI responsiveness)
+    seedDocument(editor: legacy.editor, paragraphs: 100)
+    seedDocument(editor: optimized.editor, paragraphs: 100)
   }
 
   @objc private func copyResults() {
@@ -199,14 +201,18 @@ final class PerformanceViewController: UIViewController {
     func stepCoalescedReplace() { try? coalescedReplaceOnce() }
 
     let scenarios: [Scenario] = [
-      .init(name: "Insert paragraph at TOP", iterations: 100, batch: 10, step: stepInsertTop, parityKind: .plain),
-      .init(name: "Insert paragraph at MIDDLE", iterations: 100, batch: 10, step: stepInsertMiddle, parityKind: .plain),
-      .init(name: "Insert paragraph at END", iterations: 100, batch: 10, step: stepInsertEnd, parityKind: .plain),
-      .init(name: "Text edit bursts", iterations: 50, batch: 10, step: stepTextBurst, parityKind: .plain),
-      .init(name: "Attribute-only toggle bold", iterations: 50, batch: 10, step: stepAttrToggle, parityKind: .attrOnly),
-      .init(name: "Keyed reorder (swap neighbors)", iterations: 50, batch: 10, step: stepReorderSmall, parityKind: .plain),
+      .init(name: "Insert paragraph at TOP", iterations: 100, batch: 5, step: stepInsertTop, parityKind: .plain),
+      .init(name: "Insert paragraph at MIDDLE", iterations: 100, batch: 5, step: stepInsertMiddle, parityKind: .plain),
+      .init(name: "Insert paragraph at END", iterations: 100, batch: 5, step: stepInsertEnd, parityKind: .plain),
+      .init(name: "Text edit bursts", iterations: 50, batch: 5, step: stepTextBurst, parityKind: .plain),
+      .init(name: "Attribute-only toggle bold", iterations: 50, batch: 5, step: stepAttrToggle, parityKind: .attrOnly),
+      .init(name: "Keyed reorder (swap neighbors)", iterations: 50, batch: 5, step: stepReorderSmall, parityKind: .plain),
       .init(name: "Coalesced replace (paste-like)", iterations: 20, batch: 5, step: stepCoalescedReplace, parityKind: .plain),
     ]
+
+    // Global progress across all iterations of all scenarios
+    totalSteps = scenarios.reduce(0) { $0 + $1.iterations }
+    completedSteps = 0
 
     runScenarioList(scenarios, index: 0) { [weak self] in
       guard let self else { return }
@@ -234,10 +240,8 @@ final class PerformanceViewController: UIViewController {
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
       self.appendLog(body + parity + "\n")
       // Reset documents between scenarios and continue
-      self.resetDocuments(paragraphs: 200)
-      let total = Float(scenarios.count)
-      self.progress.setProgress(Float(index + 1) / total, animated: true)
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+      self.resetDocuments(paragraphs: 100)
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
         self.runScenarioList(scenarios, index: index + 1, completion: completion)
       }
     }
@@ -249,11 +253,17 @@ final class PerformanceViewController: UIViewController {
       let end = min(completed + batch, iterations)
       // Execute a small batch synchronously on main to respect Editor's threading model
       for _ in completed..<end { step() }
+      // Update progress (global + scenario)
+      let delta = end - completed
       completed = end
-      statusLabel.text = "\(name) — \(completed)/\(iterations)"
+      completedSteps += delta
+      let global = Float(completedSteps) / Float(max(totalSteps, 1))
+      self.progress.setProgress(global, animated: true)
+      statusLabel.text = "\(name) — \(completed)/\(iterations)  (total: \(completedSteps)/\(totalSteps))"
+      appendLog("   · \(name): \(completed)/\(iterations)")
       if completed < iterations {
         // Yield to run loop so UI stays responsive
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.001) { runNextBatch() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { runNextBatch() }
       } else {
         completion()
       }
