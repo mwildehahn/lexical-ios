@@ -885,7 +885,6 @@ internal enum OptimizedReconciler {
 
     // Decide whether to do minimal moves or full region rebuild
     let movedCount = nextChildren.filter { !stableSet.contains($0) }.count
-    let lisLen = stableSet.count
     // Heuristic: prefer minimal moves when the total bytes moved is small relative to the region,
     // otherwise rebuild the region in one replace.
     let movedByteSum: Int = nextChildren.reduce(0) { acc, k in
