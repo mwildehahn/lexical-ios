@@ -248,10 +248,8 @@ final class PerformanceViewController: UIViewController {
     appendLog("Seeding documents (\(cfg.seedParas) paragraphs)…")
     // Pre-warm editors and seed documents based on preset
     preWarmEditors()
-    clearRoot(editor: legacyView.editor)
-    clearRoot(editor: optimizedView.editor)
-    seedDocument(editor: legacyView.editor, paragraphs: cfg.seedParas)
-    seedDocument(editor: optimizedView.editor, paragraphs: cfg.seedParas)
+    resetAndSeed(editor: legacyView.editor, paragraphs: cfg.seedParas)
+    resetAndSeed(editor: optimizedView.editor, paragraphs: cfg.seedParas)
     appendLog("Seed complete. Starting scenarios…")
 
     // Per-iteration steps (single iteration each)
@@ -521,10 +519,8 @@ final class PerformanceViewController: UIViewController {
 
   // MARK: - Reset
   private func resetDocuments(paragraphs: Int) {
-    clearRoot(editor: legacyView.editor)
-    clearRoot(editor: optimizedView.editor)
-    seedDocument(editor: legacyView.editor, paragraphs: paragraphs)
-    seedDocument(editor: optimizedView.editor, paragraphs: paragraphs)
+    resetAndSeed(editor: legacyView.editor, paragraphs: paragraphs)
+    resetAndSeed(editor: optimizedView.editor, paragraphs: paragraphs)
   }
 
   private func clearRoot(editor: Editor) {
@@ -534,6 +530,14 @@ final class PerformanceViewController: UIViewController {
         try child.remove()
       }
     }
+  }
+
+  private func resetAndSeed(editor: Editor, paragraphs: Int) {
+    // 1) Reset to an empty editor state (safe blank)
+    let empty = EditorState.empty()
+    try? editor.setEditorState(empty)
+    // 2) Seed new content in a follow-up update
+    seedDocument(editor: editor, paragraphs: paragraphs)
   }
 
   private func preWarmEditors() {
