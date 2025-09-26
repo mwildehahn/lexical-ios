@@ -187,9 +187,24 @@ final class PerformanceViewController: UIViewController {
 
   // Build the dynamic Features menu based on currently active flags
   private func updateFeaturesMenu() {
+    func toggled(_ f: FeatureFlags, name: String) -> FeatureFlags {
+      let n = name
+      return FeatureFlags(
+        reconcilerSanityCheck: n == "sanity-check" ? !f.reconcilerSanityCheck : f.reconcilerSanityCheck,
+        proxyTextViewInputDelegate: n == "proxy-input-delegate" ? !f.proxyTextViewInputDelegate : f.proxyTextViewInputDelegate,
+        useOptimizedReconciler: true, // always on in Perf VC
+        useReconcilerFenwickDelta: n == "fenwick-delta" ? !f.useReconcilerFenwickDelta : f.useReconcilerFenwickDelta,
+        useReconcilerKeyedDiff: n == "keyed-diff" ? !f.useReconcilerKeyedDiff : f.useReconcilerKeyedDiff,
+        useReconcilerBlockRebuild: n == "block-rebuild" ? !f.useReconcilerBlockRebuild : f.useReconcilerBlockRebuild,
+        useOptimizedReconcilerStrictMode: n == "strict-mode" ? !f.useOptimizedReconcilerStrictMode : f.useOptimizedReconcilerStrictMode,
+        useReconcilerFenwickCentralAggregation: n == "central-aggregation" ? !f.useReconcilerFenwickCentralAggregation : f.useReconcilerFenwickCentralAggregation,
+        useReconcilerShadowCompare: n == "shadow-compare" ? !f.useReconcilerShadowCompare : f.useReconcilerShadowCompare,
+        useReconcilerInsertBlockFenwick: n == "insert-block-fenwick" ? !f.useReconcilerInsertBlockFenwick : f.useReconcilerInsertBlockFenwick,
+        useReconcilerPrePostAttributesOnly: n == "pre/post-attrs-only" ? !f.useReconcilerPrePostAttributesOnly : f.useReconcilerPrePostAttributesOnly
+      )
+    }
+
     func actions(for f: FeatureFlags) -> [UIAction] {
-      // Show every available flag and its state, except the base `useOptimizedReconciler` which is always ON for the optimized view.
-      // Order chosen for readability.
       let items: [(String, Bool)] = [
         ("strict-mode", f.useOptimizedReconcilerStrictMode),
         ("fenwick-delta", f.useReconcilerFenwickDelta),
@@ -203,7 +218,15 @@ final class PerformanceViewController: UIViewController {
         ("proxy-input-delegate", f.proxyTextViewInputDelegate)
       ]
       return items.map { name, isOn in
-        UIAction(title: name, attributes: [.disabled], state: isOn ? .on : .off, handler: { _ in })
+        UIAction(title: name, state: isOn ? .on : .off, handler: { [weak self] _ in
+          guard let self else { return }
+          // Toggle, enforce base, rebuild optimized view, reseed to keep parity
+          let next = toggled(self.activeOptimizedFlags, name: name)
+          self.teardownEditors()
+          self.buildEditorsWith(optimizedFlags: next)
+          let paras = self.seedParasCurrent > 0 ? self.seedParasCurrent : self.config(for: self.currentPreset).seedParas
+          self.preWarmEditors(); self.resetDocuments(paragraphs: paras)
+        })
       }
     }
 
@@ -520,8 +543,7 @@ final class PerformanceViewController: UIViewController {
         // Add a subtle footer
       self.summary.append(NSAttributedString(string: "\nCompleted \(self.totalSteps) iterations across \(scenarios.count) scenarios.\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: UIColor.tertiaryLabel]))
       self.refreshSummaryView()
-      // Always show results in a full sheet after a single run
-      self.presentResultsModal()
+      // Do not auto-present results here; results screen opens after matrix runs only
       }
     }
   }

@@ -13,6 +13,14 @@ import UIKit
 
 internal enum OptimizedReconciler {
   struct InstructionApplyStats { let deletes: Int; let inserts: Int; let sets: Int; let fixes: Int; let duration: TimeInterval }
+  @MainActor
+  private static func fenwickOrderAndIndex(editor: Editor) -> ([NodeKey], [NodeKey: Int]) {
+    let order = editor.cachedDFSOrder()
+    var index: [NodeKey: Int] = [:]
+    index.reserveCapacity(order.count)
+    for (i, key) in order.enumerated() { index[key] = i + 1 }
+    return (order, index)
+  }
   // Instruction set for applying minimal changes to TextStorage
   enum Instruction {
     case delete(range: NSRange)
@@ -172,6 +180,7 @@ internal enum OptimizedReconciler {
     ) {
       // Do not return early: allow subsequent fast paths (reorder, text-only) in the same update.
     }
+    if editor.dirtyType != .noDirtyNodes { editor.invalidateDFSOrderCache() }
     // If insert-block consumed and central aggregation collected deltas, apply them once
     if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
       editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
@@ -205,6 +214,7 @@ internal enum OptimizedReconciler {
         fenwickAggregatedDeltas: &fenwickAggregatedDeltas
       ) { anyApplied = true }
       if anyApplied {
+        editor.invalidateDFSOrderCache()
         if !fenwickAggregatedDeltas.isEmpty {
           editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
         }
@@ -228,6 +238,7 @@ internal enum OptimizedReconciler {
       shouldReconcileSelection: shouldReconcileSelection,
       fenwickAggregatedDeltas: &fenwickAggregatedDeltas
     ) {
+      editor.invalidateDFSOrderCache()
       // If central aggregation is enabled, apply aggregated rebuild now
       if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
         editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
@@ -243,6 +254,7 @@ internal enum OptimizedReconciler {
       shouldReconcileSelection: shouldReconcileSelection,
       fenwickAggregatedDeltas: &fenwickAggregatedDeltas
     ) {
+      editor.invalidateDFSOrderCache()
       if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
         editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
       }
@@ -443,10 +455,7 @@ internal enum OptimizedReconciler {
     }
 
     // Prepare DFS order for potential multi-node location shifts (Fenwick available via helper when used)
-    let keysInOrder = sortedNodeKeysByLocation(rangeCache: editor.rangeCache)
-    var indexOf: [NodeKey: Int] = [:]
-    indexOf.reserveCapacity(keysInOrder.count)
-    for (i, k) in keysInOrder.enumerated() { indexOf[k] = i + 1 }
+    let (keysInOrder, indexOf) = fenwickOrderAndIndex(editor: editor)
 
     // Plan minimal instructions: delete old text range, insert new attributed text
     let textStart = prevRange.location + prevRange.preambleLength + prevRange.childrenLength
@@ -481,7 +490,9 @@ internal enum OptimizedReconciler {
       if editor.featureFlags.useReconcilerFenwickCentralAggregation {
         fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
       } else {
-        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+        let (order, positions) = fenwickOrderAndIndex(editor: editor)
+        editor.rangeCache = rebuildLocationsWithFenwick(
+          prev: editor.rangeCache, deltas: [dirtyKey: delta], order: order, indexOf: positions)
       }
     } else {
       updateRangeCacheForTextChange(nodeKey: dirtyKey, delta: delta)
@@ -578,7 +589,7 @@ internal enum OptimizedReconciler {
     var totalShift = 0
     var combinedInsertPrefix: NSAttributedString? = nil
     var deleteOldPostRange: NSRange? = nil
-    if insertIndex > 0 {
+    if editor.featureFlags.useReconcilerInsertBlockFenwick && insertIndex > 0 {
       let prevSiblingKey = nextChildren[insertIndex - 1]
       if let prevSiblingRange = editor.rangeCache[prevSiblingKey],
          let prevSiblingNext = pendingEditorState.nodeMap[prevSiblingKey] {
@@ -615,24 +626,23 @@ internal enum OptimizedReconciler {
     }
     if instructions.isEmpty { return false }
 
-    // Region rebuild for parent children to keep postamble and boundaries consistent
-    guard let textStorage = editor.textStorage else { return false }
-    let previousMode = textStorage.mode
-    textStorage.mode = .controllerMode
-    textStorage.beginEditing()
-    let theme2 = editor.getTheme()
-    let builtParentChildren = NSMutableAttributedString()
-    for child in nextChildren { builtParentChildren.append(buildAttributedSubtree(nodeKey: child, state: pendingEditorState, theme: theme2)) }
-    let parentChildrenStart = parentPrevRange.location + parentPrevRange.preambleLength
-    let parentChildrenRange = NSRange(location: parentChildrenStart, length: parentPrevRange.childrenLength)
-    textStorage.replaceCharacters(in: parentChildrenRange, with: builtParentChildren)
-    textStorage.fixAttributes(in: NSRange(location: parentChildrenStart, length: builtParentChildren.length))
-    textStorage.endEditing()
-    textStorage.mode = previousMode
-
-    // Recompute parent subtree cache and reconcile decorators under parent
-    _ = recomputeRangeCacheSubtree(nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location, editor: editor)
-    reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
+    if !editor.featureFlags.useReconcilerInsertBlockFenwick {
+      guard let textStorage = editor.textStorage else { return false }
+      let previousMode = textStorage.mode
+      textStorage.mode = .controllerMode
+      textStorage.beginEditing()
+      let theme2 = editor.getTheme()
+      let builtParentChildren = NSMutableAttributedString()
+      for child in nextChildren { builtParentChildren.append(buildAttributedSubtree(nodeKey: child, state: pendingEditorState, theme: theme2)) }
+      let parentChildrenStart = parentPrevRange.location + parentPrevRange.preambleLength
+      let parentChildrenRange = NSRange(location: parentChildrenStart, length: parentPrevRange.childrenLength)
+      textStorage.replaceCharacters(in: parentChildrenRange, with: builtParentChildren)
+      textStorage.fixAttributes(in: NSRange(location: parentChildrenStart, length: builtParentChildren.length))
+      textStorage.endEditing()
+      textStorage.mode = previousMode
+      _ = recomputeRangeCacheSubtree(nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location, editor: editor)
+      reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
+    }
 
     // Block attributes only for inserted node
     applyBlockAttributesPass(
@@ -970,25 +980,23 @@ internal enum OptimizedReconciler {
     }
 
     // Shift locations for each direct child subtree via Fenwick range adds
-    var rangeShifts: [(NodeKey, NodeKey?, Int)] = []
-    // Build DFS/location order indices from current cache
-    let orderedKeys = sortedNodeKeysByLocation(rangeCache: editor.rangeCache)
-    var indexOf: [NodeKey: Int] = [:]; indexOf.reserveCapacity(orderedKeys.count)
-    for (i, k) in orderedKeys.enumerated() { indexOf[k] = i + 1 }
-
-    for k in nextChildrenOrder {
-      guard let oldStart = childOldStart[k], let newStart = childNewStart[k] else { continue }
-      let deltaShift = newStart - oldStart
-      if deltaShift == 0 { continue }
-      // Determine subtree end (exclusive) in orderedKeys
-      let subKeys = subtreeKeysDFS(rootKey: k, state: pendingEditorState)
-      var maxIdx = 0
-      for sk in subKeys { if let idx = indexOf[sk], idx > maxIdx { maxIdx = idx } }
-      let endExclusive: NodeKey? = (maxIdx < orderedKeys.count) ? orderedKeys[maxIdx] : nil
-      rangeShifts.append((k, endExclusive, deltaShift))
-    }
-    if !rangeShifts.isEmpty {
-      editor.rangeCache = rebuildLocationsWithFenwickRanges(prev: editor.rangeCache, ranges: rangeShifts)
+    if editor.featureFlags.useReconcilerInsertBlockFenwick {
+      var rangeShifts: [(NodeKey, NodeKey?, Int)] = []
+    let (orderedKeys, indexOf) = fenwickOrderAndIndex(editor: editor)
+      for k in nextChildrenOrder {
+        guard let oldStart = childOldStart[k], let newStart = childNewStart[k] else { continue }
+        let deltaShift = newStart - oldStart
+        if deltaShift == 0 { continue }
+        let subKeys = subtreeKeysDFS(rootKey: k, state: pendingEditorState)
+        var maxIdx = 0
+        for sk in subKeys { if let idx = indexOf[sk], idx > maxIdx { maxIdx = idx } }
+        let endExclusive: NodeKey? = (maxIdx < orderedKeys.count) ? orderedKeys[maxIdx] : nil
+        rangeShifts.append((k, endExclusive, deltaShift))
+      }
+      if !rangeShifts.isEmpty {
+        editor.rangeCache = rebuildLocationsWithFenwickRanges(
+          prev: editor.rangeCache, ranges: rangeShifts, order: orderedKeys, indexOf: indexOf)
+      }
     }
 
     // Reconcile decorators within this subtree (moves preserve cache; dirty -> needsDecorating)
@@ -1146,7 +1154,9 @@ internal enum OptimizedReconciler {
         if editor.featureFlags.useReconcilerFenwickCentralAggregation {
           fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
         } else {
-          editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+          let (order, positions) = fenwickOrderAndIndex(editor: editor)
+          editor.rangeCache = rebuildLocationsWithFenwick(
+            prev: editor.rangeCache, deltas: [dirtyKey: delta], order: order, indexOf: positions)
         }
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .postamble, newPartLength: nextPostLen, delta: delta)
@@ -1179,7 +1189,9 @@ internal enum OptimizedReconciler {
         if editor.featureFlags.useReconcilerFenwickCentralAggregation {
           fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
         } else {
-          editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: [dirtyKey: delta])
+          let (keysInOrder, indexOf) = fenwickOrderAndIndex(editor: editor)
+          editor.rangeCache = rebuildLocationsWithFenwick(
+            prev: editor.rangeCache, deltas: [dirtyKey: delta], order: keysInOrder, indexOf: indexOf)
         }
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .preamble, newPartLength: nextPreLen, preambleSpecialCharacterLength: preSpecial, delta: delta)
