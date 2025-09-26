@@ -39,16 +39,67 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - Compute `next.location = prev.location + cumulativeDelta` for all nodes in DFS order (single O(n) pass).
   - Update per‑node part lengths where changed; propagate `childrenLength` to ancestors.
 
-## Feature Flags
-- `useOptimizedReconciler` (default false)
-- `useOptimizedReconcilerStrictMode` (avoid legacy fallback; optimized slow path instead)
-- `useReconcilerShadowCompare` (debug parity harness)
-- `useReconcilerFenwickDelta` (per‑path Fenwick rebuilds)
-- `useReconcilerFenwickCentralAggregation` (aggregate per‑node deltas; single rebuild at end)
-- `useReconcilerKeyedDiff` (LIS‑based children diff)
-- `useReconcilerBlockRebuild` (region rebuild fallback)
-- `useReconcilerInsertBlockFenwick` (insert‑block fast path range shifts)
-- `useTextKit2Experimental` (frontend A/B using TextKit 2)
+## Feature Flags (current)
+
+The following runtime flags live in `Lexical/Core/FeatureFlags.swift` and can be supplied to `LexicalView` and tests. Defaults are `false` unless noted.
+
+- `useOptimizedReconciler`
+  - Purpose: Route updates through the new optimized reconciler instead of the legacy reconciler.
+  - Default: false (tests and the Playground opt profiles set it true).
+  - Effects: Enables all optimized planners and slow paths; legacy remains available for fallback when strict mode is off.
+  - Interactions: Pairs well with `useReconcilerFenwickDelta`; consider enabling `useOptimizedReconcilerStrictMode` in tests.
+
+- `useOptimizedReconcilerStrictMode`
+  - Purpose: Disallow delegating to the legacy reconciler; use optimized fast paths or optimized slow path only.
+  - Default: false (true in most perf/parity tests to surface defects quickly).
+  - Risks: If a path isn’t implemented, updates fall back to the optimized slow path; parity issues will be visible immediately.
+
+- `useReconcilerFenwickDelta`
+  - Purpose: Maintain node locations using Fenwick (BIT) range shifts instead of full subtree recomputes.
+  - Scope: All fast paths (text-only, pre/post-only, insert-block, reorder) can emit deltas that shift following nodes.
+  - Benefit: Fewer TextStorage edits and smaller range-cache work for mid‑document changes.
+  - Interactions: Combine with `useReconcilerFenwickCentralAggregation` to batch multiple deltas and rebuild once per update.
+
+- `useReconcilerFenwickCentralAggregation`
+  - Purpose: Aggregate per-node length deltas across an update and apply a single Fenwick rebuild at the end.
+  - Default: false.
+  - When to enable: Multi-sibling edits in one `editor.update {}` (typing bursts, paste-like changes) for better O(1) per-change behavior and a single O(n) rebuild.
+  - Interactions: Requires `useReconcilerFenwickDelta` to have effect.
+
+- `useReconcilerKeyedDiff`
+  - Purpose: Plan children moves using LIS-based keyed diff to minimize create/destroy for reorders.
+  - Default: false.
+  - Notes: Current reorder heuristics prefer a stable region rebuild for tricky patterns; keyed diff can be enabled as we expand coverage.
+
+- `useReconcilerBlockRebuild`
+  - Purpose: Prefer a single region (block) rebuild when many siblings change within the same parent.
+  - Default: false.
+  - Tradeoff: More deterministic and often safer around boundary cases; may do more work than a perfect minimal‑move plan.
+
+- `useReconcilerInsertBlockFenwick`
+  - Purpose: Fast path for structural inserts that composes the new block once and shifts following nodes via Fenwick instead of recomputing the whole parent subtree.
+  - Default: false (enabled in optimized perf profiles).
+  - Tests: Covered by `InsertParityTests` and perf scenarios.
+
+- `useReconcilerPrePostAttributesOnly`
+  - Purpose: When only preamble/postamble attributes change (lengths unchanged), emit `SetAttributes` + minimal `FixAttributes` without text deletes/inserts.
+  - Default: false (kept behind a flag while boundary invariants are finalized).
+  - Benefit: Dramatically reduces churn on quote/list/code markers and heading markers.
+
+- `useReconcilerShadowCompare`
+  - Purpose: Debug harness that runs legacy and optimized reconciler on cloned state and logs parity/mapping invariants.
+  - Default: false; enable for diagnosis only (adds overhead).
+
+- `reconcilerSanityCheck`
+  - Purpose: Extra runtime checks inside reconcile to assert range/length invariants. Disabled on the Simulator by default in `TextView`.
+  - Default: false; enable selectively during development.
+
+- `proxyTextViewInputDelegate`
+  - Purpose: Route UITextView’s `inputDelegate` through a lightweight proxy to avoid selection-change churn from certain keyboards/IME flows.
+  - Default: false; used for targeted integration scenarios.
+
+Deprecated/removed flags (no longer compiled)
+- `useTextKit2Experimental`, `useTextKit2LayoutPerBatch`, `useTextKit2LayoutOncePerScenario`: removed along with the experimental TextKit 2 A/B path and timing UI in the Playground.
 
 ## Milestones & Subtasks
 
@@ -177,14 +228,10 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Add initial non-brittle bounds on operation counts (rangesAdded+rangesDeleted) for typing, mass stylings, and reorder scenarios. Timings still logged only.
   - [ ] Ship sub‑flags off by default; enable in CI nightly; collect metrics.
 
-- [ ] M6a — Platform bump + Text stack options (iOS 16+)
-  - [x] Bump SPM minimum to iOS 16 in Package.swift (enables TextKit 2 APIs at compile time).
-  - [x] Enable `NSLayoutManager.allowsNonContiguousLayout` for TextKit 1 to reduce full relayout on large inserts (UIKit NSLayoutManager property).
-  - [x] Add feature flag `useTextKit2Experimental` and prototype a TextKit 2 frontend path using `UITextView(init(usingTextLayoutManager:))`; mirror optimized content for layout A/B.
-  - [x] Add TK2 layout timing (avg per scenario) and combined `apply+TK2` timing to console summary (Optimized line).
-  - [ ] Option: add flag to fold TK2 into `avg wall` for end‑to‑end single figure (kept separate for clarity for now).
-  - [ ] Investigate `NSTextViewportLayoutController` (iOS 15+) for viewport‑only layout on large docs (prototype wiring behind the flag).
-  - [ ] Measure before/after on block inserts at TOP/MIDDLE/END with viewport controller enabled.
+- [ ] M6a — Platform bump
+  - [x] Bump SPM minimum to iOS 16 in Package.swift.
+  - [x] Enable `NSLayoutManager.allowsNonContiguousLayout` (TextKit 1) to reduce unnecessary relayout during large inserts.
+  - [x] Removed the experimental TextKit 2 A/B path and related flags and UI (see Fixes / Maintenance).
 
 - [ ] M6b — Perf instrumentation & summary (diagnose bottlenecks)
   - [x] Console: per‑scenario averages — avg wall, avg plan, avg apply, and apply share (% of wall).
@@ -204,10 +251,10 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 ### Playground polish
 - [x] Adopt UIScene lifecycle (SceneDelegate) and add `UIApplicationSceneManifest` to Info.plist to silence future assert warnings. Window setup moved to SceneDelegate.
 - [x] Remove the in‑app Flags tab to reduce complexity; feature flags are driven by the Perf matrix runner only.
-- [x] Perf: add “Run Variations” to run the benchmark suite across curated optimized profiles (baseline, +central aggregation, +insert‑block Fenwick, +TextKit2, all toggles).
+  - [x] Perf: add “Run Variations” to run the benchmark suite across curated optimized profiles (baseline, +central aggregation, +insert‑block Fenwick, all toggles).
   - [x] Scale presets to Quick/Standard/Heavy seeding 100/250/500 paragraphs; reduce iterations; show `seed=N`; synchronize reseed.
   - [x] Highlight fastest TOP insert variation in the summary after “Run Variations”.
-  - [x] TK2 layout avg and `apply+TK2` avg printed per scenario when TK2 A/B is active.
+  - [x] Results emphasize delta% and per-scenario wall/plan/apply stats; TK2 A/B removed.
   - [x] Results screen auto‑opens on completion: portrait‑friendly pager (segmented control), matrix view toggle, CSV export; color coded (green=faster, gray≈same, red=slower).
 
 ### Fixes / Maintenance
@@ -223,13 +270,12 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 ## Today’s Changes (summary)
 - Insert‑block path now avoids full parent subtree recompute; computes inserted subtree only and shifts following nodes using a range‑based Fenwick rebuild.
 - Pre/post‑only path adds attribute‑only updates when lengths are unchanged (SetAttributes+FixAttributes), reducing churn.
-- Prototype TextKit 2 frontend A/B path behind `useTextKit2Experimental` using `UITextView(usingTextLayoutManager:)`; per‑scenario TK2 layout avg and `apply+TK2` avg added to console summary.
+- Removed TextKit 2 experimental A/B path and flags; simplified Playground results accordingly.
 - Adopted UIScene lifecycle in the Playground app.
 
 ## Next
  - Add unit tests for insert‑block (top/mid/end) and attribute‑only pre/post cases; compare optimized vs legacy string parity and selection mapping. [In progress; first suite added — InsertParityTests]
- - Measure TK2 A/B on large insert scenarios; consider keeping viewport controller enabled by default behind flag.
- - Decision (timings): keep `avg wall` focused on reconciler timing for comparability; expose TK2 layout and `apply+TK2` as separate fields. Optional flag to fold TK2 into wall later if needed.
+ - Focus timings on reconciler wall/plan/apply for comparability.
 
 - [ ] M7b — Reorder heuristics & Fenwick shifts
   - [x] Relax minimal‑move threshold from ~20% LIS to ~10% to prefer moves more often.
@@ -357,7 +403,7 @@ Reminder: after every significant change, run iOS simulator tests (Lexical-Packa
   - Header tiles (Seed, fastest TOP insert profile and timing)
   - Profile pager (segmented control) to switch optimized profiles
   - Matrix view toggle (color‑coded cells), CSV export
-  - Chips for avg wall/plan/apply and, when TK2 is active, avg TK2 layout and avg `apply+TK2`
+  - Chips for avg wall/plan/apply
 - Presets scaled: Quick/Standard/Heavy seeding 100/250/500; iterations reduced for responsiveness; reseed synchronized; status shows `seed=N`.
 - Verified on iOS simulator; Playground app build PASS.
 
@@ -378,14 +424,8 @@ Reminder: after every significant change, run iOS simulator tests (Lexical-Packa
 - When pre/post lengths are unchanged, emit `SetAttributes + FixAttributes` (no delete/insert churn).
 - Observed lower apply time in perf scenarios; unit tests for lists/quotes/heading markers to be added.
 
-### 2025‑09‑26: TextKit 2 prototype — layout timing
-- Added `useTextKit2Experimental` A/B path with `UITextView(usingTextLayoutManager:)` to time layout independently of reconcile.
-- Perf summary prints TK2 layout average and combined `apply+TK2` for optimized runs when enabled.
-- New TK2 measurement modes (flags):
-  - `useTextKit2LayoutPerBatch`: perform one TK2 layout per scenario batch and attribute its time across updates (reduces repeated full‑doc relayout during tight loops).
-  - `useTextKit2LayoutOncePerScenario`: perform a single TK2 layout at scenario end for a coarse end‑to‑end measure.
-  - Added both as perf variations in the Playground matrix ("+ TextKit 2" uses per‑batch; "+ TK2 (once per scenario)" measures end‑of‑scenario).
-- Next: prototype `NSTextViewportLayoutController` for viewport‑only layout on large documents.
+### 2025‑09‑26: Text stack cleanup
+- Removed the experimental TextKit 2 A/B path and all related flags, UI, and timings to reduce complexity and focus on reconciler performance. TextKit 1 remains the supported frontend.
 
 ### 2025‑09‑25: Decorator removal parity (strict mode) — FIXED
 - Implemented safe pruning for `editor.rangeCache` after full/subtree recompute to drop stale keys:
