@@ -91,17 +91,35 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
 
     for p in profiles {
       let l = UILabel(); l.font = .monospacedSystemFont(ofSize: 12, weight: .regular); l.textAlignment = .center; l.numberOfLines = 2
+      var colorView = UIView()
+      var bg: UIColor = .clear
       if let r = row[p] {
         let pct = String(format: "%+.1f%%", r.deltaPct)
         var txt = pct
         if let tk = r.tk2Avg { txt += String(format: "\nTK2 %.2fms", tk*1000) }
         if let ap = r.applyPlusTk2 { txt += String(format: "  +%.2fms", ap*1000) }
         l.text = txt
-        l.textColor = r.deltaPct > 0.5 ? .systemGreen : (r.deltaPct < -0.5 ? .systemRed : .secondaryLabel)
+        // Color scale by delta: green positive, red negative, gray near 0
+        let magnitude = min(1.0, abs(r.deltaPct) / 25.0) // 25% => max intensity
+        if r.deltaPct > 0.5 {
+          bg = UIColor.systemGreen.withAlphaComponent(0.15 + 0.30 * magnitude)
+          l.textColor = .label
+        } else if r.deltaPct < -0.5 {
+          bg = UIColor.systemRed.withAlphaComponent(0.15 + 0.30 * magnitude)
+          l.textColor = .label
+        } else {
+          bg = UIColor.systemGray5
+          l.textColor = .secondaryLabel
+        }
       } else {
         l.text = "—"; l.textColor = .tertiaryLabel
+        bg = .clear
       }
-      stack.addArrangedSubview(spacerWrap(l, width: 130))
+      colorView = spacerWrap(l, width: 130)
+      colorView.backgroundColor = bg
+      colorView.layer.cornerRadius = 6
+      colorView.clipsToBounds = true
+      stack.addArrangedSubview(colorView)
     }
 
     cell.contentView.subviews.forEach { $0.removeFromSuperview() }
@@ -148,4 +166,3 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
     return out.joined(separator: "\n")
   }
 }
-
