@@ -187,24 +187,31 @@ final class PerformanceViewController: UIViewController {
 
   // Build the dynamic Features menu based on currently active flags
   private func updateFeaturesMenu() {
-    func list(_ f: FeatureFlags) -> [String] {
-      var flags: [String] = []
-      if f.useOptimizedReconciler { flags.append("optimized") }
-      if f.useOptimizedReconcilerStrictMode { flags.append("strict-mode") }
-      if f.useReconcilerFenwickDelta { flags.append("fenwick-delta") }
-      if f.useReconcilerFenwickCentralAggregation { flags.append("central-aggregation") }
-      if f.useReconcilerInsertBlockFenwick { flags.append("insert-block-fenwick") }
-      if f.useReconcilerKeyedDiff { flags.append("keyed-diff") }
-      if f.useReconcilerBlockRebuild { flags.append("block-rebuild") }
-      if f.reconcilerSanityCheck { flags.append("sanity-check") }
-      if f.proxyTextViewInputDelegate { flags.append("proxy-input-delegate") }
-      return flags
+    func actions(for f: FeatureFlags) -> [UIAction] {
+      // Show every available flag and its state, except the base `useOptimizedReconciler` which is always ON for the optimized view.
+      // Order chosen for readability.
+      let items: [(String, Bool)] = [
+        ("strict-mode", f.useOptimizedReconcilerStrictMode),
+        ("fenwick-delta", f.useReconcilerFenwickDelta),
+        ("central-aggregation", f.useReconcilerFenwickCentralAggregation),
+        ("insert-block-fenwick", f.useReconcilerInsertBlockFenwick),
+        ("keyed-diff", f.useReconcilerKeyedDiff),
+        ("block-rebuild", f.useReconcilerBlockRebuild),
+        ("pre/post-attrs-only", f.useReconcilerPrePostAttributesOnly),
+        ("shadow-compare", f.useReconcilerShadowCompare),
+        ("sanity-check", f.reconcilerSanityCheck),
+        ("proxy-input-delegate", f.proxyTextViewInputDelegate)
+      ]
+      return items.map { name, isOn in
+        UIAction(title: name, attributes: [.disabled], state: isOn ? .on : .off, handler: { _ in })
+      }
     }
 
-    let legacyItems = list(activeLegacyFlags).map { UIAction(title: $0, attributes: [.disabled], state: .on, handler: { _ in }) }
-    let optItems = list(activeOptimizedFlags).map { UIAction(title: $0, attributes: [.disabled], state: .on, handler: { _ in }) }
+    let legacyItems = actions(for: activeLegacyFlags)
+    let optItems = actions(for: activeOptimizedFlags)
     let legacyMenu = UIMenu(title: "Legacy", options: .displayInline, children: legacyItems.isEmpty ? [UIAction(title: "(none)", attributes: [.disabled], handler: { _ in })] : legacyItems)
-    let optMenu = UIMenu(title: "Optimized", options: .displayInline, children: optItems.isEmpty ? [UIAction(title: "(none)", attributes: [.disabled], handler: { _ in })] : optItems)
+    let optTitle = "Optimized (base=ON)"
+    let optMenu = UIMenu(title: optTitle, options: .displayInline, children: optItems.isEmpty ? [UIAction(title: "(none)", attributes: [.disabled], handler: { _ in })] : optItems)
     featuresBarButton.menu = UIMenu(title: "Current Feature Flags", children: [legacyMenu, optMenu])
   }
 
@@ -385,10 +392,26 @@ final class PerformanceViewController: UIViewController {
     legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
     let legacyFlags = FeatureFlags()
     activeLegacyFlags = legacyFlags
-    activeOptimizedFlags = optimizedFlags
+    // Enforce base: optimized reconciler always ON in Performance VC
+    func forceOptimizedBase(_ f: FeatureFlags) -> FeatureFlags {
+      FeatureFlags(
+        reconcilerSanityCheck: f.reconcilerSanityCheck,
+        proxyTextViewInputDelegate: f.proxyTextViewInputDelegate,
+        useOptimizedReconciler: true,
+        useReconcilerFenwickDelta: f.useReconcilerFenwickDelta,
+        useReconcilerKeyedDiff: f.useReconcilerKeyedDiff,
+        useReconcilerBlockRebuild: f.useReconcilerBlockRebuild,
+        useOptimizedReconcilerStrictMode: f.useOptimizedReconcilerStrictMode,
+        useReconcilerFenwickCentralAggregation: f.useReconcilerFenwickCentralAggregation,
+        useReconcilerShadowCompare: f.useReconcilerShadowCompare,
+        useReconcilerInsertBlockFenwick: f.useReconcilerInsertBlockFenwick,
+        useReconcilerPrePostAttributesOnly: f.useReconcilerPrePostAttributesOnly
+      )
+    }
+    activeOptimizedFlags = forceOptimizedBase(optimizedFlags)
     func makeConfig(metrics: EditorMetricsContainer) -> EditorConfig { let theme = Theme(); theme.link = [.foregroundColor: UIColor.systemBlue]; return EditorConfig(theme: theme, plugins: [], metricsContainer: metrics) }
     let legacy = LexicalView(editorConfig: makeConfig(metrics: legacyMetrics), featureFlags: legacyFlags)
-    let optimized = LexicalView(editorConfig: makeConfig(metrics: optimizedMetrics), featureFlags: optimizedFlags)
+    let optimized = LexicalView(editorConfig: makeConfig(metrics: optimizedMetrics), featureFlags: activeOptimizedFlags)
     legacyView = legacy; optimizedView = optimized
     legacy.translatesAutoresizingMaskIntoConstraints = false; optimized.translatesAutoresizingMaskIntoConstraints = false
     legacyContainer.addSubview(legacy); optimizedContainer.addSubview(optimized)
