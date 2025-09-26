@@ -8,17 +8,17 @@
 import Foundation
 
 @objc public class FeatureFlags: NSObject {
-  let reconcilerSanityCheck: Bool
-  let proxyTextViewInputDelegate: Bool
-  let useOptimizedReconciler: Bool
-  let useReconcilerFenwickDelta: Bool
-  let useReconcilerKeyedDiff: Bool
-  let useReconcilerBlockRebuild: Bool
-  let useOptimizedReconcilerStrictMode: Bool
-  let useReconcilerFenwickCentralAggregation: Bool
-  let useReconcilerShadowCompare: Bool
-  let useTextKit2Experimental: Bool
-  let useReconcilerInsertBlockFenwick: Bool
+  public let reconcilerSanityCheck: Bool
+  public let proxyTextViewInputDelegate: Bool
+  public let useOptimizedReconciler: Bool
+  public let useReconcilerFenwickDelta: Bool
+  public let useReconcilerKeyedDiff: Bool
+  public let useReconcilerBlockRebuild: Bool
+  public let useOptimizedReconcilerStrictMode: Bool
+  public let useReconcilerFenwickCentralAggregation: Bool
+  public let useReconcilerShadowCompare: Bool
+  public let useTextKit2Experimental: Bool
+  public let useReconcilerInsertBlockFenwick: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,

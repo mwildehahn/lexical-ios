@@ -66,6 +66,9 @@ final class PerformanceViewController: UIViewController {
   private var recordingVariations = false
   private var currentVariationName: String? = nil
   private var bestTopInsert: (name: String, avg: TimeInterval)? = nil
+  // TK2 layout timing per scenario
+  private var tk2LayoutAccum: TimeInterval = 0
+  private var tk2LayoutCount: Int = 0
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -495,6 +498,7 @@ final class PerformanceViewController: UIViewController {
 
     // Reset state and metrics for this scenario
     legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
+    tk2LayoutAccum = 0; tk2LayoutCount = 0
     appendLog("• \(scenario.name) — running \(scenario.iterations)x")
     statusLabel.text = scenario.name
 
@@ -503,7 +507,8 @@ final class PerformanceViewController: UIViewController {
       let ok = (scenario.parityKind == .plain) ? self.assertParity(scenario.name) : self.assertAttributeOnlyParity(scenario.name)
       let legacyDur = self.totalDuration(self.legacyMetrics)
       let optDur = self.totalDuration(self.optimizedMetrics)
-      let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs)
+      let tk2Avg = (self.tk2View != nil && self.tk2LayoutCount > 0) ? (self.tk2LayoutAccum / Double(self.tk2LayoutCount)) : nil
+      let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs, tk2Avg: tk2Avg)
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
       self.appendLog(body + parity + "\n")
       self.addSummaryLine(name: scenario.name, legacyWall: legacyDur, optimizedWall: optDur, legacyCount: self.legacyMetrics.runs.count, optimizedCount: self.optimizedMetrics.runs.count)
@@ -532,8 +537,13 @@ final class PerformanceViewController: UIViewController {
       let end = min(completed + batch, iterations)
       // Execute a small batch synchronously on main to respect Editor's threading model
       for _ in completed..<end { step() }
-      // Mirror optimized content into TK2 view if enabled
-      if tk2View != nil { syncTK2FromOptimized() }
+      // Mirror optimized content into TK2 view if enabled (and time it)
+      if tk2View != nil {
+        let s = CFAbsoluteTimeGetCurrent()
+        syncTK2FromOptimized()
+        tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
+        tk2LayoutCount += 1
+      }
       // Update progress (global + scenario)
       let delta = end - completed
       completed = end
@@ -572,7 +582,7 @@ final class PerformanceViewController: UIViewController {
     c.runs.reduce(0) { $0 + $1.duration }
   }
 
-  private func summary(_ label: String, wall: TimeInterval, runs: [ReconcilerMetric]) -> String {
+  private func summary(_ label: String, wall: TimeInterval, runs: [ReconcilerMetric], tk2Avg: TimeInterval? = nil) -> String {
     guard !runs.isEmpty else { return "  - \(label): no runs\n" }
     let count = Double(runs.count)
     let planSum = runs.reduce(0) { $0 + $1.planningDuration }
@@ -588,7 +598,9 @@ final class PerformanceViewController: UIViewController {
     let moved = runs.reduce(0) { $0 + $1.movedChildren }
     let fmt = { (t: TimeInterval) in String(format: "%.3f ms", t * 1000) }
     let share = String(format: "%.0f%%", applyShare)
-    return "  - \(label): avg wall=\(fmt(wallAvg)) plan=\(fmt(planAvg)) apply=\(fmt(applyAvg)) (apply=\(share)) ops(del=\(deletes) ins=\(inserts) set=\(sets) fix=\(fixes) moved=\(moved))\n"
+    var line = "  - \(label): avg wall=\(fmt(wallAvg)) plan=\(fmt(planAvg)) apply=\(fmt(applyAvg)) (apply=\(share)) ops(del=\(deletes) ins=\(inserts) set=\(sets) fix=\(fixes) moved=\(moved))"
+    if let tk2 = tk2Avg { line += String(format: "  TK2 layout avg=%.3f ms", tk2 * 1000) }
+    return line + "\n"
   }
 
   private func nowStamp() -> String {
