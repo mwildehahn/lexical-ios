@@ -377,6 +377,7 @@ Reminder: after every significant change, run iOS simulator tests (Lexical-Packa
 - New TK2 measurement modes (flags):
   - `useTextKit2LayoutPerBatch`: perform one TK2 layout per scenario batch and attribute its time across updates (reduces repeated full‑doc relayout during tight loops).
   - `useTextKit2LayoutOncePerScenario`: perform a single TK2 layout at scenario end for a coarse end‑to‑end measure.
+  - Added both as perf variations in the Playground matrix ("+ TextKit 2" uses per‑batch; "+ TK2 (once per scenario)" measures end‑of‑scenario).
 - Next: prototype `NSTextViewportLayoutController` for viewport‑only layout on large documents.
 
 ### 2025‑09‑25: Decorator removal parity (strict mode) — FIXED

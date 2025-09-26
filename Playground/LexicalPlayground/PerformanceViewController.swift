@@ -324,6 +324,15 @@ final class PerformanceViewController: UIViewController {
         useReconcilerShadowCompare: false, useTextKit2Experimental: true,
         useReconcilerInsertBlockFenwick: true, useTextKit2LayoutPerBatch: true
       )),
+      ("+ TK2 (once per scenario)", FeatureFlags(
+        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
+        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
+        useReconcilerShadowCompare: false, useTextKit2Experimental: true,
+        useReconcilerInsertBlockFenwick: true, useTextKit2LayoutPerBatch: false,
+        useTextKit2LayoutOncePerScenario: true
+      )),
       ("All toggles", FeatureFlags(
         reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
         useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
@@ -345,6 +354,8 @@ final class PerformanceViewController: UIViewController {
       if f.useReconcilerKeyedDiff { flags.append("keyed-diff") }
       if f.useReconcilerBlockRebuild { flags.append("block-rebuild") }
       if f.useTextKit2Experimental { flags.append("textkit2") }
+      if f.useTextKit2LayoutPerBatch { flags.append("tk2-per-batch") }
+      if f.useTextKit2LayoutOncePerScenario { flags.append("tk2-once") }
       return flags
     }
     lastVariationProfiles = variations.map { (name, flags) in
