@@ -9,6 +9,16 @@ import Lexical
 import UIKit
 
 final class PerformanceViewController: UIViewController {
+  // MARK: - Presets
+  private enum Preset: Int, CaseIterable { case quick = 0, standard = 1, heavy = 2 }
+  private struct PresetConfig { let seedParas: Int; let batch: Int; let iterTop: Int; let iterMid: Int; let iterEnd: Int; let iterText: Int; let iterAttr: Int; let iterSmallReorder: Int; let iterCoalesced: Int; let iterPrePost: Int; let iterLargeReorder: Int }
+  private func config(for preset: Preset) -> PresetConfig {
+    switch preset {
+    case .quick: return PresetConfig(seedParas: 20, batch: 1, iterTop: 20, iterMid: 20, iterEnd: 20, iterText: 15, iterAttr: 15, iterSmallReorder: 15, iterCoalesced: 10, iterPrePost: 10, iterLargeReorder: 10)
+    case .standard: return PresetConfig(seedParas: 30, batch: 2, iterTop: 40, iterMid: 40, iterEnd: 40, iterText: 30, iterAttr: 30, iterSmallReorder: 30, iterCoalesced: 15, iterPrePost: 20, iterLargeReorder: 20)
+    case .heavy: return PresetConfig(seedParas: 80, batch: 3, iterTop: 100, iterMid: 100, iterEnd: 100, iterText: 60, iterAttr: 60, iterSmallReorder: 60, iterCoalesced: 30, iterPrePost: 40, iterLargeReorder: 40)
+    }
+  }
   // MARK: - Scenario models
   private enum ParityKind { case plain, attrOnly }
   private struct Scenario { let name: String; let iterations: Int; let batch: Int; let step: () -> Void; let parityKind: ParityKind }
@@ -43,6 +53,9 @@ final class PerformanceViewController: UIViewController {
   private var attrToggleBoldState = true
   private var totalSteps: Int = 0
   private var completedSteps: Int = 0
+  private var currentPreset: Preset = .standard
+  private var isRunning = false
+  private var prePostWrapped = false
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -51,6 +64,8 @@ final class PerformanceViewController: UIViewController {
 
     configureUI()
     buildEditors()
+    configurePresetControl()
+    configureRunButton()
   }
 
   override func viewDidAppear(_ animated: Bool) {
@@ -130,6 +145,30 @@ final class PerformanceViewController: UIViewController {
     ])
   }
 
+  private func configurePresetControl() {
+    let control = UISegmentedControl(items: ["Quick", "Std", "Heavy"])
+    control.selectedSegmentIndex = currentPreset.rawValue
+    control.addTarget(self, action: #selector(onPresetChanged(_:)), for: .valueChanged)
+    navigationItem.titleView = control
+  }
+
+  private func configureRunButton() {
+    navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Run", style: .plain, target: self, action: #selector(runTapped))
+  }
+
+  @objc private func onPresetChanged(_ sender: UISegmentedControl) {
+    guard let newPreset = Preset(rawValue: sender.selectedSegmentIndex) else { return }
+    currentPreset = newPreset
+    // Re-seed for the new preset to keep the doc size aligned
+    resetDocuments(paragraphs: config(for: currentPreset).seedParas)
+    appendLog("Preset switched → \(currentPreset). Ready. Tap Run to start.")
+  }
+
+  @objc private func runTapped() {
+    guard !isRunning else { return }
+    runBenchmarks()
+  }
+
   private func buildEditors() {
     legacyMetrics.resetMetrics()
     optimizedMetrics.resetMetrics()
@@ -185,11 +224,23 @@ final class PerformanceViewController: UIViewController {
 
   // MARK: - Benchmark Scenarios (asynchronous, batched; keeps UI responsive)
   private func runBenchmarks() {
+    guard !isRunning else { return }
+    isRunning = true
     resultsTextView.text = "Lexical Reconciler Benchmarks + Parity\n" + nowStamp() + "\n\n"
     copyButton.isEnabled = false
     activity.startAnimating()
     statusLabel.text = "Preparing…"
     progress.setProgress(0, animated: false)
+
+    let cfg = config(for: currentPreset)
+    appendLog("Seeding documents (\(cfg.seedParas) paragraphs)…")
+    // Pre-warm editors and seed documents based on preset
+    preWarmEditors()
+    clearRoot(editor: legacyView.editor)
+    clearRoot(editor: optimizedView.editor)
+    seedDocument(editor: legacyView.editor, paragraphs: cfg.seedParas)
+    seedDocument(editor: optimizedView.editor, paragraphs: cfg.seedParas)
+    appendLog("Seed complete. Starting scenarios…")
 
     // Per-iteration steps (single iteration each)
     func stepInsertTop() { try? insertOnce(position: .top) }
@@ -199,26 +250,37 @@ final class PerformanceViewController: UIViewController {
     func stepAttrToggle() { try? attributeToggleOnce() }
     func stepReorderSmall() { try? reorderSmallOnce() }
     func stepCoalescedReplace() { try? coalescedReplaceOnce() }
+    func stepPrePostToggle() { try? prePostToggleOnce() }
+    func stepLargeReorder() { try? largeReorderOnce() }
 
-    let scenarios: [Scenario] = [
-      .init(name: "Insert paragraph at TOP", iterations: 100, batch: 5, step: stepInsertTop, parityKind: .plain),
-      .init(name: "Insert paragraph at MIDDLE", iterations: 100, batch: 5, step: stepInsertMiddle, parityKind: .plain),
-      .init(name: "Insert paragraph at END", iterations: 100, batch: 5, step: stepInsertEnd, parityKind: .plain),
-      .init(name: "Text edit bursts", iterations: 50, batch: 5, step: stepTextBurst, parityKind: .plain),
-      .init(name: "Attribute-only toggle bold", iterations: 50, batch: 5, step: stepAttrToggle, parityKind: .attrOnly),
-      .init(name: "Keyed reorder (swap neighbors)", iterations: 50, batch: 5, step: stepReorderSmall, parityKind: .plain),
-      .init(name: "Coalesced replace (paste-like)", iterations: 20, batch: 5, step: stepCoalescedReplace, parityKind: .plain),
-    ]
+    let scenarios: [Scenario] = {
+      let c = config(for: currentPreset)
+      return [
+        .init(name: "Insert paragraph at TOP", iterations: c.iterTop, batch: c.batch, step: stepInsertTop, parityKind: .plain),
+        .init(name: "Insert paragraph at MIDDLE", iterations: c.iterMid, batch: c.batch, step: stepInsertMiddle, parityKind: .plain),
+        .init(name: "Insert paragraph at END", iterations: c.iterEnd, batch: c.batch, step: stepInsertEnd, parityKind: .plain),
+        .init(name: "Text edit bursts", iterations: c.iterText, batch: c.batch, step: stepTextBurst, parityKind: .plain),
+        .init(name: "Attribute-only toggle bold", iterations: c.iterAttr, batch: c.batch, step: stepAttrToggle, parityKind: .attrOnly),
+        .init(name: "Pre/Post-only toggle (wrap/unwrap Quote)", iterations: c.iterPrePost, batch: c.batch, step: stepPrePostToggle, parityKind: .plain),
+        .init(name: "Keyed reorder (swap neighbors)", iterations: c.iterSmallReorder, batch: c.batch, step: stepReorderSmall, parityKind: .plain),
+        .init(name: "Large reorder rotation", iterations: c.iterLargeReorder, batch: c.batch, step: stepLargeReorder, parityKind: .plain),
+        .init(name: "Coalesced replace (paste-like)", iterations: c.iterCoalesced, batch: c.batch, step: stepCoalescedReplace, parityKind: .plain),
+      ]
+    }()
 
     // Global progress across all iterations of all scenarios
     totalSteps = scenarios.reduce(0) { $0 + $1.iterations }
     completedSteps = 0
 
-    runScenarioList(scenarios, index: 0) { [weak self] in
-      guard let self else { return }
-      self.activity.stopAnimating()
-      self.statusLabel.text = "Done"
-      self.copyButton.isEnabled = true
+    // Let UI settle before kicking the first heavy batch
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+      self.runScenarioList(scenarios, index: 0) { [weak self] in
+        guard let self else { return }
+        self.activity.stopAnimating()
+        self.statusLabel.text = "Done"
+        self.copyButton.isEnabled = true
+        self.isRunning = false
+      }
     }
   }
 
@@ -240,7 +302,7 @@ final class PerformanceViewController: UIViewController {
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
       self.appendLog(body + parity + "\n")
       // Reset documents between scenarios and continue
-      self.resetDocuments(paragraphs: 100)
+      self.resetDocuments(paragraphs: config(for: currentPreset).seedParas)
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
         self.runScenarioList(scenarios, index: index + 1, completion: completion)
       }
@@ -307,7 +369,7 @@ final class PerformanceViewController: UIViewController {
       guard let root = getRoot() else { return }
       for i in 0..<paragraphs {
         let p = ParagraphNode()
-        let t = TextNode(text: "Paragraph #\(i) — The quick brown fox jumps over the lazy dog.")
+        let t = TextNode(text: "P#\(i) quick brown fox")
         try p.append([t])
         try root.append([p])
       }
@@ -394,6 +456,39 @@ final class PerformanceViewController: UIViewController {
     try? replace(legacyView.editor); try? replace(optimizedView.editor)
   }
 
+  private func prePostToggleOnce() throws {
+    func toggle(_ editor: Editor) throws {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let idx = min( max(root.getChildrenSize()/2, 0), max(root.getChildrenSize()-1, 0))
+        if let q = root.getChildAtIndex(index: idx) as? QuoteNode {
+          // Unwrap: move first child out, then remove quote if empty
+          if let inner = q.getFirstChild() {
+            try q.insertBefore(nodeToInsert: inner)
+          }
+          if q.getChildrenSize() == 0 { try q.remove() }
+        } else if let p = root.getChildAtIndex(index: idx) as? ParagraphNode {
+          let quote = QuoteNode()
+          try p.insertBefore(nodeToInsert: quote)
+          try quote.append([p])
+        }
+      }
+    }
+    try? toggle(legacyView.editor); try? toggle(optimizedView.editor)
+    prePostWrapped.toggle()
+  }
+
+  private func largeReorderOnce() throws {
+    func rotate(_ editor: Editor) throws {
+      try editor.update {
+        guard let root = getRoot(), let last = root.getLastChild() else { return }
+        // Move last child to front — induces large LIS change over time
+        if let first = root.getFirstChild() { try first.insertBefore(nodeToInsert: last) }
+      }
+    }
+    try? rotate(legacyView.editor); try? rotate(optimizedView.editor)
+  }
+
   // MARK: - Parity assertions
   private func assertParity(_ label: String) -> Bool {
     let lhs = legacyView.textView.attributedText.string
@@ -427,6 +522,23 @@ final class PerformanceViewController: UIViewController {
         try child.remove()
       }
     }
+  }
+
+  private func preWarmEditors() {
+    // Minimal one-off change to initialize text storage/layout paths before benchmarks
+    func warm(_ editor: Editor) {
+      try? editor.update {
+        guard let root = getRoot() else { return }
+        let p = ParagraphNode(); let t = TextNode(text: "warmup")
+        try p.append([t]); try root.append([p])
+      }
+      try? editor.update {
+        guard let root = getRoot(), let last = root.getLastChild() else { return }
+        try last.remove()
+      }
+    }
+    warm(legacyView.editor)
+    warm(optimizedView.editor)
   }
 }
 

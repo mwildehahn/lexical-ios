@@ -153,7 +153,10 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
         - [x] Keyed-children reorder (swap neighbors repeatedly; small LIS).
         - [x] Coalesced multi-node replace (paste-like: replace a paragraph’s children).
       - [x] Emit compact per-scenario summaries: wall/plan/apply times and op counts (delete/insert/setAttributes/fixAttributes, movedChildren) for both editors; report parity (OK/FAIL).
-      - [ ] Extend with additional scenarios (pre/post-only, large LIS vs rebuild) — pending.
+      - [x] Presets (Quick/Standard/Heavy): seed size, batch size, and per-scenario iterations scale accordingly.
+      - [x] Add Run button; prevent re-entrancy; show global progress across all iterations.
+      - [x] Extend scenarios: pre/post-only toggle (wrap/unwrap Quote), and large reorder rotation (move last to front).
+      - [x] Pre-warm editors (tiny add/remove) to avoid cold-start stalls; reduce initial seed to keep UI responsive.
     - [x] Tab bar wiring
       - [x] Replace the single navigation stack with a `UITabBarController` containing:
         - [x] “Editor” (existing screen with reconciler toggle)
