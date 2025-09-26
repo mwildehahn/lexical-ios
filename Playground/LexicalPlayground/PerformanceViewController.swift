@@ -46,6 +46,7 @@ final class PerformanceViewController: UIViewController {
   // Matrix (text-based) aggregation
   private var scenarioNames: [String] = []
   private var matrixResults: [String: [String: (deltaPct: Double, tk2Avg: TimeInterval?, applyPlusTk2: TimeInterval?)]] = [:]
+  private var lastVariationProfiles: [ResultsViewController.VariationProfile] = []
 
   // MARK: - Editors & Views
   private var legacyView: LexicalView!
@@ -323,6 +324,23 @@ final class PerformanceViewController: UIViewController {
       )),
     ]
 
+    // Build a user‑friendly list of enabled flags per variation for the Results screen
+    func enabledFlagsList(_ f: FeatureFlags) -> [String] {
+      var flags: [String] = []
+      if f.useOptimizedReconciler { flags.append("optimized") }
+      if f.useOptimizedReconcilerStrictMode { flags.append("strict-mode") }
+      if f.useReconcilerFenwickDelta { flags.append("fenwick-delta") }
+      if f.useReconcilerFenwickCentralAggregation { flags.append("central-aggregation") }
+      if f.useReconcilerInsertBlockFenwick { flags.append("insert-block-fenwick") }
+      if f.useReconcilerKeyedDiff { flags.append("keyed-diff") }
+      if f.useReconcilerBlockRebuild { flags.append("block-rebuild") }
+      if f.useTextKit2Experimental { flags.append("textkit2") }
+      return flags
+    }
+    lastVariationProfiles = variations.map { (name, flags) in
+      ResultsViewController.VariationProfile(name: name, enabledFlags: enabledFlagsList(flags))
+    }
+
     runVariationList(variations, index: 0) { [weak self] in
       guard let self else { return }
       if let best = self.bestTopInsert {
@@ -330,12 +348,9 @@ final class PerformanceViewController: UIViewController {
         let line = NSAttributedString(string: String(format: "Fastest TOP insert: %@ (avg %.2f ms)\n\n", best.name, best.avg*1000), attributes: [.font: mono, .foregroundColor: UIColor.systemGreen])
         self.summary.append(line)
       }
-      // Open results screen with full matrix view
-      let scenarioList = self.scenarioNames.sorted()
-      let profileNames = variations.map { $0.0 }
-      let vc = ResultsViewController(scenarios: scenarioList, profiles: profileNames, results: self.matrixResults, seedParas: self.seedParasCurrent, fastestTop: self.bestTopInsert.map { ($0.name, $0.avg*1000) })
+      // Open/update Results tab with full matrix view
       self.activity.stopAnimating(); self.statusLabel.text = "Done"; self.copyButton.isEnabled = true; self.isRunning = false; self.refreshSummaryView(); self.recordingVariations = false
-      self.navigationController?.pushViewController(vc, animated: true)
+      self.presentOrUpdateResultsTab()
     }
   }
 
@@ -613,6 +628,33 @@ final class PerformanceViewController: UIViewController {
     }
     summary.append(NSAttributedString(string: header, attributes: [.font: mono, .foregroundColor: UIColor.label]))
     summary.append(NSAttributedString(string: body + "\n", attributes: [.font: mono, .foregroundColor: UIColor.secondaryLabel]))
+  }
+
+  // MARK: - Results tab wiring
+  private func presentOrUpdateResultsTab() {
+    let scenarioList = self.scenarioNames.sorted()
+    let vc = ResultsViewController(
+      scenarios: scenarioList,
+      profiles: self.lastVariationProfiles,
+      results: self.matrixResults,
+      seedParas: self.seedParasCurrent,
+      fastestTop: self.bestTopInsert.map { ($0.name, $0.avg*1000) },
+      generatedAt: Date()
+    )
+    let nav = UINavigationController(rootViewController: vc)
+    nav.tabBarItem = UITabBarItem(title: "Results", image: UIImage(systemName: "table"), selectedImage: UIImage(systemName: "table.fill"))
+    if let tab = self.tabBarController {
+      var vcs = tab.viewControllers ?? []
+      if let idx = vcs.firstIndex(where: { ($0 as? UINavigationController)?.topViewController is ResultsViewController }) {
+        vcs[idx] = nav
+      } else {
+        vcs.append(nav)
+      }
+      tab.viewControllers = vcs
+      tab.selectedViewController = nav
+    } else {
+      self.navigationController?.pushViewController(vc, animated: true)
+    }
   }
 
   private func appendLog(_ line: String) {
