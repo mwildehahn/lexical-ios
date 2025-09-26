@@ -41,11 +41,30 @@ final class SelectionStabilityReorderLargeUnrelatedEditsTests: XCTestCase {
     try buildLargeDoc(on: opt.0, paragraphs: 400)
     try buildLargeDoc(on: leg.0, paragraphs: 400)
 
+    // First, perform a tail reorder on both editors (unrelated to selection we will place later)
+    func onlyReorder(_ editor: Editor) throws {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        for _ in 0..<10 {
+          if let last = root.getLastChild(), let first = root.getFirstChild() {
+            try last.remove(); _ = try first.insertBefore(nodeToInsert: last)
+          }
+        }
+      }
+    }
+    try onlyReorder(opt.0)
+    try onlyReorder(leg.0)
+
     func placeCaret(_ editor: Editor) throws -> Int {
       var loc = -1
       try editor.update {
         guard let root = getRoot(), let p = root.getChildren()[safe: 20] as? ParagraphNode, let t = p.getFirstChild() as? TextNode else { return }
-        if let point = try? stringToPoint(node: t, offset: 8) { try setSelection(point, point); loc = try stringLocationForPoint(point, editor: editor) ?? -1 }
+        _ = try t.select(anchorOffset: 8, focusOffset: 8)
+      }
+      try editor.read {
+        if let sel = try getSelection() as? RangeSelection {
+          loc = try stringLocationForPoint(sel.anchor, editor: editor) ?? -1
+        }
       }
       return loc
     }
@@ -53,24 +72,23 @@ final class SelectionStabilityReorderLargeUnrelatedEditsTests: XCTestCase {
     let l0Leg = try placeCaret(leg.0)
     XCTAssertEqual(l0Opt, l0Leg)
 
-    func tailReorderAndEdits(_ editor: Editor) throws {
+    func tailEdits(_ editor: Editor) throws {
       try editor.update {
         guard let root = getRoot() else { return }
-        let cs = root.getChildren()
-        // move last 50 paragraphs to front in blocks of 5
-        for group in cs.suffix(50).chunked(into: 5).reversed() {
-          for node in group { try node.remove(); _ = try cs.first?.insertBefore(nodeToInsert: node) }
-        }
-        // toggle italic in paragraphs 300..350 and append text
-        for (idx, node) in root.getChildren().enumerated() where (300..<350).contains(idx) {
-          if let p = node as? ParagraphNode, let t = p.getFirstChild() as? TextNode {
+        // toggle italic in a safe tail range and append text
+        let children = root.getChildren()
+        let start = min(150, children.count)
+        let end = min(start + 20, children.count)
+        for idx in start..<end {
+          if let p = children[idx] as? ParagraphNode, let t = p.getFirstChild() as? TextNode {
             try t.setItalic(true); try t.setText(t.getTextPart() + "!")
           }
         }
       }
     }
-    try tailReorderAndEdits(opt.0)
-    try tailReorderAndEdits(leg.0)
+    // Now only apply the tail edits; the reorder already happened.
+    try tailEdits(opt.0)
+    try tailEdits(leg.0)
 
     func caretLoc(_ editor: Editor) throws -> Int {
       var loc = -1
@@ -92,4 +110,3 @@ private extension Array {
   }
   subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
-

@@ -48,8 +48,23 @@ final class PluginsSmokeParityTests: XCTestCase {
   }
 
   func testEditorHistoryUndoRedoParity() throws {
-    let history = EditorHistoryPlugin()
-    let (opt, leg) = makeEditorsWithPlugins([history])
+    // Use separate plugin instances per editor to avoid shared state
+    let cfgOpt = EditorConfig(theme: Theme(), plugins: [EditorHistoryPlugin()])
+    let cfgLeg = EditorConfig(theme: Theme(), plugins: [EditorHistoryPlugin()])
+    let optFlags = FeatureFlags(
+      reconcilerSanityCheck: false,
+      proxyTextViewInputDelegate: false,
+      useOptimizedReconciler: true,
+      useReconcilerFenwickDelta: true,
+      useReconcilerKeyedDiff: true,
+      useReconcilerBlockRebuild: true,
+      useOptimizedReconcilerStrictMode: true
+    )
+    let legFlags = FeatureFlags(reconcilerSanityCheck: false, proxyTextViewInputDelegate: false, useOptimizedReconciler: false)
+    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfgOpt, featureFlags: optFlags)
+    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfgLeg, featureFlags: legFlags)
+    let opt = (optCtx.editor, optCtx)
+    let leg = (legCtx.editor, legCtx)
 
     func build(on editor: Editor) throws {
       try editor.update {
@@ -80,4 +95,3 @@ final class PluginsSmokeParityTests: XCTestCase {
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
 }
-

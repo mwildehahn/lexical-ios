@@ -45,9 +45,11 @@ final class SelectionStabilityLargeUnrelatedEditsTests: XCTestCase {
       var baselineLoc: Int = -1
       try editor.update {
         guard let root = getRoot(), let p = root.getChildren()[safe: 10] as? ParagraphNode, let t = p.getFirstChild() as? TextNode else { return }
-        if let point = try? stringToPoint(node: t, offset: 3) {
-          try setSelection(point, point)
-          baselineLoc = try stringLocationForPoint(point, editor: editor) ?? -1
+        _ = try t.select(anchorOffset: 3, focusOffset: 3)
+      }
+      try editor.read {
+        if let sel = try getSelection() as? RangeSelection {
+          baselineLoc = try stringLocationForPoint(sel.anchor, editor: editor) ?? -1
         }
       }
       return baselineLoc
@@ -94,4 +96,3 @@ private extension Array {
     indices.contains(index) ? self[index] : nil
   }
 }
-
