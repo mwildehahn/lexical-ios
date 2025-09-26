@@ -57,7 +57,7 @@ final class IMEParityTests: XCTestCase {
   }
 
   func testIMEStartUpdateCancelParity() throws {
-    XCTExpectFailure("Known mid‑composition cancel parity drift; investigate optimized unmark handling.")
+    XCTExpectFailure("Cancel path parity (empty marked text) under investigation; optimized should respect UITextView removal without parity-coerce.")
     let legacyView = makeView(optimized: false)
     let optView = makeView(optimized: true)
     let legacy = legacyView.editor
@@ -69,15 +69,15 @@ final class IMEParityTests: XCTestCase {
     try setSelection(textKey: lText, offset: 0, editor: legacy, frontend: legacyView)
     try setSelection(textKey: oText, offset: 0, editor: opt, frontend: optView)
 
-    // Start + update composition (no strict mid-composition parity guarantees)
+    // Start + update composition
     legacyView.textView.setMarkedText("あ", selectedRange: NSRange(location: 1, length: 0))
     optView.textView.setMarkedText("あ", selectedRange: NSRange(location: 1, length: 0))
     legacyView.textView.setMarkedText("あい", selectedRange: NSRange(location: 2, length: 0))
     optView.textView.setMarkedText("あい", selectedRange: NSRange(location: 2, length: 0))
 
-    // Cancel composition (explicit unmark)
-    legacyView.textView.unmarkText()
-    optView.textView.unmarkText()
+    // Cancel composition by setting empty marked text
+    legacyView.textView.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
+    optView.textView.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
     assertParity(legacyView, optView)
   }
 

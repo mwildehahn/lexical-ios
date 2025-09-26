@@ -183,6 +183,9 @@ Convenience runner
 - Notes:
   - Added StyleParityTests.swift covering hydration, inline formatting, and block paragraph attributes; class discovered and green.
   - Added plugin parity tests for link color and list bullet attributes; green under Lexical‑Package.
+  - Added IMEParityTests.swift:
+    - Commit parity is green (start/update/commit).
+    - Cancel parity via empty marked text replacement is currently marked as expected failure; root cause: optimized parity‑coerce step can reapply pending‑state string immediately after UIKit cancels composition. Introduced `Editor.pendingImeCancel` and skipped coerce when set; further range alignment under investigation.
 
 Next steps
 - IME/Marked text parity: add a focused suite (IMEParityTests) covering start/update/commit/cancel with attributes preserved.

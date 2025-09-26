@@ -325,7 +325,7 @@ internal enum OptimizedReconciler {
       // Parity-coerce: if the optimized string diverges from legacy serialization for the
       // current pending state, replace it and rebuild cache. This is optimized-only and
       // acts as a last-resort guard to satisfy strict parity tests.
-      if editor.featureFlags.optimizedReconciler, let ts = editor.textStorage {
+      if editor.featureFlags.optimizedReconciler, let ts = editor.textStorage, editor.pendingImeCancel == false {
         // Compute expected legacy serialization safely by entering a read scope
         // for the pending state (avoids Node.getLatest() assertions when this
         // function is invoked directly from tests without an active editor scope).
@@ -364,6 +364,10 @@ internal enum OptimizedReconciler {
           }
         }
       }
+
+      // Clear any pending IME cancel flag at the end of reconciliation so future
+      // passes can safely apply parity-coerce again if needed.
+      editor.pendingImeCancel = false
 
       // Final selection resync (optimized only): ensure the native selection reflects the
       // pending model selection after applying structural/newline boundary edits. This helps

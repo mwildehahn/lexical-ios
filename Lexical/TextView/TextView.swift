@@ -323,6 +323,10 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     }
 
     if markedText.isEmpty, let markedRange = editor.getNativeSelection().markedRange {
+      // Mark that we've performed an IME cancel by empty replacement so the
+      // optimized reconciler does not immediately parity-coerce the buffer
+      // back to the pending state's string.
+      editor.pendingImeCancel = true
       textStorage.replaceCharacters(in: markedRange, with: "")
       return
     }

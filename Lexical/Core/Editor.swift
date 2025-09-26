@@ -173,6 +173,11 @@ public class Editor: NSObject {
   // Parent editors are used for nested editors inside decorator nodes
   public weak var parentEditor: Editor?
 
+  // IME/marked-text: set true when UIKit cancels composition by replacing the
+  // marked range with an empty string. Used to prevent optimized parity-coerce
+  // from restoring the pending state's string on the very next reconcile.
+  internal var pendingImeCancel: Bool = false
+
   // MARK: - Initialisation
 
   /// Initialises a new Editor.
