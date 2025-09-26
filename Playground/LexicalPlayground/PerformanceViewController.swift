@@ -14,9 +14,9 @@ final class PerformanceViewController: UIViewController {
   private struct PresetConfig { let seedParas: Int; let batch: Int; let iterTop: Int; let iterMid: Int; let iterEnd: Int; let iterText: Int; let iterAttr: Int; let iterSmallReorder: Int; let iterCoalesced: Int; let iterPrePost: Int; let iterLargeReorder: Int }
   private func config(for preset: Preset) -> PresetConfig {
     switch preset {
-    case .quick: return PresetConfig(seedParas: 100, batch: 1, iterTop: 10, iterMid: 10, iterEnd: 10, iterText: 8, iterAttr: 8, iterSmallReorder: 8, iterCoalesced: 5, iterPrePost: 6, iterLargeReorder: 6)
-    case .standard: return PresetConfig(seedParas: 250, batch: 2, iterTop: 20, iterMid: 20, iterEnd: 20, iterText: 15, iterAttr: 15, iterSmallReorder: 15, iterCoalesced: 10, iterPrePost: 12, iterLargeReorder: 12)
-    case .heavy: return PresetConfig(seedParas: 500, batch: 3, iterTop: 40, iterMid: 40, iterEnd: 40, iterText: 24, iterAttr: 24, iterSmallReorder: 24, iterCoalesced: 12, iterPrePost: 16, iterLargeReorder: 16)
+    case .quick: return PresetConfig(seedParas: 100, batch: 1, iterTop: 1, iterMid: 1, iterEnd: 1, iterText: 1, iterAttr: 1, iterSmallReorder: 1, iterCoalesced: 1, iterPrePost: 1, iterLargeReorder: 1)
+    case .standard: return PresetConfig(seedParas: 250, batch: 2, iterTop: 10, iterMid: 10, iterEnd: 10, iterText: 10, iterAttr: 10, iterSmallReorder: 10, iterCoalesced: 10, iterPrePost: 10, iterLargeReorder: 10)
+    case .heavy: return PresetConfig(seedParas: 500, batch: 3, iterTop: 20, iterMid: 20, iterEnd: 20, iterText: 20, iterAttr: 20, iterSmallReorder: 20, iterCoalesced: 20, iterPrePost: 20, iterLargeReorder: 20)
     }
   }
   // MARK: - Scenario models
@@ -535,14 +535,15 @@ final class PerformanceViewController: UIViewController {
     var completed = 0
     func runNextBatch() {
       let end = min(completed + batch, iterations)
-      // Execute a small batch synchronously on main to respect Editor's threading model
-      for _ in completed..<end { step() }
-      // Mirror optimized content into TK2 view if enabled (and time it)
-      if tk2View != nil {
-        let s = CFAbsoluteTimeGetCurrent()
-        syncTK2FromOptimized()
-        tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
-        tk2LayoutCount += 1
+      // Execute batch synchronously on main to respect Editor's threading model
+      for _ in completed..<end {
+        step()
+        if tk2View != nil {
+          let s = CFAbsoluteTimeGetCurrent()
+          syncTK2FromOptimized()
+          tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
+          tk2LayoutCount += 1
+        }
       }
       // Update progress (global + scenario)
       let delta = end - completed
@@ -599,7 +600,10 @@ final class PerformanceViewController: UIViewController {
     let fmt = { (t: TimeInterval) in String(format: "%.3f ms", t * 1000) }
     let share = String(format: "%.0f%%", applyShare)
     var line = "  - \(label): avg wall=\(fmt(wallAvg)) plan=\(fmt(planAvg)) apply=\(fmt(applyAvg)) (apply=\(share)) ops(del=\(deletes) ins=\(inserts) set=\(sets) fix=\(fixes) moved=\(moved))"
-    if let tk2 = tk2Avg { line += String(format: "  TK2 layout avg=%.3f ms", tk2 * 1000) }
+    if let tk2 = tk2Avg {
+      let combined = applyAvg + tk2
+      line += String(format: "  TK2 layout avg=%.3f ms  apply+TK2 avg=%.3f ms", tk2 * 1000, combined * 1000)
+    }
     return line + "\n"
   }
 
