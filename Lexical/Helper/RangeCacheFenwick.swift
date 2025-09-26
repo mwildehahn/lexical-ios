@@ -14,25 +14,39 @@ import Foundation
 /// - Returns: next map with updated `location` fields; other fields preserved from `prev`.
 @MainActor
 internal func rebuildLocationsWithFenwick(
-  prev: [NodeKey: RangeCacheItem], deltas: [NodeKey: Int]
+  prev: [NodeKey: RangeCacheItem],
+  deltas: [NodeKey: Int],
+  order: [NodeKey]? = nil,
+  indexOf: [NodeKey: Int]? = nil
 ) -> [NodeKey: RangeCacheItem] {
-  let keys = prev.map { $0 }.sorted { a, b in
-    if a.value.location != b.value.location { return a.value.location < b.value.location }
-    return a.value.range.length > b.value.range.length
-  }.map { $0.key }
-  var indexOf: [NodeKey: Int] = [:]
-  for (i, k) in keys.enumerated() { indexOf[k] = i + 1 }
+  if deltas.isEmpty { return prev }
+  let useProvided = order != nil && indexOf != nil
+  let keys: [NodeKey]
+  let lookup: [NodeKey: Int]
+  if useProvided {
+    keys = order!
+    lookup = indexOf!
+  } else {
+    let ordered = prev.map { $0 }.sorted { a, b in
+      if a.value.location != b.value.location { return a.value.location < b.value.location }
+      return a.value.range.length > b.value.range.length
+    }
+    keys = ordered.map { $0.key }
+    var map: [NodeKey: Int] = [:]
+    map.reserveCapacity(keys.count)
+    for (i, k) in keys.enumerated() { map[k] = i + 1 }
+    lookup = map
+  }
   var bit = FenwickTree(keys.count)
   for (k, d) in deltas {
-    if let idx = indexOf[k], d != 0 { bit.add(idx, d) }
+    if let idx = lookup[k], d != 0 { bit.add(idx, d) }
   }
+  if keys.isEmpty { return prev }
   var next = prev
   for (i, k) in keys.enumerated() {
-    // Fenwick indices are 1-based; enumerate() is 0-based.
-    // A node's own delta must NOT shift its start location, so sum deltas strictly before i.
     let shift = bit.prefixSum(i)
-    if var item = next[k] {
-      item.location = max(0, prev[k]!.location + shift)
+    if var item = next[k], let prevItem = prev[k] {
+      item.location = max(0, prevItem.location + shift)
       next[k] = item
     }
   }
@@ -45,29 +59,84 @@ internal func rebuildLocationsWithFenwick(
 @MainActor
 internal func rebuildLocationsWithFenwickRanges(
   prev: [NodeKey: RangeCacheItem],
-  ranges: [(startKey: NodeKey, endKeyExclusive: NodeKey?, delta: Int)]
+  ranges: [(startKey: NodeKey, endKeyExclusive: NodeKey?, delta: Int)],
+  order: [NodeKey]? = nil,
+  indexOf: [NodeKey: Int]? = nil
 ) -> [NodeKey: RangeCacheItem] {
   if ranges.isEmpty { return prev }
-  let ordered = prev.map { $0 }.sorted { a, b in
-    if a.value.location != b.value.location { return a.value.location < b.value.location }
-    return a.value.range.length > b.value.range.length
+  let useProvided = order != nil && indexOf != nil
+  let keys: [NodeKey]
+  let lookup: [NodeKey: Int]
+  if useProvided {
+    keys = order!
+    lookup = indexOf!
+  } else {
+    let ordered = prev.map { $0 }.sorted { a, b in
+      if a.value.location != b.value.location { return a.value.location < b.value.location }
+      return a.value.range.length > b.value.range.length
+    }
+    keys = ordered.map { $0.key }
+    var map: [NodeKey: Int] = [:]
+    map.reserveCapacity(keys.count)
+    for (i, k) in keys.enumerated() { map[k] = i + 1 }
+    lookup = map
   }
-  let keys = ordered.map { $0.key }
-  var indexOf: [NodeKey: Int] = [:]
-  for (i, k) in keys.enumerated() { indexOf[k] = i + 1 }
   var bit = FenwickTree(keys.count)
   for (s, e, d) in ranges {
     if d == 0 { continue }
-    if let si = indexOf[s] { bit.add(si, d) }
-    if let e, let ei = indexOf[e] { bit.add(ei, -d) }
+    if let si = lookup[s] { bit.add(si, d) }
+    if let e, let ei = lookup[e] { bit.add(ei, -d) }
   }
+  if keys.isEmpty { return prev }
   var next = prev
   for (i, k) in keys.enumerated() {
-    // Fenwick indices are 1-based; enumerate() is 0-based.
-    // Apply only deltas that occur before the current key.
     let shift = bit.prefixSum(i)
-    if var item = next[k] {
-      item.location = max(0, prev[k]!.location + shift)
+    if var item = next[k], let prevItem = prev[k] {
+      item.location = max(0, prevItem.location + shift)
+      next[k] = item
+    }
+  }
+  return next
+}
+
+@MainActor
+internal func rebuildLocationsWithRangeDiffs(
+  prev: [NodeKey: RangeCacheItem],
+  ranges: [(startKey: NodeKey, endKeyExclusive: NodeKey?, delta: Int)],
+  order: [NodeKey]? = nil,
+  indexOf: [NodeKey: Int]? = nil
+) -> [NodeKey: RangeCacheItem] {
+  if ranges.isEmpty { return prev }
+  let useProvided = order != nil && indexOf != nil
+  let keys: [NodeKey]
+  let lookup: [NodeKey: Int]
+  if useProvided {
+    keys = order!
+    lookup = indexOf!
+  } else {
+    let ordered = prev.map { $0 }.sorted { a, b in
+      if a.value.location != b.value.location { return a.value.location < b.value.location }
+      return a.value.range.length > b.value.range.length
+    }
+    keys = ordered.map { $0.key }
+    var map: [NodeKey: Int] = [:]
+    map.reserveCapacity(keys.count)
+    for (i, k) in keys.enumerated() { map[k] = i + 1 }
+    lookup = map
+  }
+  if keys.isEmpty { return prev }
+  var diff = Array(repeating: 0, count: keys.count + 2)
+  for (s, e, d) in ranges {
+    if d == 0 { continue }
+    if let si = lookup[s] { diff[si] &+= d }
+    if let e, let ei = lookup[e] { diff[ei] &-= d }
+  }
+  var prefix = 0
+  var next = prev
+  for (i, k) in keys.enumerated() {
+    prefix &+= diff[i + 1]
+    if var item = next[k], let prevItem = prev[k] {
+      item.location = max(0, prevItem.location + prefix)
       next[k] = item
     }
   }

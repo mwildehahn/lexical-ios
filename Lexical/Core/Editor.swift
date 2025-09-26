@@ -123,6 +123,7 @@ public class Editor: NSObject {
 
   // See description in RangeCache.swift.
   internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
+  private var dfsOrderCache: [NodeKey]? = nil
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
   internal var normalizedNodes: Set<NodeKey> = Set()
@@ -176,6 +177,8 @@ public class Editor: NSObject {
       fatalError("Expected root node key when creating new editor state")
     }
     rangeCache[rootNodeKey] = RangeCacheItem()
+    dfsOrderCache = nil
+    dfsOrderCache = nil
     theme = editorConfig.theme
     plugins = editorConfig.plugins
     super.init()
@@ -439,6 +442,8 @@ public class Editor: NSObject {
 
     rangeCache = [:]
     rangeCache[kRootNodeKey] = RangeCacheItem()
+    dfsOrderCache = nil
+    dfsOrderCache = nil
 
     if let textStorage = frontend?.textStorage {
       let oldMode = textStorage.mode
@@ -700,6 +705,17 @@ public class Editor: NSObject {
   // MARK: - Manipulating the editor state
 
   var isUpdating = false
+  internal func invalidateDFSOrderCache() {
+    dfsOrderCache = nil
+  }
+
+  internal func cachedDFSOrder() -> [NodeKey] {
+    if let cached = dfsOrderCache { return cached }
+    let ordered = sortedNodeKeysByLocation(rangeCache: rangeCache)
+    dfsOrderCache = ordered
+    return ordered
+  }
+
   private func beginUpdate(
     _ closure: () throws -> Void, mode: UpdateBehaviourModificationMode,
     reason: EditorUpdateReason = .update
@@ -1071,6 +1087,7 @@ public class Editor: NSObject {
     self.dirtyType = .noDirtyNodes
     self.cloneNotNeeded = Set()
     self.rangeCache = [kRootNodeKey: RangeCacheItem()]
+    self.dfsOrderCache = nil
     self.normalizedNodes = Set()
     self.editorState = editorState
     self.pendingEditorState = nil
@@ -1081,6 +1098,7 @@ public class Editor: NSObject {
       self.dirtyType = previousDirtyType
       self.cloneNotNeeded = previousCloneNotNeeded
       self.rangeCache = previousRangeCache
+      self.dfsOrderCache = nil
       self.normalizedNodes = previousNormalizedNodes
       self.editorState = previousActiveEditorState
       self.pendingEditorState = previousPendingEditorState
