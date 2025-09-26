@@ -230,6 +230,17 @@ Reminder: after every significant change, run iOS simulator tests (Lexical-Packa
   - iOS simulator tests (Lexical-Package scheme): PASS (278 tests, 4 skipped).
   - Playground build (iPhone 17 Pro, iOS 26.0): PASS.
 
+### 2025‑09‑26: Added legacy parity tests for optimized reconciler
+- New parity suites:
+  - `OptimizedReconcilerLegacyParityReorderTextMixTests` — keyed reorder + text edit within moved node; asserts final string parity.
+  - `SelectionNavigationGranularityParityTests` — native selection moves (word/line granularity) parity; compares resulting NSRange.
+  - `RangeCachePointMappingGraphemeParityTests` — point↔string round‑trip across grapheme clusters (flag, skin tone, ZWJ family, combining marks).
+  - `OptimizedReconcilerLegacyParityMixedParentsComplexTests` — combined edits across parents (reorder in A, insert in B, text edit in A) in a single update.
+- Fixes during tests: corrected use of Node.insertBefore API and ensured test contexts retain LexicalReadOnlyTextKitContext to keep text storage alive.
+- Verification:
+  - iOS simulator: all new tests green; full suite now 282 tests, 0 failures (4 skipped).
+  - Playground app build: PASS.
+
 ### 2025‑09‑25: Decorator removal parity (strict mode) — FIXED
 - Implemented safe pruning for `editor.rangeCache` after full/subtree recompute to drop stale keys:
   - `pruneRangeCacheGlobally(nextState:, editor:)` (full slow path)
