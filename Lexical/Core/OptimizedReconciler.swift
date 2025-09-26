@@ -183,7 +183,9 @@ internal enum OptimizedReconciler {
     if editor.dirtyType != .noDirtyNodes { editor.invalidateDFSOrderCache() }
     // If insert-block consumed and central aggregation collected deltas, apply them once
     if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
-      editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+      let (order, positions) = fenwickOrderAndIndex(editor: editor)
+      let ranges = fenwickAggregatedDeltas.map { (k, d) in (startKey: k, endKeyExclusive: Optional<NodeKey>.none, delta: d) }
+      editor.rangeCache = rebuildLocationsWithRangeDiffs(prev: editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
       fenwickAggregatedDeltas.removeAll(keepingCapacity: true)
     }
 
@@ -216,7 +218,9 @@ internal enum OptimizedReconciler {
       if anyApplied {
         editor.invalidateDFSOrderCache()
         if !fenwickAggregatedDeltas.isEmpty {
-          editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+          let (order, positions) = fenwickOrderAndIndex(editor: editor)
+          let ranges = fenwickAggregatedDeltas.map { (k, d) in (startKey: k, endKeyExclusive: Optional<NodeKey>.none, delta: d) }
+          editor.rangeCache = rebuildLocationsWithRangeDiffs(prev: editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
         }
         // One-time selection reconcile
         let prevSelection = currentEditorState.selection
@@ -241,7 +245,9 @@ internal enum OptimizedReconciler {
       editor.invalidateDFSOrderCache()
       // If central aggregation is enabled, apply aggregated rebuild now
       if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
-        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+        let (order, positions) = fenwickOrderAndIndex(editor: editor)
+        let ranges = fenwickAggregatedDeltas.map { (k, d) in (startKey: k, endKeyExclusive: Optional<NodeKey>.none, delta: d) }
+        editor.rangeCache = rebuildLocationsWithRangeDiffs(prev: editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
       }
       return
     }
@@ -256,7 +262,9 @@ internal enum OptimizedReconciler {
     ) {
       editor.invalidateDFSOrderCache()
       if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
-        editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+        let (order, positions) = fenwickOrderAndIndex(editor: editor)
+        let ranges = fenwickAggregatedDeltas.map { (k, d) in (startKey: k, endKeyExclusive: Optional<NodeKey>.none, delta: d) }
+        editor.rangeCache = rebuildLocationsWithRangeDiffs(prev: editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
       }
       return
     }
@@ -454,8 +462,7 @@ internal enum OptimizedReconciler {
       return false
     }
 
-    // Prepare DFS order for potential multi-node location shifts (Fenwick available via helper when used)
-    let (keysInOrder, indexOf) = fenwickOrderAndIndex(editor: editor)
+    // Prepare for possible location shifts if needed later
 
     // Plan minimal instructions: delete old text range, insert new attributed text
     let textStart = prevRange.location + prevRange.preambleLength + prevRange.childrenLength
@@ -491,8 +498,10 @@ internal enum OptimizedReconciler {
         fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
       } else {
         let (order, positions) = fenwickOrderAndIndex(editor: editor)
-        editor.rangeCache = rebuildLocationsWithFenwick(
-          prev: editor.rangeCache, deltas: [dirtyKey: delta], order: order, indexOf: positions)
+        editor.rangeCache = rebuildLocationsWithRangeDiffs(
+          prev: editor.rangeCache,
+          ranges: [(startKey: dirtyKey, endKeyExclusive: nil, delta: delta)],
+          order: order, indexOf: positions)
       }
     } else {
       updateRangeCacheForTextChange(nodeKey: dirtyKey, delta: delta)
@@ -1155,8 +1164,10 @@ internal enum OptimizedReconciler {
           fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
         } else {
           let (order, positions) = fenwickOrderAndIndex(editor: editor)
-          editor.rangeCache = rebuildLocationsWithFenwick(
-            prev: editor.rangeCache, deltas: [dirtyKey: delta], order: order, indexOf: positions)
+          editor.rangeCache = rebuildLocationsWithRangeDiffs(
+            prev: editor.rangeCache,
+            ranges: [(startKey: dirtyKey, endKeyExclusive: nil, delta: delta)],
+            order: order, indexOf: positions)
         }
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .postamble, newPartLength: nextPostLen, delta: delta)
@@ -1189,9 +1200,11 @@ internal enum OptimizedReconciler {
         if editor.featureFlags.useReconcilerFenwickCentralAggregation {
           fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
         } else {
-          let (keysInOrder, indexOf) = fenwickOrderAndIndex(editor: editor)
-          editor.rangeCache = rebuildLocationsWithFenwick(
-            prev: editor.rangeCache, deltas: [dirtyKey: delta], order: keysInOrder, indexOf: indexOf)
+          let (order, positions) = fenwickOrderAndIndex(editor: editor)
+          editor.rangeCache = rebuildLocationsWithRangeDiffs(
+            prev: editor.rangeCache,
+            ranges: [(startKey: dirtyKey, endKeyExclusive: nil, delta: delta)],
+            order: order, indexOf: positions)
         }
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .preamble, newPartLength: nextPreLen, preambleSpecialCharacterLength: preSpecial, delta: delta)
