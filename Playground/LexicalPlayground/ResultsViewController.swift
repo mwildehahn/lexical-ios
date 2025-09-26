@@ -30,6 +30,9 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
   private let matrixGridStack = UIStackView()     // vertical stack of rows; each row is a horizontal stack of cells
   private let legendLabel = UILabel()
   private let variationsTable = UITableView(frame: .zero, style: .insetGrouped)
+  // Layout constants
+  private let cellWidth: CGFloat = 140
+  private let rowHeight: CGFloat = 40
 
   init(scenarios: [String], profiles: [VariationProfile], results: [String: [String: (Double, TimeInterval?, TimeInterval?)]], seedParas: Int, fastestTop: (String, Double)?, generatedAt: Date = Date()) {
     self.scenarios = scenarios
@@ -226,16 +229,20 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
 
     // Header rows
     let scenarioHeader = UILabel(); scenarioHeader.text = "Scenario"; scenarioHeader.font = .systemFont(ofSize: 12, weight: .semibold)
+    scenarioHeader.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
     matrixLeftColumn.addArrangedSubview(scenarioHeader)
     let headerRow = UIStackView(); headerRow.axis = .horizontal; headerRow.spacing = 6; headerRow.alignment = .fill
     for p in profiles { headerRow.addArrangedSubview(matrixCell(title: p.name, value: nil, isHeader: true)) }
+    headerRow.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
     matrixGridStack.addArrangedSubview(headerRow)
 
     // Body rows
     for name in scenarios {
       let sLabel = UILabel(); sLabel.text = name; sLabel.font = .systemFont(ofSize: 12); sLabel.numberOfLines = 2
+      sLabel.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
       matrixLeftColumn.addArrangedSubview(sLabel)
       let rowStack = UIStackView(); rowStack.axis = .horizontal; rowStack.spacing = 6; rowStack.alignment = .fill
+      rowStack.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
       let row = results[name] ?? [:]
       for p in profiles {
         if let r = row[p.name] {
@@ -273,7 +280,8 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
       l.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -8),
       l.topAnchor.constraint(equalTo: v.topAnchor, constant: 6),
       l.bottomAnchor.constraint(equalTo: v.bottomAnchor, constant: -6),
-      v.widthAnchor.constraint(greaterThanOrEqualToConstant: 120)
+      v.widthAnchor.constraint(equalToConstant: cellWidth),
+      v.heightAnchor.constraint(equalToConstant: rowHeight)
     ])
     return v
   }
