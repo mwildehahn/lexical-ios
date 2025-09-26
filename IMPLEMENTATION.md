@@ -172,6 +172,25 @@ Convenience runner
   - [x] Provide snapshot API and console dump (gated by `reconcilerMetrics`).
   - [ ] Add lightweight metrics panel in Playground to render snapshot.
 
+2025‑09‑26 — Status update (iOS 26.0)
+- Full iOS runs (Lexical + plugin parity) are green on iPhone 17 Pro:
+  - Core filters (SelectionTests, StyleParityTests) and plugin suites (LinkStyleParityTests, ListStyleParityTests) pass.
+  - Ran via Lexical scheme and Lexical‑Package scheme as needed for plugins.
+- Playground fixes validated:
+  - Editor tab preselected on launch (AppDelegate).
+  - Both Editor and Compare screens include ListPlugin + LinkPlugin and an explicit base Theme (Helvetica 15, UIColor.label; link color systemBlue).
+  - Optimized reconciler adds base font/color only where missing after hydrate and reconcile; does not override inline/link styles.
+- Notes:
+  - Added StyleParityTests.swift covering hydration, inline formatting, and block paragraph attributes; class discovered and green.
+  - Added plugin parity tests for link color and list bullet attributes; green under Lexical‑Package.
+
+Next steps
+- IME/Marked text parity: add a focused suite (IMEParityTests) covering start/update/commit/cancel with attributes preserved.
+- Decorator lifecycle under complex edits: extend DecoratorLifecycleParityTests with multi‑sibling operations.
+- Mixed content parity: lists with links, quotes, code (inline+block) across multi‑paragraph edits.
+- Optional: shared “Lexical‑All” scheme/test plan; current script `scripts/run_ios_tests.sh` already runs both cores.
+
+
 ---
 
 ## Test Suites (authoritative on iOS Simulator)
