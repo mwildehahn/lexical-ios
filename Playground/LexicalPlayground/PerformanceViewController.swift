@@ -9,6 +9,9 @@ import Lexical
 import UIKit
 
 final class PerformanceViewController: UIViewController {
+  // MARK: - Scenario models
+  private enum ParityKind { case plain, attrOnly }
+  private struct Scenario { let name: String; let iterations: Int; let batch: Int; let step: () -> Void; let parityKind: ParityKind }
   // MARK: - Metrics
   final class PerfMetricsContainer: EditorMetricsContainer {
     private(set) var runs: [ReconcilerMetric] = []
@@ -37,6 +40,7 @@ final class PerformanceViewController: UIViewController {
   private var legacyMetrics = PerfMetricsContainer()
   private var optimizedMetrics = PerfMetricsContainer()
   private var didRunOnce = false
+  private var attrToggleBoldState = true
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -51,9 +55,7 @@ final class PerformanceViewController: UIViewController {
     super.viewDidAppear(animated)
     guard !didRunOnce else { return }
     didRunOnce = true
-    DispatchQueue.main.async { [weak self] in
-      self?.runBenchmarks()
-    }
+    DispatchQueue.main.async { [weak self] in self?.runBenchmarks() }
   }
 
   private func configureUI() {
@@ -179,46 +181,92 @@ final class PerformanceViewController: UIViewController {
     UIPasteboard.general.string = resultsTextView.text
   }
 
-  // MARK: - Benchmark Scenarios
+  // MARK: - Benchmark Scenarios (asynchronous, batched; keeps UI responsive)
   private func runBenchmarks() {
-    var log = "Lexical Reconciler Benchmarks + Parity\n" + nowStamp() + "\n\n"
-
-    struct Scenario { let name: String; let run: () -> Bool }
-
-    let scenarios: [Scenario] = [
-      Scenario(name: "Insert paragraph at TOP (100x)") { self.benchInsert(position: .top, iterations: 100); return self.assertParity("Insert TOP") },
-      Scenario(name: "Insert paragraph at MIDDLE (100x)") { self.benchInsert(position: .middle, iterations: 100); return self.assertParity("Insert MIDDLE") },
-      Scenario(name: "Insert paragraph at END (100x)") { self.benchInsert(position: .end, iterations: 100); return self.assertParity("Insert END") },
-      Scenario(name: "Text edit bursts (50x)") { self.benchTextBursts(iterations: 50); return self.assertParity("Text bursts") },
-      Scenario(name: "Attribute-only toggle bold (50x)") { self.benchAttributeToggle(iterations: 50); return self.assertAttributeOnlyParity("Attr-only bold") },
-      Scenario(name: "Keyed reorder small (swap neighbors × 50)") { self.benchReorderSmall(iterations: 50); return self.assertParity("Reorder small") },
-      Scenario(name: "Coalesced replace (paste-like × 20)") { self.benchCoalescedReplace(iterations: 20); return self.assertParity("Coalesced replace") },
-    ]
-
+    resultsTextView.text = "Lexical Reconciler Benchmarks + Parity\n" + nowStamp() + "\n\n"
+    copyButton.isEnabled = false
     activity.startAnimating()
-    statusLabel.text = "Running \(scenarios.count) scenarios…"
+    statusLabel.text = "Preparing…"
     progress.setProgress(0, animated: false)
 
-    let total = Float(scenarios.count)
-    for (idx, s) in scenarios.enumerated() {
-      legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
-      let ok = s.run()
-      let legacyDur = totalDuration(legacyMetrics)
-      let optDur = totalDuration(optimizedMetrics)
-      let header = "• \(s.name)\n"
-      let body = summary("Legacy", wall: legacyDur, runs: legacyMetrics.runs) + summary("Optimized", wall: optDur, runs: optimizedMetrics.runs)
-      let parity = ok ? "  - Parity: OK\n" : "  - Parity: FAIL\n"
-      log += header + body + parity + "\n"
-      print(header + body + parity)
-      resultsTextView.text = log
-      progress.setProgress(Float(idx + 1) / total, animated: true)
-      statusLabel.text = "Finished \(idx + 1)/\(Int(total))"
+    // Per-iteration steps (single iteration each)
+    func stepInsertTop() { try? insertOnce(position: .top) }
+    func stepInsertMiddle() { try? insertOnce(position: .middle) }
+    func stepInsertEnd() { try? insertOnce(position: .end) }
+    func stepTextBurst() { try? textBurstOnce() }
+    func stepAttrToggle() { try? attributeToggleOnce() }
+    func stepReorderSmall() { try? reorderSmallOnce() }
+    func stepCoalescedReplace() { try? coalescedReplaceOnce() }
 
-      // Reset editors to fresh state between scenarios
-      resetDocuments(paragraphs: 200)
+    let scenarios: [Scenario] = [
+      .init(name: "Insert paragraph at TOP", iterations: 100, batch: 10, step: stepInsertTop, parityKind: .plain),
+      .init(name: "Insert paragraph at MIDDLE", iterations: 100, batch: 10, step: stepInsertMiddle, parityKind: .plain),
+      .init(name: "Insert paragraph at END", iterations: 100, batch: 10, step: stepInsertEnd, parityKind: .plain),
+      .init(name: "Text edit bursts", iterations: 50, batch: 10, step: stepTextBurst, parityKind: .plain),
+      .init(name: "Attribute-only toggle bold", iterations: 50, batch: 10, step: stepAttrToggle, parityKind: .attrOnly),
+      .init(name: "Keyed reorder (swap neighbors)", iterations: 50, batch: 10, step: stepReorderSmall, parityKind: .plain),
+      .init(name: "Coalesced replace (paste-like)", iterations: 20, batch: 5, step: stepCoalescedReplace, parityKind: .plain),
+    ]
+
+    runScenarioList(scenarios, index: 0) { [weak self] in
+      guard let self else { return }
+      self.activity.stopAnimating()
+      self.statusLabel.text = "Done"
+      self.copyButton.isEnabled = true
     }
+  }
 
-    activity.stopAnimating()
+  private func runScenarioList(_ scenarios: [Scenario], index: Int, completion: @escaping () -> Void) {
+    guard index < scenarios.count else { completion(); return }
+    let scenario = scenarios[index]
+
+    // Reset state and metrics for this scenario
+    legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
+    appendLog("• \(scenario.name) — running \(scenario.iterations)x")
+    statusLabel.text = scenario.name
+
+    runScenarioBatched(name: scenario.name, iterations: scenario.iterations, batch: scenario.batch, step: scenario.step) { [weak self] in
+      guard let self else { return }
+      let ok = (scenario.parityKind == .plain) ? self.assertParity(scenario.name) : self.assertAttributeOnlyParity(scenario.name)
+      let legacyDur = self.totalDuration(self.legacyMetrics)
+      let optDur = self.totalDuration(self.optimizedMetrics)
+      let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs)
+      let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
+      self.appendLog(body + parity + "\n")
+      // Reset documents between scenarios and continue
+      self.resetDocuments(paragraphs: 200)
+      let total = Float(scenarios.count)
+      self.progress.setProgress(Float(index + 1) / total, animated: true)
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+        self.runScenarioList(scenarios, index: index + 1, completion: completion)
+      }
+    }
+  }
+
+  private func runScenarioBatched(name: String, iterations: Int, batch: Int, step: @escaping () -> Void, completion: @escaping () -> Void) {
+    var completed = 0
+    func runNextBatch() {
+      let end = min(completed + batch, iterations)
+      // Execute a small batch synchronously on main to respect Editor's threading model
+      for _ in completed..<end { step() }
+      completed = end
+      statusLabel.text = "\(name) — \(completed)/\(iterations)"
+      if completed < iterations {
+        // Yield to run loop so UI stays responsive
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.001) { runNextBatch() }
+      } else {
+        completion()
+      }
+    }
+    runNextBatch()
+  }
+
+  private func appendLog(_ line: String) {
+    let newText = (resultsTextView.text ?? "") + line + (line.hasSuffix("\n") ? "" : "\n")
+    resultsTextView.text = newText
+    let bottom = NSRange(location: max(newText.count - 1, 0), length: 1)
+    resultsTextView.scrollRangeToVisible(bottom)
+    print(line)
   }
 
   private func totalDuration(_ c: PerfMetricsContainer) -> TimeInterval {
@@ -257,7 +305,7 @@ final class PerformanceViewController: UIViewController {
   }
 
   private enum InsertPos { case top, middle, end }
-  private func benchInsert(position: InsertPos, iterations: Int) {
+  private func insertOnce(position: InsertPos) throws {
     func insert(_ editor: Editor) throws {
       try editor.update {
         guard let root = getRoot(), let first = root.getFirstChild(), let last = root.getLastChild() else { return }
@@ -278,13 +326,11 @@ final class PerformanceViewController: UIViewController {
         }
       }
     }
-    for _ in 0..<iterations {
-      try? insert(legacyView.editor)
-      try? insert(optimizedView.editor)
-    }
+    try? insert(legacyView.editor)
+    try? insert(optimizedView.editor)
   }
 
-  private func benchTextBursts(iterations: Int) {
+  private func textBurstOnce() throws {
     func mutate(_ editor: Editor) throws {
       try editor.update {
         guard let root = getRoot(), let para = root.getChildAtIndex(index: 3) as? ParagraphNode,
@@ -293,14 +339,11 @@ final class PerformanceViewController: UIViewController {
         try text.setText(current + " +typing+")
       }
     }
-    for _ in 0..<iterations {
-      try? mutate(legacyView.editor)
-      try? mutate(optimizedView.editor)
-    }
+    try? mutate(legacyView.editor)
+    try? mutate(optimizedView.editor)
   }
 
-  private func benchAttributeToggle(iterations: Int) {
-    var makeBold = true
+  private func attributeToggleOnce() throws {
     func toggle(_ editor: Editor, bold: Bool) throws {
       try editor.update {
         guard let root = getRoot(), let para = root.getChildAtIndex(index: 5) as? ParagraphNode,
@@ -308,14 +351,12 @@ final class PerformanceViewController: UIViewController {
         try text.setBold(bold)
       }
     }
-    for _ in 0..<iterations {
-      try? toggle(legacyView.editor, bold: makeBold)
-      try? toggle(optimizedView.editor, bold: makeBold)
-      makeBold.toggle()
-    }
+    try? toggle(legacyView.editor, bold: attrToggleBoldState)
+    try? toggle(optimizedView.editor, bold: attrToggleBoldState)
+    attrToggleBoldState.toggle()
   }
 
-  private func benchReorderSmall(iterations: Int) {
+  private func reorderSmallOnce() throws {
     func reorder(_ editor: Editor) throws {
       try editor.update {
         guard let root = getRoot() else { return }
@@ -327,10 +368,10 @@ final class PerformanceViewController: UIViewController {
         }
       }
     }
-    for _ in 0..<iterations { try? reorder(legacyView.editor); try? reorder(optimizedView.editor) }
+    try? reorder(legacyView.editor); try? reorder(optimizedView.editor)
   }
 
-  private func benchCoalescedReplace(iterations: Int) {
+  private func coalescedReplaceOnce() throws {
     func replace(_ editor: Editor) throws {
       try editor.update {
         guard let root = getRoot(), let p = root.getChildAtIndex(index: 2) as? ParagraphNode else { return }
@@ -340,7 +381,7 @@ final class PerformanceViewController: UIViewController {
         try p.append([t])
       }
     }
-    for _ in 0..<iterations { try? replace(legacyView.editor); try? replace(optimizedView.editor) }
+    try? replace(legacyView.editor); try? replace(optimizedView.editor)
   }
 
   // MARK: - Parity assertions
