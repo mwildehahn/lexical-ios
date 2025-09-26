@@ -53,7 +53,7 @@ final class PerformanceViewController: UIViewController {
   private var attrToggleBoldState = true
   private var totalSteps: Int = 0
   private var completedSteps: Int = 0
-  private var currentPreset: Preset = .standard
+  private var currentPreset: Preset = .quick
   private var isRunning = false
   private var prePostWrapped = false
 
@@ -70,8 +70,10 @@ final class PerformanceViewController: UIViewController {
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
+    // Auto-run once using Quick preset
     guard !didRunOnce else { return }
     didRunOnce = true
+    currentPreset = .quick
     DispatchQueue.main.async { [weak self] in self?.runBenchmarks() }
   }
 
@@ -146,10 +148,20 @@ final class PerformanceViewController: UIViewController {
   }
 
   private func configurePresetControl() {
+    let title = UILabel(); title.text = "Preset:"; title.font = .systemFont(ofSize: 12, weight: .medium)
     let control = UISegmentedControl(items: ["Quick", "Std", "Heavy"])
     control.selectedSegmentIndex = currentPreset.rawValue
     control.addTarget(self, action: #selector(onPresetChanged(_:)), for: .valueChanged)
-    navigationItem.titleView = control
+    let stack = UIStackView(arrangedSubviews: [title, control])
+    stack.axis = .horizontal
+    stack.spacing = 8
+    stack.alignment = .center
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+      stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12)
+    ])
   }
 
   private func configureRunButton() {
