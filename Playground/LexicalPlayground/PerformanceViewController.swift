@@ -58,6 +58,8 @@ final class PerformanceViewController: UIViewController {
   private var prePostWrapped = false
   private var presetHeader: UIStackView?
   private var presetControl: UISegmentedControl?
+  private var showLogsInUI = false // keep logs in console; UI shows pretty summary only
+  private var summary = NSMutableAttributedString()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -238,6 +240,7 @@ final class PerformanceViewController: UIViewController {
   }
 
   @objc private func copyResults() {
+    // Copy plain summary text for now
     UIPasteboard.general.string = resultsTextView.text
   }
 
@@ -245,7 +248,8 @@ final class PerformanceViewController: UIViewController {
   private func runBenchmarks() {
     guard !isRunning else { return }
     isRunning = true
-    resultsTextView.text = "Lexical Reconciler Benchmarks + Parity\n" + nowStamp() + "\n\n"
+    summary = NSMutableAttributedString(string: "Lexical Reconciler Benchmarks + Parity\n" + nowStamp() + "\n\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 12, weight: .regular), .foregroundColor: UIColor.secondaryLabel])
+    refreshSummaryView()
     copyButton.isEnabled = false
     activity.startAnimating()
     statusLabel.text = "Preparing…"
@@ -297,6 +301,9 @@ final class PerformanceViewController: UIViewController {
         self.statusLabel.text = "Done"
         self.copyButton.isEnabled = true
         self.isRunning = false
+        // Add a subtle footer
+        self.summary.append(NSAttributedString(string: "\nCompleted \(self.totalSteps) iterations across \(scenarios.count) scenarios.\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: UIColor.tertiaryLabel]))
+        self.refreshSummaryView()
       }
     }
   }
@@ -318,6 +325,8 @@ final class PerformanceViewController: UIViewController {
       let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs)
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
       self.appendLog(body + parity + "\n")
+      self.addSummaryLine(name: scenario.name, legacyWall: legacyDur, optimizedWall: optDur, legacyCount: self.legacyMetrics.runs.count, optimizedCount: self.optimizedMetrics.runs.count)
+      self.refreshSummaryView()
       // Reset documents between scenarios and continue
       self.resetDocuments(paragraphs: config(for: currentPreset).seedParas)
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
@@ -351,10 +360,12 @@ final class PerformanceViewController: UIViewController {
   }
 
   private func appendLog(_ line: String) {
-    let newText = (resultsTextView.text ?? "") + line + (line.hasSuffix("\n") ? "" : "\n")
-    resultsTextView.text = newText
-    let bottom = NSRange(location: max(newText.count - 1, 0), length: 1)
-    resultsTextView.scrollRangeToVisible(bottom)
+    if showLogsInUI {
+      let newText = (resultsTextView.text ?? "") + line + (line.hasSuffix("\n") ? "" : "\n")
+      resultsTextView.text = newText
+      let bottom = NSRange(location: max(newText.count - 1, 0), length: 1)
+      resultsTextView.scrollRangeToVisible(bottom)
+    }
     print(line)
   }
 
@@ -540,11 +551,56 @@ final class PerformanceViewController: UIViewController {
   }
 
   private func resetAndSeed(editor: Editor, paragraphs: Int) {
-    // 1) Reset to an empty editor state (safe blank)
-    let empty = EditorState.empty()
-    try? editor.setEditorState(empty)
-    // 2) Seed new content in a follow-up update
-    seedDocument(editor: editor, paragraphs: paragraphs)
+    print("🔥 PERF: resetAndSeed(editor=\(ObjectIdentifier(editor)), paras=\(paragraphs)) begin")
+    // Two-step safe path without ever leaving the editor empty to avoid placeholder/layout races.
+    try? editor.update {
+      guard let root = getRoot() else { return }
+      if root.getChildrenSize() == 0 {
+        let p = ParagraphNode(); let t = TextNode(text: "seed")
+        try p.append([t]); try root.append([p])
+      }
+    }
+    DispatchQueue.main.async {
+      try? editor.update {
+        guard let root = getRoot() else { return }
+        var newNodes: [Node] = []
+        for i in 0..<paragraphs {
+          let p = ParagraphNode(); let t = TextNode(text: "P#\(i) quick brown fox"); try p.append([t]); newNodes.append(p)
+        }
+        while let child = root.getFirstChild() { try child.remove() }
+        try root.append(newNodes)
+      }
+      print("🔥 PERF: resetAndSeed end")
+    }
+  }
+
+  // MARK: - Pretty summary
+  private func addSummaryLine(name: String, legacyWall: TimeInterval, optimizedWall: TimeInterval, legacyCount: Int, optimizedCount: Int) {
+    let avgL = legacyCount > 0 ? legacyWall / Double(legacyCount) : 0
+    let avgO = optimizedCount > 0 ? optimizedWall / Double(optimizedCount) : 0
+    let (faster, deltaPct) = diffPercent(b: avgO, a: avgL)
+
+    let title = NSAttributedString(string: "• \(name)\n", attributes: [.font: UIFont.systemFont(ofSize: 14, weight: .semibold), .foregroundColor: UIColor.label])
+    let mono = UIFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    let line1 = NSAttributedString(string: "   avg wall — legacy: \(ms(avgL))  optimized: \(ms(avgO))\n", attributes: [.font: mono, .foregroundColor: UIColor.secondaryLabel])
+    let color: UIColor = faster ? .systemGreen : (abs(deltaPct) < 0.5 ? .systemGray : .systemRed)
+    let verdict = faster ? "faster" : (abs(deltaPct) < 0.5 ? "same" : "slower")
+    let deltaText = NSAttributedString(string: String(format: "   Δ %.1f%% (%@)\n\n", deltaPct, verdict), attributes: [.font: mono, .foregroundColor: color])
+    summary.append(title); summary.append(line1); summary.append(deltaText)
+  }
+
+  private func refreshSummaryView() {
+    resultsTextView.attributedText = summary
+  }
+
+  private func ms(_ t: TimeInterval) -> String {
+    String(format: "%.2f ms", t * 1000)
+  }
+
+  private func diffPercent(b optimized: TimeInterval, a legacy: TimeInterval) -> (Bool, Double) {
+    guard legacy > 0 else { return (false, 0) }
+    let pct = (legacy - optimized) / legacy * 100
+    return (pct > 0, pct)
   }
 
   private func preWarmEditors() {
