@@ -28,6 +28,9 @@ let package = Package(
       name: "LexicalLinkPlugin",
       targets: ["LexicalLinkPlugin"]),
     .library(
+      name: "LexicalLinkHTMLSupport",
+      targets: ["LexicalLinkHTMLSupport"]),
+    .library(
       name: "LexicalInlineImagePlugin",
       targets: ["LexicalInlineImagePlugin"]),
     .library(
@@ -51,7 +54,7 @@ let package = Package(
       path: "./Lexical"),
     .testTarget(
       name: "LexicalTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML"],
+      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport"],
       path: "./LexicalTests"),
 
     .target(
@@ -84,6 +87,10 @@ let package = Package(
       name: "LexicalLinkPluginTests",
       dependencies: ["Lexical", "LexicalLinkPlugin"],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPluginTests"),
+    .target(
+      name: "LexicalLinkHTMLSupport",
+      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalHTML"],
+      path: "./Plugins/LexicalLinkPlugin/LexicalLinkHTMLSupport"),
 
     .target(
       name: "LexicalInlineImagePlugin",

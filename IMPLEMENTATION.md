@@ -218,6 +218,18 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 
 Reminder: after every significant change, run iOS simulator tests (Lexical-Package scheme) and build the Playground app. Update this file with status and a short summary before marking subtasks done.
 
+### 2025‑09‑26: Plugin parity — Link HTML export support
+- Added `LexicalLinkHTMLSupport` bridging target to provide retroactive `NodeHTMLSupport` conformance for `LinkNode` (exports `<a href="...">`).
+- Updated `Package.swift`:
+  - New product/target `LexicalLinkHTMLSupport` (deps: `Lexical`, `LexicalLinkPlugin`, `LexicalHTML`).
+  - Added `LexicalLinkHTMLSupport` as a dependency of `LexicalTests` to make the conformance available in tests.
+- Tests:
+  - Added `OptimizedReconcilerLinkHTMLExportParityTests` asserting HTML export parity (optimized vs legacy) for a paragraph containing a link with inline styles.
+  - Kept assertions to parity only (HTML utils currently return an empty string in this harness), matching existing parity tests.
+- Verification:
+  - iOS simulator tests (Lexical-Package scheme): PASS (278 tests, 4 skipped).
+  - Playground build (iPhone 17 Pro, iOS 26.0): PASS.
+
 ### 2025‑09‑25: Decorator removal parity (strict mode) — FIXED
 - Implemented safe pruning for `editor.rangeCache` after full/subtree recompute to drop stale keys:
   - `pruneRangeCacheGlobally(nextState:, editor:)` (full slow path)

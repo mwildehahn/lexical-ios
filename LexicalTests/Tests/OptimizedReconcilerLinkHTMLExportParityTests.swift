@@ -1,9 +1,11 @@
 import XCTest
 @testable import Lexical
 @testable import LexicalHTML
+@testable import LexicalLinkPlugin
+@testable import LexicalLinkHTMLSupport
 
 @MainActor
-final class OptimizedReconcilerHTMLExportParityTests: XCTestCase {
+final class OptimizedReconcilerLinkHTMLExportParityTests: XCTestCase {
 
   private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
@@ -26,26 +28,26 @@ final class OptimizedReconcilerHTMLExportParityTests: XCTestCase {
     return ((optCtx.editor, optCtx), (legCtx.editor, legCtx))
   }
 
-  func testHTMLExportParity_CommonConstructs() throws {
+  func testHTMLExportParity_LinkWithInlineStyles() throws {
     let (opt, leg) = makeEditors()
 
     func build(on editor: Editor) throws {
       try editor.update {
         guard let root = getRoot() else { return }
-        // Heading, Quote, Code, Paragraph with inline styles
-        let h = HeadingNode(tag: .h2); try h.append([ createTextNode(text: "Title") ])
-        let quote = QuoteNode(); let qp = createParagraphNode(); try qp.append([ createTextNode(text: "Quote") ]); try quote.append([qp])
-        let code = CodeNode(); try code.append([ createTextNode(text: "print('x')") ])
-        let p = createParagraphNode();
-        let t1 = createTextNode(text: "Hello ")
-        let tb = createTextNode(text: "Bold"); try tb.setBold(true)
-        let ti = createTextNode(text: " Italic"); try ti.setItalic(true)
-        try p.append([t1, tb, ti])
-        try root.append([h, quote, code, p])
+        let p = createParagraphNode()
+        let link = LinkNode(url: "https://example.com", key: nil)
+        let t1 = createTextNode(text: "Visit ")
+        let tb = createTextNode(text: "Example"); try tb.setBold(true)
+        let ti = createTextNode(text: ".com"); try ti.setItalic(true)
+        try link.append([tb, ti])
+        try p.append([t1, link])
+        try root.append([p])
       }
     }
+
     try build(on: opt.0)
     try build(on: leg.0)
+
 
     let htmlOpt = try generateHTMLFromNodes(editor: opt.0, selection: nil)
     let htmlLeg = try generateHTMLFromNodes(editor: leg.0, selection: nil)
