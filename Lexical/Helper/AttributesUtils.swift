@@ -126,13 +126,61 @@ enum AttributeUtils {
     var attributes = [[NSAttributedString.Key: Any]]()
     attributes.append(node.getAttributedStringAttributes(theme: theme))
     if let elementNode = node as? ElementNode, elementNode.isInline() == false {
-      attributes.append([.indent_internal: elementNode.getIndent()])
+      // Compute indent without calling getLatest()/getIndent():
+      // For ListItemNode, indent equals nesting depth of ancestor ListItemNodes.
+      func computeIndent(_ elem: ElementNode) -> Int {
+        // Special handling for list items
+        if elem.type.rawValue == "listitem" {
+          // parent: ListNode; grandParent: maybe ListItemNode when nested
+          var depth = 0
+          var maybeListItemKey = state.nodeMap[elem.parent ?? ""]?.parent
+          while let listItemKey = maybeListItemKey, let listItemNode = state.nodeMap[listItemKey] {
+            if (listItemNode as? ElementNode)?.type.rawValue == "listitem" {
+              depth += 1
+              // climb two levels: ListItem -> List -> parent of List
+              let listKey = state.nodeMap[listItemKey]?.parent
+              maybeListItemKey = state.nodeMap[listKey ?? ""]?.parent
+            } else {
+              break
+            }
+          }
+          return depth
+        }
+        // Fallback to the element's stored indent (safe for non-list elements)
+        return (elem as ElementNode).indent
+      }
+      var dict: [NSAttributedString.Key: Any] = [.indent_internal: computeIndent(elementNode)]
+      // For list items, synthesize base padding so paragraphs inside are offset by one indent level
+      if elementNode.type.rawValue == "listitem" {
+        dict[.paddingHead] = CGFloat(theme.indentSize)
+      }
+      attributes.append(dict)
     }
 
     while let parent = node.parent, let parentNode = state.nodeMap[parent] {
       attributes.append(parentNode.getAttributedStringAttributes(theme: theme))
       if let elementNode = parentNode as? ElementNode, elementNode.isInline() == false {
-        attributes.append([.indent_internal: elementNode.getIndent()])
+        // See note above: compute indent without getLatest().
+        func computeIndent(_ elem: ElementNode) -> Int {
+          if elem.type.rawValue == "listitem" {
+            var depth = 0
+            var maybeListItemKey = state.nodeMap[elem.parent ?? ""]?.parent
+            while let listItemKey = maybeListItemKey, let listItemNode = state.nodeMap[listItemKey] {
+              if (listItemNode as? ElementNode)?.type.rawValue == "listitem" {
+                depth += 1
+                let listKey = state.nodeMap[listItemKey]?.parent
+                maybeListItemKey = state.nodeMap[listKey ?? ""]?.parent
+              } else { break }
+            }
+            return depth
+          }
+          return (elem as ElementNode).indent
+        }
+        var dict: [NSAttributedString.Key: Any] = [.indent_internal: computeIndent(elementNode)]
+        if elementNode.type.rawValue == "listitem" {
+          dict[.paddingHead] = CGFloat(theme.indentSize)
+        }
+        attributes.append(dict)
       }
       node = parentNode
     }

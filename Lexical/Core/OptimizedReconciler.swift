@@ -228,6 +228,12 @@ internal enum OptimizedReconciler {
         // After block-level application, top up any ranges missing base font/color so
         // newly inserted pre/postamble and empty segments render with the theme color.
         fillMissingBaseInlineAttributes(editor: editor)
+
+        // Finally, ensure inline attributes originating from ancestor and element
+        // nodes (e.g. LinkNode and ListItemNode) are present starting at element
+        // preambles so custom drawing (bullets) and link color work on first paint.
+        reapplyInlineAttributes(editor: editor, pendingState: pendingEditorState, limitedTo: impacted)
+        reapplyElementInlineAttributes(editor: editor, pendingState: pendingEditorState, limitedTo: impacted)
       }
 
       // Prune stale range cache entries for nodes that no longer exist in pending state
@@ -354,9 +360,13 @@ internal enum OptimizedReconciler {
           newCache[kRootNodeKey] = RangeCacheItem(nodeKey: kRootNodeKey, location: 0, nodeIndex: 0, preambleLength: 0, preambleSpecialCharacterLength: 0, childrenLength: 0, textLength: 0, postambleLength: 0)
           if let root = pendingEditorState.nodeMap[kRootNodeKey] { visit(root.getKey()) }
           editor.rangeCache = newCache
-          // Re-apply block attributes and decorator bookkeeping for consistency
+          // Re-apply block attributes and decorator bookkeeping for consistency,
+          // then restore inline/base attributes so the coerced string is fully styled.
           applyBlockLevelAttributes(editor: editor, pendingState: pendingEditorState, dirtyNodes: editor.dirtyNodes, textStorage: ts)
           updateDecoratorPositions(editor: editor, pendingState: pendingEditorState)
+          fillMissingBaseInlineAttributes(editor: editor)
+          reapplyInlineAttributes(editor: editor, pendingState: pendingEditorState)
+          reapplyElementInlineAttributes(editor: editor, pendingState: pendingEditorState)
 
           if editor.featureFlags.diagnostics.verboseLogs {
             let prev = String(expected.prefix(120)).replacingOccurrences(of: "\n", with: "\\n")
@@ -499,6 +509,11 @@ internal enum OptimizedReconciler {
     // adds attributes where missing and won't override links or styled runs.
     Self.fillMissingBaseInlineAttributes(editor: editor)
 
+    // Also reapply inline attributes for all nodes to ensure link color
+    // and list bullets are present from the first render.
+    Self.reapplyInlineAttributes(editor: editor, pendingState: pendingState)
+    Self.reapplyElementInlineAttributes(editor: editor, pendingState: pendingState)
+
     // Parity safeguard (optional): ensure fresh-doc string exactly matches legacy serialization.
     // Disabled by default to avoid stripping attributes; enable only under selectionParityDebug.
     if editor.featureFlags.selectionParityDebug {
@@ -532,6 +547,183 @@ internal enum OptimizedReconciler {
       if !toAdd.isEmpty { ts.addAttributes(toAdd, range: range) }
     }
     ts.endEditing(); ts.mode = prev
+  }
+
+  /// Reapply a minimal set of inline attributes (font/color/link/list markers)
+  /// to visible text ranges for a collection of TextNodes. This is a safety net
+  /// for cases where the initial hydration path or incremental updates leave
+  /// some runs uncoated with inline attributes that are normally inherited from
+  /// ancestors (e.g. LinkNode or ListItemNode). It only adds/merges attributes;
+  /// it never removes existing ones.
+  private static func reapplyInlineAttributes(
+    editor: Editor,
+    pendingState: EditorState,
+    limitedTo keys: Set<NodeKey>? = nil
+  ) {
+    guard let ts = editor.textStorage else { return }
+    let prev = ts.mode; ts.mode = .controllerMode
+    let theme = editor.getTheme()
+    
+    // Avoid depending on plugin symbols from Core: use raw value of list item key.
+    let listItemKey = NSAttributedString.Key(rawValue: "list_item")
+    
+    // Compute absolute start purely from pendingState + rangeCache (no Fenwick / editor lookups).
+    func absStartCache(_ key: NodeKey) -> Int {
+      if key == kRootNodeKey { return 0 }
+      guard let node = pendingState.nodeMap[key], let parentKey = node.parent,
+            let parentItem = editor.rangeCache[parentKey], let parent = pendingState.nodeMap[parentKey] as? ElementNode else {
+        return editor.rangeCache[key]?.location ?? 0
+      }
+      var acc = absStartCache(parentKey) + parentItem.preambleLength
+      for ck in parent.getChildrenKeys(fromLatest: false) {
+        if ck == key { break }
+        if let s = editor.rangeCache[ck] {
+          acc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength
+        }
+      }
+      return acc
+    }
+
+    func visit(_ key: NodeKey) {
+      guard let node = pendingState.nodeMap[key] else { return }
+      if let text = node as? TextNode, let item = editor.rangeCache[key] {
+        let start = absStartCache(key) + item.preambleLength
+        let length = item.textLength
+        if length > 0 && start >= 0 && (start + length) <= ts.length {
+          var attrs = AttributeUtils.attributedStringStyles(from: text, state: pendingState, theme: theme)
+          // Defensive: ensure font reflects format flags even if upstream styling missed it
+          let baseFont = (attrs[.font] as? UIFont) ?? (theme.paragraph?[.font] as? UIFont) ?? LexicalConstants.defaultFont
+          var desc = baseFont.fontDescriptor
+          var tr = desc.symbolicTraits
+          if text.format.bold { tr.insert(.traitBold) } else { tr.remove(.traitBold) }
+          if text.format.italic { tr.insert(.traitItalic) } else { tr.remove(.traitItalic) }
+          if let nd = desc.withSymbolicTraits(tr) { attrs[.font] = UIFont(descriptor: nd, size: 0) }
+          // Restrict to inline keys so we don’t fight the block‑level pass
+          let allowed: Set<NSAttributedString.Key> = [
+            .font, .foregroundColor, .underlineStyle, .strikethroughStyle, .backgroundColor, .link, listItemKey
+          ]
+          attrs = attrs.filter { allowed.contains($0.key) }
+          if !attrs.isEmpty {
+            ts.addAttributes(attrs, range: NSRange(location: start, length: length))
+          }
+        }
+      }
+      if let elem = node as? ElementNode {
+        for c in elem.getChildrenKeys(fromLatest: false) { visit(c) }
+      }
+    }
+
+    if let keys = keys, !keys.isEmpty {
+      for k in keys { visit(k) }
+    } else if let root = pendingState.nodeMap[kRootNodeKey] {
+      visit(root.getKey())
+    }
+
+    ts.mode = prev
+  }
+
+  /// Overlay element-scope inline attributes (e.g. link color, list bullets)
+  /// onto the character ranges owned by those elements. This ensures that
+  /// attributes that drive custom drawing (.list_item) and inline styling
+  /// (.link, foregroundColor) are present starting from the element preamble.
+  private static func reapplyElementInlineAttributes(
+    editor: Editor,
+    pendingState: EditorState,
+    limitedTo keys: Set<NodeKey>? = nil
+  ) {
+    guard let ts = editor.textStorage else { return }
+    let prev = ts.mode; ts.mode = .controllerMode
+    let theme = editor.getTheme()
+    let listItemKey = NSAttributedString.Key(rawValue: "list_item")
+
+    // Pure cache-based absolute start (no Fenwick / runtime node lookups)
+    func absStartCache(_ key: NodeKey) -> Int {
+      if key == kRootNodeKey { return 0 }
+      guard let node = pendingState.nodeMap[key], let parentKey = node.parent,
+            let parentItem = editor.rangeCache[parentKey], let parent = pendingState.nodeMap[parentKey] as? ElementNode else {
+        return editor.rangeCache[key]?.location ?? 0
+      }
+      var acc = absStartCache(parentKey) + parentItem.preambleLength
+      for ck in parent.getChildrenKeys(fromLatest: false) {
+        if ck == key { break }
+        if let s = editor.rangeCache[ck] {
+          acc += s.preambleLength + s.childrenLength + s.textLength + s.postambleLength
+        }
+      }
+      return acc
+    }
+
+    func coat(_ key: NodeKey) {
+      guard let node = pendingState.nodeMap[key], let item = editor.rangeCache[key] else { return }
+      // Only reapply for element types that carry inline visuals we need:
+      // - LinkNode: .link + its foregroundColor from theme.link
+      // - ListItemNode: .list_item only (bullet drawing reads this); avoid
+      //   overlaying paragraphStyle or foregroundColor to prevent overriding
+      //   link colors or text styles.
+      var attrs: [NSAttributedString.Key: Any] = [:]
+      if String(describing: type(of: node)).contains("LinkNode") {
+        let linkAttrs = node.getAttributedStringAttributes(theme: theme)
+        let allowed: Set<NSAttributedString.Key> = [.link, .foregroundColor]
+        attrs = linkAttrs.filter { allowed.contains($0.key) }
+      } else if String(describing: type(of: node)).contains("ListItemNode") {
+        // For bullets to draw, the .list_item attribute MUST begin at the first
+        // character of the paragraph line (so previous char is newline or index 0).
+        // Apply .list_item on each child paragraph starting at the paragraph start.
+        if let elem = node as? ElementNode {
+          for ck in elem.getChildrenKeys(fromLatest: false) {
+            if let para = pendingState.nodeMap[ck] as? ParagraphNode,
+               let pItem = editor.rangeCache[ck] {
+              // Paragraph style (indent/padding) — ensure text is offset
+              let psAttrs = AttributeUtils.attributedStringStyles(from: para, state: pendingState, theme: theme)
+              let pLoc = absStartCache(ck)
+              let pLen = pItem.preambleLength + pItem.childrenLength + pItem.textLength + pItem.postambleLength
+              if pLen > 0 && pLoc >= 0 && NSMaxRange(NSRange(location: pLoc, length: pLen)) <= ts.length {
+                if let ps = psAttrs[.paragraphStyle] as? NSParagraphStyle {
+                  ts.addAttribute(.paragraphStyle, value: ps, range: NSRange(location: pLoc, length: pLen))
+                }
+                // Apply .list_item across the paragraph so custom drawing sees it consistently
+                let bulletAttr = (node.getAttributedStringAttributes(theme: theme)[listItemKey]) ?? true
+                ts.addAttribute(listItemKey, value: bulletAttr, range: NSRange(location: pLoc, length: pLen))
+              }
+            } else if let textChild = pendingState.nodeMap[ck] as? TextNode,
+                      let cItem = editor.rangeCache[ck] {
+              // No paragraph node — apply for text child directly at its first character
+              let base = absStartCache(ck) + cItem.preambleLength
+              if base >= 0 && base < ts.length {
+                let bulletAttr = (node.getAttributedStringAttributes(theme: theme)[listItemKey]) ?? true
+                let paraRange = ts.mutableString.paragraphRange(for: NSRange(location: base, length: 0))
+                ts.addAttribute(listItemKey, value: bulletAttr, range: paraRange)
+                // Paragraph style from the list item element
+                let elemPSAttrs = AttributeUtils.attributedStringStyles(from: elem, state: pendingState, theme: theme)
+                if let ps = elemPSAttrs[.paragraphStyle] as? NSParagraphStyle {
+                  ts.addAttribute(.paragraphStyle, value: ps, range: paraRange)
+                }
+              }
+            }
+          }
+        }
+        // Do not apply .list_item at the element base; drawing logic expects it
+        // to begin at the paragraph start.
+        return
+      } else {
+        return
+      }
+      guard !attrs.isEmpty else { return }
+      // Cache-based absolute base to avoid read-scope dependencies
+      let loc = absStartCache(key)
+      let len = item.preambleLength + item.childrenLength + item.textLength + item.postambleLength
+      if len > 0 && loc >= 0 && NSMaxRange(NSRange(location: loc, length: len)) <= ts.length {
+        ts.addAttributes(attrs, range: NSRange(location: loc, length: len))
+      }
+    }
+
+    if let filter = keys, !filter.isEmpty {
+      for k in filter { coat(k) }
+    } else {
+      for (k, _) in pendingState.nodeMap { coat(k) }
+    }
+
+    ts.mode = prev
   }
 
   /// Build a complete INSERT-only batch for a fresh document using document order.

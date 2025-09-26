@@ -158,6 +158,19 @@ Notes
 
 Follow‑up (Compare screen & base attributes)
 - CompareViewController now includes ListPlugin and LinkPlugin for both editors and sets Theme.link color; bullets and links render in both Legacy and Optimized.
+
+2025‑09‑26 — Playground: Optimized editor missing styles (white text, bullets, links)
+- Root cause
+  - Parity‑coerce inside the optimized reconciler could replace the TextStorage string with a plain (unstyled) legacy serialization during the first load of the Editor screen. After this replacement we only re‑applied block‑level attributes, so inline styles (font/foregroundColor), link color and list bullet attributes were missing until a later edit triggered another reconcile.
+  - In some incremental cases ancestor‑driven inline attributes (e.g., LinkNode, ListItemNode) were not merged onto visible text runs immediately.
+- Fix
+  - Added `reapplyInlineAttributes(editor:pendingState:limitedTo:)` that walks TextNodes and overlays a minimal set of inline keys: font, foregroundColor, underlineStyle, strikethroughStyle, backgroundColor, link, and the list item attribute (raw key `"list_item"` to avoid a Core→Plugin dependency).
+  - Invoke it after each reconcile (for impacted subtrees), after fresh‑document hydration, and after parity‑coerce. Also call `fillMissingBaseInlineAttributes` after parity‑coerce.
+- Files
+  - Lexical/Core/OptimizedReconciler.swift — new helper + calls in three places.
+- Verification (iOS 26.0 simulator)
+  - Lexical scheme: green.
+  - Playground Editor tab: initial debug dump now shows color/link present immediately: `🔥 EDITOR ATTR [Editor(viewDidLoad)]: 0:f=1 c=1 …`. Bullets render via ListPlugin.
 - Added base-attribute top‑up after both fresh hydration and regular optimized reconcile: any ranges missing .font or .foregroundColor get the theme’s base values (does not override existing attributes). This removes “black text until you type”.
 
 Convenience runner
@@ -386,3 +399,18 @@ Open Tasks
 - Always run the authoritative suite with the `Lexical‑Package` scheme on iOS (iPhone 17 Pro, iOS 26.0) per AGENTS.md.
 - For every user‑reported issue, add a focused unit test (expected failure allowed while iterating) and log it in “Bugs (tracked)”.
 - No commits to code until focused tests are green; documentation updates are allowed to keep plan accurate.
+2025‑09‑26 — List bullet overlap (optimized)
+- Symptom: In Optimized, list bullets either overlapped the first character or didn’t draw after toggling modes. Legacy was correct.
+- Root cause: Paragraph indent for list paragraphs wasn’t synthesized identically in attribute paths that avoid getLatest(). The ListPlugin draws bullets only when `.list_item` begins at the paragraph’s first character; applying it at the list item element or with missing headIndent causes overlap.
+- Fixes:
+  - AttributesUtils: when computing attributes for ElementNodes with type `listitem`, synthesize both `indent_internal = depth(list nesting)` and `paddingHead = theme.indentSize`. This reproduces Legacy’s headIndent baseline without getLatest().
+  - Optimized overlays:
+    - Use cache‑only absolute start for all overlays (pendingState + rangeCache), removing any dependence on Fenwick/runtime lookups.
+    - Apply `.list_item` starting exactly at the list paragraph’s first character (length 1). Apply paragraphStyle to the entire paragraph’s character range.
+  - Text leaf overlay: derive UIFont from TextNode.format and apply on the exact text span using cache start to preserve italic/bold.
+- Verification:
+  - Playground: sample `123\n456\n789` (789 in list) — bullet sits to the left, text indented equally in Legacy and Optimized; link/italic lines match.
+  - iOS simulator builds for Lexical + Lexical‑Package (list/link parity tests) succeeded.
+- Commands:
+  - Core: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/SelectionParityTests -only-testing:LexicalTests/TypingAttributesParityTests test`
+  - Plugins: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalListPluginTests/ListStyleParityTests -only-testing:LexicalLinkPluginTests/LinkStyleParityTests test`
