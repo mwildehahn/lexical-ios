@@ -25,6 +25,9 @@ let package = Package(
       name: "LexicalHTML",
       targets: ["LexicalHTML"]),
     .library(
+      name: "LexicalAutoLinkPlugin",
+      targets: ["LexicalAutoLinkPlugin"]),
+    .library(
       name: "LexicalLinkPlugin",
       targets: ["LexicalLinkPlugin"]),
     .library(
@@ -54,7 +57,7 @@ let package = Package(
       path: "./Lexical"),
     .testTarget(
       name: "LexicalTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport"],
+      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin"],
       path: "./LexicalTests"),
 
     .target(
@@ -78,6 +81,11 @@ let package = Package(
       name: "LexicalHTMLTests",
       dependencies: ["Lexical", "LexicalHTML", "SwiftSoup"],
       path: "./Plugins/LexicalHTML/LexicalHTMLTests"),
+
+    .target(
+      name: "LexicalAutoLinkPlugin",
+      dependencies: ["Lexical", "LexicalLinkPlugin"],
+      path: "./Plugins/LexicalAutoLinkPlugin/LexicalAutoLinkPlugin"),
 
     .target(
       name: "LexicalLinkPlugin",

@@ -102,7 +102,6 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [x] Toggle via debug flag `useReconcilerShadowCompare`; scenario tests exercise multiple cases.
   - [x] Expand scenario corpus (typing, reorders, decorators, coalesced replace, mixed parents). CI runs the iOS simulator suite nightly with these tests included.
 
-- [ ] M5 — Tests & Parity (comprehensive parity suite)
 - [x] M5 — Tests & Parity (comprehensive parity suite)
   - Core text/attributes
     - [x] Text‑only updates: typing, backspace, replace range (single and multi‑node).
@@ -241,6 +240,19 @@ Reminder: after every significant change, run iOS simulator tests (Lexical-Packa
 - Verification:
   - iOS simulator: all new tests green; full suite now 282 tests, 0 failures (4 skipped).
   - Playground app build: PASS.
+
+### 2025‑09‑26: Selection stability (large-scale) + plugin smoke parity
+- Selection stability:
+  - `SelectionStabilityLargeUnrelatedEditsTests` — 200-paragraph doc, caret placed early; tail half receives style+text edits and a new tail paragraph; caret location remains unchanged; parity vs legacy.
+  - `SelectionStabilityReorderLargeUnrelatedEditsTests` — 400-paragraph doc, tail reorders in blocks + style/append edits; caret stable; parity vs legacy.
+- Plugin smoke parity:
+  - `PluginsSmokeParityTests.testAutoLinkSmokeParity` — AutoLink transforms a plain URL-like token; optimized vs legacy final string equal.
+  - `PluginsSmokeParityTests.testEditorHistoryUndoRedoParity` — append series, undo 5/redo 3; parity on final string.
+- Build wiring:
+  - Added `LexicalAutoLinkPlugin` product/target in Package.swift and included it in `LexicalTests` deps.
+- Verification:
+  - Filtered iOS simulator tests for the new suites: PASS.
+  - Full iOS simulator suite: PASS. Playground build: PASS.
 
 ### 2025‑09‑25: Decorator removal parity (strict mode) — FIXED
 - Implemented safe pruning for `editor.rangeCache` after full/subtree recompute to drop stale keys:
