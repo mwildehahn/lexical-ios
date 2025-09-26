@@ -27,7 +27,7 @@ internal enum OptimizedReconciler {
 
   // MARK: - Instruction application & coalescing
   @MainActor
-  private static func applyInstructions(_ instructions: [Instruction], editor: Editor) -> InstructionApplyStats {
+  private static func applyInstructions(_ instructions: [Instruction], editor: Editor, fixAttributesEnabled: Bool = true) -> InstructionApplyStats {
     guard let textStorage = editor.textStorage else { return InstructionApplyStats(deletes: 0, inserts: 0, sets: 0, fixes: 0, duration: 0) }
 
     // Gather deletes and inserts
@@ -105,14 +105,16 @@ internal enum OptimizedReconciler {
       modifiedRanges.append(r)
     }
 
-    // Fix attributes over the minimal covering range
-    if let cover = modifiedRanges.reduce(nil as NSRange?, { acc, r in
-      guard let a = acc else { return r }
-      let start = min(a.location, r.location)
-      let end = max(NSMaxRange(a), NSMaxRange(r))
-      return NSRange(location: start, length: end - start)
-    }) {
-      textStorage.fixAttributes(in: cover)
+    // Fix attributes over the minimal covering range (optional)
+    if fixAttributesEnabled {
+      if let cover = modifiedRanges.reduce(nil as NSRange?, { acc, r in
+        guard let a = acc else { return r }
+        let start = min(a.location, r.location)
+        let end = max(NSMaxRange(a), NSMaxRange(r))
+        return NSRange(location: start, length: end - start)
+      }) {
+        textStorage.fixAttributes(in: cover)
+      }
     }
 
     textStorage.endEditing()
@@ -437,7 +439,8 @@ internal enum OptimizedReconciler {
       instructions.append(.insert(location: textStart, attrString: attrString))
     }
 
-    let stats = applyInstructions(instructions, editor: editor)
+    // Insert-block builds complete attributed content; we can skip fixAttributes here.
+    let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: false)
 
     // Update RangeCache using Fenwick when enabled, otherwise fallback helper
     let delta = newTextLen - oldTextLen
@@ -588,7 +591,8 @@ internal enum OptimizedReconciler {
 
     let stats = applyInstructions(instructions, editor: editor)
 
-    if editor.featureFlags.useReconcilerInsertBlockFenwick {
+    // Prefer Fenwick range shift when Fenwick deltas are enabled
+    if editor.featureFlags.useReconcilerFenwickDelta || editor.featureFlags.useReconcilerInsertBlockFenwick {
       // Compute range cache only for the inserted subtree at its final location
       let insertedLen = attr.length
       _ = recomputeRangeCacheSubtree(
@@ -667,18 +671,23 @@ internal enum OptimizedReconciler {
   // Find first key whose cached location is >= targetLocation
   @MainActor
   private static func firstKey(afterOrAt targetLocation: Int, in cache: [NodeKey: RangeCacheItem]) -> NodeKey? {
-    var best: (key: NodeKey, loc: Int)? = nil
-    for (k, item) in cache {
-      let loc = item.location
+    // Build ordered list once and binary search by location
+    let ordered = cache.map { ($0.key, $0.value.location) }.sorted { $0.1 < $1.1 }
+    guard !ordered.isEmpty else { return nil }
+    var lo = 0, hi = ordered.count - 1
+    var ans: NodeKey? = nil
+    while lo <= hi {
+      let mid = (lo + hi) / 2
+      let loc = ordered[mid].1
       if loc >= targetLocation {
-        if let cur = best {
-          if loc < cur.loc { best = (k, loc) }
-        } else {
-          best = (k, loc)
-        }
+        ans = ordered[mid].0
+        if mid == 0 { break }
+        hi = mid - 1
+      } else {
+        lo = mid + 1
       }
     }
-    return best?.key
+    return ans
   }
 
   // Multi-text changes in one pass (central aggregation only)
@@ -877,9 +886,15 @@ internal enum OptimizedReconciler {
     // Decide whether to do minimal moves or full region rebuild
     let movedCount = nextChildren.filter { !stableSet.contains($0) }.count
     let lisLen = stableSet.count
-    // Prefer minimal moves more aggressively on small/medium child counts
-    let threshold = max(1, nextChildren.count / 10) // ~10%
-    let preferMinimalMoves = lisLen >= threshold
+    // Heuristic: prefer minimal moves when the total bytes moved is small relative to the region,
+    // otherwise rebuild the region in one replace.
+    let movedByteSum: Int = nextChildren.reduce(0) { acc, k in
+      if !stableSet.contains(k), let item = editor.rangeCache[k] { return acc + item.range.length } else { return acc }
+    }
+    let regionBytes = childrenRange.length
+    let movedRatio = regionBytes > 0 ? Double(movedByteSum) / Double(regionBytes) : 0.0
+    // Base on both moved count vs total and moved byte ratio; lean to minimal for small fractions
+    let preferMinimalMoves = (movedCount <= max(2, nextChildren.count / 6)) || (movedRatio <= 0.35)
     if movedCount == 0 {
       // Nothing to do beyond cache recompute
       _ = recomputeRangeCacheSubtree(
