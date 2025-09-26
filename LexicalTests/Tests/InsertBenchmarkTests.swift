@@ -51,6 +51,7 @@ final class InsertBenchmarkTests: XCTestCase {
   }
 
   func testInsertBenchmarksQuick() throws {
+    throw XCTSkip("Perf-only; run in Playground Perf tab for detailed results.")
     let variations: [Variation] = [
       .init(name: "Optimized (base)", flags: FeatureFlags(useOptimizedReconciler: true, useReconcilerFenwickDelta: true, useOptimizedReconcilerStrictMode: true)),
       .init(name: "+ Central Aggregation", flags: FeatureFlags(useOptimizedReconciler: true, useReconcilerFenwickDelta: true, useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true)),

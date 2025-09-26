@@ -14,9 +14,9 @@ final class PerformanceViewController: UIViewController {
   private struct PresetConfig { let seedParas: Int; let batch: Int; let iterTop: Int; let iterMid: Int; let iterEnd: Int; let iterText: Int; let iterAttr: Int; let iterSmallReorder: Int; let iterCoalesced: Int; let iterPrePost: Int; let iterLargeReorder: Int }
   private func config(for preset: Preset) -> PresetConfig {
     switch preset {
-    case .quick: return PresetConfig(seedParas: 20, batch: 1, iterTop: 20, iterMid: 20, iterEnd: 20, iterText: 15, iterAttr: 15, iterSmallReorder: 15, iterCoalesced: 10, iterPrePost: 10, iterLargeReorder: 10)
-    case .standard: return PresetConfig(seedParas: 30, batch: 2, iterTop: 40, iterMid: 40, iterEnd: 40, iterText: 30, iterAttr: 30, iterSmallReorder: 30, iterCoalesced: 15, iterPrePost: 20, iterLargeReorder: 20)
-    case .heavy: return PresetConfig(seedParas: 80, batch: 3, iterTop: 100, iterMid: 100, iterEnd: 100, iterText: 60, iterAttr: 60, iterSmallReorder: 60, iterCoalesced: 30, iterPrePost: 40, iterLargeReorder: 40)
+    case .quick: return PresetConfig(seedParas: 100, batch: 1, iterTop: 10, iterMid: 10, iterEnd: 10, iterText: 8, iterAttr: 8, iterSmallReorder: 8, iterCoalesced: 5, iterPrePost: 6, iterLargeReorder: 6)
+    case .standard: return PresetConfig(seedParas: 250, batch: 2, iterTop: 20, iterMid: 20, iterEnd: 20, iterText: 15, iterAttr: 15, iterSmallReorder: 15, iterCoalesced: 10, iterPrePost: 12, iterLargeReorder: 12)
+    case .heavy: return PresetConfig(seedParas: 500, batch: 3, iterTop: 40, iterMid: 40, iterEnd: 40, iterText: 24, iterAttr: 24, iterSmallReorder: 24, iterCoalesced: 12, iterPrePost: 16, iterLargeReorder: 16)
     }
   }
   // MARK: - Scenario models
@@ -47,6 +47,7 @@ final class PerformanceViewController: UIViewController {
   // MARK: - Editors & Views
   private var legacyView: LexicalView!
   private var optimizedView: LexicalView!
+  private var tk2View: UITextView?
   private var legacyMetrics = PerfMetricsContainer()
   private var optimizedMetrics = PerfMetricsContainer()
   private var didRunOnce = false
@@ -54,12 +55,17 @@ final class PerformanceViewController: UIViewController {
   private var totalSteps: Int = 0
   private var completedSteps: Int = 0
   private var currentPreset: Preset = .quick
+  private var seedParasCurrent: Int = 0
   private var isRunning = false
   private var prePostWrapped = false
   private var presetHeader: UIStackView?
   private var presetControl: UISegmentedControl?
   private var showLogsInUI = false // keep logs in console; UI shows pretty summary only
   private var summary = NSMutableAttributedString()
+  // Variation tracking (for best TOP insert)
+  private var recordingVariations = false
+  private var currentVariationName: String? = nil
+  private var bestTopInsert: (name: String, avg: TimeInterval)? = nil
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -183,7 +189,8 @@ final class PerformanceViewController: UIViewController {
     guard let newPreset = Preset(rawValue: sender.selectedSegmentIndex) else { return }
     currentPreset = newPreset
     // Re-seed for the new preset to keep the doc size aligned
-    resetDocuments(paragraphs: config(for: currentPreset).seedParas)
+    seedParasCurrent = config(for: currentPreset).seedParas
+    resetDocuments(paragraphs: seedParasCurrent)
     appendLog("Preset switched → \(currentPreset). Ready. Tap Run to start.")
   }
 
@@ -231,11 +238,34 @@ final class PerformanceViewController: UIViewController {
     // Seed both documents with identical content (keep modest for UI responsiveness)
     seedDocument(editor: legacy.editor, paragraphs: 100)
     seedDocument(editor: optimized.editor, paragraphs: 100)
+
+    // Optional: TextKit 2 frontend A/B — mirror optimized content into a TK2 UITextView
+    if FlagsStore.shared.tk2 {
+      let t = UITextView(usingTextLayoutManager: true)
+      t.isEditable = false
+      t.backgroundColor = .clear
+      t.translatesAutoresizingMaskIntoConstraints = false
+      optimizedContainer.addSubview(t)
+      NSLayoutConstraint.activate([
+        t.topAnchor.constraint(equalTo: optimizedContainer.topAnchor),
+        t.bottomAnchor.constraint(equalTo: optimizedContainer.bottomAnchor),
+        t.leadingAnchor.constraint(equalTo: optimizedContainer.leadingAnchor),
+        t.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor)
+      ])
+      self.tk2View = t
+      // Keep LexicalView present for updates but hide it so only TK2 renders
+      optimized.isHidden = true
+      syncTK2FromOptimized()
+    } else {
+      self.tk2View = nil
+    }
   }
 
   // MARK: - Variations Runner
   @objc private func runVariationsTapped() {
     guard !isRunning else { return }
+    recordingVariations = true
+    bestTopInsert = nil
     isRunning = true
     summary = NSMutableAttributedString(string: "Lexical Perf Variations\n" + nowStamp() + "\n\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 12, weight: .regular), .foregroundColor: UIColor.secondaryLabel])
     refreshSummaryView()
@@ -289,7 +319,12 @@ final class PerformanceViewController: UIViewController {
 
     runVariationList(variations, index: 0) { [weak self] in
       guard let self else { return }
-      self.activity.stopAnimating(); self.statusLabel.text = "Done"; self.copyButton.isEnabled = true; self.isRunning = false; self.refreshSummaryView()
+      if let best = self.bestTopInsert {
+        let mono = UIFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
+        let line = NSAttributedString(string: String(format: "Fastest TOP insert: %@ (avg %.2f ms)\n\n", best.name, best.avg*1000), attributes: [.font: mono, .foregroundColor: UIColor.systemGreen])
+        self.summary.append(line)
+      }
+      self.activity.stopAnimating(); self.statusLabel.text = "Done"; self.copyButton.isEnabled = true; self.isRunning = false; self.refreshSummaryView(); self.recordingVariations = false
     }
   }
 
@@ -297,12 +332,14 @@ final class PerformanceViewController: UIViewController {
     guard index < vars.count else { completion(); return }
     let (name, flags) = vars[index]
     appendLog("\n===== Variation: \(name) =====\n")
+    currentVariationName = name
     // Rebuild editors with new optimized flags
     teardownEditors()
     buildEditorsWith(optimizedFlags: flags)
     // Re-seed and run scenarios
     currentPreset = .quick
     let cfg = config(for: currentPreset)
+    seedParasCurrent = cfg.seedParas
     preWarmEditors(); resetDocuments(paragraphs: cfg.seedParas)
     let scenarios = makeScenarios()
     totalSteps = scenarios.reduce(0) { $0 + $1.iterations }; completedSteps = 0
@@ -315,6 +352,7 @@ final class PerformanceViewController: UIViewController {
 
   private func teardownEditors() {
     legacyView?.removeFromSuperview(); optimizedView?.removeFromSuperview(); legacyView = nil; optimizedView = nil
+    tk2View?.removeFromSuperview(); tk2View = nil
   }
 
   private func buildEditorsWith(optimizedFlags: FeatureFlags) {
@@ -330,6 +368,25 @@ final class PerformanceViewController: UIViewController {
       legacy.topAnchor.constraint(equalTo: legacyContainer.topAnchor), legacy.bottomAnchor.constraint(equalTo: legacyContainer.bottomAnchor), legacy.leadingAnchor.constraint(equalTo: legacyContainer.leadingAnchor), legacy.trailingAnchor.constraint(equalTo: legacyContainer.trailingAnchor),
       optimized.topAnchor.constraint(equalTo: optimizedContainer.topAnchor), optimized.bottomAnchor.constraint(equalTo: optimizedContainer.bottomAnchor), optimized.leadingAnchor.constraint(equalTo: optimizedContainer.leadingAnchor), optimized.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor),
     ])
+
+    if optimizedFlags.useTextKit2Experimental {
+      let t = UITextView(usingTextLayoutManager: true)
+      t.isEditable = false
+      t.backgroundColor = .clear
+      t.translatesAutoresizingMaskIntoConstraints = false
+      optimizedContainer.addSubview(t)
+      NSLayoutConstraint.activate([
+        t.topAnchor.constraint(equalTo: optimizedContainer.topAnchor),
+        t.bottomAnchor.constraint(equalTo: optimizedContainer.bottomAnchor),
+        t.leadingAnchor.constraint(equalTo: optimizedContainer.leadingAnchor),
+        t.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor)
+      ])
+      self.tk2View = t
+      optimized.isHidden = true
+      syncTK2FromOptimized()
+    } else {
+      self.tk2View = nil
+    }
   }
 
   private func makeScenarios() -> [Scenario] {
@@ -373,13 +430,20 @@ final class PerformanceViewController: UIViewController {
     progress.setProgress(0, animated: false)
 
     let cfg = config(for: currentPreset)
+    seedParasCurrent = cfg.seedParas
     appendLog("Seeding documents (\(cfg.seedParas) paragraphs)…")
-    // Pre-warm editors and seed documents based on preset
+    // Pre-warm editors and seed documents based on preset; start after both complete
     preWarmEditors()
-    resetAndSeed(editor: legacyView.editor, paragraphs: cfg.seedParas)
-    resetAndSeed(editor: optimizedView.editor, paragraphs: cfg.seedParas)
-    appendLog("Seed complete. Starting scenarios…")
+    let g = DispatchGroup()
+    g.enter(); resetAndSeedAsync(editor: legacyView.editor, paragraphs: cfg.seedParas) { g.leave() }
+    g.enter(); resetAndSeedAsync(editor: optimizedView.editor, paragraphs: cfg.seedParas) { g.leave() }
+    g.notify(queue: .main) {
+      self.appendLog("Seed complete. Starting scenarios…")
+      self.startScenarioRun()
+    }
+  }
 
+  private func startScenarioRun() {
     // Per-iteration steps (single iteration each)
     func stepInsertTop() { try? insertOnce(position: .top) }
     func stepInsertMiddle() { try? insertOnce(position: .middle) }
@@ -443,6 +507,16 @@ final class PerformanceViewController: UIViewController {
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
       self.appendLog(body + parity + "\n")
       self.addSummaryLine(name: scenario.name, legacyWall: legacyDur, optimizedWall: optDur, legacyCount: self.legacyMetrics.runs.count, optimizedCount: self.optimizedMetrics.runs.count)
+      // Record best TOP insert across variations
+      if self.recordingVariations && scenario.name.hasPrefix("Insert paragraph at TOP") {
+        let count = max(1, self.optimizedMetrics.runs.count)
+        let avg = optDur / Double(count)
+        if let best = self.bestTopInsert {
+          if avg < best.avg { self.bestTopInsert = (self.currentVariationName ?? "?", avg) }
+        } else {
+          self.bestTopInsert = (self.currentVariationName ?? "?", avg)
+        }
+      }
       self.refreshSummaryView()
       // Reset documents between scenarios and continue
       self.resetDocuments(paragraphs: config(for: currentPreset).seedParas)
@@ -458,13 +532,15 @@ final class PerformanceViewController: UIViewController {
       let end = min(completed + batch, iterations)
       // Execute a small batch synchronously on main to respect Editor's threading model
       for _ in completed..<end { step() }
+      // Mirror optimized content into TK2 view if enabled
+      if tk2View != nil { syncTK2FromOptimized() }
       // Update progress (global + scenario)
       let delta = end - completed
       completed = end
       completedSteps += delta
       let global = Float(completedSteps) / Float(max(totalSteps, 1))
       self.progress.setProgress(global, animated: true)
-      statusLabel.text = "\(name) — \(completed)/\(iterations)  (total: \(completedSteps)/\(totalSteps))"
+      statusLabel.text = "\(name) — \(completed)/\(iterations)  (total: \(completedSteps)/\(totalSteps))  seed=\(self.seedParasCurrent)"
       appendLog("   · \(name): \(completed)/\(iterations)")
       if completed < iterations {
         // Yield to run loop so UI stays responsive
@@ -474,6 +550,12 @@ final class PerformanceViewController: UIViewController {
       }
     }
     runNextBatch()
+  }
+
+  private func syncTK2FromOptimized() {
+    guard let t = tk2View else { return }
+    t.attributedText = optimizedView.textView.attributedText
+    t.layoutIfNeeded()
   }
 
   private func appendLog(_ line: String) {
@@ -660,8 +742,10 @@ final class PerformanceViewController: UIViewController {
 
   // MARK: - Reset
   private func resetDocuments(paragraphs: Int) {
-    resetAndSeed(editor: legacyView.editor, paragraphs: paragraphs)
-    resetAndSeed(editor: optimizedView.editor, paragraphs: paragraphs)
+    let g = DispatchGroup()
+    g.enter(); resetAndSeedAsync(editor: legacyView.editor, paragraphs: paragraphs) { g.leave() }
+    g.enter(); resetAndSeedAsync(editor: optimizedView.editor, paragraphs: paragraphs) { g.leave() }
+    g.notify(queue: .main) { self.appendLog("Reseed complete (paras=\(paragraphs))") }
   }
 
   private func clearRoot(editor: Editor) {
@@ -693,7 +777,31 @@ final class PerformanceViewController: UIViewController {
         while let child = root.getFirstChild() { try child.remove() }
         try root.append(newNodes)
       }
-      print("🔥 PERF: resetAndSeed end")
+      print("🔥 PERF: resetAndSeed end (paras=\(paragraphs))")
+    }
+  }
+
+  private func resetAndSeedAsync(editor: Editor, paragraphs: Int, completion: @escaping () -> Void) {
+    print("🔥 PERF: resetAndSeed(editor=\(ObjectIdentifier(editor)), paras=\(paragraphs)) begin")
+    try? editor.update {
+      guard let root = getRoot() else { return }
+      if root.getChildrenSize() == 0 {
+        let p = ParagraphNode(); let t = TextNode(text: "seed")
+        try p.append([t]); try root.append([p])
+      }
+    }
+    DispatchQueue.main.async {
+      try? editor.update {
+        guard let root = getRoot() else { return }
+        var newNodes: [Node] = []
+        for i in 0..<paragraphs {
+          let p = ParagraphNode(); let t = TextNode(text: "P#\(i) quick brown fox"); try p.append([t]); newNodes.append(p)
+        }
+        while let child = root.getFirstChild() { try child.remove() }
+        try root.append(newNodes)
+      }
+      print("🔥 PERF: resetAndSeed end (paras=\(paragraphs))")
+      completion()
     }
   }
 
