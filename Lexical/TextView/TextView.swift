@@ -406,11 +406,23 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
           let markedRangeSelection = RangeSelection(
             anchor: anchor, focus: focus, format: TextFormat())
+
+          // If the previous action was an IME cancel (empty replacement),
+          // reflect it in the model by removing the same range. Otherwise,
+          // this unmark corresponds to commit and should preserve the text.
+          if editor.pendingImeCancel {
+            try markedRangeSelection.insertText("")
+          }
+
+          // Mark affected nodes dirty to ensure any style recomputation occurs
+          // (e.g., paragraph style changes around empty runs).
           _ = try markedRangeSelection.getNodes().map { node in
             internallyMarkNodeAsDirty(node: node, cause: .userInitiated)
           }
 
           editor.compositionKey = nil
+          // Clear cancel flag after we processed it.
+          editor.pendingImeCancel = false
         }
       } catch {}
     }

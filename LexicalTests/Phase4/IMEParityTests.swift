@@ -57,7 +57,6 @@ final class IMEParityTests: XCTestCase {
   }
 
   func testIMEStartUpdateCancelParity() throws {
-    XCTExpectFailure("Cancel path parity (empty marked text) under investigation; optimized should respect UITextView removal without parity-coerce.")
     let legacyView = makeView(optimized: false)
     let optView = makeView(optimized: true)
     let legacy = legacyView.editor
