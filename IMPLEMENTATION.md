@@ -178,11 +178,23 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
   - [ ] Investigate `NSTextViewportLayoutController` (iOS 15+) for viewport‑only layout on large docs.
   - [ ] Measure before/after on block inserts at TOP/MIDDLE/END with viewport controller enabled.
 
+- [ ] M6b — Perf instrumentation & summary (diagnose bottlenecks)
+  - [x] Console: per‑scenario averages — avg wall, avg plan, avg apply, and apply share (% of wall).
+  - [x] In‑app: compact, color‑coded summary blocks (green=faster, gray≈same, red=slower).
+  - [ ] Option: show plan/apply averages in‑app (toggle) to correlate with console.
+
 - [ ] M7 — Insert‑block fast path (structural)
-  - [ ] Compose attributed block once; single Insert at string position.
-  - [ ] Update part lengths and parent `childrenLength` + aggregate Fenwick deltas; one Fenwick rebuild.
-  - [ ] Apply block‑level attributes only for inserted node; avoid region rebuild.
-  - [ ] Tests: inserts at top/mid/end; parity + perf assertions; selection mapping parity.
+  - [x] First pass: compose new block once; single Insert at string position; recompute parent subtree range cache; apply block‑level attrs for inserted node; selection reconcile; metrics label `insert-block`.
+  - [ ] Replace subtree recompute with aggregated Fenwick ancestor delta + single rebuild at end‑of‑run.
+  - [ ] Tests: inserts at top/mid/end (medium/large docs); parity + perf assertions; selection mapping parity.
+
+- [ ] M7a — Pre/Post‑only refinements
+  - [ ] When lengths unchanged: use pure SetAttributes + minimal FixAttributes (no delete/insert); apply one small Fenwick delta where needed.
+  - [ ] Tests: list bullets, quote/code markers, heading boundaries — parity + perf.
+
+- [ ] M7b — Reorder heuristics & Fenwick shifts
+  - [x] Relax minimal‑move threshold from ~20% LIS to ~10% to prefer moves more often.
+  - [ ] Aggregate subtree range shifts and apply one Fenwick rebuild per reorder; tests to verify no overlaps and parity on decorator‑bearing subtrees.
   - [ ] Flip `useOptimizedReconciler` in staged environments.
   - [ ] Remove legacy delegation once composition + shadow compare are green; retain a one‑release kill switch.
 
