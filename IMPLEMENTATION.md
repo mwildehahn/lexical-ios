@@ -174,8 +174,10 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [ ] M6a — Platform bump + Text stack options (iOS 16+)
   - [x] Bump SPM minimum to iOS 16 in Package.swift (enables TextKit 2 APIs at compile time).
   - [x] Enable `NSLayoutManager.allowsNonContiguousLayout` for TextKit 1 to reduce full relayout on large inserts (UIKit NSLayoutManager property).
-  - [x] Add feature flag `useTextKit2Experimental` and prototype a TextKit 2 path (UITextView.textLayoutManager) in a sandbox editor for A/B. Docs: UITextView.textLayoutManager (iOS 16+), NSTextLayoutManager (iOS 15+).
-  - [x] Investigate `NSTextViewportLayoutController` (iOS 15+) for viewport‑only layout on large docs (prototype wiring behind the flag).
+  - [x] Add feature flag `useTextKit2Experimental` and prototype a TextKit 2 frontend path using `UITextView(init(usingTextLayoutManager:))`; mirror optimized content for layout A/B.
+  - [x] Add TK2 layout timing (avg per scenario) and combined `apply+TK2` timing to console summary (Optimized line).
+  - [ ] Option: add flag to fold TK2 into `avg wall` for end‑to‑end single figure (kept separate for clarity for now).
+  - [ ] Investigate `NSTextViewportLayoutController` (iOS 15+) for viewport‑only layout on large docs (prototype wiring behind the flag).
   - [ ] Measure before/after on block inserts at TOP/MIDDLE/END with viewport controller enabled.
 
 - [ ] M6b — Perf instrumentation & summary (diagnose bottlenecks)
@@ -196,6 +198,9 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [x] Adopt UIScene lifecycle (SceneDelegate) and add `UIApplicationSceneManifest` to Info.plist to silence future assert warnings. Window setup moved to SceneDelegate.
 - [x] Add a Flags tab (global toggles). Flags persist in UserDefaults; both Editor and Perf screens read from this store when (re)building editors.
 - [x] Perf: add “Run Variations” to run the benchmark suite across curated flag combinations (baseline optimized, +central aggregation, +insert‑block Fenwick, +TextKit2, all toggles).
+ - [x] Scale presets to Quick/Standard/Heavy seeding 100/250/500 paragraphs; reduce iterations for faster runs; show `seed=N` in status; synchronize reseed before scenarios.
+ - [x] Highlight fastest TOP insert variation in the summary after “Run Variations”.
+ - [x] TK2 layout avg and `apply+TK2` avg printed per scenario when TK2 A/B is active.
 
 ### Fixes / Maintenance
 - [x] Fenwick off‑by‑one: use `prefixSum(i+1)` when iterating 0‑based enumerate indices.
@@ -203,12 +208,13 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 ## Today’s Changes (summary)
 - Insert‑block path now avoids full parent subtree recompute; computes inserted subtree only and shifts following nodes using a range‑based Fenwick rebuild.
 - Pre/post‑only path adds attribute‑only updates when lengths are unchanged (SetAttributes+FixAttributes), reducing churn.
-- Prototype TextKit 2 A/B path behind `useTextKit2Experimental` (bridges our custom TextStorage via NSTextContentStorage; hooks a viewport layout controller).
+- Prototype TextKit 2 frontend A/B path behind `useTextKit2Experimental` using `UITextView(usingTextLayoutManager:)`; per‑scenario TK2 layout avg and `apply+TK2` avg added to console summary.
 - Adopted UIScene lifecycle in the Playground app.
 
 ## Next
-- Add unit tests for insert‑block (top/mid/end) and attribute‑only pre/post cases; compare optimized vs legacy string parity and selection mapping.
-- Measure TK2 A/B on large insert scenarios; consider keeping viewport controller enabled by default behind flag.
+ - Add unit tests for insert‑block (top/mid/end) and attribute‑only pre/post cases; compare optimized vs legacy string parity and selection mapping. [In progress; first suite added — InsertParityTests]
+ - Measure TK2 A/B on large insert scenarios; consider keeping viewport controller enabled by default behind flag.
+ - Decision (timings): keep `avg wall` focused on reconciler timing for comparability; expose TK2 layout and `apply+TK2` as separate fields. Optional flag to fold TK2 into wall later if needed.
 
 - [ ] M7b — Reorder heuristics & Fenwick shifts
   - [x] Relax minimal‑move threshold from ~20% LIS to ~10% to prefer moves more often.
