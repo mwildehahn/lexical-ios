@@ -350,7 +350,7 @@ final class PerformanceViewController: UIViewController {
       }
       // Open/update Results tab with full matrix view
       self.activity.stopAnimating(); self.statusLabel.text = "Done"; self.copyButton.isEnabled = true; self.isRunning = false; self.refreshSummaryView(); self.recordingVariations = false
-      self.presentOrUpdateResultsTab()
+      self.presentResultsModal()
     }
   }
 
@@ -631,7 +631,7 @@ final class PerformanceViewController: UIViewController {
   }
 
   // MARK: - Results tab wiring
-  private func presentOrUpdateResultsTab() {
+  private func presentResultsModal() {
     let scenarioList = self.scenarioNames.sorted()
     let vc = ResultsViewController(
       scenarios: scenarioList,
@@ -642,19 +642,12 @@ final class PerformanceViewController: UIViewController {
       generatedAt: Date()
     )
     let nav = UINavigationController(rootViewController: vc)
-    nav.tabBarItem = UITabBarItem(title: "Results", image: UIImage(systemName: "table"), selectedImage: UIImage(systemName: "table.fill"))
-    if let tab = self.tabBarController {
-      var vcs = tab.viewControllers ?? []
-      if let idx = vcs.firstIndex(where: { ($0 as? UINavigationController)?.topViewController is ResultsViewController }) {
-        vcs[idx] = nav
-      } else {
-        vcs.append(nav)
-      }
-      tab.viewControllers = vcs
-      tab.selectedViewController = nav
-    } else {
-      self.navigationController?.pushViewController(vc, animated: true)
+    nav.modalPresentationStyle = .pageSheet
+    if let sheet = nav.sheetPresentationController {
+      sheet.detents = [.medium(), .large()]
+      sheet.prefersGrabberVisible = true
     }
+    self.present(nav, animated: true)
   }
 
   private func appendLog(_ line: String) {

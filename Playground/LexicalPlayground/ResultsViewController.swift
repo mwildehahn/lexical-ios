@@ -138,8 +138,15 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
     let export = UIBarButtonItem(title: "Export", style: .plain, target: self, action: #selector(exportTapped))
     let printBtn = UIBarButtonItem(title: "Print", style: .plain, target: self, action: #selector(printTapped))
     navigationItem.rightBarButtonItems = [export, printBtn]
+    if presentingViewController != nil || navigationController?.presentingViewController != nil {
+      navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .close, target: self, action: #selector(closePressed))
+    }
 
     buildMatrix()
+  }
+
+  @objc private func closePressed() {
+    dismiss(animated: true)
   }
 
   private func tileView(title: String, value: String, accent: UIColor = .secondaryLabel) -> UIView {
@@ -271,4 +278,3 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
     return v
   }
 }
-
