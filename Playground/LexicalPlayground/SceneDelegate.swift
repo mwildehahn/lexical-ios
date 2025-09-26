@@ -24,6 +24,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     let tab = UITabBarController()
     tab.viewControllers = [editorNav, perfNav]
+    // Default to the Perf tab so the Quick preset auto-runs and logs
+    tab.selectedIndex = 1
 
     window.rootViewController = tab
     self.window = window

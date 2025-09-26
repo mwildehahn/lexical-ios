@@ -20,6 +20,7 @@ import Foundation
   public let useTextKit2Experimental: Bool
   public let useReconcilerInsertBlockFenwick: Bool
   public let useTextKit2LayoutPerBatch: Bool
+  public let useTextKit2LayoutOncePerScenario: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
@@ -33,7 +34,8 @@ import Foundation
     useReconcilerShadowCompare: Bool = false,
     useTextKit2Experimental: Bool = false,
     useReconcilerInsertBlockFenwick: Bool = false,
-    useTextKit2LayoutPerBatch: Bool = false
+    useTextKit2LayoutPerBatch: Bool = false,
+    useTextKit2LayoutOncePerScenario: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -47,6 +49,7 @@ import Foundation
     self.useTextKit2Experimental = useTextKit2Experimental
     self.useReconcilerInsertBlockFenwick = useReconcilerInsertBlockFenwick
     self.useTextKit2LayoutPerBatch = useTextKit2LayoutPerBatch
+    self.useTextKit2LayoutOncePerScenario = useTextKit2LayoutOncePerScenario
     super.init()
   }
 }

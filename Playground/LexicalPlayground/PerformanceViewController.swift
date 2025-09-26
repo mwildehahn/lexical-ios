@@ -6,6 +6,7 @@
  */
 
 import Lexical
+import os
 import UIKit
 
 final class PerformanceViewController: UIViewController {
@@ -74,6 +75,9 @@ final class PerformanceViewController: UIViewController {
   private var tk2LayoutAccum: TimeInterval = 0
   private var tk2LayoutCount: Int = 0
   private var tk2LayoutPerBatch: Bool = false
+  private var tk2LayoutOncePerScenario: Bool = false
+  // Unified logger for CLI capture
+  private let perfLog = Logger(subsystem: "com.facebook.LexicalPlayground", category: "perf")
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -263,12 +267,14 @@ final class PerformanceViewController: UIViewController {
       self.tk2View = t
       // Keep LexicalView present for updates but hide it so only TK2 renders
       optimized.isHidden = true
-      // Per-batch TK2 layout experiment toggle
+      // TK2 layout experiment toggles
       tk2LayoutPerBatch = optimizedFlags.useTextKit2LayoutPerBatch
+      tk2LayoutOncePerScenario = optimizedFlags.useTextKit2LayoutOncePerScenario
       syncTK2FromOptimized()
     } else {
       self.tk2View = nil
       tk2LayoutPerBatch = false
+      tk2LayoutOncePerScenario = false
     }
   }
 
@@ -534,6 +540,12 @@ final class PerformanceViewController: UIViewController {
       let ok = (scenario.parityKind == .plain) ? self.assertParity(scenario.name) : self.assertAttributeOnlyParity(scenario.name)
       let legacyDur = self.totalDuration(self.legacyMetrics)
       let optDur = self.totalDuration(self.optimizedMetrics)
+      if self.tk2View != nil && self.tk2LayoutOncePerScenario {
+        let s = CFAbsoluteTimeGetCurrent()
+        self.syncTK2FromOptimized()
+        self.tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
+        self.tk2LayoutCount += 1
+      }
       let tk2Avg = (self.tk2View != nil && self.tk2LayoutCount > 0) ? (self.tk2LayoutAccum / Double(self.tk2LayoutCount)) : nil
       let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs, tk2Avg: tk2Avg)
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
@@ -668,6 +680,7 @@ final class PerformanceViewController: UIViewController {
       resultsTextView.scrollRangeToVisible(bottom)
     }
     print(line)
+    perfLog.info("\(line, privacy: .public)")
   }
 
   private func totalDuration(_ c: PerfMetricsContainer) -> TimeInterval {
@@ -695,6 +708,7 @@ final class PerformanceViewController: UIViewController {
       let combined = applyAvg + tk2
       line += String(format: "  TK2 layout avg=%.3f ms  apply+TK2 avg=%.3f ms", tk2 * 1000, combined * 1000)
     }
+    perfLog.info("\(line, privacy: .public)")
     return line + "\n"
   }
 
