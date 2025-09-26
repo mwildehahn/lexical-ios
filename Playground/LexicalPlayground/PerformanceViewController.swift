@@ -207,12 +207,10 @@ final class PerformanceViewController: UIViewController {
       }
     }
 
-    let legacyItems = actions(for: activeLegacyFlags)
     let optItems = actions(for: activeOptimizedFlags)
-    let legacyMenu = UIMenu(title: "Legacy", options: .displayInline, children: legacyItems.isEmpty ? [UIAction(title: "(none)", attributes: [.disabled], handler: { _ in })] : legacyItems)
     let optTitle = "Optimized (base=ON)"
     let optMenu = UIMenu(title: optTitle, options: .displayInline, children: optItems.isEmpty ? [UIAction(title: "(none)", attributes: [.disabled], handler: { _ in })] : optItems)
-    featuresBarButton.menu = UIMenu(title: "Current Feature Flags", children: [legacyMenu, optMenu])
+    featuresBarButton.menu = UIMenu(title: "Feature Flags", children: [optMenu])
   }
 
   private func configureRunButton() {
