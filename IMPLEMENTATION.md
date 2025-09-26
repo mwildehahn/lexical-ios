@@ -136,6 +136,32 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
     - [x] Indent/Outdent commands parity — element indent levels match across optimized vs legacy; strings unchanged.
     - [~] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings). Note: Import is not currently implemented in LexicalMarkdown; we validated export parity and left import round‑trip as N/A pending feature support.
 
+  - [ ] M5A — Playground Screens (Manual Validation & Benchmarks)
+    - [x] Editor screen toggle
+      - [x] Add a UI toggle on the existing Playground editor screen to switch between legacy and optimized reconciler.
+      - [x] When toggled, persist current editor state, rebuild `LexicalView` with the selected feature flags, and restore the state.
+      - [x] Default to Optimized off (legacy) on first launch; persist selection in `UserDefaults` (key: `useOptimizedInPlayground`).
+    - [x] Performance screen (side-by-side)
+      - [x] Implement `PerformanceViewController` with two `LexicalView` instances: left (legacy), right (optimized).
+      - [x] Supply each editor with an `EditorMetricsContainer` to collect reconciler metrics (duration/op counts/path labels).
+      - [x] Auto-run a benchmark + parity suite on `viewDidAppear` and display results in a scrollable text view with a Copy button.
+      - [x] Add status UI (spinner + progress bar + label) while scenarios run; stream partial results to UI and console.
+      - [x] Scenarios to benchmark (N iterations; warm-up inherent in first runs):
+        - [x] Insert paragraph at top / middle / end.
+        - [x] Text node edit bursts (append to a mid paragraph).
+        - [x] Attribute-only toggles (bold) alternating true/false.
+        - [x] Keyed-children reorder (swap neighbors repeatedly; small LIS).
+        - [x] Coalesced multi-node replace (paste-like: replace a paragraph’s children).
+      - [x] Emit compact per-scenario summaries: wall/plan/apply times and op counts (delete/insert/setAttributes/fixAttributes, movedChildren) for both editors; report parity (OK/FAIL).
+      - [ ] Extend with additional scenarios (pre/post-only, large LIS vs rebuild) — pending.
+    - [x] Tab bar wiring
+      - [x] Replace the single navigation stack with a `UITabBarController` containing:
+        - [x] “Editor” (existing screen with reconciler toggle)
+        - [x] “Perf” (performance benchmarks)
+    - [x] Build & verify
+      - [x] Build iOS Playground app (iPhone 17 Pro, iOS 26.0) — PASS.
+      - [ ] Run full iOS simulator tests (Lexical-Package scheme) — to be run in CI/nightly; manual run optional.
+
   - [ ] M6 — Performance & Rollout
     - [x] Benchmark tests (`ReconcilerBenchmarkTests`): typing, mass stylings, large reorder — parity asserted; timings logged.
     - [x] Basic metrics capture (per‑run instruction counts) via a test metrics container; printed in logs for visibility.

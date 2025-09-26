@@ -18,45 +18,22 @@ class ViewController: UIViewController, UIToolbarDelegate {
   weak var toolbar: UIToolbar?
   weak var hierarchyView: UIView?
   private let editorStatePersistenceKey = "editorState"
+  private let reconcilerPreferenceKey = "useOptimizedInPlayground"
+  private var reconcilerControl: UISegmentedControl!
 
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .systemBackground
 
-    let editorHistoryPlugin = EditorHistoryPlugin()
-    let toolbarPlugin = ToolbarPlugin(viewControllerForPresentation: self, historyPlugin: editorHistoryPlugin)
-    let toolbar = toolbarPlugin.toolbar
-    toolbar.delegate = self
+    // Toggle (Legacy | Optimized)
+    let control = UISegmentedControl(items: ["Legacy", "Optimized"])
+    control.selectedSegmentIndex = UserDefaults.standard.bool(forKey: reconcilerPreferenceKey) ? 1 : 0
+    control.addTarget(self, action: #selector(onReconcilerToggleChanged), for: .valueChanged)
+    self.reconcilerControl = control
+    navigationItem.titleView = control
 
-    let hierarchyPlugin = NodeHierarchyViewPlugin()
-    let hierarchyView = hierarchyPlugin.hierarchyView
-
-    let listPlugin = ListPlugin()
-    let imagePlugin = InlineImagePlugin()
-
-    let linkPlugin = LinkPlugin()
-
-    let theme = Theme()
-    theme.setBlockLevelAttributes(.heading, value: BlockLevelAttributes(marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 20))
-    theme.indentSize = 40.0
-    theme.link = [
-      .foregroundColor: UIColor.systemBlue,
-    ]
-
-    let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
-    let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: FeatureFlags())
-
-    linkPlugin.lexicalView = lexicalView
-
-    self.lexicalView = lexicalView
-    self.toolbar = toolbar
-    self.hierarchyView = hierarchyView
-
-    self.restoreEditorState()
-
-    view.addSubview(lexicalView)
-    view.addSubview(toolbar)
-    view.addSubview(hierarchyView)
+    // Initial build for selected reconciler
+    rebuildEditor(useOptimized: control.selectedSegmentIndex == 1)
 
     navigationItem.title = "Lexical"
     setUpExportMenu()
@@ -137,5 +114,71 @@ class ViewController: UIViewController, UIToolbarDelegate {
 
   func position(for bar: UIBarPositioning) -> UIBarPosition {
     return .top
+  }
+
+  @objc private func onReconcilerToggleChanged() {
+    let useOptimized = reconcilerControl.selectedSegmentIndex == 1
+    // Persist current state and rebuild the editor with new flags
+    persistEditorState()
+    UserDefaults.standard.set(useOptimized, forKey: reconcilerPreferenceKey)
+    rebuildEditor(useOptimized: useOptimized)
+    restoreEditorState()
+  }
+
+  private func rebuildEditor(useOptimized: Bool) {
+    // Clean old views
+    lexicalView?.removeFromSuperview()
+    toolbar?.removeFromSuperview()
+    hierarchyView?.removeFromSuperview()
+
+    // Plugins
+    let editorHistoryPlugin = EditorHistoryPlugin()
+    let toolbarPlugin = ToolbarPlugin(viewControllerForPresentation: self, historyPlugin: editorHistoryPlugin)
+    let toolbar = toolbarPlugin.toolbar
+    toolbar.delegate = self
+    let hierarchyPlugin = NodeHierarchyViewPlugin()
+    let hierarchyView = hierarchyPlugin.hierarchyView
+    let listPlugin = ListPlugin()
+    let imagePlugin = InlineImagePlugin()
+    let linkPlugin = LinkPlugin()
+
+    // Theme
+    let theme = Theme()
+    theme.setBlockLevelAttributes(.heading, value: BlockLevelAttributes(marginTop: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 20))
+    theme.indentSize = 40.0
+    theme.link = [ .foregroundColor: UIColor.systemBlue ]
+
+    // Feature flags
+    let flags: FeatureFlags
+    if useOptimized {
+      flags = FeatureFlags(
+        reconcilerSanityCheck: false,
+        proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true,
+        useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: true,
+        useReconcilerBlockRebuild: true,
+        useOptimizedReconcilerStrictMode: true,
+        useReconcilerFenwickCentralAggregation: true,
+        useReconcilerShadowCompare: false
+      )
+    } else {
+      flags = FeatureFlags()
+    }
+
+    let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
+    let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: flags)
+    linkPlugin.lexicalView = lexicalView
+
+    self.lexicalView = lexicalView
+    self.toolbar = toolbar
+    self.hierarchyView = hierarchyView
+
+    view.addSubview(lexicalView)
+    view.addSubview(toolbar)
+    view.addSubview(hierarchyView)
+
+    view.setNeedsLayout()
+    view.layoutIfNeeded()
   }
 }

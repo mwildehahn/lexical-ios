@@ -15,9 +15,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow()
     guard let window else { return false }
     window.makeKeyAndVisible()
-    let viewController = ViewController()
-    let navigationController = UINavigationController(rootViewController: viewController)
-    window.rootViewController = navigationController
+    let editorVC = ViewController()
+    editorVC.tabBarItem = UITabBarItem(title: "Editor", image: UIImage(systemName: "doc.text"), selectedImage: UIImage(systemName: "doc.text.fill"))
+    let perfVC = PerformanceViewController()
+    perfVC.tabBarItem = UITabBarItem(title: "Perf", image: UIImage(systemName: "speedometer"), selectedImage: UIImage(systemName: "speedometer"))
+
+    let editorNav = UINavigationController(rootViewController: editorVC)
+    let perfNav = UINavigationController(rootViewController: perfVC)
+
+    let tab = UITabBarController()
+    tab.viewControllers = [editorNav, perfNav]
+    window.rootViewController = tab
     return true
   }
 
@@ -26,10 +34,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   func persistEditorState() {
-    guard let viewController = window?.rootViewController as? ViewController else {
-      return
+    // Try to persist from the editor tab if present
+    if let tab = window?.rootViewController as? UITabBarController,
+       let nav = tab.viewControllers?.first as? UINavigationController,
+       let editorVC = nav.viewControllers.first as? ViewController {
+      editorVC.persistEditorState()
     }
-
-    viewController.persistEditorState()
   }
 }
