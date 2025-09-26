@@ -15,7 +15,7 @@ final class FlagsStore {
   // Keys
   private enum K: String {
     case useOptimized, strict, fenwickDelta, centralAgg, keyedDiff, blockRebuild
-    case shadowCompare, tk2, insertBlockFenwick, sanityCheck, proxyInputDelegate
+    case shadowCompare, insertBlockFenwick, sanityCheck, proxyInputDelegate
   }
 
   private init() {}
@@ -30,7 +30,6 @@ final class FlagsStore {
   var keyedDiff: Bool { get { b(.keyedDiff) } set { set(.keyedDiff, newValue) } }
   var blockRebuild: Bool { get { b(.blockRebuild) } set { set(.blockRebuild, newValue) } }
   var shadowCompare: Bool { get { b(.shadowCompare) } set { set(.shadowCompare, newValue) } }
-  var tk2: Bool { get { b(.tk2) } set { set(.tk2, newValue) } }
   var insertBlockFenwick: Bool { get { b(.insertBlockFenwick) } set { set(.insertBlockFenwick, newValue) } }
   var sanityCheck: Bool { get { b(.sanityCheck) } set { set(.sanityCheck, newValue) } }
   var proxyInputDelegate: Bool { get { b(.proxyInputDelegate) } set { set(.proxyInputDelegate, newValue) } }
@@ -46,7 +45,6 @@ final class FlagsStore {
       useOptimizedReconcilerStrictMode: strict,
       useReconcilerFenwickCentralAggregation: centralAgg,
       useReconcilerShadowCompare: shadowCompare,
-      useTextKit2Experimental: tk2,
       useReconcilerInsertBlockFenwick: insertBlockFenwick
     )
   }
@@ -54,7 +52,7 @@ final class FlagsStore {
   func signature() -> String {
     return [
       useOptimized, strict, fenwickDelta, centralAgg, keyedDiff, blockRebuild,
-      insertBlockFenwick, tk2, shadowCompare, sanityCheck, proxyInputDelegate
+      insertBlockFenwick, shadowCompare, sanityCheck, proxyInputDelegate
     ].map { $0 ? "1" : "0" }.joined()
   }
 

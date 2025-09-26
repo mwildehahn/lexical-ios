@@ -17,10 +17,8 @@ import Foundation
   public let useOptimizedReconcilerStrictMode: Bool
   public let useReconcilerFenwickCentralAggregation: Bool
   public let useReconcilerShadowCompare: Bool
-  public let useTextKit2Experimental: Bool
   public let useReconcilerInsertBlockFenwick: Bool
-  public let useTextKit2LayoutPerBatch: Bool
-  public let useTextKit2LayoutOncePerScenario: Bool
+  public let useReconcilerPrePostAttributesOnly: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
@@ -32,10 +30,9 @@ import Foundation
     useOptimizedReconcilerStrictMode: Bool = false,
     useReconcilerFenwickCentralAggregation: Bool = false,
     useReconcilerShadowCompare: Bool = false,
-    useTextKit2Experimental: Bool = false,
     useReconcilerInsertBlockFenwick: Bool = false,
-    useTextKit2LayoutPerBatch: Bool = false,
-    useTextKit2LayoutOncePerScenario: Bool = false
+    useReconcilerPrePostAttributesOnly: Bool = false,
+    
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -46,10 +43,8 @@ import Foundation
     self.useOptimizedReconcilerStrictMode = useOptimizedReconcilerStrictMode
     self.useReconcilerFenwickCentralAggregation = useReconcilerFenwickCentralAggregation
     self.useReconcilerShadowCompare = useReconcilerShadowCompare
-    self.useTextKit2Experimental = useTextKit2Experimental
     self.useReconcilerInsertBlockFenwick = useReconcilerInsertBlockFenwick
-    self.useTextKit2LayoutPerBatch = useTextKit2LayoutPerBatch
-    self.useTextKit2LayoutOncePerScenario = useTextKit2LayoutOncePerScenario
+    self.useReconcilerPrePostAttributesOnly = useReconcilerPrePostAttributesOnly
     super.init()
   }
 }

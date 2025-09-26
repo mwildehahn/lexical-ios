@@ -44,15 +44,15 @@ final class PerformanceViewController: UIViewController {
   private var progress = UIProgressView(progressViewStyle: .default)
   private var statusLabel = UILabel()
   private var copyButton = UIButton(type: .system)
+  private var featuresBarButton = UIBarButtonItem()
   // Matrix (text-based) aggregation
   private var scenarioNames: [String] = []
-  private var matrixResults: [String: [String: (deltaPct: Double, tk2Avg: TimeInterval?, applyPlusTk2: TimeInterval?)]] = [:]
+  private var matrixResults: [String: [String: Double]] = [:]
   private var lastVariationProfiles: [ResultsViewController.VariationProfile] = []
 
   // MARK: - Editors & Views
   private var legacyView: LexicalView!
   private var optimizedView: LexicalView!
-  private var tk2View: UITextView?
   private var legacyMetrics = PerfMetricsContainer()
   private var optimizedMetrics = PerfMetricsContainer()
   private var didRunOnce = false
@@ -71,13 +71,11 @@ final class PerformanceViewController: UIViewController {
   private var recordingVariations = false
   private var currentVariationName: String? = nil
   private var bestTopInsert: (name: String, avg: TimeInterval)? = nil
-  // TK2 layout timing per scenario
-  private var tk2LayoutAccum: TimeInterval = 0
-  private var tk2LayoutCount: Int = 0
-  private var tk2LayoutPerBatch: Bool = false
-  private var tk2LayoutOncePerScenario: Bool = false
   // Unified logger for CLI capture
   private let perfLog = Logger(subsystem: "com.facebook.LexicalPlayground", category: "perf")
+  // Active feature flags (for Features menu)
+  private var activeLegacyFlags = FeatureFlags()
+  private var activeOptimizedFlags = FeatureFlags()
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -93,11 +91,7 @@ final class PerformanceViewController: UIViewController {
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
-    // Auto-run once using Quick preset
-    guard !didRunOnce else { return }
-    didRunOnce = true
-    currentPreset = .quick
-    DispatchQueue.main.async { [weak self] in self?.runBenchmarks() }
+    // No autorun; user starts explicitly via Start button
   }
 
   private func configureUI() {
@@ -191,9 +185,35 @@ final class PerformanceViewController: UIViewController {
     self.presetControl = control
   }
 
+  // Build the dynamic Features menu based on currently active flags
+  private func updateFeaturesMenu() {
+    func list(_ f: FeatureFlags) -> [String] {
+      var flags: [String] = []
+      if f.useOptimizedReconciler { flags.append("optimized") }
+      if f.useOptimizedReconcilerStrictMode { flags.append("strict-mode") }
+      if f.useReconcilerFenwickDelta { flags.append("fenwick-delta") }
+      if f.useReconcilerFenwickCentralAggregation { flags.append("central-aggregation") }
+      if f.useReconcilerInsertBlockFenwick { flags.append("insert-block-fenwick") }
+      if f.useReconcilerKeyedDiff { flags.append("keyed-diff") }
+      if f.useReconcilerBlockRebuild { flags.append("block-rebuild") }
+      if f.reconcilerSanityCheck { flags.append("sanity-check") }
+      if f.proxyTextViewInputDelegate { flags.append("proxy-input-delegate") }
+      return flags
+    }
+
+    let legacyItems = list(activeLegacyFlags).map { UIAction(title: $0, attributes: [.disabled], state: .on, handler: { _ in }) }
+    let optItems = list(activeOptimizedFlags).map { UIAction(title: $0, attributes: [.disabled], state: .on, handler: { _ in }) }
+    let legacyMenu = UIMenu(title: "Legacy", options: .displayInline, children: legacyItems.isEmpty ? [UIAction(title: "(none)", attributes: [.disabled], handler: { _ in })] : legacyItems)
+    let optMenu = UIMenu(title: "Optimized", options: .displayInline, children: optItems.isEmpty ? [UIAction(title: "(none)", attributes: [.disabled], handler: { _ in })] : optItems)
+    featuresBarButton.menu = UIMenu(title: "Current Feature Flags", children: [legacyMenu, optMenu])
+  }
+
   private func configureRunButton() {
+    let start = UIBarButtonItem(title: "Start", style: .plain, target: self, action: #selector(runTapped))
     let runVar = UIBarButtonItem(title: "Run Matrix", style: .plain, target: self, action: #selector(runVariationsTapped))
-    navigationItem.rightBarButtonItems = [runVar]
+    featuresBarButton = UIBarButtonItem(title: "Features", style: .plain, target: nil, action: nil)
+    navigationItem.rightBarButtonItems = [start, runVar, featuresBarButton]
+    updateFeaturesMenu()
   }
 
   @objc private func onPresetChanged(_ sender: UISegmentedControl) {
@@ -215,8 +235,10 @@ final class PerformanceViewController: UIViewController {
     optimizedMetrics.resetMetrics()
 
     let legacyFlags = FeatureFlags()
+    activeLegacyFlags = legacyFlags
     // Default to Opt-Base profile in the live view; matrix runner will swap flags per-variation
     let optimizedFlags = FeatureFlags(useOptimizedReconciler: true, useReconcilerFenwickDelta: true, useOptimizedReconcilerStrictMode: true)
+    activeOptimizedFlags = optimizedFlags
 
     func makeConfig(metrics: EditorMetricsContainer) -> EditorConfig {
       let theme = Theme()
@@ -251,31 +273,8 @@ final class PerformanceViewController: UIViewController {
     seedDocument(editor: legacy.editor, paragraphs: 100)
     seedDocument(editor: optimized.editor, paragraphs: 100)
 
-    // Optional: TextKit 2 frontend A/B — mirror optimized content into a TK2 UITextView
-    if optimizedFlags.useTextKit2Experimental {
-      let t = UITextView(usingTextLayoutManager: true)
-      t.isEditable = false
-      t.backgroundColor = .clear
-      t.translatesAutoresizingMaskIntoConstraints = false
-      optimizedContainer.addSubview(t)
-      NSLayoutConstraint.activate([
-        t.topAnchor.constraint(equalTo: optimizedContainer.topAnchor),
-        t.bottomAnchor.constraint(equalTo: optimizedContainer.bottomAnchor),
-        t.leadingAnchor.constraint(equalTo: optimizedContainer.leadingAnchor),
-        t.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor)
-      ])
-      self.tk2View = t
-      // Keep LexicalView present for updates but hide it so only TK2 renders
-      optimized.isHidden = true
-      // TK2 layout experiment toggles
-      tk2LayoutPerBatch = optimizedFlags.useTextKit2LayoutPerBatch
-      tk2LayoutOncePerScenario = optimizedFlags.useTextKit2LayoutOncePerScenario
-      syncTK2FromOptimized()
-    } else {
-      self.tk2View = nil
-      tk2LayoutPerBatch = false
-      tk2LayoutOncePerScenario = false
-    }
+    // Refresh the Features menu with the currently active flags
+    updateFeaturesMenu()
   }
 
   // MARK: - Variations Runner
@@ -297,7 +296,7 @@ final class PerformanceViewController: UIViewController {
         useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
         useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
         useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: false,
-        useReconcilerShadowCompare: false, useTextKit2Experimental: false,
+        useReconcilerShadowCompare: false,
         useReconcilerInsertBlockFenwick: false
       )),
       ("+ Central Aggregation", FeatureFlags(
@@ -305,7 +304,7 @@ final class PerformanceViewController: UIViewController {
         useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
         useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
         useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
-        useReconcilerShadowCompare: false, useTextKit2Experimental: false,
+        useReconcilerShadowCompare: false,
         useReconcilerInsertBlockFenwick: false
       )),
       ("+ Insert-Block Fenwick", FeatureFlags(
@@ -313,32 +312,15 @@ final class PerformanceViewController: UIViewController {
         useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
         useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
         useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
-        useReconcilerShadowCompare: false, useTextKit2Experimental: false,
+        useReconcilerShadowCompare: false,
         useReconcilerInsertBlockFenwick: true
-      )),
-      ("+ TextKit 2", FeatureFlags(
-        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
-        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
-        useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
-        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
-        useReconcilerShadowCompare: false, useTextKit2Experimental: true,
-        useReconcilerInsertBlockFenwick: true, useTextKit2LayoutPerBatch: true
-      )),
-      ("+ TK2 (once per scenario)", FeatureFlags(
-        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
-        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
-        useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
-        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
-        useReconcilerShadowCompare: false, useTextKit2Experimental: true,
-        useReconcilerInsertBlockFenwick: true, useTextKit2LayoutPerBatch: false,
-        useTextKit2LayoutOncePerScenario: true
       )),
       ("All toggles", FeatureFlags(
         reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
         useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
         useReconcilerKeyedDiff: true, useReconcilerBlockRebuild: true,
         useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
-        useReconcilerShadowCompare: false, useTextKit2Experimental: true,
+        useReconcilerShadowCompare: false,
         useReconcilerInsertBlockFenwick: true
       )),
     ]
@@ -353,9 +335,6 @@ final class PerformanceViewController: UIViewController {
       if f.useReconcilerInsertBlockFenwick { flags.append("insert-block-fenwick") }
       if f.useReconcilerKeyedDiff { flags.append("keyed-diff") }
       if f.useReconcilerBlockRebuild { flags.append("block-rebuild") }
-      if f.useTextKit2Experimental { flags.append("textkit2") }
-      if f.useTextKit2LayoutPerBatch { flags.append("tk2-per-batch") }
-      if f.useTextKit2LayoutOncePerScenario { flags.append("tk2-once") }
       return flags
     }
     lastVariationProfiles = variations.map { (name, flags) in
@@ -399,12 +378,14 @@ final class PerformanceViewController: UIViewController {
 
   private func teardownEditors() {
     legacyView?.removeFromSuperview(); optimizedView?.removeFromSuperview(); legacyView = nil; optimizedView = nil
-    tk2View?.removeFromSuperview(); tk2View = nil
+    // no TK2 view to tear down
   }
 
   private func buildEditorsWith(optimizedFlags: FeatureFlags) {
     legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
     let legacyFlags = FeatureFlags()
+    activeLegacyFlags = legacyFlags
+    activeOptimizedFlags = optimizedFlags
     func makeConfig(metrics: EditorMetricsContainer) -> EditorConfig { let theme = Theme(); theme.link = [.foregroundColor: UIColor.systemBlue]; return EditorConfig(theme: theme, plugins: [], metricsContainer: metrics) }
     let legacy = LexicalView(editorConfig: makeConfig(metrics: legacyMetrics), featureFlags: legacyFlags)
     let optimized = LexicalView(editorConfig: makeConfig(metrics: optimizedMetrics), featureFlags: optimizedFlags)
@@ -416,24 +397,10 @@ final class PerformanceViewController: UIViewController {
       optimized.topAnchor.constraint(equalTo: optimizedContainer.topAnchor), optimized.bottomAnchor.constraint(equalTo: optimizedContainer.bottomAnchor), optimized.leadingAnchor.constraint(equalTo: optimizedContainer.leadingAnchor), optimized.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor),
     ])
 
-    if optimizedFlags.useTextKit2Experimental {
-      let t = UITextView(usingTextLayoutManager: true)
-      t.isEditable = false
-      t.backgroundColor = .clear
-      t.translatesAutoresizingMaskIntoConstraints = false
-      optimizedContainer.addSubview(t)
-      NSLayoutConstraint.activate([
-        t.topAnchor.constraint(equalTo: optimizedContainer.topAnchor),
-        t.bottomAnchor.constraint(equalTo: optimizedContainer.bottomAnchor),
-        t.leadingAnchor.constraint(equalTo: optimizedContainer.leadingAnchor),
-        t.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor)
-      ])
-      self.tk2View = t
-      optimized.isHidden = true
-      syncTK2FromOptimized()
-    } else {
-      self.tk2View = nil
-    }
+    // TextKit 2 experimental path removed
+
+    // Update Features menu to reflect the variation's flags
+    updateFeaturesMenu()
   }
 
   private func makeScenarios() -> [Scenario] {
@@ -530,8 +497,10 @@ final class PerformanceViewController: UIViewController {
         self.copyButton.isEnabled = true
         self.isRunning = false
         // Add a subtle footer
-        self.summary.append(NSAttributedString(string: "\nCompleted \(self.totalSteps) iterations across \(scenarios.count) scenarios.\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: UIColor.tertiaryLabel]))
-        self.refreshSummaryView()
+      self.summary.append(NSAttributedString(string: "\nCompleted \(self.totalSteps) iterations across \(scenarios.count) scenarios.\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: UIColor.tertiaryLabel]))
+      self.refreshSummaryView()
+      // Always show results in a full sheet after a single run
+      self.presentResultsModal()
       }
     }
   }
@@ -542,7 +511,7 @@ final class PerformanceViewController: UIViewController {
 
     // Reset state and metrics for this scenario
     legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
-    tk2LayoutAccum = 0; tk2LayoutCount = 0
+    // no TK2 timing
     appendLog("• \(scenario.name) — running \(scenario.iterations)x")
     statusLabel.text = scenario.name
 
@@ -551,14 +520,7 @@ final class PerformanceViewController: UIViewController {
       let ok = (scenario.parityKind == .plain) ? self.assertParity(scenario.name) : self.assertAttributeOnlyParity(scenario.name)
       let legacyDur = self.totalDuration(self.legacyMetrics)
       let optDur = self.totalDuration(self.optimizedMetrics)
-      if self.tk2View != nil && self.tk2LayoutOncePerScenario {
-        let s = CFAbsoluteTimeGetCurrent()
-        self.syncTK2FromOptimized()
-        self.tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
-        self.tk2LayoutCount += 1
-      }
-      let tk2Avg = (self.tk2View != nil && self.tk2LayoutCount > 0) ? (self.tk2LayoutAccum / Double(self.tk2LayoutCount)) : nil
-      let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs, tk2Avg: tk2Avg)
+      let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs)
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
       self.appendLog(body + parity + "\n")
       self.addSummaryLine(name: scenario.name, legacyWall: legacyDur, optimizedWall: optDur, legacyCount: self.legacyMetrics.runs.count, optimizedCount: self.optimizedMetrics.runs.count)
@@ -577,10 +539,8 @@ final class PerformanceViewController: UIViewController {
         let legacyAvg = self.legacyMetrics.runs.isEmpty ? 0 : legacyDur / Double(self.legacyMetrics.runs.count)
         let optAvg = self.optimizedMetrics.runs.isEmpty ? 0 : optDur / Double(self.optimizedMetrics.runs.count)
         let deltaPct = (legacyAvg > 0 && optAvg > 0) ? ((legacyAvg - optAvg) / legacyAvg * 100.0) : 0
-        let applyAvg = self.optimizedMetrics.runs.isEmpty ? 0 : (self.optimizedMetrics.runs.reduce(0) { $0 + $1.applyDuration } / Double(self.optimizedMetrics.runs.count))
-        let applyPlus = (tk2Avg ?? 0) + applyAvg
         var row = self.matrixResults[scenario.name] ?? [:]
-        row[varName] = (deltaPct: deltaPct, tk2Avg: tk2Avg, applyPlusTk2: applyPlus)
+        row[varName] = deltaPct
         self.matrixResults[scenario.name] = row
         if !self.scenarioNames.contains(scenario.name) { self.scenarioNames.append(scenario.name) }
       }
@@ -598,15 +558,7 @@ final class PerformanceViewController: UIViewController {
     func runNextBatch() {
       let end = min(completed + batch, iterations)
       // Execute batch synchronously on main to respect Editor's threading model
-      for _ in completed..<end {
-        step()
-        if tk2View != nil && !tk2LayoutPerBatch {
-          let s = CFAbsoluteTimeGetCurrent()
-          syncTK2FromOptimized()
-          tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
-          tk2LayoutCount += 1
-        }
-      }
+      for _ in completed..<end { step() }
       // Update progress (global + scenario)
       let delta = end - completed
       completed = end
@@ -619,23 +571,13 @@ final class PerformanceViewController: UIViewController {
         // Yield to run loop so UI stays responsive
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { runNextBatch() }
       } else {
-        if tk2View != nil && tk2LayoutPerBatch {
-          let s = CFAbsoluteTimeGetCurrent()
-          syncTK2FromOptimized()
-          tk2LayoutAccum += CFAbsoluteTimeGetCurrent() - s
-          tk2LayoutCount += 1
-        }
+        // no TK2 per-batch timing
         completion()
       }
     }
     runNextBatch()
   }
-
-  private func syncTK2FromOptimized() {
-    guard let t = tk2View else { return }
-    t.attributedText = optimizedView.textView.attributedText
-    t.layoutIfNeeded()
-  }
+  // TK2 experimental path removed
 
   private func renderMatrixSummary(variations: [String]) {
     guard !scenarioNames.isEmpty else { return }
@@ -651,7 +593,7 @@ final class PerformanceViewController: UIViewController {
       let row = matrixResults[name] ?? [:]
       for v in variations {
         if let r = row[v] {
-          let pct = String(format: "%+.1f%%", r.deltaPct)
+          let pct = String(format: "%+.1f%%", r)
           line += pad(pct, colW)
         } else {
           line += pad("—", colW)
@@ -677,7 +619,9 @@ final class PerformanceViewController: UIViewController {
     let nav = UINavigationController(rootViewController: vc)
     nav.modalPresentationStyle = .pageSheet
     if let sheet = nav.sheetPresentationController {
-      sheet.detents = [.medium(), .large()]
+      // Always present as a full-height sheet
+      sheet.detents = [.large()]
+      sheet.selectedDetentIdentifier = .large
       sheet.prefersGrabberVisible = true
     }
     self.present(nav, animated: true)
@@ -698,7 +642,7 @@ final class PerformanceViewController: UIViewController {
     c.runs.reduce(0) { $0 + $1.duration }
   }
 
-  private func summary(_ label: String, wall: TimeInterval, runs: [ReconcilerMetric], tk2Avg: TimeInterval? = nil) -> String {
+  private func summary(_ label: String, wall: TimeInterval, runs: [ReconcilerMetric]) -> String {
     guard !runs.isEmpty else { return "  - \(label): no runs\n" }
     let count = Double(runs.count)
     let planSum = runs.reduce(0) { $0 + $1.planningDuration }
@@ -714,11 +658,7 @@ final class PerformanceViewController: UIViewController {
     let moved = runs.reduce(0) { $0 + $1.movedChildren }
     let fmt = { (t: TimeInterval) in String(format: "%.3f ms", t * 1000) }
     let share = String(format: "%.0f%%", applyShare)
-    var line = "  - \(label): avg wall=\(fmt(wallAvg)) plan=\(fmt(planAvg)) apply=\(fmt(applyAvg)) (apply=\(share)) ops(del=\(deletes) ins=\(inserts) set=\(sets) fix=\(fixes) moved=\(moved))"
-    if let tk2 = tk2Avg {
-      let combined = applyAvg + tk2
-      line += String(format: "  TK2 layout avg=%.3f ms  apply+TK2 avg=%.3f ms", tk2 * 1000, combined * 1000)
-    }
+    let line = "  - \(label): avg wall=\(fmt(wallAvg)) plan=\(fmt(planAvg)) apply=\(fmt(applyAvg)) (apply=\(share)) ops(del=\(deletes) ins=\(inserts) set=\(sets) fix=\(fixes) moved=\(moved))"
     perfLog.info("\(line, privacy: .public)")
     return line + "\n"
   }
@@ -883,7 +823,7 @@ final class PerformanceViewController: UIViewController {
   private func clearRoot(editor: Editor) {
     try? editor.update {
       guard let root = getRoot() else { return }
-      while let child = root.getFirstChild() {
+      while let child = root.getLastChild() {
         try child.remove()
       }
     }
@@ -906,7 +846,7 @@ final class PerformanceViewController: UIViewController {
         for i in 0..<paragraphs {
           let p = ParagraphNode(); let t = TextNode(text: "P#\(i) quick brown fox"); try p.append([t]); newNodes.append(p)
         }
-        while let child = root.getFirstChild() { try child.remove() }
+        while let child = root.getLastChild() { try child.remove() }
         try root.append(newNodes)
       }
       print("🔥 PERF: resetAndSeed end (paras=\(paragraphs))")
@@ -929,7 +869,7 @@ final class PerformanceViewController: UIViewController {
         for i in 0..<paragraphs {
           let p = ParagraphNode(); let t = TextNode(text: "P#\(i) quick brown fox"); try p.append([t]); newNodes.append(p)
         }
-        while let child = root.getFirstChild() { try child.remove() }
+        while let child = root.getLastChild() { try child.remove() }
         try root.append(newNodes)
       }
       print("🔥 PERF: resetAndSeed end (paras=\(paragraphs))")

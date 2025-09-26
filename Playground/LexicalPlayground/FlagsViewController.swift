@@ -8,7 +8,7 @@
 import UIKit
 
 final class FlagsViewController: UITableViewController {
-  private enum Section: Int, CaseIterable { case reconciler, fenwick, textkit, misc }
+  private enum Section: Int, CaseIterable { case reconciler, fenwick, misc }
   private struct Row { let title: String; let keyPath: WritableKeyPath<FlagsStore, Bool> }
   private var sections: [[Row]] = []
 
@@ -35,10 +35,6 @@ final class FlagsViewController: UITableViewController {
         Row(title: "Central Aggregation", keyPath: \.centralAgg),
         Row(title: "Insert-Block Fenwick", keyPath: \.insertBlockFenwick),
       ],
-      // TextKit
-      [
-        Row(title: "TextKit 2 Experimental", keyPath: \.tk2),
-      ],
       // Misc
       [
         Row(title: "Reconciler Sanity Check", keyPath: \.sanityCheck),
@@ -53,7 +49,6 @@ final class FlagsViewController: UITableViewController {
     switch Section(rawValue: section)! {
     case .reconciler: return "Reconciler"
     case .fenwick: return "Fenwick / Locations"
-    case .textkit: return "TextKit"
     case .misc: return "Misc"
     }
   }

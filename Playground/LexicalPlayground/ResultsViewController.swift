@@ -16,8 +16,8 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
   // Inputs
   private let scenarios: [String]
   private let profiles: [VariationProfile]
-  // results[scenario][profileName] => (delta vs legacy %, tk2Avg, apply+tk2)
-  private let results: [String: [String: (deltaPct: Double, tk2Avg: TimeInterval?, applyPlusTk2: TimeInterval?)]]
+  // results[scenario][profileName] => delta vs legacy %
+  private let results: [String: [String: Double]]
   private let seedParas: Int
   private let fastestTop: (name: String, avgMs: Double)?
   private let generatedAt: Date
@@ -34,7 +34,7 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
   private let cellWidth: CGFloat = 140
   private let rowHeight: CGFloat = 40
 
-  init(scenarios: [String], profiles: [VariationProfile], results: [String: [String: (Double, TimeInterval?, TimeInterval?)]], seedParas: Int, fastestTop: (String, Double)?, generatedAt: Date = Date()) {
+  init(scenarios: [String], profiles: [VariationProfile], results: [String: [String: Double]], seedParas: Int, fastestTop: (String, Double)?, generatedAt: Date = Date()) {
     self.scenarios = scenarios
     self.profiles = profiles
     self.results = results
@@ -208,7 +208,7 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
     for s in scenarios.sorted() {
       var row = [s]
       let r = results[s] ?? [:]
-      for p in profiles { row.append(String(format: "%.2f", r[p.name]?.deltaPct ?? 0)) }
+      for p in profiles { row.append(String(format: "%.2f", r[p.name] ?? 0)) }
       out.append(row.joined(separator: ","))
     }
     // Append a blank line then a variations/flags summary for print‑friendliness
@@ -245,12 +245,8 @@ final class ResultsViewController: UIViewController, UITableViewDataSource, UITa
       rowStack.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
       let row = results[name] ?? [:]
       for p in profiles {
-        if let r = row[p.name] {
-          let pct = r.deltaPct
-          let txt = String(format: "%+.1f%%%@%@",
-                           pct,
-                           r.tk2Avg.map { String(format: "\nTK2 %.1fms", $0 * 1000) } ?? "",
-                           r.applyPlusTk2.map { String(format: "  +%.1fms", $0 * 1000) } ?? "")
+        if let pct = row[p.name] {
+          let txt = String(format: "%+.1f%%", pct)
           rowStack.addArrangedSubview(matrixCell(title: nil, value: txt, delta: pct))
         } else {
           rowStack.addArrangedSubview(matrixCell(title: nil, value: "—", delta: nil))

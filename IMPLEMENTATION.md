@@ -213,6 +213,13 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 ### Fixes / Maintenance
 - [x] Fenwick off‑by‑one: use `prefixSum(i+1)` when iterating 0‑based enumerate indices.
 
+- [x] Removed TextKit 2 experimental A/B flags and code paths
+  - Deleted feature flags: `useTextKit2Experimental`, `useTextKit2LayoutPerBatch`, `useTextKit2LayoutOncePerScenario` from `FeatureFlags`.
+  - Removed TK2 UI and timing in `PerformanceViewController` (mirrored UITextView, per‑batch/once‑per‑scenario layout measurements, matrix fields and summaries).
+  - Simplified results matrix to delta% only; adjusted `ResultsViewController` and CSV export accordingly.
+  - Dropped TK2 toggle from Playground `FlagsViewController` and `FlagsStore`.
+  - Updated tests (`InsertBenchmarkTests`) to remove TK2 variation.
+
 ## Today’s Changes (summary)
 - Insert‑block path now avoids full parent subtree recompute; computes inserted subtree only and shifts following nodes using a range‑based Fenwick rebuild.
 - Pre/post‑only path adds attribute‑only updates when lengths are unchanged (SetAttributes+FixAttributes), reducing churn.

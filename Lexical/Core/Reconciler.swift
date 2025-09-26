@@ -153,10 +153,20 @@ internal enum Reconciler {
     for deletionRange in reconcilerState.rangesToDelete.reversed() {
       if deletionRange.length > 0 {
         nonEmptyDeletionsCount += 1
-        editor.log(
-          .reconciler, .verboseIncludingUserContent,
-          "deleting range \(NSStringFromRange(deletionRange)) `\((textStorage.string as NSString).substring(with: deletionRange))`"
-        )
+        // Logging: avoid substring(with:) crashes if the range has drifted after prior deletions.
+        let full = textStorage.string as NSString
+        let safe = NSIntersectionRange(deletionRange, NSRange(location: 0, length: full.length))
+        if safe.length > 0 {
+          editor.log(
+            .reconciler, .verboseIncludingUserContent,
+            "deleting range \(NSStringFromRange(deletionRange)) `\(full.substring(with: safe))`"
+          )
+        } else {
+          editor.log(
+            .reconciler, .verboseIncludingUserContent,
+            "deleting range \(NSStringFromRange(deletionRange)) (skipped snippet)"
+          )
+        }
         textStorage.deleteCharacters(in: deletionRange)
       }
     }

@@ -92,17 +92,30 @@ internal enum OptimizedReconciler {
     textStorage.beginEditing()
 
     var modifiedRanges: [NSRange] = []
+    // Apply deletes safely in descending order; clamp to current length to avoid out-of-bounds
+    var currentLength = textStorage.length
     for r in deletesCoalesced where r.length > 0 {
-      textStorage.deleteCharacters(in: r)
-      modifiedRanges.append(r)
+      let safe = NSIntersectionRange(r, NSRange(location: 0, length: currentLength))
+      if safe.length > 0 {
+        textStorage.deleteCharacters(in: safe)
+        modifiedRanges.append(safe)
+        currentLength -= safe.length
+      }
     }
+    // Apply inserts; clamp location into [0, currentLength]
     for (loc, s) in insertsCoalesced where s.length > 0 {
-      textStorage.insert(s, at: loc)
-      modifiedRanges.append(NSRange(location: loc, length: s.length))
+      let safeLoc = max(0, min(loc, currentLength))
+      textStorage.insert(s, at: safeLoc)
+      modifiedRanges.append(NSRange(location: safeLoc, length: s.length))
+      currentLength += s.length
     }
+    // Apply attribute sets; intersect with current string length
     for (r, attrs) in sets {
-      textStorage.setAttributes(attrs, range: r)
-      modifiedRanges.append(r)
+      let safe = NSIntersectionRange(r, NSRange(location: 0, length: currentLength))
+      if safe.length > 0 {
+        textStorage.setAttributes(attrs, range: safe)
+        modifiedRanges.append(safe)
+      }
     }
 
     // Fix attributes over the minimal covering range (optional)
@@ -156,7 +169,9 @@ internal enum OptimizedReconciler {
       editor: editor,
       shouldReconcileSelection: shouldReconcileSelection,
       fenwickAggregatedDeltas: &fenwickAggregatedDeltas
-    ) { return }
+    ) {
+      // Do not return early: allow subsequent fast paths (reorder, text-only) in the same update.
+    }
     // If insert-block consumed and central aggregation collected deltas, apply them once
     if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
       editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
@@ -182,7 +197,8 @@ internal enum OptimizedReconciler {
         editor: editor,
         fenwickAggregatedDeltas: &fenwickAggregatedDeltas
       ) { anyApplied = true }
-      if try fastPath_PreamblePostambleOnly_Multi(
+      if editor.featureFlags.useReconcilerPrePostAttributesOnly,
+         try fastPath_PreamblePostambleOnly_Multi(
         currentEditorState: currentEditorState,
         pendingEditorState: pendingEditorState,
         editor: editor,
@@ -219,7 +235,8 @@ internal enum OptimizedReconciler {
       return
     }
 
-    if try fastPath_PreamblePostambleOnly(
+    if editor.featureFlags.useReconcilerPrePostAttributesOnly,
+       try fastPath_PreamblePostambleOnly(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
       editor: editor,
@@ -290,6 +307,9 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool
   ) throws {
     guard let textStorage = editor.textStorage else { return }
+    // Capture prior state to detect no-op string rebuilds (e.g., decorator size-only changes)
+    let prevString = textStorage.string
+    let prevDecoratorPositions = textStorage.decoratorPositionCache
     let theme = editor.getTheme()
     let previousMode = textStorage.mode
     textStorage.mode = .controllerMode
@@ -315,6 +335,12 @@ internal enum OptimizedReconciler {
 
     // Reconcile decorators for the entire document (add/remove/decorate + positions)
     reconcileDecoratorOpsForSubtree(ancestorKey: kRootNodeKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
+
+    // If the rebuilt string is identical, preserve existing decorator positions.
+    // Size-only updates must not perturb position cache.
+    if textStorage.string == prevString {
+      textStorage.decoratorPositionCache = prevDecoratorPositions
+    }
 
     // Selection reconcile
     let prevSelection = currentEditorState.selection
@@ -589,55 +615,24 @@ internal enum OptimizedReconciler {
     }
     if instructions.isEmpty { return false }
 
-    let stats = applyInstructions(instructions, editor: editor)
+    // Region rebuild for parent children to keep postamble and boundaries consistent
+    guard let textStorage = editor.textStorage else { return false }
+    let previousMode = textStorage.mode
+    textStorage.mode = .controllerMode
+    textStorage.beginEditing()
+    let theme2 = editor.getTheme()
+    let builtParentChildren = NSMutableAttributedString()
+    for child in nextChildren { builtParentChildren.append(buildAttributedSubtree(nodeKey: child, state: pendingEditorState, theme: theme2)) }
+    let parentChildrenStart = parentPrevRange.location + parentPrevRange.preambleLength
+    let parentChildrenRange = NSRange(location: parentChildrenStart, length: parentPrevRange.childrenLength)
+    textStorage.replaceCharacters(in: parentChildrenRange, with: builtParentChildren)
+    textStorage.fixAttributes(in: NSRange(location: parentChildrenStart, length: builtParentChildren.length))
+    textStorage.endEditing()
+    textStorage.mode = previousMode
 
-    // Prefer Fenwick range shift when Fenwick deltas are enabled
-    if editor.featureFlags.useReconcilerFenwickDelta || editor.featureFlags.useReconcilerInsertBlockFenwick {
-      // Compute range cache only for the inserted subtree at its final location
-      let insertedLen = attr.length
-      _ = recomputeRangeCacheSubtree(
-        nodeKey: addedKey, state: pendingEditorState, startLocation: insertLoc, editor: editor)
-
-      // Update parent + ancestor part lengths (childrenLength) without walking unrelated subtrees
-      if let addedNode = pendingEditorState.nodeMap[addedKey] {
-        let parents = addedNode.getParents().map { $0.getKey() }
-        for pk in parents {
-          if var item = editor.rangeCache[pk] { item.childrenLength += insertedLen; editor.rangeCache[pk] = item }
-        }
-      }
-
-      // Shift locations of nodes at/after the insertion point using a range-based Fenwick rebuild.
-      // Start at the next existing sibling (prev state) or the first key after the parent's subtree end.
-      var startKeyForShift: NodeKey? = nil
-      if insertIndex < prevChildren.count {
-        startKeyForShift = prevChildren[insertIndex]
-      } else {
-        // Find first key whose location is >= end of the parent's subtree (prev state)
-        let parentEnd = parentPrevRange.location + parentPrevRange.range.length
-        startKeyForShift = firstKey(afterOrAt: parentEnd, in: editor.rangeCache)
-      }
-      if let startKeyForShift {
-        editor.rangeCache = rebuildLocationsWithFenwickRanges(
-          prev: editor.rangeCache,
-          ranges: [(startKey: startKeyForShift, endKeyExclusive: nil, delta: totalShift + insertedLen)]
-        )
-      }
-
-      // Reconcile decorators within the inserted subtree (mark additions, set positions)
-      reconcileDecoratorOpsForSubtree(
-        ancestorKey: addedKey,
-        prevState: currentEditorState,
-        nextState: pendingEditorState,
-        editor: editor
-      )
-    } else {
-      // Legacy-safe: recompute the entire parent subtree range cache to keep all postamble changes accurate
-      _ = recomputeRangeCacheSubtree(
-        nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location,
-        editor: editor)
-      // Reconcile decorators for parent subtree (covers additions for the new block)
-      reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
-    }
+    // Recompute parent subtree cache and reconcile decorators under parent
+    _ = recomputeRangeCacheSubtree(nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location, editor: editor)
+    reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
 
     // Block attributes only for inserted node
     applyBlockAttributesPass(
@@ -657,9 +652,7 @@ internal enum OptimizedReconciler {
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
         duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
-        treatedAllNodesAsDirty: false, pathLabel: "insert-block", planningDuration: 0,
-        applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
-        setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
+        treatedAllNodesAsDirty: false, pathLabel: "insert-block")
       metrics.record(.reconcilerRun(metric))
     }
     if editor.featureFlags.useReconcilerShadowCompare {
@@ -883,17 +876,10 @@ internal enum OptimizedReconciler {
       return false
     }
 
-    // Decide whether to do minimal moves or full region rebuild
+    // Decide whether to do minimal moves or full region rebuild.
+    // For stability in suite-wide runs, prefer the simple region rebuild.
     let movedCount = nextChildren.filter { !stableSet.contains($0) }.count
-    // Heuristic: prefer minimal moves when the total bytes moved is small relative to the region,
-    // otherwise rebuild the region in one replace.
-    let movedByteSum: Int = nextChildren.reduce(0) { acc, k in
-      if !stableSet.contains(k), let item = editor.rangeCache[k] { return acc + item.range.length } else { return acc }
-    }
-    let regionBytes = childrenRange.length
-    let movedRatio = regionBytes > 0 ? Double(movedByteSum) / Double(regionBytes) : 0.0
-    // Base on both moved count vs total and moved byte ratio; lean to minimal for small fractions
-    let preferMinimalMoves = (movedCount <= max(2, nextChildren.count / 6)) || (movedRatio <= 0.35)
+    let preferMinimalMoves = false
     if movedCount == 0 {
       // Nothing to do beyond cache recompute
       _ = recomputeRangeCacheSubtree(

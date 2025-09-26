@@ -67,7 +67,6 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     textStorage.addLayoutManager(layoutManager)
 
     var reconcilerSanityCheck = featureFlags.reconcilerSanityCheck
-    let useTK2 = featureFlags.useTextKit2Experimental
 
     #if targetEnvironment(simulator)
       reconcilerSanityCheck = false
@@ -86,15 +85,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
     super.init(frame: .zero, textContainer: textContainer)
 
-    // Optional TextKit 2 A/B path (iOS 16+)
-    if useTK2 {
-      if #available(iOS 16.0, *) {
-        // Prototype hook: building a TextView with TextKit 2 requires
-        // initializing UITextView in TK2 mode. We keep this flag to permit
-        // A/B wiring and will switch construction to TK2 in a dedicated patch.
-        _ = self.textLayoutManager // may be nil when initialized with TextKit 1 path
-      }
-    }
+    // TextKit 2 experimental A/B path removed.
 
     if useInputDelegateProxy {
       inputDelegateProxy.targetInputDelegate = self.inputDelegate
