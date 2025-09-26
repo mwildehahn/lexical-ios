@@ -147,6 +147,20 @@ internal enum OptimizedReconciler {
     var fenwickAggregatedDeltas: [NodeKey: Int] = [:]
     // Pre-compute part diffs (used by some paths and metrics)
     let _ = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
+    // Structural insert fast path (before reorder)
+    if try fastPath_InsertBlock(
+      currentEditorState: currentEditorState,
+      pendingEditorState: pendingEditorState,
+      editor: editor,
+      shouldReconcileSelection: shouldReconcileSelection,
+      fenwickAggregatedDeltas: &fenwickAggregatedDeltas
+    ) { return }
+    // If insert-block consumed and central aggregation collected deltas, apply them once
+    if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
+      editor.rangeCache = rebuildLocationsWithFenwick(prev: editor.rangeCache, deltas: fenwickAggregatedDeltas)
+      fenwickAggregatedDeltas.removeAll(keepingCapacity: true)
+    }
+
     if try fastPath_ReorderChildren(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
@@ -480,6 +494,193 @@ internal enum OptimizedReconciler {
     return true
   }
 
+  // MARK: - Fast path: insert block (single new direct child under an Element)
+  @MainActor
+  private static func fastPath_InsertBlock(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    shouldReconcileSelection: Bool,
+    fenwickAggregatedDeltas: inout [NodeKey: Int]
+  ) throws -> Bool {
+    // Find a parent Element whose children gained exactly one child (no removals)
+    // and no other structural deltas.
+    let dirtyParents = editor.dirtyNodes.keys.compactMap { key -> (NodeKey, ElementNode, ElementNode)? in
+      guard let prev = currentEditorState.nodeMap[key] as? ElementNode,
+            let next = pendingEditorState.nodeMap[key] as? ElementNode else { return nil }
+      return (key, prev, next)
+    }
+    guard let cand = dirtyParents.first(where: { (parentKey, prev, next) in
+      let prevChildren = prev.getChildrenKeys(fromLatest: false)
+      let nextChildren = next.getChildrenKeys(fromLatest: false)
+      if nextChildren.count != prevChildren.count + 1 { return false }
+      let prevSet = Set(prevChildren)
+      let nextSet = Set(nextChildren)
+      let added = nextSet.subtracting(prevSet)
+      let removed = prevSet.subtracting(nextSet)
+      return added.count == 1 && removed.isEmpty
+    }) else { return false }
+
+    let (parentKey, prevParent, nextParent) = cand
+    let prevChildren = prevParent.getChildrenKeys(fromLatest: false)
+    let nextChildren = nextParent.getChildrenKeys(fromLatest: false)
+    let prevSet = Set(prevChildren)
+    let addedKey = Set(nextChildren).subtracting(prevSet).first!
+
+    // Compute insert index in nextChildren
+    guard let insertIndex = nextChildren.firstIndex(of: addedKey) else { return false }
+    guard let parentPrevRange = editor.rangeCache[parentKey] else { return false }
+    let childrenStart = parentPrevRange.location + parentPrevRange.preambleLength
+    // Sum lengths of previous siblings that existed before
+    var acc = 0
+    for k in nextChildren.prefix(insertIndex) {
+      if let r = editor.rangeCache[k]?.range {
+        acc += r.length
+      } else {
+        acc += subtreeTotalLength(nodeKey: k, state: currentEditorState)
+      }
+    }
+    let insertLoc = childrenStart + acc
+    let theme = editor.getTheme()
+    var instructions: [Instruction] = []
+
+    // If inserting not at index 0, the previous sibling's postamble may change (e.g., add a newline).
+    // We replace old postamble (if any) and insert the new postamble + the new block in a single combined insert.
+    var totalShift = 0
+    var combinedInsertPrefix: NSAttributedString? = nil
+    var deleteOldPostRange: NSRange? = nil
+    if insertIndex > 0 {
+      let prevSiblingKey = nextChildren[insertIndex - 1]
+      if let prevSiblingRange = editor.rangeCache[prevSiblingKey],
+         let prevSiblingNext = pendingEditorState.nodeMap[prevSiblingKey] {
+        let oldPost = prevSiblingRange.postambleLength
+        let newPost = prevSiblingNext.getPostamble().lengthAsNSString()
+        if newPost != oldPost {
+          let postLoc = prevSiblingRange.location + prevSiblingRange.preambleLength + prevSiblingRange.childrenLength + prevSiblingRange.textLength
+          // Will delete old postamble (if present) and then insert (newPost + new block) at postLoc
+          if oldPost > 0 { deleteOldPostRange = NSRange(location: postLoc, length: oldPost) }
+          let postAttrStr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: prevSiblingNext.getPostamble()), from: prevSiblingNext, state: pendingEditorState, theme: theme)
+          if postAttrStr.length > 0 { combinedInsertPrefix = postAttrStr }
+          // Update cache + ancestor childrenLength and account for location shift for following content
+          let deltaPost = newPost - oldPost
+          totalShift += deltaPost
+          if var it = editor.rangeCache[prevSiblingKey] { it.postambleLength = newPost; editor.rangeCache[prevSiblingKey] = it }
+          // bump ancestors
+          let parents = prevSiblingNext.getParents().map { $0.getKey() }
+          for pk in parents { if var item = editor.rangeCache[pk] { item.childrenLength += deltaPost; editor.rangeCache[pk] = item } }
+          // insertion happens at original postLoc; combinedInsertPrefix accounts for the new postamble content
+        }
+      }
+    }
+
+    let attr = buildAttributedSubtree(nodeKey: addedKey, state: pendingEditorState, theme: theme)
+    if let del = deleteOldPostRange { instructions.append(.delete(range: del)) }
+    if attr.length > 0 {
+      if let prefix = combinedInsertPrefix {
+        let combined = NSMutableAttributedString(attributedString: prefix)
+        combined.append(attr)
+        instructions.append(.insert(location: insertLoc, attrString: combined))
+      } else {
+        instructions.append(.insert(location: insertLoc, attrString: attr))
+      }
+    }
+    if instructions.isEmpty { return false }
+
+    let stats = applyInstructions(instructions, editor: editor)
+
+    if editor.featureFlags.useReconcilerInsertBlockFenwick {
+      // Compute range cache only for the inserted subtree at its final location
+      let insertedLen = attr.length
+      _ = recomputeRangeCacheSubtree(
+        nodeKey: addedKey, state: pendingEditorState, startLocation: insertLoc, editor: editor)
+
+      // Update parent + ancestor part lengths (childrenLength) without walking unrelated subtrees
+      if let addedNode = pendingEditorState.nodeMap[addedKey] {
+        let parents = addedNode.getParents().map { $0.getKey() }
+        for pk in parents {
+          if var item = editor.rangeCache[pk] { item.childrenLength += insertedLen; editor.rangeCache[pk] = item }
+        }
+      }
+
+      // Shift locations of nodes at/after the insertion point using a range-based Fenwick rebuild.
+      // Start at the next existing sibling (prev state) or the first key after the parent's subtree end.
+      var startKeyForShift: NodeKey? = nil
+      if insertIndex < prevChildren.count {
+        startKeyForShift = prevChildren[insertIndex]
+      } else {
+        // Find first key whose location is >= end of the parent's subtree (prev state)
+        let parentEnd = parentPrevRange.location + parentPrevRange.range.length
+        startKeyForShift = firstKey(afterOrAt: parentEnd, in: editor.rangeCache)
+      }
+      if let startKeyForShift {
+        editor.rangeCache = rebuildLocationsWithFenwickRanges(
+          prev: editor.rangeCache,
+          ranges: [(startKey: startKeyForShift, endKeyExclusive: nil, delta: totalShift + insertedLen)]
+        )
+      }
+
+      // Reconcile decorators within the inserted subtree (mark additions, set positions)
+      reconcileDecoratorOpsForSubtree(
+        ancestorKey: addedKey,
+        prevState: currentEditorState,
+        nextState: pendingEditorState,
+        editor: editor
+      )
+    } else {
+      // Legacy-safe: recompute the entire parent subtree range cache to keep all postamble changes accurate
+      _ = recomputeRangeCacheSubtree(
+        nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location,
+        editor: editor)
+      // Reconcile decorators for parent subtree (covers additions for the new block)
+      reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
+    }
+
+    // Block attributes only for inserted node
+    applyBlockAttributesPass(
+      editor: editor, pendingEditorState: pendingEditorState, affectedKeys: [addedKey],
+      treatAllNodesAsDirty: false)
+
+    // Selection reconcile mirrors other fast paths
+    let prevSelection = currentEditorState.selection
+    let nextSelection = pendingEditorState.selection
+    var selectionsAreDifferent = false
+    if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+    let needsUpdate = editor.dirtyType != .noDirtyNodes
+    if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+      try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+    }
+
+    if let metrics = editor.metricsContainer {
+      let metric = ReconcilerMetric(
+        duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+        treatedAllNodesAsDirty: false, pathLabel: "insert-block", planningDuration: 0,
+        applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
+        setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
+      metrics.record(.reconcilerRun(metric))
+    }
+    if editor.featureFlags.useReconcilerShadowCompare {
+      print("🔥 OPTIMIZED RECONCILER: insert-block fast path (parent=\(parentKey), at=\(insertIndex))")
+    }
+    return true
+  }
+
+  // Find first key whose cached location is >= targetLocation
+  @MainActor
+  private static func firstKey(afterOrAt targetLocation: Int, in cache: [NodeKey: RangeCacheItem]) -> NodeKey? {
+    var best: (key: NodeKey, loc: Int)? = nil
+    for (k, item) in cache {
+      let loc = item.location
+      if loc >= targetLocation {
+        if let cur = best {
+          if loc < cur.loc { best = (k, loc) }
+        } else {
+          best = (k, loc)
+        }
+      }
+    }
+    return best?.key
+  }
+
   // Multi-text changes in one pass (central aggregation only)
   @MainActor
   private static func fastPath_TextOnly_Multi(
@@ -580,6 +781,12 @@ internal enum OptimizedReconciler {
         if var item = editor.rangeCache[key] { item.postambleLength = nextPostLen; editor.rangeCache[key] = item }
         if let n = pendingEditorState.nodeMap[key] { let parents = n.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } ; for p in parents { affected.insert(p) } }
         fenwickAggregatedDeltas[key, default: 0] += delta
+      } else if nextPostLen > 0 { // same length: prefer attributes-only update
+        let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
+        let rng = NSRange(location: postLoc, length: nextPostLen)
+        let postAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: npo), from: next, state: pendingEditorState, theme: theme)
+        let attrs = postAttr.attributes(at: 0, effectiveRange: nil)
+        instructions.append(.setAttributes(range: rng, attributes: attrs))
       }
       if nextPreLen != prevRange.preambleLength {
         let preLoc = prevRange.location
@@ -592,6 +799,12 @@ internal enum OptimizedReconciler {
         if var item = editor.rangeCache[key] { item.preambleLength = nextPreLen; item.preambleSpecialCharacterLength = preSpecial; editor.rangeCache[key] = item }
         if let n = pendingEditorState.nodeMap[key] { let parents = n.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } ; for p in parents { affected.insert(p) } }
         fenwickAggregatedDeltas[key, default: 0] += delta
+      } else if nextPreLen > 0 {
+        let preLoc = prevRange.location
+        let rng = NSRange(location: preLoc, length: nextPreLen)
+        let preAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: np), from: next, state: pendingEditorState, theme: theme)
+        let attrs = preAttr.attributes(at: 0, effectiveRange: nil)
+        instructions.append(.setAttributes(range: rng, attributes: attrs))
       }
       affected.insert(key)
     }
@@ -664,7 +877,9 @@ internal enum OptimizedReconciler {
     // Decide whether to do minimal moves or full region rebuild
     let movedCount = nextChildren.filter { !stableSet.contains($0) }.count
     let lisLen = stableSet.count
-    let preferMinimalMoves = lisLen >= max(2, nextChildren.count / 5) // if at least 20% stable, do minimal moves
+    // Prefer minimal moves more aggressively on small/medium child counts
+    let threshold = max(1, nextChildren.count / 10) // ~10%
+    let preferMinimalMoves = lisLen >= threshold
     if movedCount == 0 {
       // Nothing to do beyond cache recompute
       _ = recomputeRangeCacheSubtree(
@@ -936,6 +1151,15 @@ internal enum OptimizedReconciler {
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .postamble, newPartLength: nextPostLen, delta: delta)
       }
+    } else if nextPostLen == prevRange.postambleLength && nextPostLen > 0 {
+      // Same length: update attributes only
+      let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
+      let rng = NSRange(location: postLoc, length: nextPostLen)
+      let postAttr = AttributeUtils.attributedStringByAddingStyles(
+        NSAttributedString(string: nextNode.getPostamble()), from: nextNode, state: pendingEditorState,
+        theme: theme)
+      let attrs = postAttr.attributes(at: 0, effectiveRange: nil)
+      applied.append(.setAttributes(range: rng, attributes: attrs))
     }
 
     // Apply preamble second (lower location)
@@ -960,6 +1184,15 @@ internal enum OptimizedReconciler {
       } else {
         updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .preamble, newPartLength: nextPreLen, preambleSpecialCharacterLength: preSpecial, delta: delta)
       }
+    } else if nextPreLen == prevRange.preambleLength && nextPreLen > 0 {
+      // Same length: update attributes only
+      let preLoc = prevRange.location
+      let rng = NSRange(location: preLoc, length: nextPreLen)
+      let preAttr = AttributeUtils.attributedStringByAddingStyles(
+        NSAttributedString(string: nextNode.getPreamble()), from: nextNode, state: pendingEditorState,
+        theme: theme)
+      let attrs = preAttr.attributes(at: 0, effectiveRange: nil)
+      applied.append(.setAttributes(range: rng, attributes: attrs))
     }
     let stats = applyInstructions(applied, editor: editor)
 

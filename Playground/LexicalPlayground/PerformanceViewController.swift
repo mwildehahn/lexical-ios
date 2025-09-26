@@ -174,7 +174,9 @@ final class PerformanceViewController: UIViewController {
   }
 
   private func configureRunButton() {
-    navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Run", style: .plain, target: self, action: #selector(runTapped))
+    let run = UIBarButtonItem(title: "Run", style: .plain, target: self, action: #selector(runTapped))
+    let runVar = UIBarButtonItem(title: "Run Variations", style: .plain, target: self, action: #selector(runVariationsTapped))
+    navigationItem.rightBarButtonItems = [run, runVar]
   }
 
   @objc private func onPresetChanged(_ sender: UISegmentedControl) {
@@ -195,15 +197,7 @@ final class PerformanceViewController: UIViewController {
     optimizedMetrics.resetMetrics()
 
     let legacyFlags = FeatureFlags()
-    let optimizedFlags = FeatureFlags(
-      useOptimizedReconciler: true,
-      useReconcilerFenwickDelta: true,
-      useReconcilerKeyedDiff: true,
-      useReconcilerBlockRebuild: true,
-      useOptimizedReconcilerStrictMode: true,
-      useReconcilerFenwickCentralAggregation: true,
-      useReconcilerShadowCompare: false
-    )
+    let optimizedFlags = FlagsStore.shared.makeFeatureFlags()
 
     func makeConfig(metrics: EditorMetricsContainer) -> EditorConfig {
       let theme = Theme()
@@ -237,6 +231,129 @@ final class PerformanceViewController: UIViewController {
     // Seed both documents with identical content (keep modest for UI responsiveness)
     seedDocument(editor: legacy.editor, paragraphs: 100)
     seedDocument(editor: optimized.editor, paragraphs: 100)
+  }
+
+  // MARK: - Variations Runner
+  @objc private func runVariationsTapped() {
+    guard !isRunning else { return }
+    isRunning = true
+    summary = NSMutableAttributedString(string: "Lexical Perf Variations\n" + nowStamp() + "\n\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 12, weight: .regular), .foregroundColor: UIColor.secondaryLabel])
+    refreshSummaryView()
+    copyButton.isEnabled = false
+    activity.startAnimating()
+    statusLabel.text = "Preparing variations…"
+    progress.setProgress(0, animated: false)
+
+    let variations: [(String, FeatureFlags)] = [
+      ("Optimized (base)", FeatureFlags(
+        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
+        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: false,
+        useReconcilerShadowCompare: false, useTextKit2Experimental: false,
+        useReconcilerInsertBlockFenwick: false
+      )),
+      ("+ Central Aggregation", FeatureFlags(
+        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
+        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
+        useReconcilerShadowCompare: false, useTextKit2Experimental: false,
+        useReconcilerInsertBlockFenwick: false
+      )),
+      ("+ Insert-Block Fenwick", FeatureFlags(
+        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
+        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
+        useReconcilerShadowCompare: false, useTextKit2Experimental: false,
+        useReconcilerInsertBlockFenwick: true
+      )),
+      ("+ TextKit 2", FeatureFlags(
+        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: false, useReconcilerBlockRebuild: false,
+        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
+        useReconcilerShadowCompare: false, useTextKit2Experimental: true,
+        useReconcilerInsertBlockFenwick: true
+      )),
+      ("All toggles", FeatureFlags(
+        reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true, useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: true, useReconcilerBlockRebuild: true,
+        useOptimizedReconcilerStrictMode: true, useReconcilerFenwickCentralAggregation: true,
+        useReconcilerShadowCompare: false, useTextKit2Experimental: true,
+        useReconcilerInsertBlockFenwick: true
+      )),
+    ]
+
+    runVariationList(variations, index: 0) { [weak self] in
+      guard let self else { return }
+      self.activity.stopAnimating(); self.statusLabel.text = "Done"; self.copyButton.isEnabled = true; self.isRunning = false; self.refreshSummaryView()
+    }
+  }
+
+  private func runVariationList(_ vars: [(String, FeatureFlags)], index: Int, completion: @escaping () -> Void) {
+    guard index < vars.count else { completion(); return }
+    let (name, flags) = vars[index]
+    appendLog("\n===== Variation: \(name) =====\n")
+    // Rebuild editors with new optimized flags
+    teardownEditors()
+    buildEditorsWith(optimizedFlags: flags)
+    // Re-seed and run scenarios
+    currentPreset = .quick
+    let cfg = config(for: currentPreset)
+    preWarmEditors(); resetDocuments(paragraphs: cfg.seedParas)
+    let scenarios = makeScenarios()
+    totalSteps = scenarios.reduce(0) { $0 + $1.iterations }; completedSteps = 0
+    runScenarioList(scenarios, index: 0) { [weak self] in
+      guard let self else { return }
+      self.summary.append(NSAttributedString(string: "Finished variation: \(name)\n\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: UIColor.tertiaryLabel]))
+      self.runVariationList(vars, index: index + 1, completion: completion)
+    }
+  }
+
+  private func teardownEditors() {
+    legacyView?.removeFromSuperview(); optimizedView?.removeFromSuperview(); legacyView = nil; optimizedView = nil
+  }
+
+  private func buildEditorsWith(optimizedFlags: FeatureFlags) {
+    legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
+    let legacyFlags = FeatureFlags()
+    func makeConfig(metrics: EditorMetricsContainer) -> EditorConfig { let theme = Theme(); theme.link = [.foregroundColor: UIColor.systemBlue]; return EditorConfig(theme: theme, plugins: [], metricsContainer: metrics) }
+    let legacy = LexicalView(editorConfig: makeConfig(metrics: legacyMetrics), featureFlags: legacyFlags)
+    let optimized = LexicalView(editorConfig: makeConfig(metrics: optimizedMetrics), featureFlags: optimizedFlags)
+    legacyView = legacy; optimizedView = optimized
+    legacy.translatesAutoresizingMaskIntoConstraints = false; optimized.translatesAutoresizingMaskIntoConstraints = false
+    legacyContainer.addSubview(legacy); optimizedContainer.addSubview(optimized)
+    NSLayoutConstraint.activate([
+      legacy.topAnchor.constraint(equalTo: legacyContainer.topAnchor), legacy.bottomAnchor.constraint(equalTo: legacyContainer.bottomAnchor), legacy.leadingAnchor.constraint(equalTo: legacyContainer.leadingAnchor), legacy.trailingAnchor.constraint(equalTo: legacyContainer.trailingAnchor),
+      optimized.topAnchor.constraint(equalTo: optimizedContainer.topAnchor), optimized.bottomAnchor.constraint(equalTo: optimizedContainer.bottomAnchor), optimized.leadingAnchor.constraint(equalTo: optimizedContainer.leadingAnchor), optimized.trailingAnchor.constraint(equalTo: optimizedContainer.trailingAnchor),
+    ])
+  }
+
+  private func makeScenarios() -> [Scenario] {
+    let c = config(for: currentPreset)
+    func stepInsertTop() { try? insertOnce(position: .top) }
+    func stepInsertMiddle() { try? insertOnce(position: .middle) }
+    func stepInsertEnd() { try? insertOnce(position: .end) }
+    func stepTextBurst() { try? textBurstOnce() }
+    func stepAttrToggle() { try? attributeToggleOnce() }
+    func stepReorderSmall() { try? reorderSmallOnce() }
+    func stepCoalescedReplace() { try? coalescedReplaceOnce() }
+    func stepPrePostToggle() { try? prePostToggleOnce() }
+    func stepLargeReorder() { try? largeReorderOnce() }
+    return [
+      .init(name: "Insert paragraph at TOP", iterations: c.iterTop, batch: c.batch, step: stepInsertTop, parityKind: .plain),
+      .init(name: "Insert paragraph at MIDDLE", iterations: c.iterMid, batch: c.batch, step: stepInsertMiddle, parityKind: .plain),
+      .init(name: "Insert paragraph at END", iterations: c.iterEnd, batch: c.batch, step: stepInsertEnd, parityKind: .plain),
+      .init(name: "Text edit bursts", iterations: c.iterText, batch: c.batch, step: stepTextBurst, parityKind: .plain),
+      .init(name: "Attribute-only toggle bold", iterations: c.iterAttr, batch: c.batch, step: stepAttrToggle, parityKind: .attrOnly),
+      .init(name: "Pre/Post-only toggle (wrap/unwrap Quote)", iterations: c.iterPrePost, batch: c.batch, step: stepPrePostToggle, parityKind: .plain),
+      .init(name: "Keyed reorder (swap neighbors)", iterations: c.iterSmallReorder, batch: c.batch, step: stepReorderSmall, parityKind: .plain),
+      .init(name: "Large reorder rotation", iterations: c.iterLargeReorder, batch: c.batch, step: stepLargeReorder, parityKind: .plain),
+      .init(name: "Coalesced replace (paste-like)", iterations: c.iterCoalesced, batch: c.batch, step: stepCoalescedReplace, parityKind: .plain),
+    ]
   }
 
   @objc private func copyResults() {
@@ -375,15 +492,21 @@ final class PerformanceViewController: UIViewController {
 
   private func summary(_ label: String, wall: TimeInterval, runs: [ReconcilerMetric]) -> String {
     guard !runs.isEmpty else { return "  - \(label): no runs\n" }
-    let apply = runs.reduce(0) { $0 + $1.applyDuration }
-    let plan = runs.reduce(0) { $0 + $1.planningDuration }
+    let count = Double(runs.count)
+    let planSum = runs.reduce(0) { $0 + $1.planningDuration }
+    let applySum = runs.reduce(0) { $0 + $1.applyDuration }
+    let planAvg = planSum / count
+    let applyAvg = applySum / count
+    let wallAvg = wall / count
+    let applyShare = wallAvg > 0 ? (applyAvg / wallAvg * 100.0) : 0
     let deletes = runs.reduce(0) { $0 + $1.deleteCount }
     let inserts = runs.reduce(0) { $0 + $1.insertCount }
     let sets = runs.reduce(0) { $0 + $1.setAttributesCount }
     let fixes = runs.reduce(0) { $0 + $1.fixAttributesCount }
     let moved = runs.reduce(0) { $0 + $1.movedChildren }
     let fmt = { (t: TimeInterval) in String(format: "%.3f ms", t * 1000) }
-    return "  - \(label): wall=\(fmt(wall)) plan=\(fmt(plan)) apply=\(fmt(apply)) ops(del=\(deletes) ins=\(inserts) set=\(sets) fix=\(fixes) moved=\(moved))\n"
+    let share = String(format: "%.0f%%", applyShare)
+    return "  - \(label): avg wall=\(fmt(wallAvg)) plan=\(fmt(planAvg)) apply=\(fmt(applyAvg)) (apply=\(share)) ops(del=\(deletes) ins=\(inserts) set=\(sets) fix=\(fixes) moved=\(moved))\n"
   }
 
   private func nowStamp() -> String {

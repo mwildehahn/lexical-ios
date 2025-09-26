@@ -9,7 +9,10 @@
 /* Begin PBXBuildFile section */
 		0630DC162A2F624D009EB23B /* LexicalLinkPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 0630DC152A2F624D009EB23B /* LexicalLinkPlugin */; };
 		0656CF7929D1E438009CA08F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0656CF7829D1E438009CA08F /* AppDelegate.swift */; };
+		06AA55EF2B1A100000AABBCC /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AA55EE2B1A100000AABBCC /* SceneDelegate.swift */; };
 		0656CF7D29D1E438009CA08F /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0656CF7C29D1E438009CA08F /* ViewController.swift */; };
+		06AA55F02B1A101000AABBCC /* FlagsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AA55F22B1A101000AABBCC /* FlagsStore.swift */; };
+		06AA55F12B1A101000AABBCC /* FlagsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AA55F32B1A101000AABBCC /* FlagsViewController.swift */; };
 		0656CF8229D1E439009CA08F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0656CF8129D1E439009CA08F /* Assets.xcassets */; };
 		0656CF8529D1E439009CA08F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0656CF8329D1E439009CA08F /* LaunchScreen.storyboard */; };
 		0656CF9029D1ED8F009CA08F /* ToolbarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0656CF8F29D1ED8F009CA08F /* ToolbarPlugin.swift */; };
@@ -30,7 +33,10 @@
 /* Begin PBXFileReference section */
 		0656CF7529D1E438009CA08F /* LexicalPlayground.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LexicalPlayground.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0656CF7829D1E438009CA08F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		06AA55EE2B1A100000AABBCC /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		0656CF7C29D1E438009CA08F /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		06AA55F22B1A101000AABBCC /* FlagsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlagsStore.swift; sourceTree = "<group>"; };
+		06AA55F32B1A101000AABBCC /* FlagsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlagsViewController.swift; sourceTree = "<group>"; };
 		0656CF8129D1E439009CA08F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		0656CF8429D1E439009CA08F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		0656CF8629D1E439009CA08F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -84,6 +90,9 @@
 			isa = PBXGroup;
 			children = (
 				0656CF7829D1E438009CA08F /* AppDelegate.swift */,
+				06AA55EE2B1A100000AABBCC /* SceneDelegate.swift */,
+				06AA55F22B1A101000AABBCC /* FlagsStore.swift */,
+				06AA55F32B1A101000AABBCC /* FlagsViewController.swift */,
 				0656CF7C29D1E438009CA08F /* ViewController.swift */,
 				069E59DC2A1F726D00CA4296 /* ExportOutputViewController.swift */,
 				06D0BEEF2B1A000100AABBCC /* PerformanceViewController.swift */,
@@ -199,10 +208,13 @@
 			files = (
 				0656CF7D29D1E438009CA08F /* ViewController.swift in Sources */,
 				0656CF7929D1E438009CA08F /* AppDelegate.swift in Sources */,
+				06AA55EF2B1A100000AABBCC /* SceneDelegate.swift in Sources */,
+				06AA55F12B1A101000AABBCC /* FlagsViewController.swift in Sources */,
 				0656CF9029D1ED8F009CA08F /* ToolbarPlugin.swift in Sources */,
 				069E59DD2A1F726D00CA4296 /* ExportOutputViewController.swift in Sources */,
 				06CB47B429DE0139005AC7BD /* NodeHierarchyViewPlugin.swift in Sources */,
 				06D0BEEF2B1A000200AABBCC /* PerformanceViewController.swift in Sources */,
+				06AA55F02B1A101000AABBCC /* FlagsStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

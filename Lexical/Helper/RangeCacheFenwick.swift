@@ -28,7 +28,8 @@ internal func rebuildLocationsWithFenwick(
   }
   var next = prev
   for (i, k) in keys.enumerated() {
-    let shift = bit.prefixSum(i)
+    // Fenwick indices are 1-based; enumerate() is 0-based
+    let shift = bit.prefixSum(i + 1)
     if var item = next[k] {
       item.location = max(0, prev[k]!.location + shift)
       next[k] = item
@@ -61,7 +62,8 @@ internal func rebuildLocationsWithFenwickRanges(
   }
   var next = prev
   for (i, k) in keys.enumerated() {
-    let shift = bit.prefixSum(i)
+    // Fenwick indices are 1-based; enumerate() is 0-based
+    let shift = bit.prefixSum(i + 1)
     if var item = next[k] {
       item.location = max(0, prev[k]!.location + shift)
       next[k] = item

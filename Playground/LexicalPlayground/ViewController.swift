@@ -151,17 +151,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
     // Feature flags
     let flags: FeatureFlags
     if useOptimized {
-      flags = FeatureFlags(
-        reconcilerSanityCheck: false,
-        proxyTextViewInputDelegate: false,
-        useOptimizedReconciler: true,
-        useReconcilerFenwickDelta: true,
-        useReconcilerKeyedDiff: true,
-        useReconcilerBlockRebuild: true,
-        useOptimizedReconcilerStrictMode: true,
-        useReconcilerFenwickCentralAggregation: true,
-        useReconcilerShadowCompare: false
-      )
+      flags = FlagsStore.shared.makeFeatureFlags()
     } else {
       flags = FeatureFlags()
     }

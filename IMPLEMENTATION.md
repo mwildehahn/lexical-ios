@@ -174,8 +174,8 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 - [ ] M6a — Platform bump + Text stack options (iOS 16+)
   - [x] Bump SPM minimum to iOS 16 in Package.swift (enables TextKit 2 APIs at compile time).
   - [x] Enable `NSLayoutManager.allowsNonContiguousLayout` for TextKit 1 to reduce full relayout on large inserts (UIKit NSLayoutManager property).
-  - [ ] Add feature flag `useTextKit2Experimental` and prototype a TextKit 2 path (UITextView.textLayoutManager) in a sandbox editor for A/B. Docs: UITextView.textLayoutManager (iOS 16+), NSTextLayoutManager (iOS 15+).
-  - [ ] Investigate `NSTextViewportLayoutController` (iOS 15+) for viewport‑only layout on large docs.
+  - [x] Add feature flag `useTextKit2Experimental` and prototype a TextKit 2 path (UITextView.textLayoutManager) in a sandbox editor for A/B. Docs: UITextView.textLayoutManager (iOS 16+), NSTextLayoutManager (iOS 15+).
+  - [x] Investigate `NSTextViewportLayoutController` (iOS 15+) for viewport‑only layout on large docs (prototype wiring behind the flag).
   - [ ] Measure before/after on block inserts at TOP/MIDDLE/END with viewport controller enabled.
 
 - [ ] M6b — Perf instrumentation & summary (diagnose bottlenecks)
@@ -185,12 +185,30 @@ Baseline runtime: iOS 16+ (tests run on iPhone 17 Pro, iOS 26.0 simulator)
 
 - [ ] M7 — Insert‑block fast path (structural)
   - [x] First pass: compose new block once; single Insert at string position; recompute parent subtree range cache; apply block‑level attrs for inserted node; selection reconcile; metrics label `insert-block`.
-  - [ ] Replace subtree recompute with aggregated Fenwick ancestor delta + single rebuild at end‑of‑run.
+  - [x] Replace parent subtree recompute with range‑based Fenwick location shift from the next sibling (or next key after parent) and recompute only the inserted subtree. Update parent/ancestor `childrenLength` in O(depth).
   - [ ] Tests: inserts at top/mid/end (medium/large docs); parity + perf assertions; selection mapping parity.
 
 - [ ] M7a — Pre/Post‑only refinements
-  - [ ] When lengths unchanged: use pure SetAttributes + minimal FixAttributes (no delete/insert); apply one small Fenwick delta where needed.
+  - [x] When lengths unchanged: use pure SetAttributes + minimal FixAttributes (no delete/insert). No Fenwick delta required.
   - [ ] Tests: list bullets, quote/code markers, heading boundaries — parity + perf.
+
+### Playground polish
+- [x] Adopt UIScene lifecycle (SceneDelegate) and add `UIApplicationSceneManifest` to Info.plist to silence future assert warnings. Window setup moved to SceneDelegate.
+- [x] Add a Flags tab (global toggles). Flags persist in UserDefaults; both Editor and Perf screens read from this store when (re)building editors.
+- [x] Perf: add “Run Variations” to run the benchmark suite across curated flag combinations (baseline optimized, +central aggregation, +insert‑block Fenwick, +TextKit2, all toggles).
+
+### Fixes / Maintenance
+- [x] Fenwick off‑by‑one: use `prefixSum(i+1)` when iterating 0‑based enumerate indices.
+
+## Today’s Changes (summary)
+- Insert‑block path now avoids full parent subtree recompute; computes inserted subtree only and shifts following nodes using a range‑based Fenwick rebuild.
+- Pre/post‑only path adds attribute‑only updates when lengths are unchanged (SetAttributes+FixAttributes), reducing churn.
+- Prototype TextKit 2 A/B path behind `useTextKit2Experimental` (bridges our custom TextStorage via NSTextContentStorage; hooks a viewport layout controller).
+- Adopted UIScene lifecycle in the Playground app.
+
+## Next
+- Add unit tests for insert‑block (top/mid/end) and attribute‑only pre/post cases; compare optimized vs legacy string parity and selection mapping.
+- Measure TK2 A/B on large insert scenarios; consider keeping viewport controller enabled by default behind flag.
 
 - [ ] M7b — Reorder heuristics & Fenwick shifts
   - [x] Relax minimal‑move threshold from ~20% LIS to ~10% to prefer moves more often.
