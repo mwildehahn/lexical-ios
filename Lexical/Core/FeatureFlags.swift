@@ -42,7 +42,7 @@ import Foundation
     useReconcilerFenwickDelta: Bool = false,
     useReconcilerKeyedDiff: Bool = false,
     useReconcilerBlockRebuild: Bool = false,
-    useOptimizedReconcilerStrictMode: Bool = false,
+    useOptimizedReconcilerStrictMode: Bool = true,
     useReconcilerFenwickCentralAggregation: Bool = false,
     useReconcilerShadowCompare: Bool = false,
     useReconcilerInsertBlockFenwick: Bool = false,
@@ -156,14 +156,14 @@ import Foundation
         useReconcilerFenwickDelta: true,
         useReconcilerKeyedDiff: true,
         useReconcilerBlockRebuild: true,
-        useOptimizedReconcilerStrictMode: false,
+        useOptimizedReconcilerStrictMode: true,
         useReconcilerFenwickCentralAggregation: true,
         useReconcilerShadowCompare: false,
         useReconcilerInsertBlockFenwick: true,
         useReconcilerDeleteBlockFenwick: true,
         useReconcilerPrePostAttributesOnly: false,
         useModernTextKitOptimizations: true,
-        verboseLogging: false,
+        verboseLogging: true,
         prePostAttrsOnlyMaxTargets: 0
       )
     }

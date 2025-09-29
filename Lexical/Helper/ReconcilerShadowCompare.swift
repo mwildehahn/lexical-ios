@@ -57,7 +57,6 @@ internal func shadowCompareOptimizedVsLegacy(
     useReconcilerFenwickDelta: false,
     useReconcilerKeyedDiff: false,
     useReconcilerBlockRebuild: false,
-    useOptimizedReconcilerStrictMode: false,
     useReconcilerShadowCompare: false
   )
   let cfg = EditorConfig(

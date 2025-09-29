@@ -668,3 +668,41 @@ Comprehensive batch optimization leveraging iOS 16 SDK capabilities to dramatica
 - [x] Integration with PerformanceViewController
 - [x] FlagsStore support
 - [ ] Performance metrics validation (pending test run)
+
+## 2025-09-29 — Live typing duplication + empty hydrate fix
+
+- What changed
+  - OptimizedReconciler
+    - Gate fresh-document hydration when TextStorage is empty but pending root has no children, to avoid a zero-length build cycle.
+    - Prevent any text-only fast path (single or multi) from running in the same update after an insert-block fast path already applied. This guarantees a single string write per keystroke and fixes the “Hey -> HeyH” duplication.
+  - Playground ViewController
+    - Call `restoreEditorState()` immediately after the initial `rebuildEditor(...)` in `viewDidLoad` so the editor hydrates from persisted content before the first user input.
+
+- Key files
+  - `Lexical/Core/OptimizedReconciler.swift`
+  - `Playground/LexicalPlayground/ViewController.swift`
+
+- Flags/Profiles
+  - No profile/flag changes; behavior is guarded by existing optimized reconciler flags.
+
+- Verification plan
+  - Build Playground for iPhone 17 Pro (iOS 26.0) and type into the Optimized editor with `verbose-logging` ON; confirm:
+    - No `HYDRATE: build len=0` on first input (either hydration is skipped or state restored).
+    - Exactly one `TS-EDIT replace(str)` per keystroke; no follow-up minimal replace in the same update.
+  - Re-run perf scenarios; prior gains for Top insertion/Bulk delete should remain.
+
+- Status: pending local simulator verification
+
+### 2025-09-29 — Live-editing regression tests
+
+- Added `LexicalTests/Tests/OptimizedReconcilerLiveEditingTests.swift` (uses `LexicalReadOnlyTextKitContext`, not `LexicalView`, to match existing patterns):
+  - Typing does not duplicate characters ("H", "e", "y").
+  - Backspace deletes a single character (no block delete fast path).
+  - Newline insertion creates new paragraph and caret lands at start.
+  - Legacy parity: backspace single char behaves identically.
+
+- How to run (iOS simulator tests):
+  - All: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+  - Filter just this suite: add `-only-testing:LexicalTests/OptimizedReconcilerLiveEditingTests`.
+
+- Expected: tests pass; no hangs (no `LexicalView` used in tests).

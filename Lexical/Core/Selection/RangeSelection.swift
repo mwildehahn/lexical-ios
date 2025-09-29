@@ -995,6 +995,13 @@ public class RangeSelection: BaseSelection {
       } else {
         if !result.skipSelectStart {
           _ = try newElement.selectStart()
+          if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+            if let sel = try? getSelection() as? RangeSelection {
+              print("🔥 SELECTION: after insertParagraph anchor=\(sel.anchor.key):\(sel.anchor.offset) focus=\(sel.focus.key):\(sel.focus.offset)")
+            } else {
+              print("🔥 SELECTION: after insertParagraph (no range selection)")
+            }
+          }
         }
       }
     }
@@ -1022,7 +1029,21 @@ public class RangeSelection: BaseSelection {
 
   @MainActor
   public func deleteCharacter(isBackwards: Bool) throws {
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+      print("🔥 DELETE: begin backward=\(isBackwards) anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset) collapsed=\(isCollapsed())")
+    }
     let wasCollapsed = isCollapsed()
+    // Read-only fallback: there is no native selection movement. If collapsed,
+    // synthesize a one-character selection using rangeCache so removeText() can
+    // splice correctly. This mirrors what UIKit selection movement would do.
+    if let editor = getActiveEditor(), editor.frontend is LexicalReadOnlyTextKitContext, isCollapsed() {
+      if let anchorLoc = try stringLocationForPoint(anchor, editor: editor) {
+        let start = max(0, isBackwards ? anchorLoc - 1 : anchorLoc)
+        let len = 1
+        let rng = NSRange(location: start, length: len)
+        try applySelectionRange(rng, affinity: isBackwards ? .backward : .forward)
+      }
+    }
     if isCollapsed() {
       let anchor = self.anchor
       let focus = self.focus
@@ -1114,6 +1135,9 @@ public class RangeSelection: BaseSelection {
       try modify(alter: .extend, isBackward: isBackwards, granularity: .character)
 
       if !isCollapsed() {
+        if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+          print("🔥 DELETE: after modify() collapsed=false; anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
+        }
         let focusNode = focus.type == .text ? try focus.getNode() : nil
         anchorNode = anchor.type == .text ? try anchor.getNode() : nil
 
@@ -1150,7 +1174,9 @@ public class RangeSelection: BaseSelection {
       }
     }
 
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging { print("🔥 DELETE: removeText()") }
     try removeText()
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging { print("🔥 DELETE: end") }
 
     if isBackwards && !wasCollapsed && isCollapsed() && self.anchor.type == .element
       && self.anchor.offset == 0

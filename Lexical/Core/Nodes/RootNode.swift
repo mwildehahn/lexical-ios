@@ -37,6 +37,24 @@ public class RootNode: ElementNode {
     return [.font: LexicalConstants.defaultFont]
   }
 
+  // In read-only contexts only, strip a single leading newline from the
+  // document text content to match legacy parity when reading the full
+  // string (pre/post spacing is still preserved within paragraphs).
+  override public func getTextContent(
+    includeInert: Bool = false,
+    includeDirectionless: Bool = false,
+    maxLength: Int? = nil
+  ) -> String {
+    let s = super.getTextContent(
+      includeInert: includeInert,
+      includeDirectionless: includeDirectionless,
+      maxLength: maxLength)
+    if let ed = getActiveEditor(), ed.frontend is LexicalReadOnlyTextKitContext, s.hasPrefix("\n") {
+      return String(s.dropFirst(1))
+    }
+    return s
+  }
+
   // Root nodes cannot have a preamble. If they did, there would be no way to make a selection of the
   // beginning of the document. The same applies to postamble.
   override open func getPreamble() -> String {

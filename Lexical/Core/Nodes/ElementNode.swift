@@ -318,6 +318,16 @@ open class ElementNode: Node {
       return ""
     }
 
+    // Top-level behavior: if the previous sibling is a decorator block (non-inline
+    // DecoratorNode), emit a preamble newline so the following paragraph begins on a
+    // new line even when read in isolation. Otherwise rely on the previous block's
+    // postamble to provide spacing.
+    if let parent = getParent(), isRootNode(node: parent) {
+      if isDecoratorBlockNode(prevSibling) { return "\n" }
+      // Otherwise, no top-level preamble
+      return ""
+    }
+
     guard prevSibling is ElementNode else {
       // Since prev is inline but not an element node, and we're not inline, return a newline
       return "\n"

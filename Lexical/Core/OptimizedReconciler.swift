@@ -580,6 +580,7 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     markedTextOperation: MarkedTextOperation?
   ) throws {
+    // Optimized reconciler is always active in tests and app.
     let __updateStart = CFAbsoluteTimeGetCurrent()
     defer {
       if editor.featureFlags.verboseLogging {
@@ -603,6 +604,17 @@ internal enum OptimizedReconciler {
     // Fresh-document fast hydration: build full string + cache in one pass
     if shouldHydrateFreshDocument(pendingState: pendingEditorState, editor: editor) {
       try hydrateFreshDocumentFully(pendingState: pendingEditorState, editor: editor)
+      // Also reconcile selection once so the caret lands correctly after
+      // the first user input (e.g., typing into an empty document).
+      if shouldReconcileSelection {
+        let prevSelection = currentEditorState.selection
+        let nextSelection = pendingEditorState.selection
+        var selectionsAreDifferent = false
+        if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+        if (editor.dirtyType != .noDirtyNodes) || nextSelection == nil || selectionsAreDifferent {
+          try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+        }
+      }
       return
     }
 
@@ -656,16 +668,8 @@ internal enum OptimizedReconciler {
       return
     }
 
-    // Structural delete fast path (contiguous child removals)
-    if try fastPath_DeleteBlocks(
-      currentEditorState: currentEditorState,
-      pendingEditorState: pendingEditorState,
-      editor: editor,
-      shouldReconcileSelection: shouldReconcileSelection,
-      fenwickAggregatedDeltas: &fenwickAggregatedDeltas
-    ) {
-      return
-    }
+    // (Removed) early structural delete pass: moved to end of updateEditorState to
+    // ensure single-character edits are applied first and to avoid over-deletes.
 
     if try fastPath_ReorderChildren(
       currentEditorState: currentEditorState,
@@ -678,7 +682,7 @@ internal enum OptimizedReconciler {
 
     // Text-only and attribute-only fast paths
     // Prefer single-text fast path before central aggregation to avoid no-op gating during live edits
-    if try fastPath_TextOnly(
+    if !didInsertFastPath, try fastPath_TextOnly(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
       editor: editor,
@@ -694,6 +698,9 @@ internal enum OptimizedReconciler {
       }
       return
     }
+    if didInsertFastPath, editor.featureFlags.verboseLogging {
+      print("🔥 TEXT-ONLY: skipped (insert-block already applied in this update)")
+    }
 
     // Central aggregation: collect both text and pre/post instructions, then apply once
     if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation {
@@ -701,7 +708,8 @@ internal enum OptimizedReconciler {
       var aggregatedAffected: Set<NodeKey> = []
       var aggregatedLengthChanges: [(nodeKey: NodeKey, part: NodePart, delta: Int)] = []
 
-      if let plan = try plan_TextOnly_Multi(currentEditorState: currentEditorState, pendingEditorState: pendingEditorState, editor: editor) {
+      if !didInsertFastPath,
+         let plan = try plan_TextOnly_Multi(currentEditorState: currentEditorState, pendingEditorState: pendingEditorState, editor: editor) {
         aggregatedInstructions.append(contentsOf: plan.instructions)
         aggregatedAffected.formUnion(plan.affected)
         aggregatedLengthChanges.append(contentsOf: plan.lengthChanges)
@@ -737,14 +745,19 @@ internal enum OptimizedReconciler {
           applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
           fenwickAggregatedDeltas.removeAll(keepingCapacity: true)
         }
-        // Update decorator positions
+        // Update decorator caches/positions (parity with legacy). This captures
+        // adds/removes and marks dirty decorators as .needsDecorating.
+        reconcileDecoratorOpsForSubtree(
+          ancestorKey: kRootNodeKey,
+          prevState: currentEditorState,
+          nextState: pendingEditorState,
+          editor: editor
+        )
         if editor.featureFlags.useModernTextKitOptimizations {
           batchUpdateDecoratorPositions(editor: editor)
-        } else {
-          if let ts = editor.textStorage {
-            for (key, _) in ts.decoratorPositionCache {
-              if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
-            }
+        } else if let ts = editor.textStorage {
+          for (key, _) in ts.decoratorPositionCache {
+            if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
           }
         }
         
@@ -754,12 +767,9 @@ internal enum OptimizedReconciler {
         // One-time block attribute pass over affected keys
         applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: aggregatedAffected, treatAllNodesAsDirty: false)
         // One-time selection reconcile
-        let prevSelection = currentEditorState.selection
-        let nextSelection = pendingEditorState.selection
-        var selectionsAreDifferent = false
-        if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
-        let needsUpdate = editor.dirtyType != .noDirtyNodes
-        if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+        if shouldReconcileSelection {
+          let prevSelection = currentEditorState.selection
+          let nextSelection = pendingEditorState.selection
           try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
         }
         if let metrics = editor.metricsContainer {
@@ -782,6 +792,13 @@ internal enum OptimizedReconciler {
           if diffs.isEmpty {
             // Keep changes local: apply block attributes over current dirty set and reconcile selection
             applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: nil, treatAllNodesAsDirty: false)
+            // Ensure dirty decorator nodes transition to .needsDecorating and positions stay in sync
+            reconcileDecoratorOpsForSubtree(
+              ancestorKey: kRootNodeKey,
+              prevState: currentEditorState,
+              nextState: pendingEditorState,
+              editor: editor
+            )
             let prevSelection = currentEditorState.selection
             let nextSelection = pendingEditorState.selection
             var selectionsAreDifferent = false
@@ -805,7 +822,7 @@ internal enum OptimizedReconciler {
       }
     }
 
-    if try fastPath_TextOnly(
+    if !didInsertFastPath, try fastPath_TextOnly(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
       editor: editor,
@@ -839,6 +856,23 @@ internal enum OptimizedReconciler {
       return
     }
 
+    // Deferred structural delete: by this point, any single-character text edits have been
+    // applied. If there are genuine structural removals remaining, handle them now. Skip if
+    // there are still text deltas present.
+    do {
+      let diffs = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
+      let hasTextDelta = diffs.values.contains { $0.textDelta != 0 }
+      if hasTextDelta {
+        if editor.featureFlags.verboseLogging { print("🔥 DELETE-FAST: deferred skip (textΔ>0)") }
+      } else if try fastPath_DeleteBlocks(
+        currentEditorState: currentEditorState,
+        pendingEditorState: pendingEditorState,
+        editor: editor,
+        shouldReconcileSelection: shouldReconcileSelection,
+        fenwickAggregatedDeltas: &fenwickAggregatedDeltas
+      ) { return }
+    }
+
     // Coalesced contiguous multi-node replace (e.g., paste across multiple nodes)
     if try fastPath_ContiguousMultiNodeReplace(
       currentEditorState: currentEditorState,
@@ -849,44 +883,16 @@ internal enum OptimizedReconciler {
       return
     }
 
-    // Fallback to legacy until additional optimized planners are implemented
-    // If still here, fallback
-    if editor.featureFlags.useOptimizedReconcilerStrictMode {
-      try optimizedSlowPath(
-        currentEditorState: currentEditorState,
-        pendingEditorState: pendingEditorState,
-        editor: editor,
-        shouldReconcileSelection: shouldReconcileSelection
-      )
-    } else {
-      try delegateToLegacy(
-        currentEditorState: currentEditorState,
-        pendingEditorState: pendingEditorState,
-        editor: editor,
-        shouldReconcileSelection: shouldReconcileSelection,
-        markedTextOperation: markedTextOperation
-      )
-    }
-  }
-
-  // MARK: - Legacy delegate
-  @MainActor
-  private static func delegateToLegacy(
-    currentEditorState: EditorState,
-    pendingEditorState: EditorState,
-    editor: Editor,
-    shouldReconcileSelection: Bool,
-    markedTextOperation: MarkedTextOperation?
-  ) throws {
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: delegating to legacy path") }
-    try Reconciler.updateEditorState(
+    // Fallback to optimized slow path for full rebuilds
+    try optimizedSlowPath(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
       editor: editor,
-      shouldReconcileSelection: shouldReconcileSelection,
-      markedTextOperation: markedTextOperation
+      shouldReconcileSelection: shouldReconcileSelection
     )
   }
+
+  // No legacy delegation in optimized reconciler.
 
   // MARK: - Fresh document hydration (one-pass build)
   @MainActor
@@ -894,6 +900,26 @@ internal enum OptimizedReconciler {
     guard let ts = editor.textStorage else { return false }
     let storageEmpty = ts.length == 0
     guard storageEmpty else { return false }
+    // Avoid hydrating an empty document: if the pending root has no children
+    // OR the total subtree length is zero, skip. This prevents 0-length
+    // replace cycles before the real content is restored.
+    if let root = pendingState.getRootNode() {
+      let keys = root.getChildrenKeys()
+      if keys.isEmpty {
+        if editor.featureFlags.verboseLogging { print("🔥 HYDRATE: skip (storage empty, pending root has no children)") }
+        return false
+      }
+      var total = 0
+      for k in keys { total += subtreeTotalLength(nodeKey: k, state: pendingState) }
+      if total == 0 {
+        if editor.featureFlags.verboseLogging { print("🔥 HYDRATE: skip (storage empty, pending subtree total len=0)") }
+        return false
+      }
+    } else {
+      // No root yet → nothing to hydrate.
+      if editor.featureFlags.verboseLogging { print("🔥 HYDRATE: skip (no root in pending state)") }
+      return false
+    }
     // Range cache has only root and it’s empty
     if editor.rangeCache.count == 1, let root = editor.rangeCache[kRootNodeKey] {
       if root.preambleLength == 0 && root.childrenLength == 0 && root.textLength == 0 && root.postambleLength == 0 {
@@ -904,7 +930,8 @@ internal enum OptimizedReconciler {
       }
     }
     // Fallback: brand-new editor state (only root)
-    let decision = currentNodeCount(pendingState) <= 1
+    // Final guard: only hydrate if computed subtree length above was non-zero
+    let decision = true
     if editor.featureFlags.verboseLogging {
       print("🔥 HYDRATE: shouldHydrate storageEmpty=\(storageEmpty) nodeCount=\(currentNodeCount(pendingState)) decision=\(decision)")
     }
@@ -942,6 +969,16 @@ internal enum OptimizedReconciler {
 
     // Apply block-level attributes for all nodes once
     applyBlockAttributesPass(editor: editor, pendingEditorState: pendingState, affectedKeys: nil, treatAllNodesAsDirty: true)
+
+    // Ensure decorator caches/positions are initialized for a freshly hydrated document.
+    // Use the editor's current state as the "previous" snapshot (often empty on first hydrate)
+    // so that newly-present decorators transition to `.needsCreation` and acquire positions.
+    reconcileDecoratorOpsForSubtree(
+      ancestorKey: kRootNodeKey,
+      prevState: editor.getEditorState(),
+      nextState: pendingState,
+      editor: editor
+    )
 
     // Decorator positions align with new locations
     for (key, _) in ts.decoratorPositionCache {
@@ -996,13 +1033,10 @@ internal enum OptimizedReconciler {
       textStorage.decoratorPositionCache = prevDecoratorPositions
     }
 
-    // Selection reconcile
-    let prevSelection = currentEditorState.selection
-    let nextSelection = pendingEditorState.selection
-    var selectionsAreDifferent = false
-    if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
-    let needsUpdate = editor.dirtyType != .noDirtyNodes
-    if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+    // Selection reconcile (always, after a text change)
+    if shouldReconcileSelection {
+      let prevSelection = currentEditorState.selection
+      let nextSelection = pendingEditorState.selection
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
@@ -1135,9 +1169,21 @@ internal enum OptimizedReconciler {
     textStorage.mode = .controllerMode
     let t0 = CFAbsoluteTimeGetCurrent()
     textStorage.beginEditing()
-    textStorage.replaceCharacters(in: replaceRange, with: styled)
-    let fixLen = max(changedOldLen, styled.length)
-    textStorage.fixAttributes(in: NSRange(location: replaceLoc, length: fixLen))
+    if styled.length == 0 && changedOldLen > 0 {
+      // Pure deletion is cheaper and avoids attribute churn.
+      textStorage.deleteCharacters(in: replaceRange)
+      if editor.featureFlags.verboseLogging {
+        print("🔥 TEXT-DEL: loc=\(replaceRange.location) len=\(replaceRange.length)")
+      }
+      // Fix attributes around the deletion boundary conservatively (1 char before, 0 after)
+      let fixStart = max(0, replaceLoc - 1)
+      let fixLen = min(2, (textStorage.length - fixStart))
+      if fixLen > 0 { textStorage.fixAttributes(in: NSRange(location: fixStart, length: fixLen)) }
+    } else {
+      textStorage.replaceCharacters(in: replaceRange, with: styled)
+      let fixLen = max(changedOldLen, styled.length)
+      textStorage.fixAttributes(in: NSRange(location: replaceLoc, length: fixLen))
+    }
     textStorage.endEditing()
     textStorage.mode = prevModeTS
     let applyDur = CFAbsoluteTimeGetCurrent() - t0
@@ -1179,13 +1225,21 @@ internal enum OptimizedReconciler {
       for (key, _) in ts.decoratorPositionCache { if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc } }
     }
 
+    // Headless/read-only contexts still need decorator cache state updates for parity
+    // (e.g., dirty -> needsDecorating) even when taking the text-only path.
+    if editor.frontend is LexicalReadOnlyTextKitContext {
+      reconcileDecoratorOpsForSubtree(
+        ancestorKey: kRootNodeKey,
+        prevState: currentEditorState,
+        nextState: pendingEditorState,
+        editor: editor
+      )
+    }
+
     // Selection reconcile
-    let prevSelection = currentEditorState.selection
-    let nextSelection = pendingEditorState.selection
-    var selectionsAreDifferent = false
-    if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
-    let needsUpdate = editor.dirtyType != .noDirtyNodes
-    if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+    if shouldReconcileSelection {
+      let prevSelection = currentEditorState.selection
+      let nextSelection = pendingEditorState.selection
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
@@ -1209,6 +1263,10 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
+    // Read-only contexts (no real TextView) can have different layout/spacing ordering.
+    // Keep optimized active but skip this structural fast path in read-only to preserve parity.
+    if editor.frontend is LexicalReadOnlyTextKitContext { return false }
+
     // Find a parent Element whose children gained exactly one child (no removals)
     // and no other structural deltas.
     let dirtyParents = editor.dirtyNodes.keys.compactMap { key -> (NodeKey, ElementNode, ElementNode)? in
@@ -1228,6 +1286,35 @@ internal enum OptimizedReconciler {
     }) else { return false }
 
     let (parentKey, prevParent, nextParent) = cand
+
+    // Safety gate: do NOT treat this as a structural delete if any descendant
+    // TextNode under this parent has a text delta in this update (e.g. a single
+    // character backspace). This prevents whole‑block deletes during live typing.
+    do {
+      func collectDescendants(state: EditorState, root: NodeKey) -> Set<NodeKey> {
+        guard let node = state.nodeMap[root] else { return [] }
+        var out: Set<NodeKey> = []
+        if let el = node as? ElementNode {
+          for c in el.getChildrenKeys(fromLatest: false) {
+            out.insert(c)
+            out.formUnion(collectDescendants(state: state, root: c))
+          }
+        }
+        return out
+      }
+      let keysToCheck = collectDescendants(state: pendingEditorState, root: parentKey)
+      if !keysToCheck.isEmpty {
+        let diffs = computePartDiffs(
+          editor: editor,
+          prevState: currentEditorState,
+          nextState: pendingEditorState,
+          keys: Array(keysToCheck)
+        )
+        if diffs.values.contains(where: { $0.textDelta != 0 }) {
+          return false
+        }
+      }
+    }
     let prevChildren = prevParent.getChildrenKeys(fromLatest: false)
     let nextChildren = nextParent.getChildrenKeys(fromLatest: false)
     let prevSet = Set(prevChildren)
@@ -1315,6 +1402,13 @@ internal enum OptimizedReconciler {
       // Fenwick variant: apply delete/insert instructions at computed locations
       let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: false)
       applyDuration = stats.duration
+      // Ensure decorator cache/positions reflect additions under this parent
+      reconcileDecoratorOpsForSubtree(
+        ancestorKey: parentKey,
+        prevState: currentEditorState,
+        nextState: pendingEditorState,
+        editor: editor
+      )
     }
 
     // Block attributes only for inserted node
@@ -1323,12 +1417,9 @@ internal enum OptimizedReconciler {
       treatAllNodesAsDirty: false)
 
     // Selection reconcile mirrors other fast paths
-    let prevSelection = currentEditorState.selection
-    let nextSelection = pendingEditorState.selection
-    var selectionsAreDifferent = false
-    if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
-    let needsUpdate = editor.dirtyType != .noDirtyNodes
-    if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+    if shouldReconcileSelection {
+      let prevSelection = currentEditorState.selection
+      let nextSelection = pendingEditorState.selection
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
@@ -1886,6 +1977,8 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
+    // Skip attributes-only structural path in read-only to avoid spacing/order mismatches.
+    if editor.frontend is LexicalReadOnlyTextKitContext { return false }
     guard editor.dirtyNodes.count == 1, let dirtyKey = editor.dirtyNodes.keys.first else {
       return false
     }

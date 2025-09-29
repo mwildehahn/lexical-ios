@@ -191,6 +191,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     editor.log(.UITextView, .verbose, "deleteBackward()")
 
     let previousSelectedRange = selectedRange
+    let previousText = text
 
     inputDelegateProxy.isSuspended = true  // do not send selection changes during deleteBackwards, to not confuse third party keyboards
     defer {
@@ -198,6 +199,16 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     }
 
     editor.dispatchCommand(type: .deleteCharacter, payload: true)
+
+    // Fallback: if nothing changed (text and selection), delegate to UIKit's default handling
+    if text == previousText && selectedRange == previousSelectedRange {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 TEXTVIEW: deleteBackward fallback → UIKit (no-op detected)")
+      }
+      super.deleteBackward()
+      resetTypingAttributes(for: selectedRange)
+      return
+    }
 
     if previousSelectedRange.length > 0 {
       // Expect new selection to be on the start of selection

@@ -37,6 +37,9 @@ class ViewController: UIViewController, UIToolbarDelegate {
 
     // Initial build for selected reconciler
     rebuildEditor(useOptimized: control.selectedSegmentIndex == 1)
+    // Immediately restore any persisted editor state to avoid a first-cycle
+    // empty hydration and ensure TS has content before user input.
+    restoreEditorState()
 
     navigationItem.title = "Lexical"
     setUpExportMenu()

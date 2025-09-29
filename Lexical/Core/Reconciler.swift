@@ -186,6 +186,7 @@ internal enum Reconciler {
     }
 
     // Handle the decorators
+    editor.log(.reconciler, .verbose, "DEC: begin remove=\(reconcilerState.possibleDecoratorsToRemove.count) add=\(reconcilerState.decoratorsToAdd.count) decorate=\(reconcilerState.decoratorsToDecorate.count)")
     let decoratorsToRemove = reconcilerState.possibleDecoratorsToRemove.filter { key in
       return !reconcilerState.decoratorsToAdd.contains(key)
     }
@@ -193,6 +194,7 @@ internal enum Reconciler {
       return !reconcilerState.decoratorsToAdd.contains(key)
     }
     decoratorsToRemove.forEach { key in
+      editor.log(.reconciler, .verbose, "DEC: remove key=\(key)")
       decoratorView(forKey: key, createIfNecessary: false)?.removeFromSuperview()
       destroyCachedDecoratorView(forKey: key)
       textStorage.decoratorPositionCache[key] = nil
@@ -200,17 +202,22 @@ internal enum Reconciler {
     reconcilerState.decoratorsToAdd.forEach { key in
       if editor.decoratorCache[key] == nil {
         editor.decoratorCache[key] = DecoratorCacheItem.needsCreation
+        editor.log(.reconciler, .verbose, "DEC: add key=\(key) state=needsCreation")
       }
       guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
+      editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
     }
     decoratorsToDecorate.forEach { key in
       if let cacheItem = editor.decoratorCache[key], let view = cacheItem.view {
         editor.decoratorCache[key] = DecoratorCacheItem.needsDecorating(view)
+        editor.log(.reconciler, .verbose, "DEC: decorate key=\(key) state=needsDecorating")
       }
       guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
+      editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
     }
+    editor.log(.reconciler, .verbose, "DEC: end cacheCount=\(textStorage.decoratorPositionCache.count)")
 
     editor.log(
       .reconciler, .verbose, "about to do rangesToAdd: total \(reconcilerState.rangesToAdd.count)")
