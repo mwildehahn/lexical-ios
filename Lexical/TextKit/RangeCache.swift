@@ -14,7 +14,11 @@ import UIKit
  */
 
 struct RangeCacheItem {
+  // Legacy absolute location (TextKit 1)
   var location: Int = 0
+  // Optional index for Fenwick-backed absolute locations (optimized reconciler)
+  // 0 indicates unused in this branch.
+  var nodeIndex: Int = 0
   // the length of the full preamble, including any special characters
   var preambleLength: Int = 0
   // the length of any special characters in the preamble
@@ -26,6 +30,14 @@ struct RangeCacheItem {
   var range: NSRange {
     NSRange(
       location: location, length: preambleLength + childrenLength + textLength + postambleLength)
+  }
+
+  // Optimized (Fenwick) helpers — compatibility layer
+  @MainActor
+  func locationFromFenwick(using fenwickTree: FenwickTree? = nil) -> Int { location }
+  @MainActor
+  func rangeFromFenwick(using fenwickTree: FenwickTree? = nil) -> NSRange {
+    NSRange(location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 }
 
@@ -250,6 +262,14 @@ internal func updateRangeCacheForNodePartChange(
   // Update this node's cached lengths for the part that changed
   if editor.rangeCache[nodeKey] == nil {
     editor.rangeCache[nodeKey] = RangeCacheItem()
+    // Assign a future Fenwick node index if missing
+    if var item = editor.rangeCache[nodeKey] {
+      if item.nodeIndex == 0 {
+        item.nodeIndex = editor.nextFenwickNodeIndex
+        editor.nextFenwickNodeIndex += 1
+        editor.rangeCache[nodeKey] = item
+      }
+    }
   }
   if part == .preamble {
     editor.rangeCache[nodeKey]?.preambleLength = newPartLength

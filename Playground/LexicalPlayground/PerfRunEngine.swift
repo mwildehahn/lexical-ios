@@ -70,6 +70,12 @@ final class PerfRunEngine {
     self.lastStepDurationMs = 0
 
     let link = CADisplayLink(target: self, selector: #selector(tick))
+    // On iOS 15+, prefer a lower frame rate for heavy runs to give
+    // main-thread time to process layout and keep scrolling responsive.
+    if #available(iOS 15.0, *) {
+      // 30fps preferred with 60fps upper bound; system may adjust as needed.
+      link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 30)
+    }
     // Use common run loop mode so it ticks during scrolls and UI interactions
     link.add(to: .main, forMode: .common)
     self.displayLink = link

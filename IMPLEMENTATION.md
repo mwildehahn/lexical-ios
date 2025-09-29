@@ -189,9 +189,42 @@ Deprecated/removed flags (no longer compiled)
     - [x] Link plugin inline formatting around edits (toggle link on selection, remove link) — string parity across optimized vs legacy.
     - [x] List plugin: insert unordered/ordered lists and remove list — string parity across optimized vs legacy; selection kept inside text node to avoid transform selection loss.
     - [x] Markdown export parity for common constructs (headings, quotes, code block, inline bold/italic). Exported Markdown strings equal.
-    - [x] HTML export parity (core nodes + inline bold/italic) using LexicalHTML utilities — exported HTML identical.
-    - [x] Indent/Outdent commands parity — element indent levels match across optimized vs legacy; strings unchanged.
-    - [~] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings). Note: Import is not currently implemented in LexicalMarkdown; we validated export parity and left import round‑trip as N/A pending feature support.
+  - [x] HTML export parity (core nodes + inline bold/italic) using LexicalHTML utilities — exported HTML identical.
+  - [x] Indent/Outdent commands parity — element indent levels match across optimized vs legacy; strings unchanged.
+  - [~] Markdown import/export round‑trip on common constructs (quotes, code blocks, headings). Note: Import is not currently implemented in LexicalMarkdown; we validated export parity and left import round‑trip as N/A pending feature support.
+
+## Recent Changes
+
+2025-09-29 — P0 fix: do not shift dirty node on Fenwick deltas
+
+- Fixed a bug where the dirty text node’s own `location` was shifted when
+  `useOptimizedReconciler` + `useReconcilerFenwickDelta` were enabled. We now
+  apply range shifts with an exclusive start so only nodes that follow the
+  dirty node are moved.
+  - Code: `Lexical/Core/OptimizedReconciler.swift` — replaced the last
+    `rebuildLocationsWithRangeDiffs` call with
+    `applyIncrementalLocationShifts(...)` which starts shifting strictly after
+    `startKey`.
+  - Rationale: edits inside a node must keep that node anchored; otherwise the
+    next edit computes offsets from a shifted location and corrupts the range
+    cache.
+  - Status: done; parity validated locally in Perf screen (offscreen + UI).
+
+2025-09-29 — Perf screen runner unblocking
+
+- New non-blocking runner `PerfRunEngine` (CADisplayLink-paced) keeps UI
+  responsive while running heavy scenarios; yields between steps, supports
+  soft deadlines on on-screen runs, and removes the previous soft timeout for
+  offscreen runs.
+- Added offscreen contexts so the full matrix can run without UIKit view
+  overhead. Logs clearly mark mode as `[OFFSCREEN]` or `[UI]`.
+- Summaries now report non-zero durations for optimized paths (apply time comes
+  from instruction application), fixing misleading `0.000 ms` reports.
+
+Verification checklist (to run on iOS simulator):
+- Build: `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
+- Tests (authoritative): `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+- Perf screen: try Heavy preset (500 paras) with Offscreen ON, then OFF; ensure scenarios progress and summary shows realistic timings (no 0.000 ms).
 
   - [ ] M5A — Playground Screens (Manual Validation & Benchmarks)
     - [x] Editor screen toggle

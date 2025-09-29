@@ -137,6 +137,8 @@ public class Editor: NSObject {
   ]
 
   internal var nodeTransforms: [NodeType: [(Int, NodeTransform)]] = [:]
+  // Optimized reconciler groundwork: index source for future Fenwick-backed locations.
+  internal var nextFenwickNodeIndex: Int = 1
 
   // Used to help co-ordinate selection and events
   internal var compositionKey: NodeKey?

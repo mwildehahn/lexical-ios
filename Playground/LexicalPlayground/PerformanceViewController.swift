@@ -11,13 +11,15 @@ import UIKit
 
 final class PerformanceViewController: UIViewController {
   // MARK: - Presets
-  private enum Preset: Int, CaseIterable { case quick = 0, standard = 1, heavy = 2 }
+  private enum Preset: Int, CaseIterable { case quick = 0, standard = 1, heavy = 2, custom = 3 }
   private struct PresetConfig { let seedParas: Int; let batch: Int; let iterTop: Int; let iterMid: Int; let iterEnd: Int; let iterText: Int; let iterAttr: Int; let iterSmallReorder: Int; let iterCoalesced: Int; let iterPrePost: Int; let iterLargeReorder: Int }
+  private var customConfig = PresetConfig(seedParas: 300, batch: 2, iterTop: 5, iterMid: 5, iterEnd: 5, iterText: 5, iterAttr: 5, iterSmallReorder: 5, iterCoalesced: 5, iterPrePost: 5, iterLargeReorder: 5)
   private func config(for preset: Preset) -> PresetConfig {
     switch preset {
     case .quick: return PresetConfig(seedParas: 100, batch: 1, iterTop: 1, iterMid: 1, iterEnd: 1, iterText: 1, iterAttr: 1, iterSmallReorder: 1, iterCoalesced: 1, iterPrePost: 1, iterLargeReorder: 1)
     case .standard: return PresetConfig(seedParas: 250, batch: 2, iterTop: 10, iterMid: 10, iterEnd: 10, iterText: 10, iterAttr: 10, iterSmallReorder: 10, iterCoalesced: 10, iterPrePost: 10, iterLargeReorder: 10)
     case .heavy: return PresetConfig(seedParas: 500, batch: 3, iterTop: 20, iterMid: 20, iterEnd: 20, iterText: 20, iterAttr: 20, iterSmallReorder: 20, iterCoalesced: 20, iterPrePost: 20, iterLargeReorder: 20)
+    case .custom: return customConfig
     }
   }
   // MARK: - Scenario models
@@ -45,6 +47,7 @@ final class PerformanceViewController: UIViewController {
   private var statusLabel = UILabel()
   private var copyButton = UIButton(type: .system)
   private var featuresBarButton = UIBarButtonItem()
+  private var configureBarButton = UIBarButtonItem()
   private var cancelBarButton = UIBarButtonItem()
   private var offscreenBarButton = UIBarButtonItem()
   // Matrix (text-based) aggregation
@@ -178,7 +181,7 @@ final class PerformanceViewController: UIViewController {
 
   private func configurePresetControl() {
     let title = UILabel(); title.text = "Preset:"; title.font = .systemFont(ofSize: 12, weight: .medium)
-    let control = UISegmentedControl(items: ["Quick", "Std", "Heavy"])
+    let control = UISegmentedControl(items: ["Quick", "Std", "Heavy", "Custom"])
     control.selectedSegmentIndex = currentPreset.rawValue
     control.addTarget(self, action: #selector(onPresetChanged(_:)), for: .valueChanged)
     let stack = UIStackView(arrangedSubviews: [title, control])
@@ -252,10 +255,11 @@ final class PerformanceViewController: UIViewController {
     let cancel = UIBarButtonItem(title: "Cancel", style: .plain, target: self, action: #selector(cancelTapped))
     let runVar = UIBarButtonItem(title: "Run Matrix", style: .plain, target: self, action: #selector(runVariationsTapped))
     featuresBarButton = UIBarButtonItem(title: "Features", style: .plain, target: nil, action: nil)
+    configureBarButton = UIBarButtonItem(title: "Configure", style: .plain, target: self, action: #selector(configureTapped))
     offscreenBarButton = UIBarButtonItem(title: "Offscreen: ON", style: .plain, target: self, action: #selector(toggleOffscreen))
     cancel.isEnabled = false
     self.cancelBarButton = cancel
-    navigationItem.rightBarButtonItems = [start, runVar, cancel, offscreenBarButton, featuresBarButton]
+    navigationItem.rightBarButtonItems = [start, runVar, cancel, configureBarButton, offscreenBarButton, featuresBarButton]
     updateFeaturesMenu()
   }
 
@@ -263,9 +267,35 @@ final class PerformanceViewController: UIViewController {
     guard let newPreset = Preset(rawValue: sender.selectedSegmentIndex) else { return }
     currentPreset = newPreset
     // Re-seed for the new preset to keep the doc size aligned
-    seedParasCurrent = config(for: currentPreset).seedParas
-    resetDocuments(paragraphs: seedParasCurrent)
-    appendLog("Preset switched → \(currentPreset). Ready. Tap Run to start.")
+    if currentPreset == .custom {
+      presentConfigureAlert()
+    } else {
+      seedParasCurrent = config(for: currentPreset).seedParas
+      resetDocuments(paragraphs: seedParasCurrent)
+      appendLog("Preset switched → \(currentPreset). Ready. Tap Run to start.")
+    }
+  }
+
+  // MARK: - Configure Custom
+  @objc private func configureTapped() { presentConfigureAlert() }
+  private func presentConfigureAlert() {
+    let alert = UIAlertController(title: "Configure Benchmarks", message: "Set paragraphs, iterations, and batch.", preferredStyle: .alert)
+    alert.addTextField { tf in tf.placeholder = "Paragraphs"; tf.keyboardType = .numberPad; tf.text = String(self.customConfig.seedParas) }
+    alert.addTextField { tf in tf.placeholder = "Iterations per scenario"; tf.keyboardType = .numberPad; tf.text = String(self.customConfig.iterTop) }
+    alert.addTextField { tf in tf.placeholder = "Batch per tick"; tf.keyboardType = .numberPad; tf.text = String(self.customConfig.batch) }
+    alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+    alert.addAction(UIAlertAction(title: "Apply", style: .default, handler: { _ in
+      let paras = Int(alert.textFields?[0].text ?? "") ?? self.customConfig.seedParas
+      let iters = Int(alert.textFields?[1].text ?? "") ?? self.customConfig.iterTop
+      let batch = Int(alert.textFields?[2].text ?? "") ?? self.customConfig.batch
+      self.customConfig = PresetConfig(seedParas: max(1, paras), batch: max(1, batch), iterTop: max(1, iters), iterMid: max(1, iters), iterEnd: max(1, iters), iterText: max(1, iters), iterAttr: max(1, iters), iterSmallReorder: max(1, iters), iterCoalesced: max(1, iters), iterPrePost: max(1, iters), iterLargeReorder: max(1, iters))
+      self.currentPreset = .custom
+      self.presetControl?.selectedSegmentIndex = Preset.custom.rawValue
+      self.seedParasCurrent = self.customConfig.seedParas
+      self.resetDocuments(paragraphs: self.seedParasCurrent)
+      self.appendLog("Preset switched → custom (paras=\(self.seedParasCurrent), iters=\(iters), batch=\(batch)). Ready.")
+    }))
+    present(alert, animated: true)
   }
 
   @objc private func runTapped() {
@@ -654,9 +684,14 @@ final class PerformanceViewController: UIViewController {
     cancelBarButton.isEnabled = true
 
     let startCompletedSteps = self.completedSteps
+    // Adaptive pacing: allow multiple steps per frame within a slightly higher budget.
+    let cfg = useOffscreenRunner
+      ? PerfRunEngine.Config(frameBudgetMs: 12.0, maxStepsPerFrame: 6, minStepsPerFrame: 1, softDeadlineSeconds: nil)
+      : PerfRunEngine.Config(frameBudgetMs: 12.0, maxStepsPerFrame: 3, minStepsPerFrame: 1, softDeadlineSeconds: 10)
+    throttleViewsForRun(true)
     runEngine?.run(
       totalIterations: iterations,
-      config: PerfRunEngine.Config(frameBudgetMs: useOffscreenRunner ? 10.0 : 8.0, maxStepsPerFrame: 1, minStepsPerFrame: 1, softDeadlineSeconds: useOffscreenRunner ? nil : 10),
+      config: cfg,
       step: {
         let t0 = CFAbsoluteTimeGetCurrent()
         autoreleasepool { step() }
@@ -679,6 +714,7 @@ final class PerformanceViewController: UIViewController {
         } else {
           self.appendLog("   · \(name): \(iterations)/\(iterations)")
         }
+        self.throttleViewsForRun(false)
         completion()
       },
       shouldRunThisTick: { [weak self] in
@@ -1017,6 +1053,15 @@ final class PerformanceViewController: UIViewController {
 
   private func refreshSummaryView() {
     resultsTextView.attributedText = summary
+  }
+
+  // Temporarily reduce UI overhead while running onscreen benchmarks
+  private func throttleViewsForRun(_ running: Bool) {
+    guard !useOffscreenRunner else { return }
+    legacyView.isUserInteractionEnabled = !running
+    optimizedView.isUserInteractionEnabled = !running
+    legacyView.textView.isScrollEnabled = !running
+    optimizedView.textView.isScrollEnabled = !running
   }
 
   private func ms(_ t: TimeInterval) -> String {
