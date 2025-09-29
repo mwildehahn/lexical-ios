@@ -149,7 +149,30 @@ class ViewController: UIViewController, UIToolbarDelegate {
     theme.link = [ .foregroundColor: UIColor.systemBlue ]
 
     // Feature flags
-    let flags: FeatureFlags = useOptimized ? FeatureFlags.optimizedProfile(.aggressive) : FeatureFlags()
+    let flags: FeatureFlags
+    if useOptimized {
+      // Use Aggressive (debug) but disable attrs-only threshold in Editor tab to avoid any gated no-op during live editing.
+      let base = FeatureFlags.optimizedProfile(.aggressiveDebug)
+      flags = FeatureFlags(
+        reconcilerSanityCheck: base.reconcilerSanityCheck,
+        proxyTextViewInputDelegate: base.proxyTextViewInputDelegate,
+        useOptimizedReconciler: base.useOptimizedReconciler,
+        useReconcilerFenwickDelta: base.useReconcilerFenwickDelta,
+        useReconcilerKeyedDiff: base.useReconcilerKeyedDiff,
+        useReconcilerBlockRebuild: base.useReconcilerBlockRebuild,
+        useOptimizedReconcilerStrictMode: base.useOptimizedReconcilerStrictMode,
+        useReconcilerFenwickCentralAggregation: base.useReconcilerFenwickCentralAggregation,
+        useReconcilerShadowCompare: base.useReconcilerShadowCompare,
+        useReconcilerInsertBlockFenwick: base.useReconcilerInsertBlockFenwick,
+        useReconcilerDeleteBlockFenwick: base.useReconcilerDeleteBlockFenwick,
+        useReconcilerPrePostAttributesOnly: base.useReconcilerPrePostAttributesOnly,
+        useModernTextKitOptimizations: base.useModernTextKitOptimizations,
+        verboseLogging: base.verboseLogging,
+        prePostAttrsOnlyMaxTargets: 0 // disable gating in live editor to ensure no-op never suppresses display
+      )
+    } else {
+      flags = FeatureFlags()
+    }
 
     let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
     let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: flags)
