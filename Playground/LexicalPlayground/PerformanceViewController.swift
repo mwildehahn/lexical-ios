@@ -174,9 +174,11 @@ final class PerformanceViewController: UIViewController {
         useReconcilerFenwickCentralAggregation: n == "central-aggregation" ? !f.useReconcilerFenwickCentralAggregation : f.useReconcilerFenwickCentralAggregation,
         useReconcilerShadowCompare: n == "shadow-compare" ? !f.useReconcilerShadowCompare : f.useReconcilerShadowCompare,
         useReconcilerInsertBlockFenwick: n == "insert-block-fenwick" ? !f.useReconcilerInsertBlockFenwick : f.useReconcilerInsertBlockFenwick,
+        useReconcilerDeleteBlockFenwick: n == "delete-block-fenwick" ? !f.useReconcilerDeleteBlockFenwick : f.useReconcilerDeleteBlockFenwick,
         useReconcilerPrePostAttributesOnly: n == "pre/post-attrs-only" ? !f.useReconcilerPrePostAttributesOnly : f.useReconcilerPrePostAttributesOnly,
         useModernTextKitOptimizations: n == "modern-textkit" ? !f.useModernTextKitOptimizations : f.useModernTextKitOptimizations,
-        verboseLogging: n == "verbose-logging" ? !f.verboseLogging : f.verboseLogging
+        verboseLogging: n == "verbose-logging" ? !f.verboseLogging : f.verboseLogging,
+        prePostAttrsOnlyMaxTargets: f.prePostAttrsOnlyMaxTargets
       )
     }
 
@@ -204,6 +206,7 @@ final class PerformanceViewController: UIViewController {
         coreToggle("strict-mode", f.useOptimizedReconcilerStrictMode),
         coreToggle("pre/post-attrs-only", f.useReconcilerPrePostAttributesOnly),
         coreToggle("insert-block-fenwick", f.useReconcilerInsertBlockFenwick),
+        coreToggle("delete-block-fenwick", f.useReconcilerDeleteBlockFenwick),
         coreToggle("central-aggregation", f.useReconcilerFenwickCentralAggregation),
         coreToggle("modern-textkit", f.useModernTextKitOptimizations),
         coreToggle("verbose-logging", f.verboseLogging)

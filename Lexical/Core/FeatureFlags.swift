@@ -18,9 +18,11 @@ import Foundation
   public let useReconcilerFenwickCentralAggregation: Bool
   public let useReconcilerShadowCompare: Bool
   public let useReconcilerInsertBlockFenwick: Bool
+  public let useReconcilerDeleteBlockFenwick: Bool
   public let useReconcilerPrePostAttributesOnly: Bool
   public let useModernTextKitOptimizations: Bool
   public let verboseLogging: Bool
+  public let prePostAttrsOnlyMaxTargets: Int
 
   // Profiles: convenience presets to reduce flag surface in product contexts.
   // Advanced flags remain available for development and testing.
@@ -43,9 +45,11 @@ import Foundation
     useReconcilerFenwickCentralAggregation: Bool = false,
     useReconcilerShadowCompare: Bool = false,
     useReconcilerInsertBlockFenwick: Bool = false,
+    useReconcilerDeleteBlockFenwick: Bool = false,
     useReconcilerPrePostAttributesOnly: Bool = false,
     useModernTextKitOptimizations: Bool = false,
-    verboseLogging: Bool = false
+    verboseLogging: Bool = false,
+    prePostAttrsOnlyMaxTargets: Int = 0
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -57,9 +61,11 @@ import Foundation
     self.useReconcilerFenwickCentralAggregation = useReconcilerFenwickCentralAggregation
     self.useReconcilerShadowCompare = useReconcilerShadowCompare
     self.useReconcilerInsertBlockFenwick = useReconcilerInsertBlockFenwick
+    self.useReconcilerDeleteBlockFenwick = useReconcilerDeleteBlockFenwick
     self.useReconcilerPrePostAttributesOnly = useReconcilerPrePostAttributesOnly
     self.useModernTextKitOptimizations = useModernTextKitOptimizations
     self.verboseLogging = verboseLogging
+    self.prePostAttrsOnlyMaxTargets = prePostAttrsOnlyMaxTargets
     super.init()
   }
 
@@ -73,8 +79,10 @@ import Foundation
         useOptimizedReconciler: true,
         useReconcilerFenwickDelta: true,
         useReconcilerInsertBlockFenwick: true,
+        useReconcilerDeleteBlockFenwick: true,
         useModernTextKitOptimizations: true,
-        verboseLogging: false
+        verboseLogging: false,
+        prePostAttrsOnlyMaxTargets: 16
       )
     case .minimalDebug:
       return FeatureFlags(
@@ -83,8 +91,10 @@ import Foundation
         useOptimizedReconciler: true,
         useReconcilerFenwickDelta: true,
         useReconcilerInsertBlockFenwick: true,
+        useReconcilerDeleteBlockFenwick: true,
         useModernTextKitOptimizations: true,
-        verboseLogging: true
+        verboseLogging: true,
+        prePostAttrsOnlyMaxTargets: 16
       )
     case .balanced:
       return FeatureFlags(
@@ -93,9 +103,11 @@ import Foundation
         useOptimizedReconciler: true,
         useReconcilerFenwickDelta: true,
         useReconcilerInsertBlockFenwick: true,
+        useReconcilerDeleteBlockFenwick: true,
         useReconcilerPrePostAttributesOnly: true,
         useModernTextKitOptimizations: true,
-        verboseLogging: false
+        verboseLogging: false,
+        prePostAttrsOnlyMaxTargets: 16
       )
     case .aggressive:
       return FeatureFlags(
@@ -107,9 +119,11 @@ import Foundation
         useReconcilerBlockRebuild: true,
         useReconcilerFenwickCentralAggregation: true,
         useReconcilerInsertBlockFenwick: true,
+        useReconcilerDeleteBlockFenwick: true,
         useReconcilerPrePostAttributesOnly: true,
         useModernTextKitOptimizations: true,
-        verboseLogging: false
+        verboseLogging: false,
+        prePostAttrsOnlyMaxTargets: 16
       )
     case .aggressiveDebug:
       return FeatureFlags(
@@ -121,9 +135,11 @@ import Foundation
         useReconcilerBlockRebuild: true,
         useReconcilerFenwickCentralAggregation: true,
         useReconcilerInsertBlockFenwick: true,
+        useReconcilerDeleteBlockFenwick: true,
         useReconcilerPrePostAttributesOnly: true,
         useModernTextKitOptimizations: true,
-        verboseLogging: true
+        verboseLogging: true,
+        prePostAttrsOnlyMaxTargets: 16
       )
     }
   }

@@ -95,6 +95,14 @@ internal enum OptimizedReconciler {
       if np == prevRange.preambleLength && npo == prevRange.postambleLength && (np > 0 || npo > 0) { targets.append(key) }
     }
     if targets.isEmpty { return nil }
+    // Threshold-gate attributes-only multi pass to avoid sweeping many nodes.
+    let thresh = editor.featureFlags.prePostAttrsOnlyMaxTargets
+    if thresh > 0 && targets.count > thresh {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 PREPOST-MULTI (attrs-only): skip (candidates=\(targets.count) > threshold=\(thresh))")
+      }
+      return nil
+    }
     var instructions: [Instruction] = []
     var affected: Set<NodeKey> = []
     // attributes-only variant: no lengthChanges aggregation
@@ -120,6 +128,10 @@ internal enum OptimizedReconciler {
       affected.insert(key)
     }
     let lengthChanges: [(nodeKey: NodeKey, part: NodePart, delta: Int)] = []
+    if editor.featureFlags.verboseLogging {
+      let setCount = instructions.reduce(0) { acc, inst in if case .setAttributes = inst { return acc + 1 } else { return acc } }
+      print("🔥 PREPOST-MULTI (attrs-only): targets=\(targets.count) setOps=\(setCount)")
+    }
     return instructions.isEmpty ? nil : (instructions, lengthChanges, affected)
   }
   
@@ -644,6 +656,17 @@ internal enum OptimizedReconciler {
       return
     }
 
+    // Structural delete fast path (contiguous child removals)
+    if try fastPath_DeleteBlocks(
+      currentEditorState: currentEditorState,
+      pendingEditorState: pendingEditorState,
+      editor: editor,
+      shouldReconcileSelection: shouldReconcileSelection,
+      fenwickAggregatedDeltas: &fenwickAggregatedDeltas
+    ) {
+      return
+    }
+
     if try fastPath_ReorderChildren(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
@@ -727,6 +750,40 @@ internal enum OptimizedReconciler {
           metrics.record(.reconcilerRun(metric))
         }
         return
+      } else {
+        // No aggregated instructions. If pre/post attrs-only was gated and there are no
+        // actual part-length deltas for dirty nodes, treat as a no-op beyond block attrs
+        // and selection. This avoids falling back to a slow full rebuild.
+        if editor.featureFlags.useReconcilerPrePostAttributesOnly {
+          let diffs = computePartDiffs(
+            editor: editor,
+            prevState: currentEditorState,
+            nextState: pendingEditorState,
+            keys: Array(editor.dirtyNodes.keys)
+          )
+          if diffs.isEmpty {
+            // Keep changes local: apply block attributes over current dirty set and reconcile selection
+            applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: nil, treatAllNodesAsDirty: false)
+            let prevSelection = currentEditorState.selection
+            let nextSelection = pendingEditorState.selection
+            var selectionsAreDifferent = false
+            if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+            let needsUpdate = editor.dirtyType != .noDirtyNodes
+            if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+              try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+            }
+            if editor.featureFlags.verboseLogging {
+              print("🔥 PREPOST-MULTI: gated → no-op (block-attrs + selection only)")
+            }
+            if let metrics = editor.metricsContainer {
+              let metric = ReconcilerMetric(
+                duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+                treatedAllNodesAsDirty: false, pathLabel: "prepost-gated-noop")
+              metrics.record(.reconcilerRun(metric))
+            }
+            return
+          }
+        }
       }
     }
 
@@ -1264,6 +1321,113 @@ internal enum OptimizedReconciler {
     return true
   }
 
+  // MARK: - Fast path: delete contiguous blocks under a single ElementNode
+  @MainActor
+  private static func fastPath_DeleteBlocks(
+    currentEditorState: EditorState,
+    pendingEditorState: EditorState,
+    editor: Editor,
+    shouldReconcileSelection: Bool,
+    fenwickAggregatedDeltas: inout [NodeKey: Int]
+  ) throws -> Bool {
+    guard editor.featureFlags.useReconcilerDeleteBlockFenwick else { return false }
+    // Find a parent Element whose children lost one or more direct children (no additions)
+    let dirtyParents = editor.dirtyNodes.keys.compactMap { key -> (NodeKey, ElementNode, ElementNode)? in
+      guard let prev = currentEditorState.nodeMap[key] as? ElementNode,
+            let next = pendingEditorState.nodeMap[key] as? ElementNode else { return nil }
+      return (key, prev, next)
+    }
+    guard let cand = dirtyParents.first(where: { (parentKey, prev, next) in
+      let prevChildren = prev.getChildrenKeys(fromLatest: false)
+      let nextChildren = next.getChildrenKeys(fromLatest: false)
+      if nextChildren.count >= prevChildren.count { return false }
+      let prevSet = Set(prevChildren)
+      let nextSet = Set(nextChildren)
+      let removed = prevSet.subtracting(nextSet)
+      let added = nextSet.subtracting(prevSet)
+      return !removed.isEmpty && added.isEmpty
+    }) else { return false }
+
+    let (parentKey, prevParent, nextParent) = cand
+    let prevChildren = prevParent.getChildrenKeys(fromLatest: false)
+    let nextChildren = nextParent.getChildrenKeys(fromLatest: false)
+    let nextSet = Set(nextChildren)
+    // Collect removed indices in prev order and cluster into contiguous groups
+    var removedIndices: [Int] = []
+    for (i, k) in prevChildren.enumerated() { if !nextSet.contains(k) { removedIndices.append(i) } }
+    if removedIndices.isEmpty { return false }
+    var groups: [(start: Int, end: Int)] = []
+    var s = removedIndices[0]
+    var e = s
+    for idx in removedIndices.dropFirst() {
+      if idx == e + 1 { e = idx } else { groups.append((s, e)); s = idx; e = idx }
+    }
+    groups.append((s, e))
+
+    // Build delete ranges coalesced per group
+    var instructions: [Instruction] = []
+    var totalDelta = 0
+    var affected: Set<NodeKey> = [parentKey]
+    for g in groups {
+      guard g.start < prevChildren.count && g.end < prevChildren.count else { continue }
+      let firstKey = prevChildren[g.start]
+      let lastKey = prevChildren[g.end]
+      guard let firstItem = editor.rangeCache[firstKey], let lastItem = editor.rangeCache[lastKey] else { continue }
+      let start = firstItem.location
+      let end = lastItem.location + lastItem.range.length
+      let len = max(0, end - start)
+      if len > 0 { instructions.append(.delete(range: NSRange(location: start, length: len))) }
+      totalDelta &-= len
+      // Mark neighbors as affected for block attributes
+      if g.start > 0 { affected.insert(prevChildren[g.start - 1]) }
+      if g.end + 1 < prevChildren.count { affected.insert(prevChildren[g.end + 1]) }
+    }
+    if instructions.isEmpty { return false }
+
+    // Apply deletes via batch path
+    let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: false)
+
+    // Prune removed keys from range cache under the parent and rebuild positions via Fenwick range shifts
+    pruneRangeCacheUnderAncestor(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
+
+    if editor.featureFlags.useReconcilerFenwickDelta {
+      // Shift everything after the last removed index by totalDelta (negative)
+      let (order, positions) = fenwickOrderAndIndex(editor: editor)
+      // Use the last removed child's key in prev (still present in order before pruning) as start anchor if available,
+      // otherwise fall back to parent key (shift after parent's preamble)
+      let startAnchor: NodeKey = prevChildren[removedIndices.max() ?? 0]
+      let ranges = [(startKey: startAnchor, endKeyExclusive: Optional<NodeKey>.none, delta: totalDelta)]
+      applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
+    } else {
+      // Recompute subtree under parent for correctness
+      if let parentPrevRange = editor.rangeCache[parentKey] {
+        _ = recomputeRangeCacheSubtree(nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location, editor: editor)
+      }
+    }
+
+    // Block attributes over parent + neighbors
+    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+
+    // Selection reconcile
+    let prevSelection = currentEditorState.selection
+    let nextSelection = pendingEditorState.selection
+    var selectionsAreDifferent = false
+    if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+    let needsUpdate = editor.dirtyType != .noDirtyNodes
+    if shouldReconcileSelection && (needsUpdate || nextSelection == nil || selectionsAreDifferent) {
+      try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+    }
+
+    if let metrics = editor.metricsContainer {
+      let metric = ReconcilerMetric(duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "delete-block", planningDuration: 0, applyDuration: stats.duration)
+      metrics.record(.reconcilerRun(metric))
+    }
+    if editor.featureFlags.verboseLogging {
+      print("🔥 DELETE-FAST: took delete-block path (groups=\(groups.count), totalΔ=\(totalDelta))")
+    }
+    return true
+  }
+
   // Find first key whose cached location is >= targetLocation
   @MainActor
   private static func firstKey(afterOrAt targetLocation: Int, in cache: [NodeKey: RangeCacheItem]) -> NodeKey? {
@@ -1383,12 +1547,18 @@ internal enum OptimizedReconciler {
       if np != prevRange.preambleLength || npo != prevRange.postambleLength { targets.append(key) }
     }
     if targets.isEmpty { return false }
+    let thresh = editor.featureFlags.prePostAttrsOnlyMaxTargets
+    if thresh > 0 && targets.count > thresh {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 PREPOST-MULTI: skip (candidates=\(targets.count) > threshold=\(thresh))")
+      }
+      return false
+    }
     if editor.featureFlags.verboseLogging {
       print("🔥 PREPOST-MULTI: candidates=\(targets.count) dirty=\(editor.dirtyNodes.count)")
     }
     var instructions: [Instruction] = []
     var affected: Set<NodeKey> = []
-    var lengthChanges: [(nodeKey: NodeKey, part: NodePart, delta: Int)] = []
     let theme = editor.getTheme()
     for key in targets {
       guard let next = pendingEditorState.nodeMap[key], let prevRange = editor.rangeCache[key] else { continue }
@@ -1486,49 +1656,11 @@ internal enum OptimizedReconciler {
     // Decide whether to do minimal moves or full region rebuild.
     // For stability in suite-wide runs, prefer the simple region rebuild.
     let movedCount = nextChildren.filter { !stableSet.contains($0) }.count
-    let preferMinimalMoves = false
     if movedCount == 0 {
       // Nothing to do beyond cache recompute
       _ = recomputeRangeCacheSubtree(
         nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location,
         editor: editor)
-    } else if preferMinimalMoves {
-      // Minimal move plan: delete moved child ranges, then insert them at target positions in next order
-      var instructions: [Instruction] = []
-      // Delete moved children in descending location order
-      let movedKeys = prevChildren.filter { !stableSet.contains($0) }
-      let movedDeleteRanges: [NSRange] = movedKeys.compactMap { k in editor.rangeCache[k]?.range }
-      for r in movedDeleteRanges.sorted(by: { $0.location > $1.location }) {
-        instructions.append(.delete(range: r))
-      }
-
-      // Compute pending lengths for all children
-      var nextLen: [NodeKey: Int] = [:]
-      for k in nextChildren {
-        nextLen[k] = subtreeTotalLength(nodeKey: k, state: pendingEditorState)
-      }
-      // Insert moved children at target positions based on next order
-      var acc = 0
-      for k in nextChildren {
-        if stableSet.contains(k) {
-          acc += nextLen[k] ?? 0
-        } else {
-          let insertLoc = childrenStart + acc
-          let attr = buildAttributedSubtree(nodeKey: k, state: pendingEditorState, theme: theme)
-          instructions.append(.insert(location: insertLoc, attrString: attr))
-          acc += attr.length
-        }
-      }
-
-      let stats = applyInstructions(instructions, editor: editor)
-      if let metrics = editor.metricsContainer {
-        let metric = ReconcilerMetric(
-          duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
-          treatedAllNodesAsDirty: false, pathLabel: "reorder-minimal", planningDuration: 0,
-          applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
-          setAttributesCount: stats.sets, fixAttributesCount: stats.fixes, movedChildren: movedCount)
-        metrics.record(.reconcilerRun(metric))
-      }
     } else {
       // Region rebuild fallback when many moves
       guard let textStorage = editor.textStorage else { return false }

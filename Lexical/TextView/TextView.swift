@@ -84,9 +84,11 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       useReconcilerFenwickCentralAggregation: featureFlags.useReconcilerFenwickCentralAggregation,
       useReconcilerShadowCompare: featureFlags.useReconcilerShadowCompare,
       useReconcilerInsertBlockFenwick: featureFlags.useReconcilerInsertBlockFenwick,
+      useReconcilerDeleteBlockFenwick: featureFlags.useReconcilerDeleteBlockFenwick,
       useReconcilerPrePostAttributesOnly: featureFlags.useReconcilerPrePostAttributesOnly,
       useModernTextKitOptimizations: featureFlags.useModernTextKitOptimizations,
-      verboseLogging: featureFlags.verboseLogging
+      verboseLogging: featureFlags.verboseLogging,
+      prePostAttrsOnlyMaxTargets: featureFlags.prePostAttrsOnlyMaxTargets
     )
 
     editor = Editor(
