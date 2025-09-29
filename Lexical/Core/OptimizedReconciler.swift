@@ -92,45 +92,25 @@ internal enum OptimizedReconciler {
       if let el = next as? ElementNode { for c in el.getChildrenKeys() { computedChildrenLen += subtreeTotalLength(nodeKey: c, state: pendingEditorState) } }
       if computedChildrenLen != prevRange.childrenLength { continue }
       let np = next.getPreamble().lengthAsNSString(); let npo = next.getPostamble().lengthAsNSString()
-      if np != prevRange.preambleLength || npo != prevRange.postambleLength { targets.append(key) }
+      if np == prevRange.preambleLength && npo == prevRange.postambleLength && (np > 0 || npo > 0) { targets.append(key) }
     }
     if targets.isEmpty { return nil }
     var instructions: [Instruction] = []
     var affected: Set<NodeKey> = []
-    var lengthChanges: [(nodeKey: NodeKey, part: NodePart, delta: Int)] = []
+    // attributes-only variant: no lengthChanges aggregation
     let theme = editor.getTheme()
     for key in targets {
       guard let next = pendingEditorState.nodeMap[key], let prevRange = editor.rangeCache[key] else { continue }
       let np = next.getPreamble(); let npo = next.getPostamble()
       let nextPreLen = np.lengthAsNSString(); let nextPostLen = npo.lengthAsNSString()
-      if nextPostLen != prevRange.postambleLength {
-        let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
-        let oldR = NSRange(location: postLoc, length: prevRange.postambleLength)
-        instructions.append(.delete(range: oldR))
-        let postAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: npo), from: next, state: pendingEditorState, theme: theme)
-        if postAttr.length > 0 { instructions.append(.insert(location: postLoc, attrString: postAttr)) }
-        let delta = nextPostLen - prevRange.postambleLength
-        lengthChanges.append((nodeKey: key, part: .postamble, delta: delta))
-        for p in next.getParents() { affected.insert(p.getKey()) }
-      } else if nextPostLen > 0 {
+      if nextPostLen > 0 {
         let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
         let rng = NSRange(location: postLoc, length: nextPostLen)
         let postAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: npo), from: next, state: pendingEditorState, theme: theme)
         let attrs = postAttr.attributes(at: 0, effectiveRange: nil)
         instructions.append(.setAttributes(range: rng, attributes: attrs))
       }
-      if nextPreLen != prevRange.preambleLength {
-        let preLoc = prevRange.location
-        let oldR = NSRange(location: preLoc, length: prevRange.preambleLength)
-        instructions.append(.delete(range: oldR))
-        let preAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: np), from: next, state: pendingEditorState, theme: theme)
-        if preAttr.length > 0 { instructions.append(.insert(location: preLoc, attrString: preAttr)) }
-        let delta = nextPreLen - prevRange.preambleLength
-        let preSpecial = np.lengthAsNSString(includingCharacters: ["\u{200B}"])
-        if var item = editor.rangeCache[key] { item.preambleSpecialCharacterLength = preSpecial; editor.rangeCache[key] = item }
-        lengthChanges.append((nodeKey: key, part: .preamble, delta: delta))
-        for p in next.getParents() { affected.insert(p.getKey()) }
-      } else if nextPreLen > 0 {
+      if nextPreLen > 0 {
         let preLoc = prevRange.location
         let rng = NSRange(location: preLoc, length: nextPreLen)
         let preAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: np), from: next, state: pendingEditorState, theme: theme)
@@ -139,6 +119,7 @@ internal enum OptimizedReconciler {
       }
       affected.insert(key)
     }
+    let lengthChanges: [(nodeKey: NodeKey, part: NodePart, delta: Int)] = []
     return instructions.isEmpty ? nil : (instructions, lengthChanges, affected)
   }
   
@@ -461,7 +442,11 @@ internal enum OptimizedReconciler {
   private static func applyInstructions(_ instructions: [Instruction], editor: Editor, fixAttributesEnabled: Bool = true) -> InstructionApplyStats {
     // Use modern optimizations if enabled
     if editor.featureFlags.useOptimizedReconciler && editor.featureFlags.useModernTextKitOptimizations {
-      return applyInstructionsWithModernBatching(instructions, editor: editor, fixAttributesEnabled: fixAttributesEnabled)
+      let stats = applyInstructionsWithModernBatching(instructions, editor: editor, fixAttributesEnabled: fixAttributesEnabled)
+      if editor.featureFlags.verboseLogging {
+        print("🔥 APPLY (modern): del=\(stats.deletes) ins=\(stats.inserts) set=\(stats.sets) fix=\(stats.fixes) dur=\(String(format: "%.2f", stats.duration*1000))ms")
+      }
+      return stats
     }
     
     guard let textStorage = editor.textStorage else { return InstructionApplyStats(deletes: 0, inserts: 0, sets: 0, fixes: 0, duration: 0) }
@@ -569,6 +554,9 @@ internal enum OptimizedReconciler {
     textStorage.endEditing()
     textStorage.mode = previousMode
     let applyDuration = CFAbsoluteTimeGetCurrent() - applyStart
+    if editor.featureFlags.verboseLogging {
+      print("🔥 APPLY: del=\(deletesCoalesced.count) ins=\(insertsCoalesced.count) set=\(sets.count) fix=\(fixCount>0 ? 1:0) dur=\(String(format: "%.2f", applyDuration*1000))ms")
+    }
     return InstructionApplyStats(deletes: deletesCoalesced.count, inserts: insertsCoalesced.count, sets: sets.count, fixes: (fixCount > 0 ? 1 : 0), duration: applyDuration)
   }
 
@@ -580,6 +568,13 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     markedTextOperation: MarkedTextOperation?
   ) throws {
+    let __updateStart = CFAbsoluteTimeGetCurrent()
+    defer {
+      if editor.featureFlags.verboseLogging {
+        let total = CFAbsoluteTimeGetCurrent() - __updateStart
+        print("🔥 UPDATE: dirty=\(editor.dirtyNodes.count) type=\(editor.dirtyType) total=\(String(format: "%.2f", total*1000))ms")
+      }
+    }
     guard editor.textStorage != nil else { fatalError("Cannot run optimized reconciler on an editor with no text storage") }
 
     // Composition (marked text) fast path first
@@ -603,8 +598,16 @@ internal enum OptimizedReconciler {
     // Optional central aggregation of Fenwick deltas across paths
     var fenwickAggregatedDeltas: [NodeKey: Int] = [:]
     // Pre-compute part diffs (used by some paths and metrics)
-    let _ = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
+    if editor.featureFlags.verboseLogging {
+      let t0 = CFAbsoluteTimeGetCurrent()
+      _ = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
+      let dt = CFAbsoluteTimeGetCurrent() - t0
+      print("🔥 PLAN-DIFF: computed in \(String(format: "%.2f", dt*1000))ms")
+    } else {
+      _ = computePartDiffs(editor: editor, prevState: currentEditorState, nextState: pendingEditorState)
+    }
     // Structural insert fast path (before reorder)
+    var didInsertFastPath = false
     if try fastPath_InsertBlock(
       currentEditorState: currentEditorState,
       pendingEditorState: pendingEditorState,
@@ -612,15 +615,33 @@ internal enum OptimizedReconciler {
       shouldReconcileSelection: shouldReconcileSelection,
       fenwickAggregatedDeltas: &fenwickAggregatedDeltas
     ) {
-      // Do not return early: allow subsequent fast paths (reorder, text-only) in the same update.
+      didInsertFastPath = true
+      if editor.featureFlags.verboseLogging {
+        print("🔥 INSERT-FAST: took insert-block path (fenwick=\(editor.featureFlags.useReconcilerInsertBlockFenwick))")
+      }
     }
     if editor.dirtyType != .noDirtyNodes { editor.invalidateDFSOrderCache() }
     // If insert-block consumed and central aggregation collected deltas, apply them once
     if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
       let (order, positions) = fenwickOrderAndIndex(editor: editor)
       let ranges = fenwickAggregatedDeltas.map { (k, d) in (startKey: k, endKeyExclusive: Optional<NodeKey>.none, delta: d) }
-      applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
+      if editor.featureFlags.verboseLogging {
+        let t0 = CFAbsoluteTimeGetCurrent()
+        applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
+        let dt = CFAbsoluteTimeGetCurrent() - t0
+        print("🔥 RANGE-CACHE: fenwick-range-shifts count=\(ranges.count) dur=\(String(format: "%.2f", dt*1000))ms")
+      } else {
+        applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
+      }
       fenwickAggregatedDeltas.removeAll(keepingCapacity: true)
+    }
+
+    // Early-out optimization: if only a simple insert was handled and no further dirty work remains, return.
+    if didInsertFastPath && editor.dirtyNodes.isEmpty {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 INSERT-FAST: early-out (no further dirty)")
+      }
+      return
     }
 
     if try fastPath_ReorderChildren(
@@ -992,63 +1013,85 @@ internal enum OptimizedReconciler {
       return false
     }
 
-    // Prepare for possible location shifts if needed later
-
-    // Plan minimal instructions: delete old text range, insert new attributed text
+    // Minimal replace algorithm (LCP/LCS): replace only the changed span
+    guard let textStorage = editor.textStorage else { return false }
     let textStart = prevRange.location + prevRange.preambleLength + prevRange.childrenLength
-    let deleteRange = NSRange(location: textStart, length: oldTextLen)
+    let textRange = NSRange(location: textStart, length: oldTextLen)
+    guard textRange.upperBound <= textStorage.length else { return false }
 
-    // Build attributed string with correct styles for the new text
-    let attrString = AttributeUtils.attributedStringByAddingStyles(
-      NSAttributedString(string: newText), from: nextNode, state: pendingEditorState,
-      theme: editor.getTheme())
+    let oldStr = (textStorage.attributedSubstring(from: textRange).string as NSString)
+    let newStr = (newText as NSString)
+    let oldLen = oldStr.length
+    let newLen = newStr.length
+    let maxPref = min(oldLen, newLen)
+    var lcp = 0
+    while lcp < maxPref && oldStr.character(at: lcp) == newStr.character(at: lcp) { lcp += 1 }
+    let oldRem = oldLen - lcp
+    let newRem = newLen - lcp
+    let maxSuf = min(oldRem, newRem)
+    var lcs = 0
+    while lcs < maxSuf && oldStr.character(at: oldLen - 1 - lcs) == newStr.character(at: newLen - 1 - lcs) { lcs += 1 }
 
-    var instructions: [Instruction] = []
-    if deleteRange.length > 0 {
-      instructions.append(.delete(range: deleteRange))
+    let changedOldLen = max(0, oldRem - lcs)
+    let changedNewLen = max(0, newRem - lcs)
+    let replaceLoc = textStart + lcp
+    let replaceRange = NSRange(location: replaceLoc, length: changedOldLen)
+
+    // Build styled replacement for changed segment
+    let theme = editor.getTheme()
+    let state = pendingEditorState
+    let newSegment = changedNewLen > 0 ? newStr.substring(with: NSRange(location: lcp, length: changedNewLen)) : ""
+    let styled = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: newSegment), from: nextNode, state: state, theme: theme)
+
+    let prevModeTS = textStorage.mode
+    textStorage.mode = .controllerMode
+    let t0 = CFAbsoluteTimeGetCurrent()
+    textStorage.beginEditing()
+    textStorage.replaceCharacters(in: replaceRange, with: styled)
+    let fixLen = max(changedOldLen, styled.length)
+    textStorage.fixAttributes(in: NSRange(location: replaceLoc, length: fixLen))
+    textStorage.endEditing()
+    textStorage.mode = prevModeTS
+    let applyDur = CFAbsoluteTimeGetCurrent() - t0
+    if editor.featureFlags.verboseLogging { print("🔥 TEXT-MIN-REPLACE: dur=\(String(format: "%.2f", applyDur*1000))ms") }
+
+    // Update cache lengths and ancestors
+    let delta = newLen - oldLen
+    if var item = editor.rangeCache[dirtyKey] { item.textLength = newLen; editor.rangeCache[dirtyKey] = item }
+    if delta != 0, let node = pendingEditorState.nodeMap[dirtyKey] {
+      for p in node.getParents() { if var it = editor.rangeCache[p.getKey()] { it.childrenLength += delta; editor.rangeCache[p.getKey()] = it } }
     }
-    if attrString.length > 0 {
-      instructions.append(.insert(location: textStart, attrString: attrString))
-    }
 
-    // Insert-block builds complete attributed content; we can skip fixAttributes here.
-    let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: false)
-
-    // Update RangeCache using Fenwick when enabled, otherwise fallback helper
-    let delta = newTextLen - oldTextLen
-    if editor.featureFlags.useReconcilerFenwickDelta {
-      // Update lengths in cache without walking tree
-      if var item = editor.rangeCache[dirtyKey] { item.textLength = newTextLen; editor.rangeCache[dirtyKey] = item }
-      // Update ancestors' childrenLength
-      if let node = pendingEditorState.nodeMap[dirtyKey] as? TextNode {
-        let parentKeys = node.getParents().map { $0.getKey() }
-        for pk in parentKeys { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } }
-      }
-      if editor.featureFlags.useReconcilerFenwickCentralAggregation {
-        fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
-      } else {
+    // Location shifts
+    if delta != 0 {
+      if editor.featureFlags.useReconcilerFenwickDelta {
         let (order, positions) = fenwickOrderAndIndex(editor: editor)
-        applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: [(startKey: dirtyKey, endKeyExclusive: nil, delta: delta)], order: order, indexOf: positions)
-      }
-    } else {
-      updateRangeCacheForTextChange(nodeKey: dirtyKey, delta: delta)
-    }
-
-    // Update decorator positions to match new locations
-    if let ts = editor.textStorage {
-      for (key, _) in ts.decoratorPositionCache {
-        if let loc = editor.rangeCache[key]?.location {
-          ts.decoratorPositionCache[key] = loc
+        let ranges = [(startKey: dirtyKey, endKeyExclusive: Optional<NodeKey>.none, delta: delta)]
+        if editor.featureFlags.verboseLogging {
+          let t0 = CFAbsoluteTimeGetCurrent();
+          applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
+          let dt = CFAbsoluteTimeGetCurrent() - t0
+          print("🔥 RANGE-CACHE: single-range-shift dur=\(String(format: "%.2f", dt*1000))ms delta=\(delta)")
+        } else {
+          applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
+        }
+      } else {
+        if editor.featureFlags.verboseLogging {
+          let t0 = CFAbsoluteTimeGetCurrent(); _ = applyLengthDeltasBatch(editor: editor, changes: [(dirtyKey, .text, delta)])
+          let dt = CFAbsoluteTimeGetCurrent() - t0
+          print("🔥 RANGE-CACHE: length-delta (single) dur=\(String(format: "%.2f", dt*1000))ms delta=\(delta)")
+        } else {
+          _ = applyLengthDeltasBatch(editor: editor, changes: [(dirtyKey, .text, delta)])
         }
       }
     }
 
-    // Block-level attributes: apply for this node and its ancestors only (optimized scope)
-    var affected: Set<NodeKey> = [dirtyKey]
-    if let node = pendingEditorState.nodeMap[dirtyKey] { for p in node.getParents() { affected.insert(p.getKey()) } }
-    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+    // Update decorator positions
+    if let ts = editor.textStorage {
+      for (key, _) in ts.decoratorPositionCache { if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc } }
+    }
 
-    // Reconcile selection similarly to legacy when requested
+    // Selection reconcile
     let prevSelection = currentEditorState.selection
     let nextSelection = pendingEditorState.selection
     var selectionsAreDifferent = false
@@ -1060,13 +1103,12 @@ internal enum OptimizedReconciler {
 
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
-        duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
-        treatedAllNodesAsDirty: false, pathLabel: "text-only", planningDuration: 0,
-        applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
-        setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
+        duration: applyDur, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+        treatedAllNodesAsDirty: false, pathLabel: "text-only-min-replace", planningDuration: 0,
+        applyDuration: applyDur, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
       metrics.record(.reconcilerRun(metric))
     }
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: text-only fast path applied (delta=\(delta))") }
+    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: text-only minimal replace applied (Δ=\(delta))") }
     return true
   }
 
@@ -1296,8 +1338,17 @@ internal enum OptimizedReconciler {
 
     // Single batched cache/ancestor updates; aggregate Fenwick start shifts
     if !lengthChanges.isEmpty {
-      let shifts = applyLengthDeltasBatch(editor: editor, changes: lengthChanges)
-      for (k, d) in shifts where d != 0 { fenwickAggregatedDeltas[k, default: 0] &+= d }
+      if editor.featureFlags.verboseLogging {
+        let t0 = CFAbsoluteTimeGetCurrent()
+        let shifts = applyLengthDeltasBatch(editor: editor, changes: lengthChanges)
+        let dt = CFAbsoluteTimeGetCurrent() - t0
+        let nonZero = shifts.values.filter { $0 != 0 }.count
+        print("🔥 RANGE-CACHE: length-deltas changes=\(lengthChanges.count) nonzero-starts=\(nonZero) dur=\(String(format: "%.2f", dt*1000))ms")
+        for (k, d) in shifts where d != 0 { fenwickAggregatedDeltas[k, default: 0] &+= d }
+      } else {
+        let shifts = applyLengthDeltasBatch(editor: editor, changes: lengthChanges)
+        for (k, d) in shifts where d != 0 { fenwickAggregatedDeltas[k, default: 0] &+= d }
+      }
     }
 
     // Update decorator positions after location rebuild at end (done in caller)
@@ -1332,6 +1383,9 @@ internal enum OptimizedReconciler {
       if np != prevRange.preambleLength || npo != prevRange.postambleLength { targets.append(key) }
     }
     if targets.isEmpty { return false }
+    if editor.featureFlags.verboseLogging {
+      print("🔥 PREPOST-MULTI: candidates=\(targets.count) dirty=\(editor.dirtyNodes.count)")
+    }
     var instructions: [Instruction] = []
     var affected: Set<NodeKey> = []
     var lengthChanges: [(nodeKey: NodeKey, part: NodePart, delta: Int)] = []
@@ -1340,34 +1394,14 @@ internal enum OptimizedReconciler {
       guard let next = pendingEditorState.nodeMap[key], let prevRange = editor.rangeCache[key] else { continue }
       let np = next.getPreamble(); let npo = next.getPostamble()
       let nextPreLen = np.lengthAsNSString(); let nextPostLen = npo.lengthAsNSString()
-      if nextPostLen != prevRange.postambleLength {
-        let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
-        let oldR = NSRange(location: postLoc, length: prevRange.postambleLength)
-        instructions.append(.delete(range: oldR))
-        let postAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: npo), from: next, state: pendingEditorState, theme: theme)
-        if postAttr.length > 0 { instructions.append(.insert(location: postLoc, attrString: postAttr)) }
-        let delta = nextPostLen - prevRange.postambleLength
-        lengthChanges.append((nodeKey: key, part: .postamble, delta: delta))
-        if let n = pendingEditorState.nodeMap[key] { for p in n.getParents() { affected.insert(p.getKey()) } }
-      } else if nextPostLen > 0 { // same length: prefer attributes-only update
+      if nextPostLen > 0 {
         let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
         let rng = NSRange(location: postLoc, length: nextPostLen)
         let postAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: npo), from: next, state: pendingEditorState, theme: theme)
         let attrs = postAttr.attributes(at: 0, effectiveRange: nil)
         instructions.append(.setAttributes(range: rng, attributes: attrs))
       }
-      if nextPreLen != prevRange.preambleLength {
-        let preLoc = prevRange.location
-        let oldR = NSRange(location: preLoc, length: prevRange.preambleLength)
-        instructions.append(.delete(range: oldR))
-        let preAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: np), from: next, state: pendingEditorState, theme: theme)
-        if preAttr.length > 0 { instructions.append(.insert(location: preLoc, attrString: preAttr)) }
-        let delta = nextPreLen - prevRange.preambleLength
-        let preSpecial = np.lengthAsNSString(includingCharacters: ["\u{200B}"])
-        if var item = editor.rangeCache[key] { item.preambleSpecialCharacterLength = preSpecial; editor.rangeCache[key] = item }
-        lengthChanges.append((nodeKey: key, part: .preamble, delta: delta))
-        if let n = pendingEditorState.nodeMap[key] { for p in n.getParents() { affected.insert(p.getKey()) } }
-      } else if nextPreLen > 0 {
+      if nextPreLen > 0 {
         let preLoc = prevRange.location
         let rng = NSRange(location: preLoc, length: nextPreLen)
         let preAttr = AttributeUtils.attributedStringByAddingStyles(NSAttributedString(string: np), from: next, state: pendingEditorState, theme: theme)
@@ -1377,15 +1411,18 @@ internal enum OptimizedReconciler {
       affected.insert(key)
     }
     if instructions.isEmpty { return false }
-    let stats = applyInstructions(instructions, editor: editor)
-    if !lengthChanges.isEmpty {
-      let shifts = applyLengthDeltasBatch(editor: editor, changes: lengthChanges)
-      for (k, d) in shifts where d != 0 { fenwickAggregatedDeltas[k, default: 0] &+= d }
+    if editor.featureFlags.verboseLogging {
+      let setCount = instructions.reduce(0) { acc, inst in if case .setAttributes = inst { return acc + 1 } else { return acc } }
+      print("🔥 PREPOST-MULTI: setOps=\(setCount) (pre/post attrs-only)")
     }
-    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+    let stats = applyInstructions(instructions, editor: editor)
+    // No cache/ancestor shifts or block attributes in attributes-only variant
     if let metrics = editor.metricsContainer {
-      let metric = ReconcilerMetric(duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "prepost-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
+      let metric = ReconcilerMetric(duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "prepost-attrs-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
       metrics.record(.reconcilerRun(metric))
+    }
+    if editor.featureFlags.verboseLogging {
+      print("🔥 PREPOST-MULTI: applied in \(String(format: "%.2f", stats.duration*1000))ms")
     }
     return true
   }
@@ -1654,14 +1691,27 @@ internal enum OptimizedReconciler {
     nextSelection: BaseSelection?,
     editor: Editor
   ) throws {
+    let __t0 = CFAbsoluteTimeGetCurrent()
     guard let nextSelection else {
       if let prevSelection, !prevSelection.dirty {
+        if editor.featureFlags.verboseLogging {
+          let dt = CFAbsoluteTimeGetCurrent() - __t0
+          print("🔥 SELECTION: no-op (prev clean, next nil) dur=\(String(format: "%.2f", dt*1000))ms")
+        }
         return
       }
       editor.frontend?.resetSelectedRange()
+      if editor.featureFlags.verboseLogging {
+        let dt = CFAbsoluteTimeGetCurrent() - __t0
+        print("🔥 SELECTION: resetNative dur=\(String(format: "%.2f", dt*1000))ms")
+      }
       return
     }
     try editor.frontend?.updateNativeSelection(from: nextSelection)
+    if editor.featureFlags.verboseLogging {
+      let dt = CFAbsoluteTimeGetCurrent() - __t0
+      print("🔥 SELECTION: updateNative dur=\(String(format: "%.2f", dt*1000))ms")
+    }
   }
 
   // MARK: - Fast path: preamble/postamble change only for a single node (children & text unchanged)
@@ -1680,7 +1730,7 @@ internal enum OptimizedReconciler {
           let nextNode = pendingEditorState.nodeMap[dirtyKey],
           let prevRange = editor.rangeCache[dirtyKey] else { return false }
 
-    // Ensure children/text lengths unchanged
+    // Ensure children/text lengths unchanged (attributes-only path must not change lengths)
     let nextTextLen = nextNode.getTextPart().lengthAsNSString()
     if nextTextLen != prevRange.textLength { return false }
     // We approximate children unchanged by comparing aggregated length via pending state subtree build
@@ -1694,37 +1744,18 @@ internal enum OptimizedReconciler {
 
     let nextPreLen = nextNode.getPreamble().lengthAsNSString()
     let nextPostLen = nextNode.getPostamble().lengthAsNSString()
-    let preChanged = nextPreLen != prevRange.preambleLength
-    let postChanged = nextPostLen != prevRange.postambleLength
-    if !preChanged && !postChanged { return false }
+    // Attributes-only: strictly no length changes (safer; avoids re-dirty loops)
+    guard nextPreLen == prevRange.preambleLength && nextPostLen == prevRange.postambleLength else { return false }
+    if nextPreLen == 0 && nextPostLen == 0 { return false }
 
     let theme = editor.getTheme()
     var applied: [Instruction] = []
+    if editor.featureFlags.verboseLogging {
+      print("🔥 PREPOST-SINGLE: key=\(dirtyKey) preLen=\(nextPreLen) postLen=\(nextPostLen)")
+    }
 
-    // Apply postamble first (higher location)
-    if postChanged {
-      let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
-      let oldR = NSRange(location: postLoc, length: prevRange.postambleLength)
-      applied.append(.delete(range: oldR))
-      let postAttr = AttributeUtils.attributedStringByAddingStyles(
-        NSAttributedString(string: nextNode.getPostamble()), from: nextNode, state: pendingEditorState,
-        theme: theme)
-      if postAttr.length > 0 { applied.append(.insert(location: postLoc, attrString: postAttr)) }
-      let delta = nextPostLen - prevRange.postambleLength
-      if editor.featureFlags.useReconcilerFenwickDelta {
-        if var item = editor.rangeCache[dirtyKey] { item.postambleLength = nextPostLen; editor.rangeCache[dirtyKey] = item }
-        if let node = pendingEditorState.nodeMap[dirtyKey] { let parents = node.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } }
-        if editor.featureFlags.useReconcilerFenwickCentralAggregation {
-          fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
-        } else {
-          let (order, positions) = fenwickOrderAndIndex(editor: editor)
-          applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: [(startKey: dirtyKey, endKeyExclusive: nil, delta: delta)], order: order, indexOf: positions)
-        }
-      } else {
-        updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .postamble, newPartLength: nextPostLen, delta: delta)
-      }
-    } else if nextPostLen == prevRange.postambleLength && nextPostLen > 0 {
-      // Same length: update attributes only
+    // Postamble attributes only (higher location first)
+    if nextPostLen > 0 {
       let postLoc = prevRange.location + prevRange.preambleLength + prevRange.childrenLength + prevRange.textLength
       let rng = NSRange(location: postLoc, length: nextPostLen)
       let postAttr = AttributeUtils.attributedStringByAddingStyles(
@@ -1735,37 +1766,8 @@ internal enum OptimizedReconciler {
     }
 
     // Apply preamble second (lower location)
-    if preChanged {
-      let preLoc = prevRange.location
-      let oldR = NSRange(location: preLoc, length: prevRange.preambleLength)
-      applied.append(.delete(range: oldR))
-      let preAttr = AttributeUtils.attributedStringByAddingStyles(
-        NSAttributedString(string: nextNode.getPreamble()), from: nextNode, state: pendingEditorState,
-        theme: theme)
-      if preAttr.length > 0 { applied.append(.insert(location: preLoc, attrString: preAttr)) }
-      let delta = nextPreLen - prevRange.preambleLength
-      let preSpecial = nextNode.getPreamble().lengthAsNSString(includingCharacters: ["\u{200B}"])
-      if editor.featureFlags.useReconcilerFenwickDelta {
-        if var item = editor.rangeCache[dirtyKey] { item.preambleLength = nextPreLen; item.preambleSpecialCharacterLength = preSpecial; editor.rangeCache[dirtyKey] = item }
-        if let node = pendingEditorState.nodeMap[dirtyKey] { let parents = node.getParents().map { $0.getKey() }; for pk in parents { if var it = editor.rangeCache[pk] { it.childrenLength += delta; editor.rangeCache[pk] = it } } }
-        if editor.featureFlags.useReconcilerFenwickCentralAggregation {
-          fenwickAggregatedDeltas[dirtyKey, default: 0] += delta
-        } else {
-          // IMPORTANT: shift nodes strictly AFTER the dirty node; do not move the dirty
-          // node's own location when the edit happens inside it.
-          let (order, positions) = fenwickOrderAndIndex(editor: editor)
-          applyIncrementalLocationShifts(
-            rangeCache: &editor.rangeCache,
-            ranges: [(startKey: dirtyKey, endKeyExclusive: nil, delta: delta)],
-            order: order,
-            indexOf: positions
-          )
-        }
-      } else {
-        updateRangeCacheForNodePartChange(nodeKey: dirtyKey, part: .preamble, newPartLength: nextPreLen, preambleSpecialCharacterLength: preSpecial, delta: delta)
-      }
-    } else if nextPreLen == prevRange.preambleLength && nextPreLen > 0 {
-      // Same length: update attributes only
+    // Preamble attributes only
+    if nextPreLen > 0 {
       let preLoc = prevRange.location
       let rng = NSRange(location: preLoc, length: nextPreLen)
       let preAttr = AttributeUtils.attributedStringByAddingStyles(
@@ -1775,6 +1777,9 @@ internal enum OptimizedReconciler {
       applied.append(.setAttributes(range: rng, attributes: attrs))
     }
     let stats = applyInstructions(applied, editor: editor)
+    if editor.featureFlags.verboseLogging {
+      print("🔥 PREPOST-SINGLE: applied in \(String(format: "%.2f", stats.duration*1000))ms")
+    }
 
     // Update decorators positions
     if let ts = editor.textStorage {
@@ -1785,10 +1790,7 @@ internal enum OptimizedReconciler {
       }
     }
 
-    // Block-level attributes: apply for this node and its ancestors only (optimized scope)
-    var affected: Set<NodeKey> = [dirtyKey]
-    if let node = pendingEditorState.nodeMap[dirtyKey] { for p in node.getParents() { affected.insert(p.getKey()) } }
-    applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
+    // No block-level attribute pass for attributes-only; keep changes local
 
     // Selection handling
     let prevSelection = currentEditorState.selection
@@ -1803,7 +1805,7 @@ internal enum OptimizedReconciler {
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
         duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
-        treatedAllNodesAsDirty: false, pathLabel: "prepost-only", planningDuration: 0,
+        treatedAllNodesAsDirty: false, pathLabel: "prepost-attrs-only", planningDuration: 0,
         applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
         setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
       metrics.record(.reconcilerRun(metric))
@@ -2021,6 +2023,7 @@ internal enum OptimizedReconciler {
     let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(theme: theme) ?? [:]
 
     let previousMode = textStorage.mode
+    let __t0 = CFAbsoluteTimeGetCurrent()
     textStorage.mode = .controllerMode
     textStorage.beginEditing()
     let rangeCache = editor.rangeCache
@@ -2032,6 +2035,10 @@ internal enum OptimizedReconciler {
     }
     textStorage.endEditing()
     textStorage.mode = previousMode
+    if editor.featureFlags.verboseLogging {
+      let dt = CFAbsoluteTimeGetCurrent() - __t0
+      print("🔥 BLOCK-ATTR: nodes=\(nodesToApply.count) dur=\(String(format: "%.2f", dt*1000))ms allDirty=\(treatAllNodesAsDirty)")
+    }
   }
 
   // Collect all node keys in a subtree (DFS order), including the root key.

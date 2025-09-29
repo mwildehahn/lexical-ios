@@ -526,6 +526,40 @@ Commit summary
 - Wired as a third tab in `Playground/LexicalPlayground/SceneDelegate.swift` titled “Perf (Simple)”.
 - Purpose: run perf “the same way” as the other worktree while still exercising our optimized reconciler.
 
+## Phase 7: Thin Fast Path + Flag Simplification (Speed with Parity)
+
+Goals
+- Exact parity with legacy while making common edits faster than legacy.
+- Keep planner for complex scenarios; make everyday edits take a thin path by default.
+- Reduce flag surface in product contexts; keep advanced toggles for development only.
+
+Approach
+- Add a thin fast path that bypasses the planner for trivial edits (single TextNode text change; small attribute‑only; simple block insert at top/middle/end).
+- Default to a minimal, modern profile: optimized + Fenwick + modern TextKit batching; strict‑mode OFF.
+- Introduce feature flag profiles (minimal, balanced, aggressive); keep existing flags but consume profiles in UI/harnesses.
+- Validate against the other worktree’s behavior and TextKit tricks (single replaceCharacters, clamped insert locations, minimal fix ranges, animations disabled).
+
+Deliverables
+1. Thin text‑edit fast path: minimal replace (LCP/LCS) and single replaceCharacters; single Fenwick update.
+2. (Optional follow‑up) Thin insert fast path at head/middle/tail; use existing insert‑block logic but allow without extra planner work.
+3. FeatureFlags profile helpers + docs; Simple perf screen defaults to the minimal profile and trims the visible toggles.
+4. Measurements in Perf (Simple) demonstrating optimized < legacy on: top insert, middle edit, bulk delete(10), format change.
+
+Risks
+- Grapheme boundaries vs NSString length: we’ll use NSString length consistently (TextKit baseline). Add tests later for complex emoji.
+- Parity on attribute‑only: ensure we style via AttributeUtils and keep fix ranges minimal.
+
+Validation Plan
+- Manual: Perf (Simple) on iPhone 17 Pro (iOS 26.0) — run each case (5x) and confirm optimized median < legacy and identical final strings.
+- Spot‑check selection parity for edits that shouldn’t move the caret.
+
+Status
+- [x] 7.1 Profiles implemented and used by Perf screen (minimal/balanced/aggressive).
+- [x] 7.2 Thin text‑edit fast path (LCP/LCS) landed (text-only-min-replace path).
+- [x] 7.3 Thin insert path landed (Fenwick variant unconditional for simple inserts).
+- [ ] 7.4 Perf (Simple) numbers verified.
+
+
 ## Phase 6: Modern TextKit & UIKit Batch Performance Optimizations (iOS 16+)
 
 ### Overview

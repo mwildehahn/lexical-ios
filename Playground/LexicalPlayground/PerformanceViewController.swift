@@ -12,8 +12,8 @@ import Lexical
 final class PerformanceViewController: UIViewController {
 
   // MARK: - Config
-  private static let paragraphCount = 200
-  private static let iterationsPerTest = 1
+  private static let paragraphCount = 100
+  private static let iterationsPerTest = 5
 
   // MARK: - UI refs
   private weak var legacyView: LexicalView?
@@ -28,21 +28,25 @@ final class PerformanceViewController: UIViewController {
   private weak var clearButton: UIButton?
   private weak var spinner: UIActivityIndicatorView?
 
+  // Metrics containers to verify fast paths (console-only)
+  final class PerfMetricsContainer: EditorMetricsContainer {
+    private(set) var runs: [ReconcilerMetric] = []
+    func record(_ metric: EditorMetric) {
+      if case let .reconcilerRun(m) = metric { runs.append(m) }
+    }
+    func resetMetrics() { runs.removeAll() }
+  }
+  private var legacyMetrics = PerfMetricsContainer()
+  private var optimizedMetrics = PerfMetricsContainer()
+
   // MARK: - Nav controls & flags
   private var toggleBarButton: UIBarButtonItem!
   private var featuresBarButton: UIBarButtonItem!
   private var isRunning = false
   private var runTask: Task<Void, Never>? = nil
   private var activeLegacyFlags = FeatureFlags()
-  private var activeOptimizedFlags = FeatureFlags(
-    useOptimizedReconciler: true,
-    useReconcilerFenwickDelta: true,
-    useOptimizedReconcilerStrictMode: false,
-    useReconcilerFenwickCentralAggregation: false,
-    useReconcilerInsertBlockFenwick: false,
-    useReconcilerPrePostAttributesOnly: false,
-    useModernTextKitOptimizations: false
-  )
+  private var activeOptimizedFlags = FeatureFlags.optimizedProfile(.aggressiveDebug)
+  private var activeProfile: FeatureFlags.OptimizedProfile = .aggressiveDebug
 
   private var didRunOnce = false
   private var caseResults: [(name: String, legacy: Double, optimized: Double)] = []
@@ -171,37 +175,50 @@ final class PerformanceViewController: UIViewController {
         useReconcilerShadowCompare: n == "shadow-compare" ? !f.useReconcilerShadowCompare : f.useReconcilerShadowCompare,
         useReconcilerInsertBlockFenwick: n == "insert-block-fenwick" ? !f.useReconcilerInsertBlockFenwick : f.useReconcilerInsertBlockFenwick,
         useReconcilerPrePostAttributesOnly: n == "pre/post-attrs-only" ? !f.useReconcilerPrePostAttributesOnly : f.useReconcilerPrePostAttributesOnly,
-        useModernTextKitOptimizations: n == "modern-textkit" ? !f.useModernTextKitOptimizations : f.useModernTextKitOptimizations
+        useModernTextKitOptimizations: n == "modern-textkit" ? !f.useModernTextKitOptimizations : f.useModernTextKitOptimizations,
+        verboseLogging: n == "verbose-logging" ? !f.verboseLogging : f.verboseLogging
       )
     }
 
-    func actions(for f: FeatureFlags) -> [UIAction] {
-      let items: [(String, Bool)] = [
-        ("strict-mode", f.useOptimizedReconcilerStrictMode),
-        ("fenwick-delta", f.useReconcilerFenwickDelta),
-        ("central-aggregation", f.useReconcilerFenwickCentralAggregation),
-        ("insert-block-fenwick", f.useReconcilerInsertBlockFenwick),
-        ("keyed-diff", f.useReconcilerKeyedDiff),
-        ("block-rebuild", f.useReconcilerBlockRebuild),
-        ("pre/post-attrs-only", f.useReconcilerPrePostAttributesOnly),
-        ("modern-textkit", f.useModernTextKitOptimizations),
-        ("shadow-compare", f.useReconcilerShadowCompare),
-        ("sanity-check", f.reconcilerSanityCheck),
-        ("proxy-input-delegate", f.proxyTextViewInputDelegate)
-      ]
-      return items.map { name, isOn in
-        UIAction(title: name, state: isOn ? .on : .off, handler: { [weak self] _ in
-          guard let self else { return }
-          let next = toggled(self.activeOptimizedFlags, name: name)
-          self.activeOptimizedFlags = next
-          // Don't rebuild views until test starts - just update flags
-          self.updateFeaturesMenu()
-        })
-      }
+    func coreToggle(_ name: String, _ isOn: Bool) -> UIAction {
+      UIAction(title: name, state: isOn ? .on : .off, handler: { [weak self] _ in
+        guard let self else { return }
+        let next = toggled(self.activeOptimizedFlags, name: name)
+        self.activeOptimizedFlags = next
+        self.updateFeaturesMenu()
+      })
     }
 
-    let menu = UIMenu(title: "Optimized Flags (base=ON)", children: actions(for: activeOptimizedFlags))
+    func actions(for f: FeatureFlags) -> [UIMenuElement] {
+      // Profile submenu
+      let profiles: [UIAction] = [
+        UIAction(title: "minimal", state: activeProfile == .minimal ? .on : .off, handler: { [weak self] _ in self?.setProfile(.minimal) }),
+        UIAction(title: "minimal (debug)", state: activeProfile == .minimalDebug ? .on : .off, handler: { [weak self] _ in self?.setProfile(.minimalDebug) }),
+        UIAction(title: "balanced", state: activeProfile == .balanced ? .on : .off, handler: { [weak self] _ in self?.setProfile(.balanced) }),
+        UIAction(title: "aggressive", state: activeProfile == .aggressive ? .on : .off, handler: { [weak self] _ in self?.setProfile(.aggressive) }),
+        UIAction(title: "aggressive (debug)", state: activeProfile == .aggressiveDebug ? .on : .off, handler: { [weak self] _ in self?.setProfile(.aggressiveDebug) })
+      ]
+      let profileMenu = UIMenu(title: "Profile", options: .displayInline, children: profiles)
+      // Slim core toggles most relevant to perf cases
+      let toggles: [UIAction] = [
+        coreToggle("strict-mode", f.useOptimizedReconcilerStrictMode),
+        coreToggle("pre/post-attrs-only", f.useReconcilerPrePostAttributesOnly),
+        coreToggle("insert-block-fenwick", f.useReconcilerInsertBlockFenwick),
+        coreToggle("central-aggregation", f.useReconcilerFenwickCentralAggregation),
+        coreToggle("modern-textkit", f.useModernTextKitOptimizations),
+        coreToggle("verbose-logging", f.verboseLogging)
+      ]
+      return [profileMenu] + toggles
+    }
+
+    let menu = UIMenu(title: "Optimized (profile=\(String(describing: activeProfile)))", children: actions(for: activeOptimizedFlags))
     featuresBarButton.menu = menu
+  }
+
+  private func setProfile(_ p: FeatureFlags.OptimizedProfile) {
+    activeProfile = p
+    activeOptimizedFlags = FeatureFlags.optimizedProfile(p)
+    updateFeaturesMenu()
   }
 
   @objc private func onToggleTapped() {
@@ -394,7 +411,8 @@ final class PerformanceViewController: UIViewController {
     guard let container = legacyContainerRef else { return nil }
     legacyView?.removeFromSuperview()
     let flags = activeLegacyFlags
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
+    legacyMetrics.resetMetrics()
+    let cfg = EditorConfig(theme: makeBenchTheme(), plugins: [], metricsContainer: legacyMetrics)
     let v = LexicalView(editorConfig: cfg, featureFlags: flags)
     v.translatesAutoresizingMaskIntoConstraints = false
     container.addSubview(v)
@@ -411,7 +429,8 @@ final class PerformanceViewController: UIViewController {
     guard let container = optimizedContainerRef else { return nil }
     optimizedView?.removeFromSuperview()
     let flags = activeOptimizedFlags
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
+    optimizedMetrics.resetMetrics()
+    let cfg = EditorConfig(theme: makeBenchTheme(), plugins: [], metricsContainer: optimizedMetrics)
     let v = LexicalView(editorConfig: cfg, featureFlags: flags)
     v.translatesAutoresizingMaskIntoConstraints = false
     container.addSubview(v)
@@ -422,6 +441,22 @@ final class PerformanceViewController: UIViewController {
       v.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6)
     ])
     optimizedView = v; return v
+  }
+
+  private func makeBenchTheme() -> Theme {
+    let theme = Theme()
+    let p = NSMutableParagraphStyle()
+    p.lineBreakMode = .byWordWrapping
+    p.hyphenationFactor = 0.0
+    if #available(iOS 9.0, *) {
+      if #available(iOS 14.0, *) {
+        // Avoid complex breaking for benches
+        p.lineBreakStrategy = []
+      }
+    }
+    p.allowsDefaultTighteningForTruncation = false
+    theme.paragraph = [ .paragraphStyle: p ]
+    return theme
   }
 
   private func generate(paragraphs: Int, in lexicalView: LexicalView) async {

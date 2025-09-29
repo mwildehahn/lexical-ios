@@ -45,6 +45,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   private let _keyCommands: [UIKeyCommand]?
 
   fileprivate var textViewDelegate: TextViewDelegate
+  private let modernTKOptimizations: Bool
 
   override public var keyCommands: [UIKeyCommand]? {
     return _keyCommands
@@ -72,13 +73,30 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       reconcilerSanityCheck = false
     #endif
 
+    let adjustedFlags = FeatureFlags(
+      reconcilerSanityCheck: reconcilerSanityCheck,
+      proxyTextViewInputDelegate: featureFlags.proxyTextViewInputDelegate,
+      useOptimizedReconciler: featureFlags.useOptimizedReconciler,
+      useReconcilerFenwickDelta: featureFlags.useReconcilerFenwickDelta,
+      useReconcilerKeyedDiff: featureFlags.useReconcilerKeyedDiff,
+      useReconcilerBlockRebuild: featureFlags.useReconcilerBlockRebuild,
+      useOptimizedReconcilerStrictMode: featureFlags.useOptimizedReconcilerStrictMode,
+      useReconcilerFenwickCentralAggregation: featureFlags.useReconcilerFenwickCentralAggregation,
+      useReconcilerShadowCompare: featureFlags.useReconcilerShadowCompare,
+      useReconcilerInsertBlockFenwick: featureFlags.useReconcilerInsertBlockFenwick,
+      useReconcilerPrePostAttributesOnly: featureFlags.useReconcilerPrePostAttributesOnly,
+      useModernTextKitOptimizations: featureFlags.useModernTextKitOptimizations,
+      verboseLogging: featureFlags.verboseLogging
+    )
+
     editor = Editor(
-      featureFlags: FeatureFlags(reconcilerSanityCheck: reconcilerSanityCheck),
+      featureFlags: adjustedFlags,
       editorConfig: editorConfig)
     textStorage.editor = editor
     placeholderLabel = UILabel(frame: .zero)
 
     useInputDelegateProxy = featureFlags.proxyTextViewInputDelegate
+    modernTKOptimizations = featureFlags.useModernTextKitOptimizations
     inputDelegateProxy = InputDelegateProxy()
     textViewDelegate = TextViewDelegate(editor: editor)
     _keyCommands = editorConfig.keyCommands
@@ -97,6 +115,14 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
     setUpPlaceholderLabel()
     registerRichText(editor: editor)
+
+    // Opportunistically drive viewport-only layout on iOS 16+ when enabled.
+    if modernTKOptimizations {
+      if #available(iOS 16.0, *) {
+        // Trigger an initial viewport layout; we’ll also refresh in layoutSubviews.
+        self.textLayoutManager?.textViewportLayoutController.layoutViewport()
+      }
+    }
   }
 
   /// This init method is used for unit tests
@@ -116,6 +142,13 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       x: textContainer.lineFragmentPadding * 1.5 + textContainerInset.left,
       y: textContainerInset.top)
     placeholderLabel.sizeToFit()
+
+    // Keep viewport layout bounded to visible area when enabled (iOS 16+)
+    if modernTKOptimizations {
+      if #available(iOS 16.0, *) {
+        self.textLayoutManager?.textViewportLayoutController.layoutViewport()
+      }
+    }
   }
 
   override public var inputDelegate: UITextInputDelegate? {
