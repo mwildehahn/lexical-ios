@@ -149,12 +149,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
     theme.link = [ .foregroundColor: UIColor.systemBlue ]
 
     // Feature flags
-    let flags: FeatureFlags
-    if useOptimized {
-      flags = FlagsStore.shared.makeFeatureFlags()
-    } else {
-      flags = FeatureFlags()
-    }
+    let flags: FeatureFlags = useOptimized ? FeatureFlags.optimizedProfile(.aggressive) : FeatureFlags()
 
     let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
     let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: flags)
