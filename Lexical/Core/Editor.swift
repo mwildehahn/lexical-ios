@@ -786,6 +786,10 @@ public class Editor: NSObject {
         }
 
         if !headless {
+          if featureFlags.verboseLogging {
+            let tsLen = textStorage?.length ?? -1
+            print("🔥 RECONCILE: begin optimized=\(featureFlags.useOptimizedReconciler) dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLen)")
+          }
           if featureFlags.useOptimizedReconciler {
             try OptimizedReconciler.updateEditorState(
               currentEditorState: editorState,
@@ -809,6 +813,10 @@ public class Editor: NSObject {
               shouldReconcileSelection: !mode.suppressReconcilingSelection,
               markedTextOperation: mode.markedTextOperation
             )
+          }
+          if featureFlags.verboseLogging {
+            let tsLenAfter = textStorage?.length ?? -1
+            print("🔥 RECONCILE: end dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLenAfter)")
           }
         }
         self.isUpdating = previouslyUpdating

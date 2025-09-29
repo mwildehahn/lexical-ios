@@ -176,6 +176,9 @@ class ViewController: UIViewController, UIToolbarDelegate {
 
     let editorConfig = EditorConfig(theme: theme, plugins: [toolbarPlugin, listPlugin, hierarchyPlugin, imagePlugin, linkPlugin, editorHistoryPlugin])
     let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: flags)
+    if flags.verboseLogging {
+      print("🔥 EDITOR-FLAGS: optimized=\(flags.useOptimizedReconciler) fenwick=\(flags.useReconcilerFenwickDelta) insertFast=\(flags.useReconcilerInsertBlockFenwick) deleteFast=\(flags.useReconcilerDeleteBlockFenwick) prepostOnly=\(flags.useReconcilerPrePostAttributesOnly) threshold=\(flags.prePostAttrsOnlyMaxTargets) modernTK=\(flags.useModernTextKitOptimizations)")
+    }
     linkPlugin.lexicalView = lexicalView
 
     self.lexicalView = lexicalView

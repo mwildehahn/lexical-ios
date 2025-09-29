@@ -879,11 +879,18 @@ internal enum OptimizedReconciler {
     // Range cache has only root and it’s empty
     if editor.rangeCache.count == 1, let root = editor.rangeCache[kRootNodeKey] {
       if root.preambleLength == 0 && root.childrenLength == 0 && root.textLength == 0 && root.postambleLength == 0 {
+        if editor.featureFlags.verboseLogging {
+          print("🔥 HYDRATE: shouldHydrate storageEmpty=\(storageEmpty) cacheCount=\(editor.rangeCache.count) decision=true")
+        }
         return true
       }
     }
     // Fallback: brand-new editor state (only root)
-    return currentNodeCount(pendingState) <= 1
+    let decision = currentNodeCount(pendingState) <= 1
+    if editor.featureFlags.verboseLogging {
+      print("🔥 HYDRATE: shouldHydrate storageEmpty=\(storageEmpty) nodeCount=\(currentNodeCount(pendingState)) decision=\(decision)")
+    }
+    return decision
   }
 
   @MainActor
@@ -903,6 +910,9 @@ internal enum OptimizedReconciler {
         built.append(buildAttributedSubtree(nodeKey: child, state: pendingState, theme: theme))
       }
     }
+    if editor.featureFlags.verboseLogging {
+      print("🔥 HYDRATE: build len=\(built.length) ts.len(before)=\(ts.length)")
+    }
     // Replace
     ts.replaceCharacters(in: NSRange(location: 0, length: ts.length), with: built)
     ts.fixAttributes(in: NSRange(location: 0, length: built.length))
@@ -918,6 +928,9 @@ internal enum OptimizedReconciler {
     // Decorator positions align with new locations
     for (key, _) in ts.decoratorPositionCache {
       if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
+    }
+    if editor.featureFlags.verboseLogging {
+      print("🔥 HYDRATE: end ts.len=\(ts.length) cacheCount=\(editor.rangeCache.count)")
     }
   }
 

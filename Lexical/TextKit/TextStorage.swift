@@ -71,6 +71,9 @@ public class TextStorage: NSTextStorage {
     }
     // Since we're in either controller or non-controlled mode, call super -- this will in turn call
     // both replaceCharacters and replaceAttributes.
+    if let ed = editor, ed.featureFlags.verboseLogging {
+      print("🔥 TS-EDIT: replace(attr) mode=\(mode) range=\(range) repl.len=\(attrString.length) ts.len(before)=\(backingAttributedString.length)")
+    }
     super.replaceCharacters(in: range, with: attrString)
   }
 
@@ -84,6 +87,9 @@ public class TextStorage: NSTextStorage {
     }
 
     // Mode is not none, so this change has already passed through Lexical
+    if let ed = editor, ed.featureFlags.verboseLogging {
+      print("🔥 TS-EDIT: replace(str) mode=\(mode) range=\(range) repl.len=\((str as NSString).length) ts.len(before)=\(backingAttributedString.length)")
+    }
     beginEditing()
     backingAttributedString.replaceCharacters(in: range, with: str)
     edited(.editedCharacters, range: range, changeInLength: (str as NSString).length - range.length)
@@ -141,6 +147,9 @@ public class TextStorage: NSTextStorage {
       return
     }
 
+    if let ed = editor, ed.featureFlags.verboseLogging {
+      print("🔥 TS-EDIT: setAttributes mode=\(mode) range=\(range) attrs.keys=\(attrs?.keys.count ?? 0)")
+    }
     beginEditing()
     backingAttributedString.setAttributes(attrs, range: range)
     edited(.editedAttributes, range: range, changeInLength: 0)
