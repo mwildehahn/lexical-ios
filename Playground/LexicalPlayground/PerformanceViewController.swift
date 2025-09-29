@@ -45,6 +45,8 @@ final class PerformanceViewController: UIViewController {
   private var statusLabel = UILabel()
   private var copyButton = UIButton(type: .system)
   private var featuresBarButton = UIBarButtonItem()
+  private var cancelBarButton = UIBarButtonItem()
+  private var offscreenBarButton = UIBarButtonItem()
   // Matrix (text-based) aggregation
   private var scenarioNames: [String] = []
   private var matrixResults: [String: [String: Double]] = [:]
@@ -62,11 +64,19 @@ final class PerformanceViewController: UIViewController {
   private var currentPreset: Preset = .quick
   private var seedParasCurrent: Int = 0
   private var isRunning = false
+  private var runEngine: PerfRunEngine? = nil
   private var prePostWrapped = false
   private var presetHeader: UIStackView?
   private var presetControl: UISegmentedControl?
   private var showLogsInUI = false // keep logs in console; UI shows pretty summary only
   private var summary = NSMutableAttributedString()
+  // Offscreen runner configuration
+  private var useOffscreenRunner = true
+  private var offOptimizedCtx: LexicalReadOnlyTextKitContext?
+  private var offLegacyCtx: LexicalReadOnlyTextKitContext?
+  private var offOptimizedMetrics = PerfMetricsContainer()
+  private var offLegacyMetrics = PerfMetricsContainer()
+  private var skipTicks = 0
   // Variation tracking (for best TOP insert)
   private var recordingVariations = false
   private var currentVariationName: String? = nil
@@ -76,6 +86,7 @@ final class PerformanceViewController: UIViewController {
   // Active feature flags (for Features menu)
   private var activeLegacyFlags = FeatureFlags()
   private var activeOptimizedFlags = FeatureFlags()
+  private var modeLabel: String { useOffscreenRunner ? "[OFFSCREEN]" : "[UI]" }
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -238,9 +249,13 @@ final class PerformanceViewController: UIViewController {
 
   private func configureRunButton() {
     let start = UIBarButtonItem(title: "Start", style: .plain, target: self, action: #selector(runTapped))
+    let cancel = UIBarButtonItem(title: "Cancel", style: .plain, target: self, action: #selector(cancelTapped))
     let runVar = UIBarButtonItem(title: "Run Matrix", style: .plain, target: self, action: #selector(runVariationsTapped))
     featuresBarButton = UIBarButtonItem(title: "Features", style: .plain, target: nil, action: nil)
-    navigationItem.rightBarButtonItems = [start, runVar, featuresBarButton]
+    offscreenBarButton = UIBarButtonItem(title: "Offscreen: ON", style: .plain, target: self, action: #selector(toggleOffscreen))
+    cancel.isEnabled = false
+    self.cancelBarButton = cancel
+    navigationItem.rightBarButtonItems = [start, runVar, cancel, offscreenBarButton, featuresBarButton]
     updateFeaturesMenu()
   }
 
@@ -256,6 +271,17 @@ final class PerformanceViewController: UIViewController {
   @objc private func runTapped() {
     guard !isRunning else { return }
     runBenchmarks()
+  }
+
+  @objc private func cancelTapped() {
+    runEngine?.cancel()
+  }
+
+  @objc private func toggleOffscreen() {
+    guard !isRunning else { return }
+    useOffscreenRunner.toggle()
+    offscreenBarButton.title = useOffscreenRunner ? "Offscreen: ON" : "Offscreen: OFF"
+    if useOffscreenRunner { buildOffscreenContexts() }
   }
 
   private func buildEditors() {
@@ -303,6 +329,17 @@ final class PerformanceViewController: UIViewController {
 
     // Refresh the Features menu with the currently active flags
     updateFeaturesMenu()
+    // Keep offscreen contexts in sync with current flags
+    buildOffscreenContexts()
+  }
+
+  private func buildOffscreenContexts() {
+    offOptimizedMetrics = PerfMetricsContainer()
+    offLegacyMetrics = PerfMetricsContainer()
+    let optCfg = EditorConfig(theme: Theme(), plugins: [], metricsContainer: offOptimizedMetrics)
+    let legCfg = EditorConfig(theme: Theme(), plugins: [], metricsContainer: offLegacyMetrics)
+    offOptimizedCtx = LexicalReadOnlyTextKitContext(editorConfig: optCfg, featureFlags: activeOptimizedFlags)
+    offLegacyCtx = LexicalReadOnlyTextKitContext(editorConfig: legCfg, featureFlags: activeLegacyFlags)
   }
 
   // MARK: - Variations Runner
@@ -311,6 +348,7 @@ final class PerformanceViewController: UIViewController {
     recordingVariations = true
     bestTopInsert = nil
     isRunning = true
+    appendLog("Mode: \(modeLabel)")
     summary = NSMutableAttributedString(string: "Lexical Perf Variations\n" + nowStamp() + "\n\n", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 12, weight: .regular), .foregroundColor: UIColor.secondaryLabel])
     refreshSummaryView()
     copyButton.isEnabled = false
@@ -394,7 +432,7 @@ final class PerformanceViewController: UIViewController {
     currentPreset = .quick
     let cfg = config(for: currentPreset)
     seedParasCurrent = cfg.seedParas
-    preWarmEditors(); resetDocuments(paragraphs: cfg.seedParas)
+    preWarmEditors(); resetDocumentsActive(paragraphs: cfg.seedParas)
     let scenarios = makeScenarios()
     totalSteps = scenarios.reduce(0) { $0 + $1.iterations }; completedSteps = 0
     runScenarioList(scenarios, index: 0) { [weak self] in
@@ -445,6 +483,8 @@ final class PerformanceViewController: UIViewController {
 
     // Update Features menu to reflect the variation's flags
     updateFeaturesMenu()
+    // Keep offscreen contexts in sync with the new flags for matrix runs
+    buildOffscreenContexts()
   }
 
   private func makeScenarios() -> [Scenario] {
@@ -489,12 +529,19 @@ final class PerformanceViewController: UIViewController {
 
     let cfg = config(for: currentPreset)
     seedParasCurrent = cfg.seedParas
+    appendLog("Mode: \(modeLabel)")
     appendLog("Seeding documents (\(cfg.seedParas) paragraphs)…")
     // Pre-warm editors and seed documents based on preset; start after both complete
+    if useOffscreenRunner { buildOffscreenContexts() }
     preWarmEditors()
     let g = DispatchGroup()
-    g.enter(); resetAndSeedAsync(editor: legacyView.editor, paragraphs: cfg.seedParas) { g.leave() }
-    g.enter(); resetAndSeedAsync(editor: optimizedView.editor, paragraphs: cfg.seedParas) { g.leave() }
+    if useOffscreenRunner, let le = offLegacyCtx?.editor, let oe = offOptimizedCtx?.editor {
+      g.enter(); resetAndSeedAsync(editor: le, paragraphs: cfg.seedParas) { g.leave() }
+      g.enter(); resetAndSeedAsync(editor: oe, paragraphs: cfg.seedParas) { g.leave() }
+    } else {
+      g.enter(); resetAndSeedAsync(editor: legacyView.editor, paragraphs: cfg.seedParas) { g.leave() }
+      g.enter(); resetAndSeedAsync(editor: optimizedView.editor, paragraphs: cfg.seedParas) { g.leave() }
+    }
     g.notify(queue: .main) {
       self.appendLog("Seed complete. Starting scenarios…")
       self.startScenarioRun()
@@ -553,23 +600,25 @@ final class PerformanceViewController: UIViewController {
     let scenario = scenarios[index]
 
     // Reset state and metrics for this scenario
-    legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics()
+    if useOffscreenRunner { offLegacyMetrics.resetMetrics(); offOptimizedMetrics.resetMetrics() } else { legacyMetrics.resetMetrics(); optimizedMetrics.resetMetrics() }
     // no TK2 timing
-    appendLog("• \(scenario.name) — running \(scenario.iterations)x")
+    appendLog("\(modeLabel) • \(scenario.name) — running \(scenario.iterations)x")
     statusLabel.text = scenario.name
 
-    runScenarioBatched(name: scenario.name, iterations: scenario.iterations, batch: scenario.batch, step: scenario.step) { [weak self] in
+    runScenarioStreaming(name: scenario.name, iterations: scenario.iterations, step: scenario.step) { [weak self] in
       guard let self else { return }
       let ok = (scenario.parityKind == .plain) ? self.assertParity(scenario.name) : self.assertAttributeOnlyParity(scenario.name)
-      let legacyDur = self.totalDuration(self.legacyMetrics)
-      let optDur = self.totalDuration(self.optimizedMetrics)
-      let body = self.summary("Legacy", wall: legacyDur, runs: self.legacyMetrics.runs) + self.summary("Optimized", wall: optDur, runs: self.optimizedMetrics.runs)
+      let lm = self.useOffscreenRunner ? self.offLegacyMetrics : self.legacyMetrics
+      let om = self.useOffscreenRunner ? self.offOptimizedMetrics : self.optimizedMetrics
+      let legacyDur = self.totalDuration(lm)
+      let optDur = self.totalDuration(om)
+      let body = self.summary("Legacy", wall: legacyDur, runs: lm.runs) + self.summary("Optimized", wall: optDur, runs: om.runs)
       let parity = ok ? "  - Parity: OK" : "  - Parity: FAIL"
       self.appendLog(body + parity + "\n")
-      self.addSummaryLine(name: scenario.name, legacyWall: legacyDur, optimizedWall: optDur, legacyCount: self.legacyMetrics.runs.count, optimizedCount: self.optimizedMetrics.runs.count)
+      self.addSummaryLine(name: scenario.name, legacyWall: legacyDur, optimizedWall: optDur, legacyCount: lm.runs.count, optimizedCount: om.runs.count)
       // Record best TOP insert across variations
       if self.recordingVariations && scenario.name.hasPrefix("Insert paragraph at TOP") {
-        let count = max(1, self.optimizedMetrics.runs.count)
+        let count = max(1, om.runs.count)
         let avg = optDur / Double(count)
         if let best = self.bestTopInsert {
           if avg < best.avg { self.bestTopInsert = (self.currentVariationName ?? "?", avg) }
@@ -579,8 +628,8 @@ final class PerformanceViewController: UIViewController {
       }
       // Accumulate matrix result for this scenario & variation
       if self.recordingVariations, let varName = self.currentVariationName {
-        let legacyAvg = self.legacyMetrics.runs.isEmpty ? 0 : legacyDur / Double(self.legacyMetrics.runs.count)
-        let optAvg = self.optimizedMetrics.runs.isEmpty ? 0 : optDur / Double(self.optimizedMetrics.runs.count)
+        let legacyAvg = lm.runs.isEmpty ? 0 : legacyDur / Double(lm.runs.count)
+        let optAvg = om.runs.isEmpty ? 0 : optDur / Double(om.runs.count)
         let deltaPct = (legacyAvg > 0 && optAvg > 0) ? ((legacyAvg - optAvg) / legacyAvg * 100.0) : 0
         var row = self.matrixResults[scenario.name] ?? [:]
         row[varName] = deltaPct
@@ -588,37 +637,56 @@ final class PerformanceViewController: UIViewController {
         if !self.scenarioNames.contains(scenario.name) { self.scenarioNames.append(scenario.name) }
       }
       self.refreshSummaryView()
-      // Reset documents between scenarios and continue
-      self.resetDocuments(paragraphs: config(for: currentPreset).seedParas)
+      // Reset documents between scenarios and continue. For heavy preset, avoid reseeding to reduce overhead.
+      if self.currentPreset != .heavy {
+        self.resetDocumentsActive(paragraphs: self.config(for: self.currentPreset).seedParas)
+      }
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
         self.runScenarioList(scenarios, index: index + 1, completion: completion)
       }
     }
   }
 
-  private func runScenarioBatched(name: String, iterations: Int, batch: Int, step: @escaping () -> Void, completion: @escaping () -> Void) {
-    var completed = 0
-    func runNextBatch() {
-      let end = min(completed + batch, iterations)
-      // Execute batch synchronously on main to respect Editor's threading model
-      for _ in completed..<end { step() }
-      // Update progress (global + scenario)
-      let delta = end - completed
-      completed = end
-      completedSteps += delta
-      let global = Float(completedSteps) / Float(max(totalSteps, 1))
-      self.progress.setProgress(global, animated: true)
-      statusLabel.text = "\(name) — \(completed)/\(iterations)  (total: \(completedSteps)/\(totalSteps))  seed=\(self.seedParasCurrent)"
-      appendLog("   · \(name): \(completed)/\(iterations)")
-      if completed < iterations {
-        // Yield to run loop so UI stays responsive
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { runNextBatch() }
-      } else {
-        // no TK2 per-batch timing
+  /// New non-blocking runner: executes iterations paced per-frame via PerfRunEngine.
+  private func runScenarioStreaming(name: String, iterations: Int, step: @escaping () -> Void, completion: @escaping () -> Void) {
+    // Lazily init engine per session
+    if runEngine == nil { runEngine = PerfRunEngine() }
+    cancelBarButton.isEnabled = true
+
+    let startCompletedSteps = self.completedSteps
+    runEngine?.run(
+      totalIterations: iterations,
+      config: PerfRunEngine.Config(frameBudgetMs: useOffscreenRunner ? 10.0 : 8.0, maxStepsPerFrame: 1, minStepsPerFrame: 1, softDeadlineSeconds: useOffscreenRunner ? nil : 10),
+      step: {
+        let t0 = CFAbsoluteTimeGetCurrent()
+        autoreleasepool { step() }
+        let dt = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+        self.appendLog("\(self.modeLabel) step finished in \(String(format: "%.2f", dt)) ms")
+      },
+      onProgress: { [weak self] done, total, lastMs in
+        guard let self else { return }
+        if lastMs > (self.useOffscreenRunner ? 10.0 : 8.0) { self.skipTicks = 1 }
+        self.completedSteps = startCompletedSteps + done
+        let global = Float(self.completedSteps) / Float(max(self.totalSteps, 1))
+        self.progress.setProgress(global, animated: true)
+        self.statusLabel.text = "\(name) — \(done)/\(total)  (total: \(self.completedSteps)/\(self.totalSteps))  last=\(String(format: "%.2f", lastMs))ms"
+      },
+      onFinish: { [weak self] success in
+        guard let self else { return }
+        self.cancelBarButton.isEnabled = false
+        if !success {
+          self.appendLog("   · \(name): cancelled or timed out")
+        } else {
+          self.appendLog("   · \(name): \(iterations)/\(iterations)")
+        }
         completion()
+      },
+      shouldRunThisTick: { [weak self] in
+        guard let self else { return true }
+        if self.skipTicks > 0 { self.skipTicks -= 1; return false }
+        return true
       }
-    }
-    runNextBatch()
+    )
   }
   // TK2 experimental path removed
 
@@ -678,11 +746,13 @@ final class PerformanceViewController: UIViewController {
       resultsTextView.scrollRangeToVisible(bottom)
     }
     print(line)
-    perfLog.info("\(line, privacy: .public)")
   }
 
   private func totalDuration(_ c: PerfMetricsContainer) -> TimeInterval {
-    c.runs.reduce(0) { $0 + $1.duration }
+    c.runs.reduce(0) { acc, m in
+      let wall = (m.duration > 0) ? m.duration : (m.planningDuration + m.applyDuration)
+      return acc + wall
+    }
   }
 
   private func summary(_ label: String, wall: TimeInterval, runs: [ReconcilerMetric]) -> String {
@@ -691,8 +761,9 @@ final class PerformanceViewController: UIViewController {
     let planSum = runs.reduce(0) { $0 + $1.planningDuration }
     let applySum = runs.reduce(0) { $0 + $1.applyDuration }
     let planAvg = planSum / count
-    let applyAvg = applySum / count
+    var applyAvg = applySum / count
     let wallAvg = wall / count
+    if applyAvg == 0 && wallAvg > 0 { applyAvg = wallAvg } // fallback for legacy metrics that don't split timings
     let applyShare = wallAvg > 0 ? (applyAvg / wallAvg * 100.0) : 0
     let deletes = runs.reduce(0) { $0 + $1.deleteCount }
     let inserts = runs.reduce(0) { $0 + $1.insertCount }
@@ -746,8 +817,7 @@ final class PerformanceViewController: UIViewController {
         }
       }
     }
-    try? insert(legacyView.editor)
-    try? insert(optimizedView.editor)
+    try? forEachActiveEditor { try insert($0) }
   }
 
   private func textBurstOnce() throws {
@@ -759,8 +829,7 @@ final class PerformanceViewController: UIViewController {
         try text.setText(current + " +typing+")
       }
     }
-    try? mutate(legacyView.editor)
-    try? mutate(optimizedView.editor)
+    try? forEachActiveEditor { try mutate($0) }
   }
 
   private func attributeToggleOnce() throws {
@@ -771,8 +840,7 @@ final class PerformanceViewController: UIViewController {
         try text.setBold(bold)
       }
     }
-    try? toggle(legacyView.editor, bold: attrToggleBoldState)
-    try? toggle(optimizedView.editor, bold: attrToggleBoldState)
+    try? forEachActiveEditor { try toggle($0, bold: attrToggleBoldState) }
     attrToggleBoldState.toggle()
   }
 
@@ -788,7 +856,7 @@ final class PerformanceViewController: UIViewController {
         }
       }
     }
-    try? reorder(legacyView.editor); try? reorder(optimizedView.editor)
+    try? forEachActiveEditor { try reorder($0) }
   }
 
   private func coalescedReplaceOnce() throws {
@@ -801,7 +869,7 @@ final class PerformanceViewController: UIViewController {
         try p.append([t])
       }
     }
-    try? replace(legacyView.editor); try? replace(optimizedView.editor)
+    try? forEachActiveEditor { try replace($0) }
   }
 
   private func prePostToggleOnce() throws {
@@ -822,7 +890,7 @@ final class PerformanceViewController: UIViewController {
         }
       }
     }
-    try? toggle(legacyView.editor); try? toggle(optimizedView.editor)
+    try? forEachActiveEditor { try toggle($0) }
     prePostWrapped.toggle()
   }
 
@@ -834,28 +902,40 @@ final class PerformanceViewController: UIViewController {
         if let first = root.getFirstChild() { try first.insertBefore(nodeToInsert: last) }
       }
     }
-    try? rotate(legacyView.editor); try? rotate(optimizedView.editor)
+    try? forEachActiveEditor { try rotate($0) }
   }
 
   // MARK: - Parity assertions
   private func assertParity(_ label: String) -> Bool {
-    let lhs = legacyView.textView.attributedText.string
-    let rhs = optimizedView.textView.attributedText.string
+    let (lhs, rhs) = activeStrings()
     return lhs == rhs
   }
 
   private func assertAttributeOnlyParity(_ label: String) -> Bool {
     let stringOK = assertParity(label)
     // Optimized should generally not exceed legacy ops by a large factor on attr-only
-    let legacySets = legacyMetrics.runs.reduce(0) { $0 + $1.setAttributesCount }
-    let optSets = optimizedMetrics.runs.reduce(0) { $0 + $1.setAttributesCount }
-    let legacyDeletes = legacyMetrics.runs.reduce(0) { $0 + $1.deleteCount }
-    let optDeletes = optimizedMetrics.runs.reduce(0) { $0 + $1.deleteCount }
+    let lm = useOffscreenRunner ? offLegacyMetrics : legacyMetrics
+    let om = useOffscreenRunner ? offOptimizedMetrics : optimizedMetrics
+    let legacySets = lm.runs.reduce(0) { $0 + $1.setAttributesCount }
+    let optSets = om.runs.reduce(0) { $0 + $1.setAttributesCount }
+    let legacyDeletes = lm.runs.reduce(0) { $0 + $1.deleteCount }
+    let optDeletes = om.runs.reduce(0) { $0 + $1.deleteCount }
     _ = legacySets; _ = optSets
     return stringOK && optDeletes <= legacyDeletes && optSets >= 1
   }
 
   // MARK: - Reset
+  private func resetDocumentsActive(paragraphs: Int) {
+    let g = DispatchGroup()
+    if useOffscreenRunner, let le = offLegacyCtx?.editor, let oe = offOptimizedCtx?.editor {
+      g.enter(); resetAndSeedAsync(editor: le, paragraphs: paragraphs) { g.leave() }
+      g.enter(); resetAndSeedAsync(editor: oe, paragraphs: paragraphs) { g.leave() }
+    } else {
+      g.enter(); resetAndSeedAsync(editor: legacyView.editor, paragraphs: paragraphs) { g.leave() }
+      g.enter(); resetAndSeedAsync(editor: optimizedView.editor, paragraphs: paragraphs) { g.leave() }
+    }
+    g.notify(queue: .main) { self.appendLog("Reseed complete (paras=\(paragraphs))") }
+  }
   private func resetDocuments(paragraphs: Int) {
     let g = DispatchGroup()
     g.enter(); resetAndSeedAsync(editor: legacyView.editor, paragraphs: paragraphs) { g.leave() }
@@ -964,6 +1044,25 @@ final class PerformanceViewController: UIViewController {
     }
     warm(legacyView.editor)
     warm(optimizedView.editor)
+    if useOffscreenRunner, let oe = offOptimizedCtx?.editor, let le = offLegacyCtx?.editor { warm(oe); warm(le) }
+  }
+
+  // MARK: - Active editors & helpers
+  private func forEachActiveEditor(_ block: (Editor) throws -> Void) rethrows {
+    if useOffscreenRunner {
+      if let le = offLegacyCtx?.editor { try block(le) }
+      if let oe = offOptimizedCtx?.editor { try block(oe) }
+    } else {
+      try block(legacyView.editor)
+      try block(optimizedView.editor)
+    }
+  }
+
+  private func activeStrings() -> (String, String) {
+    if useOffscreenRunner, let le = offLegacyCtx, let oe = offOptimizedCtx {
+      return (le.textStorage.string, oe.textStorage.string)
+    }
+    return (legacyView.textView.attributedText.string, optimizedView.textView.attributedText.string)
   }
 }
 

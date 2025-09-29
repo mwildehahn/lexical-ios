@@ -374,6 +374,9 @@ internal enum OptimizedReconciler {
 
     if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: optimized slow path applied (full rebuild)") }
     if let metrics = editor.metricsContainer {
+      // Approximate wall time for slow path as pure apply time for the full replace
+      // (We don't separate planning here.)
+      // Note: applyDuration was measured above implicitly by the editing block; recompute here conservatively
       let metric = ReconcilerMetric(
         duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
         treatedAllNodesAsDirty: true, pathLabel: "slow")
@@ -421,11 +424,13 @@ internal enum OptimizedReconciler {
             from: nextNode, state: pendingEditorState, theme: editor.getTheme())
           let previousMode = textStorage.mode
           textStorage.mode = .controllerMode
+          let t0 = CFAbsoluteTimeGetCurrent()
           textStorage.beginEditing()
           textStorage.setAttributes(attributes, range: textRange)
           textStorage.fixAttributes(in: textRange)
           textStorage.endEditing()
           textStorage.mode = previousMode
+          let applyDur = CFAbsoluteTimeGetCurrent() - t0
 
           // No length delta, but re-apply decorator positions for safety
           for (key, _) in textStorage.decoratorPositionCache {
@@ -449,9 +454,9 @@ internal enum OptimizedReconciler {
           }
           if let metrics = editor.metricsContainer {
             let metric = ReconcilerMetric(
-              duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+              duration: applyDur, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
               treatedAllNodesAsDirty: false, pathLabel: "attr-only", planningDuration: 0,
-              applyDuration: 0, deleteCount: 0, insertCount: 0, setAttributesCount: 1, fixAttributesCount: 1)
+              applyDuration: applyDur, deleteCount: 0, insertCount: 0, setAttributesCount: 1, fixAttributesCount: 1)
             metrics.record(.reconcilerRun(metric))
           }
           if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: attribute-only fast path applied") }
@@ -533,7 +538,7 @@ internal enum OptimizedReconciler {
 
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
-        duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+        duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
         treatedAllNodesAsDirty: false, pathLabel: "text-only", planningDuration: 0,
         applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
         setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
@@ -635,10 +640,12 @@ internal enum OptimizedReconciler {
     }
     if instructions.isEmpty { return false }
 
+    var applyDuration: TimeInterval = 0
     if !editor.featureFlags.useReconcilerInsertBlockFenwick {
       guard let textStorage = editor.textStorage else { return false }
       let previousMode = textStorage.mode
       textStorage.mode = .controllerMode
+      let t0 = CFAbsoluteTimeGetCurrent()
       textStorage.beginEditing()
       let theme2 = editor.getTheme()
       let builtParentChildren = NSMutableAttributedString()
@@ -649,8 +656,13 @@ internal enum OptimizedReconciler {
       textStorage.fixAttributes(in: NSRange(location: parentChildrenStart, length: builtParentChildren.length))
       textStorage.endEditing()
       textStorage.mode = previousMode
+      applyDuration = CFAbsoluteTimeGetCurrent() - t0
       _ = recomputeRangeCacheSubtree(nodeKey: parentKey, state: pendingEditorState, startLocation: parentPrevRange.location, editor: editor)
       reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
+    } else {
+      // Fenwick variant: apply delete/insert instructions at computed locations
+      let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: false)
+      applyDuration = stats.duration
     }
 
     // Block attributes only for inserted node
@@ -670,8 +682,8 @@ internal enum OptimizedReconciler {
 
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
-        duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
-        treatedAllNodesAsDirty: false, pathLabel: "insert-block")
+        duration: applyDuration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+        treatedAllNodesAsDirty: false, pathLabel: "insert-block", planningDuration: 0, applyDuration: applyDuration)
       metrics.record(.reconcilerRun(metric))
     }
     if editor.featureFlags.useReconcilerShadowCompare {
@@ -758,7 +770,7 @@ internal enum OptimizedReconciler {
     applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
 
     if let metrics = editor.metricsContainer {
-      let metric = ReconcilerMetric(duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "text-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
+      let metric = ReconcilerMetric(duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "text-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
       metrics.record(.reconcilerRun(metric))
     }
     return true
@@ -833,7 +845,7 @@ internal enum OptimizedReconciler {
     let stats = applyInstructions(instructions, editor: editor)
     applyBlockAttributesPass(editor: editor, pendingEditorState: pendingEditorState, affectedKeys: affected, treatAllNodesAsDirty: false)
     if let metrics = editor.metricsContainer {
-      let metric = ReconcilerMetric(duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "prepost-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
+      let metric = ReconcilerMetric(duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0, treatedAllNodesAsDirty: false, pathLabel: "prepost-only-multi", planningDuration: 0, applyDuration: stats.duration, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
       metrics.record(.reconcilerRun(metric))
     }
     return true
@@ -935,7 +947,7 @@ internal enum OptimizedReconciler {
       let stats = applyInstructions(instructions, editor: editor)
       if let metrics = editor.metricsContainer {
         let metric = ReconcilerMetric(
-          duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+          duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
           treatedAllNodesAsDirty: false, pathLabel: "reorder-minimal", planningDuration: 0,
           applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
           setAttributesCount: stats.sets, fixAttributesCount: stats.fixes, movedChildren: movedCount)
@@ -946,15 +958,17 @@ internal enum OptimizedReconciler {
       guard let textStorage = editor.textStorage else { return false }
       let previousMode = textStorage.mode
       textStorage.mode = .controllerMode
+      let t0 = CFAbsoluteTimeGetCurrent()
       textStorage.beginEditing()
       textStorage.replaceCharacters(in: childrenRange, with: built)
       textStorage.fixAttributes(in: NSRange(location: childrenRange.location, length: built.length))
       textStorage.endEditing()
       textStorage.mode = previousMode
       if let metrics = editor.metricsContainer {
+        let applyDur = CFAbsoluteTimeGetCurrent() - t0
         let metric = ReconcilerMetric(
-          duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
-          treatedAllNodesAsDirty: false, pathLabel: "reorder-rebuild", movedChildren: movedCount)
+          duration: applyDur, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+          treatedAllNodesAsDirty: false, pathLabel: "reorder-rebuild", planningDuration: 0, applyDuration: applyDur, movedChildren: movedCount)
         metrics.record(.reconcilerRun(metric))
       }
     }
@@ -1247,7 +1261,7 @@ internal enum OptimizedReconciler {
 
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
-        duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
+        duration: stats.duration, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,
         treatedAllNodesAsDirty: false, pathLabel: "prepost-only", planningDuration: 0,
         applyDuration: stats.duration, deleteCount: stats.deletes, insertCount: stats.inserts,
         setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)

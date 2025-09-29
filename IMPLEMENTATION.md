@@ -475,3 +475,14 @@ Commit summary
 - Added selection mapping parity test: `SelectionMappingParityTests.testCaretStabilityOnUnrelatedSiblingEdit_Parity` ensures caret at end of A remains stable when editing sibling B; optimized (strict mode) vs legacy strings and selection locations match. PASS on iOS simulator.
 - Hardened mapping scaffold kept (skipped): `RangeCachePointMappingParityTests.testPointAtStringLocation_Boundaries_TextNodes_Parity` now structured to round‑trip point→location→point per editor; currently skipped while we finalize boundary invariants (pre/post rules). Will unskip once mapping invariants are locked.
 - Test run: filtered iOS simulator tests (Lexical-Package scheme) green for the new suite.
+### 2025-09-29: PerformanceViewController — Non‑blocking test runner (PerfRunEngine)
+- Added `PerfRunEngine` (CADisplayLink‑paced) to stream iterations per frame with adaptive chunking (10 ms budget, up to 12 steps/frame). Keeps UI responsive while respecting Lexical’s main‑thread update model.
+- Replaced synchronous batch loop with `runScenarioStreaming(...)` wired to PerfRunEngine callbacks.
+- Added Cancel control to stop long runs; progress and status update each frame with last‑step timing.
+- Verified on iOS simulator: full `Lexical-Package` tests PASS; Playground build PASS; UI remains responsive during long runs.
+### 2025-09-29: PerformanceViewController — Offscreen Runner mode
+- Added Offscreen Runner (default ON) that executes scenarios against two `LexicalReadOnlyTextKitContext` instances instead of mutating the on‑screen `LexicalView` editors each iteration. This keeps UI responsive while maintaining main‑thread correctness.
+- Updated `PerfRunEngine` to support an optional `shouldRunThisTick` gate for back‑pressure; we now run at most 1 step per frame and can skip frames after expensive steps.
+- UI: added “Offscreen: ON/OFF” toggle and kept Cancel. Progress and status update per frame.
+- Step functions now operate on the “active editors pair” (offscreen or live) via a helper; parity checks read from the active pair’s text.
+- Verified: Playground builds clean; iOS simulator tests pass for focused Fenwick rebuild suite. Full parity bench test remains tracked separately and is unaffected by the UI runner changes.
