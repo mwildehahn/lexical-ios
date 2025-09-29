@@ -17,14 +17,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     let editorVC = ViewController()
     editorVC.tabBarItem = UITabBarItem(title: "Editor", image: UIImage(systemName: "doc.text"), selectedImage: UIImage(systemName: "doc.text.fill"))
     let perfVC = PerformanceViewController()
-    perfVC.tabBarItem = UITabBarItem(title: "Perf", image: UIImage(systemName: "speedometer"), selectedImage: UIImage(systemName: "speedometer"))
+    perfVC.tabBarItem = UITabBarItem(title: "Performance", image: UIImage(systemName: "speedometer"), selectedImage: UIImage(systemName: "speedometer"))
 
     let editorNav = UINavigationController(rootViewController: editorVC)
     let perfNav = UINavigationController(rootViewController: perfVC)
 
     let tab = UITabBarController()
     tab.viewControllers = [editorNav, perfNav]
-    // Default to the Perf tab so the Quick preset auto-runs and logs
+    // Default to the Performance tab
     tab.selectedIndex = 1
 
     window.rootViewController = tab

@@ -19,6 +19,7 @@ import Foundation
   public let useReconcilerShadowCompare: Bool
   public let useReconcilerInsertBlockFenwick: Bool
   public let useReconcilerPrePostAttributesOnly: Bool
+  public let useModernTextKitOptimizations: Bool
 
   @objc public init(
     reconcilerSanityCheck: Bool = false,
@@ -32,7 +33,7 @@ import Foundation
     useReconcilerShadowCompare: Bool = false,
     useReconcilerInsertBlockFenwick: Bool = false,
     useReconcilerPrePostAttributesOnly: Bool = false,
-    
+    useModernTextKitOptimizations: Bool = false
   ) {
     self.reconcilerSanityCheck = reconcilerSanityCheck
     self.proxyTextViewInputDelegate = proxyTextViewInputDelegate
@@ -45,6 +46,7 @@ import Foundation
     self.useReconcilerShadowCompare = useReconcilerShadowCompare
     self.useReconcilerInsertBlockFenwick = useReconcilerInsertBlockFenwick
     self.useReconcilerPrePostAttributesOnly = useReconcilerPrePostAttributesOnly
+    self.useModernTextKitOptimizations = useModernTextKitOptimizations
     super.init()
   }
 }

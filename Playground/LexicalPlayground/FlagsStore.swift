@@ -16,6 +16,7 @@ final class FlagsStore {
   private enum K: String {
     case useOptimized, strict, fenwickDelta, centralAgg, keyedDiff, blockRebuild
     case shadowCompare, insertBlockFenwick, sanityCheck, proxyInputDelegate
+    case prePostAttrsOnly, modernTextKit
   }
 
   private init() {}
@@ -33,6 +34,8 @@ final class FlagsStore {
   var insertBlockFenwick: Bool { get { b(.insertBlockFenwick) } set { set(.insertBlockFenwick, newValue) } }
   var sanityCheck: Bool { get { b(.sanityCheck) } set { set(.sanityCheck, newValue) } }
   var proxyInputDelegate: Bool { get { b(.proxyInputDelegate) } set { set(.proxyInputDelegate, newValue) } }
+  var prePostAttrsOnly: Bool { get { b(.prePostAttrsOnly) } set { set(.prePostAttrsOnly, newValue) } }
+  var modernTextKit: Bool { get { b(.modernTextKit) } set { set(.modernTextKit, newValue) } }
 
   func makeFeatureFlags() -> FeatureFlags {
     FeatureFlags(
@@ -45,14 +48,17 @@ final class FlagsStore {
       useOptimizedReconcilerStrictMode: strict,
       useReconcilerFenwickCentralAggregation: centralAgg,
       useReconcilerShadowCompare: shadowCompare,
-      useReconcilerInsertBlockFenwick: insertBlockFenwick
+      useReconcilerInsertBlockFenwick: insertBlockFenwick,
+      useReconcilerPrePostAttributesOnly: prePostAttrsOnly,
+      useModernTextKitOptimizations: modernTextKit
     )
   }
 
   func signature() -> String {
     return [
       useOptimized, strict, fenwickDelta, centralAgg, keyedDiff, blockRebuild,
-      insertBlockFenwick, shadowCompare, sanityCheck, proxyInputDelegate
+      insertBlockFenwick, shadowCompare, sanityCheck, proxyInputDelegate,
+      prePostAttrsOnly, modernTextKit
     ].map { $0 ? "1" : "0" }.joined()
   }
 
