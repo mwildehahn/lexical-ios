@@ -572,6 +572,9 @@ public class Editor: NSObject {
       compositionKey = nil
     }
 
+    if featureFlags.verboseLogging {
+      print("🔥 STATE: setEditorState dirtyType=fullReconcile pending.nodes=\(pendingEditorState?.nodeMap.count ?? -1)")
+    }
     try beginUpdate({}, mode: UpdateBehaviourModificationMode(), reason: .setState)
   }
 

@@ -32,6 +32,7 @@ import Foundation
     case balanced        // minimal + pre/post attrs-only + insert-block
     case aggressive      // balanced + central aggregation + keyed diff + block rebuild
     case aggressiveDebug // same as aggressive, but verbose logging enabled
+    case aggressiveEditor // tuned for live editing safety in the Editor tab
   }
 
   @objc public init(
@@ -140,6 +141,30 @@ import Foundation
         useModernTextKitOptimizations: true,
         verboseLogging: true,
         prePostAttrsOnlyMaxTargets: 16
+      )
+    case .aggressiveEditor:
+      // Safer defaults for live editing in Editor tab:
+      // - Keep all structural fast paths ON
+      // - Disable pre/post attrs-only multi to avoid unexpected no-ops during typing
+      // - Keep central aggregation ON for text multi
+      // - Modern TextKit ON
+      // - Gating threshold 0 (unused since pre/post attrs-only is OFF)
+      return FeatureFlags(
+        reconcilerSanityCheck: false,
+        proxyTextViewInputDelegate: false,
+        useOptimizedReconciler: true,
+        useReconcilerFenwickDelta: true,
+        useReconcilerKeyedDiff: true,
+        useReconcilerBlockRebuild: true,
+        useOptimizedReconcilerStrictMode: false,
+        useReconcilerFenwickCentralAggregation: true,
+        useReconcilerShadowCompare: false,
+        useReconcilerInsertBlockFenwick: true,
+        useReconcilerDeleteBlockFenwick: true,
+        useReconcilerPrePostAttributesOnly: false,
+        useModernTextKitOptimizations: true,
+        verboseLogging: false,
+        prePostAttrsOnlyMaxTargets: 0
       )
     }
   }

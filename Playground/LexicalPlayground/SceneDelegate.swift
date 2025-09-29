@@ -24,8 +24,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     let tab = UITabBarController()
     tab.viewControllers = [editorNav, perfNav]
-    // Default to the Performance tab
-    tab.selectedIndex = 1
+    // Default to the Editor tab
+    tab.selectedIndex = 0
 
     window.rootViewController = tab
     self.window = window

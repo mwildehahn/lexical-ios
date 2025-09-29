@@ -21,28 +21,8 @@ class ViewController: UIViewController, UIToolbarDelegate {
   private let reconcilerPreferenceKey = "useOptimizedInPlayground"
   private var reconcilerControl: UISegmentedControl!
   private var featuresBarButton: UIBarButtonItem!
-  private var activeOptimizedFlags: FeatureFlags = {
-    let base = FeatureFlags.optimizedProfile(.aggressiveDebug)
-    return FeatureFlags(
-      reconcilerSanityCheck: base.reconcilerSanityCheck,
-      proxyTextViewInputDelegate: base.proxyTextViewInputDelegate,
-      useOptimizedReconciler: base.useOptimizedReconciler,
-      useReconcilerFenwickDelta: base.useReconcilerFenwickDelta,
-      useReconcilerKeyedDiff: base.useReconcilerKeyedDiff,
-      useReconcilerBlockRebuild: base.useReconcilerBlockRebuild,
-      useOptimizedReconcilerStrictMode: base.useOptimizedReconcilerStrictMode,
-      useReconcilerFenwickCentralAggregation: base.useReconcilerFenwickCentralAggregation,
-      useReconcilerShadowCompare: base.useReconcilerShadowCompare,
-      useReconcilerInsertBlockFenwick: base.useReconcilerInsertBlockFenwick,
-      useReconcilerDeleteBlockFenwick: base.useReconcilerDeleteBlockFenwick,
-      useReconcilerPrePostAttributesOnly: base.useReconcilerPrePostAttributesOnly,
-      useModernTextKitOptimizations: base.useModernTextKitOptimizations,
-      verboseLogging: base.verboseLogging,
-      // Disable threshold gating by default in live editor to avoid no-op display issues
-      prePostAttrsOnlyMaxTargets: 0
-    )
-  }()
-  private var activeProfile: FeatureFlags.OptimizedProfile = .aggressiveDebug
+  private var activeOptimizedFlags: FeatureFlags = FeatureFlags.optimizedProfile(.aggressiveEditor)
+  private var activeProfile: FeatureFlags.OptimizedProfile = .aggressiveEditor
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -106,6 +86,9 @@ class ViewController: UIViewController, UIToolbarDelegate {
     }
 
     UserDefaults.standard.set(jsonString, forKey: editorStatePersistenceKey)
+    if activeOptimizedFlags.verboseLogging {
+      print("🔥 STATE: persisted json.len=\(jsonString.count)")
+    }
   }
 
   func restoreEditorState() {
@@ -124,6 +107,7 @@ class ViewController: UIViewController, UIToolbarDelegate {
 
     // install the new editor state into editor
     try? editor.setEditorState(newEditorState)
+    if activeOptimizedFlags.verboseLogging { print("🔥 STATE: restored json.len=\(jsonString.count)") }
   }
 
   func setUpExportMenu() {
@@ -265,7 +249,8 @@ class ViewController: UIViewController, UIToolbarDelegate {
       UIAction(title: "minimal (debug)", state: activeProfile == .minimalDebug ? .on : .off, handler: { _ in setProfile(.minimalDebug) }),
       UIAction(title: "balanced", state: activeProfile == .balanced ? .on : .off, handler: { _ in setProfile(.balanced) }),
       UIAction(title: "aggressive", state: activeProfile == .aggressive ? .on : .off, handler: { _ in setProfile(.aggressive) }),
-      UIAction(title: "aggressive (debug)", state: activeProfile == .aggressiveDebug ? .on : .off, handler: { _ in setProfile(.aggressiveDebug) })
+      UIAction(title: "aggressive (debug)", state: activeProfile == .aggressiveDebug ? .on : .off, handler: { _ in setProfile(.aggressiveDebug) }),
+      UIAction(title: "aggressive (editor)", state: activeProfile == .aggressiveEditor ? .on : .off, handler: { _ in setProfile(.aggressiveEditor) })
     ]
     let profileMenu = UIMenu(title: "Profile", options: .displayInline, children: profiles)
     let toggles: [UIAction] = [

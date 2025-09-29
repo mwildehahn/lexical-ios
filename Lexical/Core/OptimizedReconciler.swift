@@ -677,6 +677,24 @@ internal enum OptimizedReconciler {
     }
 
     // Text-only and attribute-only fast paths
+    // Prefer single-text fast path before central aggregation to avoid no-op gating during live edits
+    if try fastPath_TextOnly(
+      currentEditorState: currentEditorState,
+      pendingEditorState: pendingEditorState,
+      editor: editor,
+      shouldReconcileSelection: shouldReconcileSelection,
+      fenwickAggregatedDeltas: &fenwickAggregatedDeltas
+    ) {
+      editor.invalidateDFSOrderCache()
+      // If central aggregation is enabled, apply aggregated rebuild now
+      if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation && !fenwickAggregatedDeltas.isEmpty {
+        let (order, positions) = fenwickOrderAndIndex(editor: editor)
+        let ranges = fenwickAggregatedDeltas.map { (k, d) in (startKey: k, endKeyExclusive: Optional<NodeKey>.none, delta: d) }
+        applyIncrementalLocationShifts(rangeCache: &editor.rangeCache, ranges: ranges, order: order, indexOf: positions)
+      }
+      return
+    }
+
     // Central aggregation: collect both text and pre/post instructions, then apply once
     if editor.featureFlags.useReconcilerFenwickDelta && editor.featureFlags.useReconcilerFenwickCentralAggregation {
       var aggregatedInstructions: [Instruction] = []
