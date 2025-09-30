@@ -1404,7 +1404,9 @@ internal enum OptimizedReconciler {
       reconcileDecoratorOpsForSubtree(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
     } else {
       // Fenwick variant: apply delete/insert instructions at computed locations
-      let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: false)
+      // Ensure TextKit attributes are fixed after inserting attachments (e.g., decorators/images)
+      // so LayoutManager can resolve TextAttachment runs immediately for view mounting.
+      let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: true)
       applyDuration = stats.duration
       // Ensure decorator cache/positions reflect additions under this parent
       reconcileDecoratorOpsForSubtree(

@@ -686,6 +686,33 @@ Comprehensive batch optimization leveraging iOS 16 SDK capabilities to dramatica
 - [x] FlagsStore support
 - [ ] Performance metrics validation (pending test run)
 
+### 2025-09-30 — Inline Image Insertion Parity (Optimized vs Legacy)
+
+- What changed
+  - Added parity tests for inline image insertion using read-only TextKit context (no LexicalView):
+    - `OptimizedReconcilerInlineImageParityTests.testParity_InsertImageBetweenText`
+    - `OptimizedReconcilerInlineImageParityTests.testParity_NewParagraphAfterImage`
+  - Optimized reconciler: ensure TextKit attributes are fixed in the insert-block Fenwick path so inline attachments (decorators/images) are realized immediately by LayoutManager.
+
+- Key files
+  - `Plugins/LexicalInlineImagePlugin/LexicalInlineImagePluginTests/OptimizedReconcilerInlineImageParityTests.swift`
+  - `Lexical/Core/OptimizedReconciler.swift` (insert-block path now passes `fixAttributesEnabled: true`)
+
+- Why
+  - Image insertion appeared flaky/“not working” on the optimized reconciler path because the TextAttachment run was inserted without a follow-up `fixAttributes`. That could delay attachment realization and view mounting.
+
+- Verification
+  - iOS Simulator (iPhone 17 Pro):
+    - Filtered tests: `-only-testing:LexicalInlineImagePluginTests/OptimizedReconcilerInlineImageParityTests` — PASS
+    - Legacy InlineImageTests (LexicalView-based) — PASS
+    - Full `Lexical-Package` iOS simulator test run — PASS
+
+- Impact
+  - No behavior change for legacy reconciler. Optimized insert-block path performs attribute fixing only on modified range; negligible overhead and improves decorator mounting reliability.
+
+- Next
+  - Optional: add a targeted assertion that the image node’s key is present in `textStorage.decoratorPositionCache` after insertion to further lock behavior.
+
 ## 2025-09-29 — Live typing duplication + empty hydrate fix
 
 - What changed
