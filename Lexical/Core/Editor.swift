@@ -577,6 +577,7 @@ public class Editor: NSObject {
 
   // MARK: - Selection
 
+  #if canImport(UIKit)
   internal func getNativeSelection() -> NativeSelection {
     return frontend?.nativeSelection ?? NativeSelection()
   }
@@ -587,6 +588,18 @@ public class Editor: NSObject {
   ) {
     frontend?.moveNativeSelection(type: type, direction: direction, granularity: granularity)
   }
+  #elseif canImport(AppKit)
+  internal func getNativeSelection() -> NativeSelection {
+    return frontend?.nativeSelection ?? NativeSelection()
+  }
+
+  internal func moveNativeSelection(
+    type: NativeSelectionModificationType, direction: NSTextStorageDirection,
+    granularity: NSTextGranularity
+  ) {
+    frontend?.moveNativeSelection(type: type, direction: direction, granularity: granularity)
+  }
+  #endif
 
   // MARK: - Internal
 

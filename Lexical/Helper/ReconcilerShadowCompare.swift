@@ -64,6 +64,7 @@ internal func shadowCompareOptimizedVsLegacy(
     useReconcilerBlockRebuild: false,
     useReconcilerShadowCompare: false
   )
+  #if canImport(UIKit)
   let cfg = EditorConfig(
     theme: activeEditor.getTheme(),
     plugins: [],
@@ -72,6 +73,15 @@ internal func shadowCompareOptimizedVsLegacy(
     keyCommands: nil,
     metricsContainer: nil
   )
+  #elseif canImport(AppKit)
+  let cfg = EditorConfig(
+    theme: activeEditor.getTheme(),
+    plugins: [],
+    editorStateVersion:  activeEditor.getEditorState().version,
+    nodeKeyMultiplier: nil,
+    metricsContainer: nil
+  )
+  #endif
   let ctx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legacyFlags)
   let legacyEditor = ctx.editor
 

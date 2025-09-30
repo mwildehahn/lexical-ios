@@ -453,7 +453,7 @@ public func sliceSelectedTextNodeContent(selection: BaseSelection, textNode: Tex
 }
 
 @MainActor
-public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UIView? {
+public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> PlatformView? {
   guard let editor = getActiveEditor() else {
     return nil
   }

@@ -67,17 +67,33 @@ enum AttributeUtils {
     // update symbolicTraits
     if let bold = combinedAttributes[.bold] as? Bool {
       if bold {
+        #if canImport(UIKit)
         symbolicTraits = symbolicTraits.union([.traitBold])
+        #elseif canImport(AppKit)
+        symbolicTraits.insert(.bold)
+        #endif
       } else {
+        #if canImport(UIKit)
         symbolicTraits = symbolicTraits.remove(.traitBold) ?? symbolicTraits
+        #elseif canImport(AppKit)
+        symbolicTraits.remove(.bold)
+        #endif
       }
     }
 
     if let italic = combinedAttributes[.italic] as? Bool {
       if italic {
+        #if canImport(UIKit)
         symbolicTraits = symbolicTraits.union([.traitItalic])
+        #elseif canImport(AppKit)
+        symbolicTraits.insert(.italic)
+        #endif
       } else {
+        #if canImport(UIKit)
         symbolicTraits = symbolicTraits.remove(.traitItalic) ?? symbolicTraits
+        #elseif canImport(AppKit)
+        symbolicTraits.remove(.italic)
+        #endif
       }
     }
 
