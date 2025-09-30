@@ -1033,6 +1033,24 @@ public class RangeSelection: BaseSelection {
       print("🔥 DELETE: begin backward=\(isBackwards) anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset) collapsed=\(isCollapsed())")
     }
     let wasCollapsed = isCollapsed()
+    // Universal no-op: backspace at absolute document start should do nothing (parity with legacy)
+    if isBackwards && wasCollapsed {
+      if let editor = getActiveEditor() {
+        // Compute earliest visible text start across all TextNodes
+        var earliestTextStart = Int.max
+        for (key, item) in editor.rangeCache {
+          if let _ : TextNode = getNodeByKey(key: key) {
+            let start = item.location + item.preambleLength + item.childrenLength
+            if start < earliestTextStart { earliestTextStart = start }
+          }
+        }
+        if earliestTextStart == Int.max { earliestTextStart = 0 }
+        if let loc = try? stringLocationForPoint(anchor, editor: editor), loc <= earliestTextStart {
+          if editor.featureFlags.verboseLogging { print("🔥 DELETE: absolute doc-start backspace → no-op") }
+          return
+        }
+      }
+    }
     // Capture potential caret remap target for list/item merges when deleting backwards
     var preDeletePreviousTextKey: NodeKey? = nil
     if isBackwards && wasCollapsed && anchor.type == .text && anchor.offset == 0 {
@@ -1068,6 +1086,11 @@ public class RangeSelection: BaseSelection {
     // splice correctly. This mirrors what UIKit selection movement would do.
     if let editor = getActiveEditor(), editor.frontend is LexicalReadOnlyTextKitContext, isCollapsed() {
       if let anchorLoc = try stringLocationForPoint(anchor, editor: editor) {
+        // If at absolute doc start and deleting backwards, this is a no-op.
+        if isBackwards && anchorLoc == 0 {
+          if editor.featureFlags.verboseLogging { print("🔥 DELETE: read-only doc-start backspace → no-op") }
+          return
+        }
         let start = max(0, isBackwards ? anchorLoc - 1 : anchorLoc)
         let len = 1
         let rng = NSRange(location: start, length: len)
@@ -1078,6 +1101,24 @@ public class RangeSelection: BaseSelection {
       let anchor = self.anchor
       let focus = self.focus
       var anchorNode: Node? = try anchor.getNode()
+      // Structural no-op guard: backspace at absolute start of document (no previous content)
+      if isBackwards, anchor.type == .text, anchor.offset == 0 {
+        if let text = anchorNode as? TextNode {
+          var node: Node? = text
+          var hasPrev = false
+          while let n = node {
+            if n.getPreviousSibling() != nil { hasPrev = true; break }
+            if isRootNode(node: n.getParent()) { break }
+            node = n.getParent()
+          }
+          if !hasPrev {
+            if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+              print("🔥 DELETE: structural doc-start backspace → no-op")
+            }
+            return
+          }
+        }
+      }
       if !isBackwards {
         if let anchorNode = anchorNode as? ElementNode,
           anchor.type == .element,
