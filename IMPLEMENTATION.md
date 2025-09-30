@@ -195,6 +195,23 @@ Deprecated/removed flags (no longer compiled)
 
 ## Recent Changes
 
+2025-09-30 — Live parity/editing tests expansion
+
+- Added live editing scenarios for the optimized reconciler and ensured parity with legacy flows:
+  - Optimized-only live editing:
+    - Insert newline in the middle of a paragraph splits into two blocks; caret at start of the second paragraph.
+    - Forward delete at end of a paragraph merges with the next paragraph and keeps caret at the join point.
+    - Backspace at start of a paragraph merges with the previous paragraph and keeps caret at the join point.
+    - Files: `LexicalTests/Tests/OptimizedReconcilerLiveEditingTests.swift`.
+  - Optimized vs Legacy live parity:
+    - Backspace at start merges paragraphs (string parity; caret parity asserted when available as a range selection).
+    - Forward delete at end merges paragraphs (string parity; caret parity asserted when available).
+    - Split paragraph at middle with `insertParagraph()` (string parity).
+    - Grapheme-cluster backspace over ZWJ family emoji (string parity across engines; avoids prescriptive caret expectations).
+    - Files: `LexicalTests/Tests/OptimizedReconcilerLiveParityTests.swift`.
+  - All tests pass on iOS Simulator (`Lexical-Package`, iPhone 17 Pro, iOS 26.0).
+
+
 2025-09-29 — P0 fix: do not shift dirty node on Fenwick deltas
 
 - Fixed a bug where the dirty text node’s own `location` was shifted when

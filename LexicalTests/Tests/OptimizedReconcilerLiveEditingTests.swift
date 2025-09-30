@@ -104,4 +104,69 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       XCTAssertEqual(p.getTextContent(), "He")
     }
   }
+
+  func testInsertNewlineInMiddleSplitsParagraph() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "HelloWorld")
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: 5, focusOffset: 5)
+      try (getSelection() as? RangeSelection)?.insertParagraph()
+    }
+    try editor.read {
+      XCTAssertEqual(getRoot()?.getTextContent(), "Hello\nWorld")
+      guard let root = getRoot(), let p2 = root.getLastChild() as? ParagraphNode,
+            let sel = try getSelection() as? RangeSelection else { return }
+      // Caret at start of second paragraph
+      XCTAssertEqual(sel.anchor.key, sel.focus.key)
+      if let t2 = p2.getFirstChild() as? TextNode {
+        XCTAssertEqual(sel.anchor.offset, 0)
+        XCTAssertEqual(sel.focus.offset, 0)
+        XCTAssertEqual(t2.getTextPart(), "World")
+      }
+    }
+  }
+
+  func testForwardDeleteAtEndMergesNextParagraph() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p2 = createParagraphNode(); let t2 = createTextNode(text: "World")
+      try p1.append([t1]); try p2.append([t2]); try root.append([p1, p2])
+      try t1.select(anchorOffset: 5, focusOffset: 5)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
+    try editor.read {
+      XCTAssertEqual(getRoot()?.getTextContent(), "HelloWorld")
+      guard let root = getRoot(), let p = root.getFirstChild() as? ParagraphNode,
+            let t = p.getFirstChild() as? TextNode,
+            let sel = try getSelection() as? RangeSelection else { return }
+      XCTAssertEqual(t.getTextPart(), "HelloWorld")
+      XCTAssertTrue(sel.anchor.key == sel.focus.key)
+      XCTAssertEqual(sel.anchor.offset, 5)
+    }
+  }
+
+  func testBackspaceAtStartMergesWithPreviousParagraph() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p2 = createParagraphNode(); let t2 = createTextNode(text: "World")
+      try p1.append([t1]); try p2.append([t2]); try root.append([p1, p2])
+      try t2.select(anchorOffset: 0, focusOffset: 0)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.read {
+      XCTAssertEqual(getRoot()?.getTextContent(), "HelloWorld")
+      guard let root = getRoot(), let p = root.getFirstChild() as? ParagraphNode,
+            let t = p.getFirstChild() as? TextNode,
+            let sel = try getSelection() as? RangeSelection else { return }
+      XCTAssertEqual(t.getTextPart(), "HelloWorld")
+      XCTAssertTrue(sel.anchor.key == sel.focus.key)
+      XCTAssertEqual(sel.anchor.offset, 5)
+    }
+  }
 }

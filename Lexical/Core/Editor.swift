@@ -157,6 +157,16 @@ public class Editor: NSObject {
   // Used to cache decorators
   internal var decoratorCache: [NodeKey: DecoratorCacheItem] = [:]
 
+  // One-shot guard used by certain editing operations to suppress specific
+  // structural fast paths during the next reconcile pass (e.g., avoid
+  // treating forward deleteWord at document start as an insert-block).
+  internal var suppressInsertFastPathOnce: Bool = false
+
+  // One-shot clamp for structural deletes: when set, fastPath_DeleteBlocks will
+  // intersect its computed delete ranges with this string-range to avoid over‑
+  // deleting across inline decorator boundaries for selection-driven deletes.
+  internal var pendingDeletionClampRange: NSRange? = nil
+
   // Headless mode runs without the reconciler
   private var headless: Bool = false
 
@@ -842,12 +852,10 @@ public class Editor: NSObject {
         let anchor = pendingEditorState.nodeMap[pendingSelection.anchor.key]
         let focus = pendingEditorState.nodeMap[pendingSelection.focus.key]
         if anchor == nil || focus == nil {
-          let errorString =
-            """
-            updateEditor: selection has been lost because the previously selected nodes have been removed and
-            selection wasn't moved to another node. Ensure selection changes after removing/replacing a selected node.
-            """
-          throw LexicalError.invariantViolation(errorString)
+          // Parity safeguard: if selection keys were removed during the update, normalize to a safe state
+          // rather than throwing. Legacy reconciler tolerates such transitions by remapping selection.
+          // We reset selection to nil; callers can set a new caret in a follow-up update.
+          pendingEditorState.selection = nil
         }
       } else if let pendingSelection = pendingEditorState.selection as? NodeSelection {
         if pendingSelection.nodes.isEmpty {

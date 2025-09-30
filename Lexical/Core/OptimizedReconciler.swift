@@ -1263,6 +1263,10 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
+    if editor.suppressInsertFastPathOnce {
+      editor.suppressInsertFastPathOnce = false
+      return false
+    }
     // Read-only contexts (no real TextView) can have different layout/spacing ordering.
     // Keep optimized active but skip this structural fast path in read-only to preserve parity.
     if editor.frontend is LexicalReadOnlyTextKitContext { return false }
@@ -1507,6 +1511,49 @@ internal enum OptimizedReconciler {
     if instructions.isEmpty { return false }
 
     // Apply deletes via batch path
+    // If a clamp range was provided (selection-driven delete), intersect deletes.
+    if let clamp = editor.pendingDeletionClampRange {
+      var clamped: [Instruction] = []
+      var newTotalDelta = 0
+      var minStart: Int? = nil
+      for inst in instructions {
+        if case .delete(let r) = inst {
+          let inter = NSIntersectionRange(r, clamp)
+          if inter.length > 0 {
+            if minStart == nil || inter.location < minStart! { minStart = inter.location }
+            clamped.append(.delete(range: inter))
+            newTotalDelta &-= inter.length
+          }
+        }
+      }
+      // If clamp starts before the first intersected delete, add a leading delete to cover
+      // selection preamble (e.g., a paragraph separator) left behind by block grouping.
+      if let ms = minStart, clamp.location < ms {
+        let lead = NSRange(location: clamp.location, length: ms - clamp.location)
+        if lead.length > 0 { clamped.append(.delete(range: lead)); newTotalDelta &-= lead.length }
+      } else if minStart == nil {
+        // No intersections; treat entire clamp as the delete target
+        if clamp.length > 0 { clamped = [.delete(range: clamp)]; newTotalDelta = -clamp.length }
+      }
+      if !clamped.isEmpty {
+        // Coalesce resulting deletes to ensure safe application order
+        let merged = clamped.compactMap { inst -> NSRange? in if case .delete(let r) = inst { return r } else { return nil } }
+        .sorted { $0.location < $1.location }
+        var finalDeletes: [NSRange] = []
+        if let first = merged.first {
+          var cur = first
+          for r in merged.dropFirst() {
+            if NSMaxRange(cur) >= r.location { cur = NSRange(location: cur.location, length: max(NSMaxRange(cur), NSMaxRange(r)) - cur.location) }
+            else { finalDeletes.append(cur); cur = r }
+          }
+          finalDeletes.append(cur)
+        }
+        instructions = finalDeletes.sorted { $0.location > $1.location }.map { .delete(range: $0) }
+        totalDelta = newTotalDelta
+      }
+      editor.pendingDeletionClampRange = nil
+    }
+
     let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: false)
 
     // Prune removed keys from range cache under the parent and rebuild positions via Fenwick range shifts
@@ -2188,6 +2235,10 @@ internal enum OptimizedReconciler {
     let previousMode = textStorage.mode
     let childrenStart = ancestorPrevRange.location + ancestorPrevRange.preambleLength
     let childrenRange = NSRange(location: childrenStart, length: ancestorPrevRange.childrenLength)
+    if editor.featureFlags.verboseLogging {
+      let preview = built.string.prefix(4)
+      print("🔥 COALESCE: replace childrenRange=\(NSStringFromRange(childrenRange)) built.len=\(built.length) head=\(preview)")
+    }
     textStorage.mode = .controllerMode
     textStorage.beginEditing()
     textStorage.replaceCharacters(in: childrenRange, with: built)
