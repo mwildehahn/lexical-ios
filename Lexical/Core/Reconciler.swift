@@ -104,6 +104,59 @@ internal enum Reconciler {
       fatalError("Cannot run reconciler on an editor with no text storage")
     }
 
+    // Fresh-document hydration (legacy path): if TextStorage is empty but the pending state
+    // has non-empty content, build the full attributed string once and initialize caches.
+    if textStorage.length == 0 {
+      if let root = pendingEditorState.getRootNode() {
+        let childKeys = root.getChildrenKeys()
+        if !childKeys.isEmpty {
+          func subtreeTotalLengthLocal(nodeKey: NodeKey, state: EditorState) -> Int {
+            guard let node = state.nodeMap[nodeKey] else { return 0 }
+            var total = node.getPreamble().lengthAsNSString()
+            total += node.getTextPart().lengthAsNSString()
+            total += node.getPostamble().lengthAsNSString()
+            if let el = node as? ElementNode {
+              for c in el.getChildrenKeys() {
+                total += subtreeTotalLengthLocal(nodeKey: c, state: state)
+              }
+            }
+            return total
+          }
+          var total = 0
+          for k in childKeys { total += subtreeTotalLengthLocal(nodeKey: k, state: pendingEditorState) }
+          if total > 0 {
+            let t0 = CFAbsoluteTimeGetCurrent()
+            try OptimizedReconciler.hydrateFreshDocumentFully(pendingState: pendingEditorState, editor: editor)
+            let dt = CFAbsoluteTimeGetCurrent() - t0
+            if let metrics = editor.metricsContainer {
+              let added = editor.textStorage?.length ?? 0
+              let metric = ReconcilerMetric(
+                duration: dt,
+                dirtyNodes: editor.dirtyNodes.count,
+                rangesAdded: added,
+                rangesDeleted: 0,
+                treatedAllNodesAsDirty: editor.dirtyType == .fullReconcile,
+                pathLabel: "legacy-hydrate",
+                planningDuration: 0,
+                applyDuration: dt
+              )
+              metrics.record(.reconcilerRun(metric))
+            }
+            if shouldReconcileSelection {
+              let prevSelection = currentEditorState.selection
+              let nextSelection = pendingEditorState.selection
+              var selectionsAreDifferent = false
+              if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+              if editor.dirtyType != .noDirtyNodes || nextSelection == nil || selectionsAreDifferent {
+                try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+              }
+            }
+            return
+          }
+        }
+      }
+    }
+
     if editor.dirtyNodes.isEmpty,
       editor.dirtyType == .noDirtyNodes,
       let currentSelection = currentEditorState.selection,
@@ -140,6 +193,17 @@ internal enum Reconciler {
     metricsState = reconcilerState
 
     try reconcileNode(key: kRootNodeKey, reconcilerState: reconcilerState)
+
+    // Safety: On full-reconcile updates in headless/read-only contexts, ensure we do not
+    // accidentally re-insert content on top of stale storage when no explicit deletions
+    // were scheduled (e.g., decorator-heavy documents or fresh state restores via History).
+    // In those cases, force a full delete so subsequent insertions rebuild from a clean slate.
+    if editor.dirtyType == .fullReconcile,
+       textStorage.length > 0,
+       reconcilerState.rangesToDelete.isEmpty
+    {
+      reconcilerState.rangesToDelete.append(NSRange(location: 0, length: textStorage.length))
+    }
 
     let previousMode = textStorage.mode
     textStorage.mode = .controllerMode

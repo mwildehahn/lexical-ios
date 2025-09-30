@@ -1068,7 +1068,6 @@ public class RangeSelection: BaseSelection {
           }
           return nil
         }
-        var cursor: Node? = cur
         // Prefer direct previous sibling, otherwise previous sibling of ancestors, then descend to last text
         if let prev = cur.getPreviousSibling() { preDeletePreviousTextKey = lastTextDescendant(of: prev)?.getKey() }
         if preDeletePreviousTextKey == nil {
@@ -1078,7 +1077,6 @@ public class RangeSelection: BaseSelection {
             parent = p.getParent()
           }
         }
-        _ = cursor // silence (kept for clarity)
       }
     }
     // Read-only fallback: there is no native selection movement. If collapsed,

@@ -24,11 +24,9 @@ final class OptimizedReconcilerNoOpDeleteParityTests: XCTestCase {
       try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
       return ctx.textStorage.string
     }
-    let a = try run(on: opt)
-    let b = try run(on: leg)
-    if a.trimmingCharacters(in: .newlines) != b.trimmingCharacters(in: .newlines) {
-      throw XCTSkip("Backspace-at-start parity under review (opt=\(a), leg=\(b))")
-    }
+    let a = try run(on: opt).trimmingCharacters(in: .newlines)
+    let b = try run(on: leg).trimmingCharacters(in: .newlines)
+    XCTAssertEqual(a, b)
   }
 
   func testParity_ForwardDeleteAtEndOfDocument_NoOp() throws {
@@ -44,10 +42,8 @@ final class OptimizedReconcilerNoOpDeleteParityTests: XCTestCase {
       try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
       return ctx.textStorage.string
     }
-    let a = try run(on: opt)
-    let b = try run(on: leg)
-    if a.trimmingCharacters(in: .newlines) != b.trimmingCharacters(in: .newlines) {
-      throw XCTSkip("Forward-delete-at-end parity under review (opt=\(a), leg=\(b))")
-    }
+    let a = try run(on: opt).trimmingCharacters(in: .newlines)
+    let b = try run(on: leg).trimmingCharacters(in: .newlines)
+    XCTAssertEqual(a, b)
   }
 }
