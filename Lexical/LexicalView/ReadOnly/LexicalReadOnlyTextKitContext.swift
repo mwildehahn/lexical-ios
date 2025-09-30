@@ -280,8 +280,8 @@ internal class LexicalReadOnlySizeCache {
   var interceptNextSelectionChangeAndReplaceWithRange: NSRange?
 
   func moveNativeSelection(
-    type: NativeSelectionModificationType, direction: UITextStorageDirection,
-    granularity: UITextGranularity
+    type: NativeSelectionModificationType, direction: PlatformTextStorageDirection,
+    granularity: PlatformTextGranularity
   ) {
     // no-op
   }

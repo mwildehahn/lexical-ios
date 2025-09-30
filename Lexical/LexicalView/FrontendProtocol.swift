@@ -37,11 +37,7 @@ internal protocol Frontend: AnyObject {
   var interceptNextSelectionChangeAndReplaceWithRange: NSRange? { get set }
   var textLayoutWidth: CGFloat { get }
 
-  #if canImport(UIKit)
-  func moveNativeSelection(type: NativeSelectionModificationType, direction: UITextStorageDirection, granularity: UITextGranularity)
-  #elseif canImport(AppKit)
-  func moveNativeSelection(type: NativeSelectionModificationType, direction: NSTextStorageDirection, granularity: NSTextGranularity)
-  #endif
+  func moveNativeSelection(type: NativeSelectionModificationType, direction: PlatformTextStorageDirection, granularity: PlatformTextGranularity)
   func unmarkTextWithoutUpdate()
   func presentDeveloperFacingError(message: String)
   func updateNativeSelection(from selection: BaseSelection) throws

@@ -108,10 +108,19 @@ extension QuoteNode {
         attributeValue.barColor.setFill()
 
         if attributeValue.rounded {
+          #if canImport(UIKit)
           let bezierPath = UIBezierPath(roundedRect: barRect, cornerRadius: attributeValue.barWidth / 2)
           bezierPath.fill()
+          #elseif canImport(AppKit)
+          let bezierPath = NSBezierPath(roundedRect: barRect, xRadius: attributeValue.barWidth / 2, yRadius: attributeValue.barWidth / 2)
+          bezierPath.fill()
+          #endif
         } else {
+          #if canImport(UIKit)
           UIRectFill(barRect)
+          #elseif canImport(AppKit)
+          NSRectFill(barRect)
+          #endif
         }
       }
     }

@@ -711,6 +711,7 @@ internal func normalizeSelectionPointsForBoundaries(
   }
 }
 
+#if canImport(UIKit)
 @MainActor
 func validatePosition(
   textView: UITextView, position: UITextPosition, direction: UITextStorageDirection
@@ -746,3 +747,4 @@ func validatePosition(
 
   return currentPosition
 }
+#endif

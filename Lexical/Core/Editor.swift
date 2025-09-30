@@ -594,8 +594,8 @@ public class Editor: NSObject {
   }
 
   internal func moveNativeSelection(
-    type: NativeSelectionModificationType, direction: NSTextStorageDirection,
-    granularity: NSTextGranularity
+    type: NativeSelectionModificationType, direction: PlatformTextStorageDirection,
+    granularity: PlatformTextGranularity
   ) {
     frontend?.moveNativeSelection(type: type, direction: direction, granularity: granularity)
   }
