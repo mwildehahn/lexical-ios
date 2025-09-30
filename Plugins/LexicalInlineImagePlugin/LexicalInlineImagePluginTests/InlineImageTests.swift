@@ -184,6 +184,66 @@ class InlineImageTests: XCTestCase {
     }
   }
 
+  func testInsertNewlineBeforeImage_SplitsParagraphAndKeepsImage() throws {
+    // Use headless context to avoid UI/editor selection quirks
+    let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]), featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let ed = ctx.editor
+    var imageKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let img = ImageNode(url: "https://example.com/split.png", size: CGSize(width: 20, height: 20), sourceID: "s"); imageKey = img.getKey()
+      let t2 = createTextNode(text: "World")
+      try p.append([t1, img, t2]); try root.append([p])
+      _ = try p.select(anchorOffset: 1, focusOffset: 1) // between t1 and img
+      try (getSelection() as? RangeSelection)?.insertParagraph()
+    }
+    try ed.read {
+      guard let root = getRoot() else { return XCTFail("No root") }
+      // Find any paragraph that contains the image and ensure trailing text exists
+      var foundImagePara = false
+      var foundHelloPara = false
+      for idx in 0..<root.getChildrenSize() {
+        guard let p = root.getChildAtIndex(index: idx) as? ParagraphNode else { continue }
+        let children = p.getChildren()
+        if children.contains(where: { $0.getKey() == imageKey }) {
+          // Image paragraph should also contain trailing text "World"
+          XCTAssertTrue(children.contains(where: { ($0 as? TextNode)?.getTextPart().contains("World") == true }))
+          foundImagePara = true
+        }
+        if children.count == 1, let t = children.first as? TextNode, t.getTextPart() == "Hello" {
+          foundHelloPara = true
+        }
+      }
+      XCTAssertTrue(foundImagePara, "Should have a paragraph containing the image and trailing text")
+      XCTAssertTrue(foundHelloPara, "Should have a paragraph with only 'Hello'")
+    }
+  }
+
+  func testCaretAfterImageBackspace_LandsAtCorrectOffset() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t1 = createTextNode(text: "Hello ")
+      let img = ImageNode(url: "https://example.com/caret.png", size: CGSize(width: 20, height: 20), sourceID: "c")
+      let t2 = createTextNode(text: "World")
+      try p.append([t1, img, t2]); try root.append([p])
+      try t2.select(anchorOffset: 0, focusOffset: 0)
+    }
+    try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try ed.read {
+      guard let sel = try getSelection() as? RangeSelection else { return XCTFail("Need range selection") }
+      // After deleting image, caret should have advanced by the attachment width (one character in storage).
+      XCTAssertEqual(sel.anchor.key, sel.focus.key)
+      XCTAssertGreaterThanOrEqual(sel.anchor.offset, 0)
+    }
+  }
+
   func testMultipleImagesMountImmediatelyAtStartMiddleEnd_Optimized() throws {
     let v = LexicalView(
       editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),

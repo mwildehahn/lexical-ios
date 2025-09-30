@@ -197,6 +197,43 @@ final class OptimizedReconcilerInlineImageParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 
+  func testParity_DeleteLineBackwardAcrossLeadingImage() throws {
+    let (opt, leg) = makeEditors()
+    func scenario(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> String {
+      let editor = pair.0; let ctx = pair.1
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+        let p2 = createParagraphNode(); let img = imageNode(); let t2 = createTextNode(text: "World")
+        try p1.append([t1]); try p2.append([img, t2]); try root.append([p1, p2])
+        // Place caret at start of second paragraph (before image)
+        try t2.select(anchorOffset: 0, focusOffset: 0)
+      }
+      try editor.update { try (getSelection() as? RangeSelection)?.deleteLine(isBackwards: true) }
+      return ctx.textStorage.string
+    }
+    XCTAssertEqual(try scenario(on: opt), try scenario(on: leg))
+  }
+
+  func testParity_DeleteLineForwardAcrossTrailingImage() throws {
+    let (opt, leg) = makeEditors()
+    func scenario(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> String {
+      let editor = pair.0; let ctx = pair.1
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+        let img = imageNode();
+        let p2 = createParagraphNode(); let t2 = createTextNode(text: "World")
+        try p1.append([t1, img]); try p2.append([t2]); try root.append([p1, p2])
+        // Caret at end of p1 (after image)
+        _ = try t1.select(anchorOffset: t1.getTextContentSize(), focusOffset: t1.getTextContentSize())
+      }
+      try editor.update { try (getSelection() as? RangeSelection)?.deleteLine(isBackwards: false) }
+      return ctx.textStorage.string
+    }
+    XCTAssertEqual(try scenario(on: opt), try scenario(on: leg))
+  }
+
   func testParity_SplitParagraphBeforeImage() throws {
     let (opt, leg) = makeEditors()
 
