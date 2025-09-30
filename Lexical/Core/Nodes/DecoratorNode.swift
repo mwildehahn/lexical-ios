@@ -5,13 +5,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /**
- A node that renders an arbitrary `UIView` inline in the text.
+ A node that renders an arbitrary platform view (UIView on iOS, NSView on macOS) inline in the text.
 
  Behind the scenes, decorator nodes work by instructing TextKit to reserve some rectangular space, then
- creating and positioning a UIView inside that space. Lexical handles the lifecycle of this UIView.
+ creating and positioning a platform view inside that space. Lexical handles the lifecycle of this view.
 
  To make your own decorators, you must subclass `DecoratorNode`.
 
@@ -65,24 +69,24 @@ open class DecoratorNode: Node {
     Self(key)
   }
 
-  /// Create your `UIView` here.
+  /// Create your platform view (UIView on iOS, NSView on macOS) here.
   ///
   /// Do not add it to the view hierarchy or size it; Lexical will do that later.
-  open func createView() -> UIView {
+  open func createView() -> PlatformView {
     fatalError("createView: base method not extended")
   }
 
   /// Called by Lexical when reconciling a dirty decorator node. This is where you update your view to match
   /// the state encapsulated in the decorator node.
-  open func decorate(view: UIView) {
+  open func decorate(view: PlatformView) {
     fatalError("decorate: base method not extended")
   }
 
-  open func decoratorWillAppear(view: UIView) {
+  open func decoratorWillAppear(view: PlatformView) {
     // no-op unless overridden
   }
 
-  open func decoratorDidDisappear(view: UIView) {
+  open func decoratorDidDisappear(view: PlatformView) {
     // no-op unless overridden
   }
 

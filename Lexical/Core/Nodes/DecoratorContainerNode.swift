@@ -6,7 +6,12 @@
  */
 
 import Foundation
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// A base class that combines DecoratorBlockNode's custom view rendering
 /// with ElementNode's child management capabilities

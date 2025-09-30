@@ -5,19 +5,23 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 // This is an ObjC class because it needs to conform to NSObject's equality, otherwise the Layout Manager
 // can't iterate through attributes properly.
 @objc public class CodeBlockCustomDrawingAttributes: NSObject {
-  public init(background: UIColor, border: UIColor, borderWidth: CGFloat) {
+  public init(background: PlatformColor, border: PlatformColor, borderWidth: CGFloat) {
     self.background = background
     self.border = border
     self.borderWidth = borderWidth
   }
 
-  let background: UIColor
-  let border: UIColor
+  let background: PlatformColor
+  let border: PlatformColor
   let borderWidth: CGFloat
 
   override public func isEqual(_ object: Any?) -> Bool {
