@@ -6,7 +6,12 @@
  */
 
 import Foundation
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 @MainActor
 enum AttributeUtils {
@@ -55,7 +60,7 @@ enum AttributeUtils {
     // hence, they are applied last
     var combinedAttributes = lexicalAttributes.reduce([:]) { $0.merging($1) { $1 } }
 
-    var font = combinedAttributes[.font] as? UIFont ?? LexicalConstants.defaultFont
+    var font = combinedAttributes[.font] as? PlatformFont ?? LexicalConstants.defaultFont
     var fontDescriptor = font.fontDescriptor
     var symbolicTraits = fontDescriptor.symbolicTraits
 
@@ -86,7 +91,7 @@ enum AttributeUtils {
     }
 
     fontDescriptor = fontDescriptor.withSymbolicTraits(symbolicTraits) ?? fontDescriptor
-    font = UIFont(descriptor: fontDescriptor, size: 0)
+    font = PlatformFont(descriptor: fontDescriptor, size: 0)
 
     combinedAttributes[.font] = font
 

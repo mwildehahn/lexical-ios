@@ -6,12 +6,18 @@
  */
 
 import Foundation
-import MobileCoreServices
+
+#if canImport(UIKit)
 import UIKit
+import MobileCoreServices
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 import UniformTypeIdentifiers
 
 @MainActor
-internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) throws {
+internal func setPasteboard(selection: BaseSelection, pasteboard: PlatformPasteboard) throws {
   guard let editor = getActiveEditor() else {
     throw LexicalError.invariantViolation("Could not get editor")
   }
@@ -59,7 +65,7 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
 }
 
 @MainActor
-internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: UIPasteboard)
+internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: PlatformPasteboard)
   throws
 {
   let itemSet: IndexSet?
