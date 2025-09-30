@@ -64,6 +64,7 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: PlatformPasteb
   }
 }
 
+#if canImport(UIKit)
 @MainActor
 internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: PlatformPasteboard)
   throws
@@ -155,6 +156,46 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
     return
   }
 }
+#elseif canImport(AppKit)
+@MainActor
+internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: PlatformPasteboard)
+  throws
+{
+  // Try Lexical format first
+  if let pasteboardData = pasteboard.data(forType: LexicalConstants.pasteboardIdentifier) {
+    let deserializedNodes = try JSONDecoder().decode(SerializedNodeArray.self, from: pasteboardData)
+    guard let editor = getActiveEditor() else { return }
+    _ = try insertGeneratedNodes(
+      editor: editor, nodes: deserializedNodes.nodeArray, selection: selection)
+    return
+  }
+
+  // Try RTF
+  if let pasteboardRTFData = pasteboard.data(forType: .rtf) {
+    let attributedString = try NSAttributedString(
+      data: pasteboardRTFData,
+      options: [.documentType: NSAttributedString.DocumentType.rtf],
+      documentAttributes: nil
+    )
+    try insertRTF(selection: selection, attributedString: attributedString)
+    return
+  }
+
+  // Try plain text
+  if let pasteboardStringData = pasteboard.data(forType: .string),
+     let string = String(data: pasteboardStringData, encoding: .utf8)
+  {
+    try insertPlainText(selection: selection, text: string)
+    return
+  }
+
+  // Try URL
+  if let urlString = pasteboard.string(forType: .URL), let url = URL(string: urlString) {
+    try insertPlainText(selection: selection, text: url.absoluteString)
+    return
+  }
+}
+#endif
 
 @MainActor
 internal func insertPlainText(selection: RangeSelection, text: String) throws {

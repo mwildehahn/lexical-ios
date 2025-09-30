@@ -64,12 +64,25 @@ public typealias PlatformScrollView = NSScrollView
 // Text input specific types
 public typealias PlatformTextView = NSTextView
 public typealias PlatformTextViewDelegate = NSTextViewDelegate
-public typealias PlatformTextStorageDirection = NSTextStorageDirection
-public typealias PlatformTextGranularity = NSTextGranularity
 
 // Note: macOS uses NSRange directly instead of opaque text ranges
 // NSTextInput protocol exists but is different from UITextInput
 // We'll need adapter types for these
+
+// macOS doesn't have NSTextStorageDirection/NSTextGranularity - create compatibility enums
+public enum PlatformTextStorageDirection: Int {
+  case forward = 0
+  case backward = 1
+}
+
+public enum PlatformTextGranularity: Int {
+  case character = 0
+  case word = 1
+  case sentence = 2
+  case paragraph = 3
+  case line = 4
+  case document = 5
+}
 
 // Gesture recognizers
 public typealias PlatformTapGestureRecognizer = NSClickGestureRecognizer
