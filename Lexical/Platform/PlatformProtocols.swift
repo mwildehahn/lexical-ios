@@ -47,7 +47,32 @@ public protocol PlatformTextViewProtocol: AnyObject {
 #if canImport(UIKit)
 extension UITextView: PlatformTextViewProtocol {}
 #elseif canImport(AppKit)
-extension NSTextView: PlatformTextViewProtocol {}
+extension NSTextView: PlatformTextViewProtocol {
+  public var text: String {
+    get { string }
+    set { string = newValue }
+  }
+
+  public var attributedText: NSAttributedString {
+    get { attributedString() }
+    set { textStorage?.setAttributedString(newValue) }
+  }
+
+  public var markedRange: NSRange {
+    return markedTextRange ?? NSRange(location: NSNotFound, length: 0)
+  }
+
+  public var textContainerInset: NSSize {
+    get {
+      // NSTextView uses textContainerOrigin for insets
+      return NSSize(width: textContainerOrigin.x, height: textContainerOrigin.y)
+    }
+    set {
+      // Best effort - NSTextView doesn't directly support setting insets like UITextView
+      // This would require modifying textContainerOrigin which is read-only
+    }
+  }
+}
 #endif
 
 // MARK: - Platform Alert Protocol
