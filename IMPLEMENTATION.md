@@ -713,6 +713,30 @@ Comprehensive batch optimization leveraging iOS 16 SDK capabilities to dramatica
 - Next
   - Optional: add a targeted assertion that the image node’s key is present in `textStorage.decoratorPositionCache` after insertion to further lock behavior.
 
+### 2025-09-30 — Image persistence tests: crash fix and log gating
+
+- What changed
+  - Fixed `InlineImagePersistenceTests.testStateRestoreKeepsImageAcrossEngines` to avoid running reconcile without an attached frontend (no `textStorage`). The test now decodes state JSON and validates decoded `ImageNode` presence without calling `setEditorState`.
+  - Ensured tests that touch `Editor` without `LexicalView` keep a strong `LexicalReadOnlyTextKitContext` alive for the lifetime of the test.
+  - Verified decorator-related debug prints are gated behind `FeatureFlags.verboseLogging` (DEC-RECON, DEC-MOUNT, IMG-INSERT, BLOCK-ATTR, INSERT-NODE).
+
+- Key files
+  - `Plugins/LexicalInlineImagePlugin/LexicalInlineImagePluginTests/InlineImagePersistenceTests.swift`
+  - `Lexical/Core/OptimizedReconciler.swift` (decorator/log prints gated)
+  - `Lexical/Core/Editor.swift` (mount/unmount decorator logs gated)
+  - `Lexical/Core/Selection/RangeSelection.swift` (insert-node log gated)
+
+- Why
+  - Tests were intermittently crashing with: “Cannot run reconciler on an editor with no text storage” when a reconcile path was triggered without a live frontend. Keeping a read-only TextKit context or avoiding reconcile in the unit test fixes this deterministically.
+
+- Verification (authoritative iOS simulator)
+  - `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalInlineImagePluginTests test` — PASS (21 tests, 0 failures).
+
+- Status
+  - [x] Crash fixed; image persistence + parity tests green on simulator
+  - [x] Debug prints gated under `verboseLogging`
+  - [ ] Optional: add integration test with `LexicalView` for engine toggle + persistence
+
 ## 2025-09-29 — Live typing duplication + empty hydrate fix
 
 - What changed

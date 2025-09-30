@@ -5,11 +5,19 @@ import XCTest
 @MainActor
 final class InlineImagePersistenceTests: XCTestCase {
 
+  // Keep contexts strongly referenced so editor.frontend/textStorage remain attached
+  private var liveContexts: [LexicalReadOnlyTextKitContext] = []
+
   private func makeEditor(useOptimized: Bool) -> (Editor, LexicalReadOnlyTextKitContext) {
     let cfg = EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()])
     let flags = useOptimized ? FeatureFlags.optimizedProfile(.aggressiveEditor) : FeatureFlags()
     let ctx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: flags)
+    liveContexts.append(ctx)
     return (ctx.editor, ctx)
+  }
+
+  override func tearDown() {
+    liveContexts.removeAll()
   }
 
   private func firstImageKey(in state: EditorState) -> NodeKey? {
