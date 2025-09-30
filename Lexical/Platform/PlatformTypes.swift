@@ -106,6 +106,12 @@ public extension PlatformEdgeInsets {
   var trailing: CGFloat { return right }
 }
 #elseif canImport(AppKit)
+extension PlatformEdgeInsets: Equatable {
+  public static func == (lhs: NSEdgeInsets, rhs: NSEdgeInsets) -> Bool {
+    return lhs.top == rhs.top && lhs.left == rhs.left && lhs.bottom == rhs.bottom && lhs.right == rhs.right
+  }
+}
+
 public extension PlatformEdgeInsets {
   static var zero: PlatformEdgeInsets {
     return NSEdgeInsetsZero

@@ -76,7 +76,7 @@ internal class LexicalReadOnlySizeCache {
 
   @objc public var truncationString: String?
 
-  @objc weak var attachedView: LexicalReadOnlyView? {
+  @objc weak var attachedView: PlatformView? {
     didSet {
       if oldValue == attachedView {
         return
