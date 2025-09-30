@@ -6,7 +6,13 @@
  */
 
 import Foundation
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 import QuartzCore
 
 // Optimized reconciler entry point. Initially a thin wrapper so we can land
