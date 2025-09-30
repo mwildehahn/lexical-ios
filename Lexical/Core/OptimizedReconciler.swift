@@ -1479,6 +1479,19 @@ internal enum OptimizedReconciler {
     fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
     guard editor.featureFlags.useReconcilerDeleteBlockFenwick else { return false }
+    // Safety: do NOT treat this update as a structural block delete if the user's
+    // selection is a collapsed caret inside a TextNode (i.e., not at a text boundary).
+    // This prevents cases where a single-character delete/backspace inside a line
+    // accidentally triggers removal of an entire paragraph.
+    if let sel = pendingEditorState.selection as? RangeSelection, sel.isCollapsed() {
+      if sel.anchor.type == .text, let tn = pendingEditorState.nodeMap[sel.anchor.key] as? TextNode {
+        let off = sel.anchor.offset
+        let len = tn.getTextPart().lengthAsNSString()
+        if off > 0 && off < len {
+          return false
+        }
+      }
+    }
     // Find a parent Element whose children lost one or more direct children (no additions)
     let dirtyParents = editor.dirtyNodes.keys.compactMap { key -> (NodeKey, ElementNode, ElementNode)? in
       guard let prev = currentEditorState.nodeMap[key] as? ElementNode,

@@ -169,4 +169,40 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       XCTAssertEqual(sel.anchor.offset, 5)
     }
   }
+
+  func testForwardDeleteInsideTextDoesNotDeleteWholeLine() throws {
+    let (editor, _) = makeOptimizedEditor()
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "The quick brown fox")
+      try p.append([t]); try root.append([p])
+      // Caret inside the word "quick" (between 'q' and 'u')
+      try t.select(anchorOffset: 5, focusOffset: 5)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
+    try editor.read {
+      guard let root = getRoot(), let p = root.getFirstChild() as? ParagraphNode,
+            let t = p.getFirstChild() as? TextNode else { return XCTFail("Unexpected tree") }
+      XCTAssertEqual(root.getChildrenSize(), 1)
+      XCTAssertEqual(t.getTextPart(), "The qick brown fox") // 'u' removed only
+    }
+  }
+
+  func testBackspaceInsideTextDoesNotDeleteWholeLine() throws {
+    let (editor, _) = makeOptimizedEditor()
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "Hello World")
+      try p.append([t]); try root.append([p])
+      // Caret after 'o' in Hello (index 5)
+      try t.select(anchorOffset: 5, focusOffset: 5)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.read {
+      guard let root = getRoot(), let p = root.getFirstChild() as? ParagraphNode,
+            let t = p.getFirstChild() as? TextNode else { return XCTFail("Unexpected tree") }
+      XCTAssertEqual(root.getChildrenSize(), 1)
+      XCTAssertEqual(t.getTextPart(), "Hell World") // backspace removed the 'o'
+    }
+  }
 }
