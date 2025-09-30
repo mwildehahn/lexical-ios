@@ -5,7 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 internal class LexicalReadOnlySizeCache {
 
@@ -22,7 +26,7 @@ internal class LexicalReadOnlySizeCache {
   var customTruncationAttributes: [NSAttributedString.Key: Any] = [:]
   var truncationStringMode: TruncationStringMode = .noTruncation  // this is the computed truncation mode, not the desired mode
   var extraHeightForTruncationLine: CGFloat = 0  // iff truncationStringMode is displayedUnderLastLine, this is the height needed to add to the main height.
-  var cachedTextContainerInsets: UIEdgeInsets = .zero
+  var cachedTextContainerInsets: PlatformEdgeInsets = .zero
   var glyphRangeForLastLineFragmentBeforeTruncation: NSRange?
   var glyphRangeForLastLineFragmentAfterTruncation: NSRange?
   var characterRangeForLastLineFragmentBeforeTruncation: NSRange?

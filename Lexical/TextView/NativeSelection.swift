@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
 import UIKit
 
@@ -58,3 +59,4 @@ public class NativeSelection {
   // NodeSelection or similar within Lexical.
   let selectionIsNodeOrObject: Bool
 }
+#endif
