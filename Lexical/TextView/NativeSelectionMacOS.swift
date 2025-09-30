@@ -11,7 +11,7 @@ import AppKit
 
 public class NativeSelection {
 
-  internal init(range: NSRange?, affinity: NSSelectionAffinity, markedRange: NSRange?, selectionIsNodeOrObject: Bool) {
+  internal init(range: NSRange?, affinity: PlatformTextStorageDirection, markedRange: NSRange?, selectionIsNodeOrObject: Bool) {
     self.range = range
     self.affinity = affinity
     self.markedRange = markedRange
@@ -19,11 +19,11 @@ public class NativeSelection {
   }
 
   public convenience init() {
-    self.init(range: nil, affinity: .upstream, markedRange: nil, selectionIsNodeOrObject: false)
+    self.init(range: nil, affinity: .forward, markedRange: nil, selectionIsNodeOrObject: false)
   }
 
   let range: NSRange?
-  let affinity: NSSelectionAffinity
+  let affinity: PlatformTextStorageDirection
   let markedRange: NSRange?
   let selectionIsNodeOrObject: Bool
 }

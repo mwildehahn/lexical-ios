@@ -1405,12 +1405,17 @@ public class RangeSelection: BaseSelection {
   @MainActor
   public func applyNativeSelection(_ nativeSelection: NativeSelection) throws {
     guard let range = nativeSelection.range else { return }
+    #if canImport(UIKit)
     try applySelectionRange(
       range, affinity: range.length == 0 ? .backward : nativeSelection.affinity)
+    #elseif canImport(AppKit)
+    try applySelectionRange(
+      range, affinity: nativeSelection.affinity)
+    #endif
   }
 
   @MainActor
-  internal func applySelectionRange(_ range: NSRange, affinity: UITextStorageDirection) throws {
+  internal func applySelectionRange(_ range: NSRange, affinity: PlatformTextStorageDirection) throws {
     guard let editor = getActiveEditor() else {
       throw LexicalError.invariantViolation("Calling applyNativeSelection when no active editor")
     }
@@ -1433,7 +1438,7 @@ public class RangeSelection: BaseSelection {
     guard let range = nativeSelection.range, let editor = getActiveEditor(),
       !nativeSelection.selectionIsNodeOrObject
     else { return nil }
-    let affinity = range.length == 0 ? .backward : nativeSelection.affinity
+    let affinity = range.length == 0 ? PlatformTextStorageDirection.backward : nativeSelection.affinity
 
     let anchorOffset = affinity == .forward ? range.location : range.location + range.length
     let focusOffset = affinity == .forward ? range.location + range.length : range.location

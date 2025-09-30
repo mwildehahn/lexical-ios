@@ -254,10 +254,6 @@ internal enum OptimizedReconciler {
     if !decoratorOps.isEmpty {
       #if canImport(UIKit)
       UIView.performWithoutAnimation {
-      #elseif canImport(AppKit)
-      NSAnimationContext.runAnimationGroup({ context in
-        context.duration = 0
-      #endif
         for op in decoratorOps {
           switch op {
           case .decoratorAdd(let key):
@@ -274,9 +270,26 @@ internal enum OptimizedReconciler {
             break
           }
         }
-      #if canImport(UIKit)
       }
       #elseif canImport(AppKit)
+      NSAnimationContext.runAnimationGroup({ context in
+        context.duration = 0
+        for op in decoratorOps {
+          switch op {
+          case .decoratorAdd(let key):
+            if let loc = editor.rangeCache[key]?.location {
+              editor.textStorage?.decoratorPositionCache[key] = loc
+            }
+          case .decoratorRemove(let key):
+            editor.textStorage?.decoratorPositionCache[key] = nil
+          case .decoratorDecorate(let key):
+            if let loc = editor.rangeCache[key]?.location {
+              editor.textStorage?.decoratorPositionCache[key] = loc
+            }
+          default:
+            break
+          }
+        }
       })
       #endif
     }

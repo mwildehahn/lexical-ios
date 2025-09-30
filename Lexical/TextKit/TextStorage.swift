@@ -39,6 +39,12 @@ public class TextStorage: NSTextStorage {
     fatalError("\(#function) has not been implemented")
   }
 
+  #if canImport(AppKit)
+  required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
+    fatalError("\(#function) has not been implemented")
+  }
+  #endif
+
   override open var string: String {
     return backingAttributedString.string
   }
