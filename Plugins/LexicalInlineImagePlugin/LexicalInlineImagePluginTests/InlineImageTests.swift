@@ -63,6 +63,90 @@ class InlineImageTests: XCTestCase {
     }
   }
 
+  func testMultipleImagesMountImmediatelyAtStartMiddleEnd_Optimized() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 400)
+    let ed = v.editor
+    var k1: NodeKey!, k2: NodeKey!, k3: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t1 = createTextNode(text: " ")
+      let t2 = createTextNode(text: " hello ")
+      let t3 = createTextNode(text: " world ")
+      let i1 = ImageNode(url: "https://example.com/a.png", size: CGSize(width: 24, height: 24), sourceID: "a"); k1 = i1.getKey()
+      let i2 = ImageNode(url: "https://example.com/b.png", size: CGSize(width: 24, height: 24), sourceID: "b"); k2 = i2.getKey()
+      let i3 = ImageNode(url: "https://example.com/c.png", size: CGSize(width: 24, height: 24), sourceID: "c"); k3 = i3.getKey()
+      try p.append([i1, t2, i2, t3, i3, t1]); try root.append([p])
+    }
+    // Force layout/draw
+    let lm = v.layoutManager; let tc = v.textView.textContainer
+    let gr = lm.glyphRange(for: tc)
+    UIGraphicsBeginImageContextWithOptions(CGSize(width: 320, height: 60), false, 0)
+    lm.drawGlyphs(forGlyphRange: gr, at: .zero)
+    UIGraphicsEndImageContext()
+
+    func assertMounted(_ key: NodeKey) {
+      guard case let .cachedView(view)? = ed.decoratorCache[key] else { return XCTFail("not cached view: \(String(describing: ed.decoratorCache[key]))") }
+      XCTAssertFalse(view.isHidden)
+      XCTAssertTrue(view.superview === v.textView)
+    }
+    assertMounted(k1); assertMounted(k2); assertMounted(k3)
+  }
+
+  func testBackspaceAfterImageDeletesImageOnly() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imgKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t1 = createTextNode(text: "Hello ")
+      let img = ImageNode(url: "https://example.com/x.png", size: CGSize(width: 20, height: 20), sourceID: "x"); imgKey = img.getKey()
+      let t2 = createTextNode(text: "World")
+      try p.append([t1, img, t2]); try root.append([p])
+      try t2.select(anchorOffset: 0, focusOffset: 0)
+    }
+    // Backspace at start of t2 (immediately after image) should remove image only
+    try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try ed.read {
+      let content = getRoot()?.getTextContent().trimmingCharacters(in: .whitespacesAndNewlines)
+      XCTAssertEqual(content, "Hello World")
+    }
+  }
+
+  func testForwardDeleteBeforeImageDeletesImageOnly() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imgKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t1 = createTextNode(text: "Hello ")
+      let img = ImageNode(url: "https://example.com/y.png", size: CGSize(width: 20, height: 20), sourceID: "y"); imgKey = img.getKey()
+      let t2 = createTextNode(text: "World")
+      try p.append([t1, img, t2]); try root.append([p])
+      try t1.select(anchorOffset: t1.getTextPart().lengthAsNSString(), focusOffset: t1.getTextPart().lengthAsNSString())
+    }
+    try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
+    try ed.read {
+      let content = getRoot()?.getTextContent().trimmingCharacters(in: .whitespacesAndNewlines)
+      XCTAssertEqual(content, "Hello World")
+    }
+  }
+
+  // Multi-image delete sequence is covered in headless persistence tests to avoid
+  // UI timing artifacts in mount/unmount. See InlineImagePersistenceTests.
+
   func testImageMountsImmediatelyOnInsert_Optimized_LexicalView() throws {
     // Use optimized reconciler so insert-block fast path runs
     let optimizedView = LexicalView(

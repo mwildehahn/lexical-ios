@@ -91,4 +91,6 @@ final class InlineImagePersistenceTests: XCTestCase {
     }
     XCTAssertNotNil(key)
   }
+
+  // Multi-image delete sequences are exercised in LexicalView-based tests and parity tests.
 }
