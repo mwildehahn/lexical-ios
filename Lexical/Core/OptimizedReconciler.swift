@@ -252,7 +252,12 @@ internal enum OptimizedReconciler {
     
     // Step 5: Batch decorator operations without animations
     if !decoratorOps.isEmpty {
+      #if canImport(UIKit)
       UIView.performWithoutAnimation {
+      #elseif canImport(AppKit)
+      NSAnimationContext.runAnimationGroup({ context in
+        context.duration = 0
+      #endif
         for op in decoratorOps {
           switch op {
           case .decoratorAdd(let key):
@@ -269,7 +274,11 @@ internal enum OptimizedReconciler {
             break
           }
         }
+      #if canImport(UIKit)
       }
+      #elseif canImport(AppKit)
+      })
+      #endif
     }
     
     let applyDuration = CFAbsoluteTimeGetCurrent() - applyStart
@@ -448,11 +457,20 @@ internal enum OptimizedReconciler {
     }
     
     // Apply all updates in single pass without animations
+    #if canImport(UIKit)
     UIView.performWithoutAnimation {
       for (key, location) in updates {
         textStorage.decoratorPositionCache[key] = location
       }
     }
+    #elseif canImport(AppKit)
+    NSAnimationContext.runAnimationGroup({ context in
+      context.duration = 0
+      for (key, location) in updates {
+        textStorage.decoratorPositionCache[key] = location
+      }
+    })
+    #endif
   }
   
   // MARK: - Instruction application & coalescing
@@ -2169,7 +2187,7 @@ internal enum OptimizedReconciler {
 
     // Locate Point at replacement start if possible
     let startLocation = op.selectionRangeToReplace.location
-    let point = try? pointAtStringLocation(startLocation, searchDirection: .forward, rangeCache: editor.rangeCache)
+    let point = try? pointAtStringLocation(startLocation, searchDirection: PlatformTextStorageDirection.forward, rangeCache: editor.rangeCache)
 
     // Prepare attributed marked text with styles from owning node if available
     var attrs: [NSAttributedString.Key: Any] = [:]

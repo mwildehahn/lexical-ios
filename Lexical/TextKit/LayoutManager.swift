@@ -196,7 +196,7 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       return
     }
 
-    let textContainerInset = self.editor?.frontend?.textContainerInsets ?? UIEdgeInsets.zero
+    let textContainerInset = self.editor?.frontend?.textContainerInsets ?? PlatformEdgeInsets.zero
 
     try? editor.read {
       guard let decoratorView = decoratorView(forKey: key, createIfNecessary: !shouldHideView)
@@ -223,15 +223,19 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
     }
   }
 
+  #if canImport(UIKit)
   @available(iOS 13.0, *)
+  #elseif canImport(AppKit)
+  @available(macOS 10.15, *)
+  #endif
   override public func showCGGlyphs(
     _ glyphs: UnsafePointer<CGGlyph>, positions: UnsafePointer<CGPoint>, count glyphCount: Int,
-    font: UIFont, textMatrix: CGAffineTransform, attributes: [NSAttributedString.Key: Any] = [:],
+    font: PlatformFont, textMatrix: CGAffineTransform, attributes: [NSAttributedString.Key: Any] = [:],
     in context: CGContext
   ) {
 
     // fix for links with custom colour -- UIKit has trouble with this!
-    if attributes[.link] != nil, let colorAttr = attributes[.foregroundColor] as? UIColor {
+    if attributes[.link] != nil, let colorAttr = attributes[.foregroundColor] as? PlatformColor {
       context.setFillColor(colorAttr.cgColor)
     }
 

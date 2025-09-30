@@ -64,6 +64,8 @@ public typealias PlatformScrollView = NSScrollView
 // Text input specific types
 public typealias PlatformTextView = NSTextView
 public typealias PlatformTextViewDelegate = NSTextViewDelegate
+public typealias PlatformTextStorageDirection = NSTextStorageDirection
+public typealias PlatformTextGranularity = NSTextGranularity
 
 // Note: macOS uses NSRange directly instead of opaque text ranges
 // NSTextInput protocol exists but is different from UITextInput

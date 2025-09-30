@@ -162,9 +162,15 @@ extension CodeNode {
     return {
       attributeKey, attributeValue, layoutManager, attributeRunCharacterRange,
       granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
+      #if canImport(UIKit)
       guard let context = UIGraphicsGetCurrentContext(),
         let attributeValue = attributeValue as? CodeBlockCustomDrawingAttributes
       else { return }
+      #elseif canImport(AppKit)
+      guard let context = NSGraphicsContext.current?.cgContext,
+        let attributeValue = attributeValue as? CodeBlockCustomDrawingAttributes
+      else { return }
+      #endif
       context.setFillColor(attributeValue.background.cgColor)
       context.fill(rect)
 

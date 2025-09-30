@@ -7,6 +7,12 @@
 
 import Foundation
 
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
 /*
  * This file, Mutations, contains the logic for Lexical's `non-controlled` mode. In this mode,
  * the UITextView directly updates its text storage with newly typed characters, and then we
@@ -33,7 +39,7 @@ internal func handleTextMutation(textStorage: TextStorage, rangeOfChange: NSRang
 
   guard
     let point = try pointAtStringLocation(
-      rangeOfChange.location, searchDirection: .forward, rangeCache: editor.rangeCache)
+      rangeOfChange.location, searchDirection: PlatformTextStorageDirection.forward, rangeCache: editor.rangeCache)
   else {
     editor.log(.other, .verbose, "Failed to find node")
     throw LexicalError.invariantViolation("Failed to find node")
