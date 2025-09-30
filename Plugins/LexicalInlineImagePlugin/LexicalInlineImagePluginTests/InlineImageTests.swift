@@ -62,4 +62,41 @@ class InlineImageTests: XCTestCase {
       XCTAssertEqual(secondPara.getChildrenSize(), 1, "Second para should contain 1 text node")
     }
   }
+
+  func testImageMountsImmediatelyOnInsert_Optimized_LexicalView() throws {
+    // Use optimized reconciler so insert-block fast path runs
+    let optimizedView = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    optimizedView.frame = CGRect(x: 0, y: 0, width: 320, height: 400)
+    let editor = optimizedView.editor
+
+    var imageKey: NodeKey!
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t1 = createTextNode(text: "Hello ")
+      let img = ImageNode(url: "https://example.com/image.png", size: CGSize(width: 40, height: 40), sourceID: "img1")
+      imageKey = img.getKey()
+      try p.append([t1, img]); try root.append([p])
+    }
+
+    // Force a layout/draw pass so LayoutManager positions decorators immediately
+    let lm = optimizedView.layoutManager
+    let tc = optimizedView.textView.textContainer
+    let glyphRange = lm.glyphRange(for: tc)
+    UIGraphicsBeginImageContextWithOptions(CGSize(width: 320, height: 60), false, 0)
+    lm.drawGlyphs(forGlyphRange: glyphRange, at: CGPoint(x: 0, y: 0))
+    UIGraphicsEndImageContext()
+
+    // Validate: decorator cache has a view and it is visible now
+    guard case let .cachedView(v)? = editor.decoratorCache[imageKey] else {
+      return XCTFail("Image decorator view not cached")
+    }
+    XCTAssertFalse(v.isHidden, "Inserted image view should be visible immediately after insert+layout")
+    XCTAssertTrue(v.superview === optimizedView.textView, "Image view should be mounted in textView")
+  }
+
+  // Unmount semantics are covered by persistence tests which assert position cache
+  // clearing and by reconciler tests that remove decorator keys from caches.
 }
