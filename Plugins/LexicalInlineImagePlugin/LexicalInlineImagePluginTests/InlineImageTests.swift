@@ -63,6 +63,67 @@ class InlineImageTests: XCTestCase {
     }
   }
 
+  func testConsecutiveImagesMountAndDeleteSequence_Optimized() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var i1: NodeKey!, i2: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t1 = createTextNode(text: "A")
+      let img1 = ImageNode(url: "https://example.com/1.png", size: CGSize(width: 20, height: 20), sourceID: "1"); i1 = img1.getKey()
+      let img2 = ImageNode(url: "https://example.com/2.png", size: CGSize(width: 20, height: 20), sourceID: "2"); i2 = img2.getKey()
+      let t2 = createTextNode(text: "B")
+      try p.append([t1, img1, img2, t2]); try root.append([p])
+      try t2.select(anchorOffset: 0, focusOffset: 0)
+    }
+    // Mount
+    let lm = v.layoutManager; let tc = v.textView.textContainer; let gr = lm.glyphRange(for: tc)
+    UIGraphicsBeginImageContextWithOptions(CGSize(width: 320, height: 60), false, 0)
+    lm.drawGlyphs(forGlyphRange: gr, at: .zero)
+    UIGraphicsEndImageContext()
+    // Delete the image nearest caret (img2)
+    try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    // Delete the previous image explicitly via NodeSelection to avoid UIKit caret drift
+    try ed.update { getActiveEditorState()?.selection = NodeSelection(nodes: [i1]) }
+    try ed.update { try (getSelection() as? NodeSelection)?.deleteCharacter(isBackwards: true) }
+    try ed.read {
+      let text = getRoot()?.getTextContent().trimmingCharacters(in: .whitespacesAndNewlines)
+      XCTAssertEqual(text, "AB")
+    }
+  }
+
+  func testRangeDeleteSpanningTextAndImage_LexicalView() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imgKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t1 = createTextNode(text: "Hello")
+      let img = ImageNode(url: "https://example.com/x.png", size: CGSize(width: 20, height: 20), sourceID: "x"); imgKey = img.getKey()
+      let t2 = createTextNode(text: "World")
+      try p.append([t1, img, t2]); try root.append([p])
+      // Select from inside t1 to inside t2 (spanning the image)
+      try t1.select(anchorOffset: 2, focusOffset: 2)
+      if let sel = try getSelection() as? RangeSelection { sel.focus.updatePoint(key: t2.getKey(), offset: 3, type: .text) }
+    }
+    try ed.update { try (getSelection() as? RangeSelection)?.removeText() }
+    try ed.read {
+      let text = getRoot()?.getTextContent().trimmingCharacters(in: .whitespacesAndNewlines)
+      XCTAssertEqual(text, "Held") // removed "llo" + image + "Wor"
+      XCTAssertNil(ed.decoratorCache[imgKey])
+    }
+  }
+
   func testMultipleImagesMountImmediatelyAtStartMiddleEnd_Optimized() throws {
     let v = LexicalView(
       editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
