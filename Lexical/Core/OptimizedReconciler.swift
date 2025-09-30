@@ -1581,6 +1581,15 @@ internal enum OptimizedReconciler {
     // Prune removed keys from range cache under the parent and rebuild positions via Fenwick range shifts
     pruneRangeCacheUnderAncestor(ancestorKey: parentKey, prevState: currentEditorState, nextState: pendingEditorState, editor: editor)
 
+    // Reconcile decorator add/remove/positions for the affected subtree so removed decorators
+    // are unmounted immediately and caches are purged.
+    reconcileDecoratorOpsForSubtree(
+      ancestorKey: parentKey,
+      prevState: currentEditorState,
+      nextState: pendingEditorState,
+      editor: editor
+    )
+
     if editor.featureFlags.useReconcilerFenwickDelta {
       // Shift everything after the last removed index by totalDelta (negative)
       let (order, positions) = fenwickOrderAndIndex(editor: editor)
