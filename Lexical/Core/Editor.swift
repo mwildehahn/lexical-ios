@@ -5,7 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import Foundation
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 @objc public class NodeKeyMultiplier: NSObject {
   let depthBlockSize: UInt64
@@ -27,9 +33,12 @@ import UIKit
   public let plugins: [Plugin]
   public let editorStateVersion: Int
   public let nodeKeyMultiplier: NodeKeyMultiplier?
+  #if canImport(UIKit)
   public let keyCommands: [UIKeyCommand]?
+  #endif
   public let metricsContainer: EditorMetricsContainer?
 
+  #if canImport(UIKit)
   public init(
     theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
     nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil,
@@ -56,15 +65,41 @@ import UIKit
       metricsContainer: nil
     )
   }
+  #elseif canImport(AppKit)
+  public init(
+    theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil,
+    metricsContainer: EditorMetricsContainer? = nil
+  ) {
+    self.theme = theme
+    self.plugins = plugins
+    self.editorStateVersion = editorStateVersion
+    self.nodeKeyMultiplier = nodeKeyMultiplier
+    self.metricsContainer = metricsContainer
+  }
+
+  @objc public convenience init(
+    theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil
+  ) {
+    self.init(
+      theme: theme,
+      plugins: plugins,
+      editorStateVersion: editorStateVersion,
+      nodeKeyMultiplier: nodeKeyMultiplier,
+      metricsContainer: nil
+    )
+  }
+  #endif
 }
 
 internal enum DecoratorCacheItem {
   case needsCreation
-  case cachedView(UIView)
-  case unmountedCachedView(UIView)
-  case needsDecorating(UIView)
+  case cachedView(PlatformView)
+  case unmountedCachedView(PlatformView)
+  case needsDecorating(PlatformView)
 
-  var view: UIView? {
+  var view: PlatformView? {
     switch self {
     case .needsCreation:
       return nil
