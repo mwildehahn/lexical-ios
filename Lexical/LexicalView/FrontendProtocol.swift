@@ -6,7 +6,12 @@
  */
 
 import Foundation
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// A Lexical Frontend is an object that contains the TextKit stack used by Lexical, along with handling
 /// user interactions, incoming events, etc. The Frontend protocol provides a hard boundary for what are
@@ -22,17 +27,21 @@ import UIKit
 internal protocol Frontend: AnyObject {
   var textStorage: TextStorage { get }
   var layoutManager: LayoutManager { get }
-  var textContainerInsets: UIEdgeInsets { get }
+  var textContainerInsets: PlatformEdgeInsets { get }
   var editor: Editor { get }
   var nativeSelection: NativeSelection { get }
   var isFirstResponder: Bool { get }
-  var viewForDecoratorSubviews: UIView? { get }
+  var viewForDecoratorSubviews: PlatformView? { get }
   var isEmpty: Bool { get }
   var isUpdatingNativeSelection: Bool { get set }
   var interceptNextSelectionChangeAndReplaceWithRange: NSRange? { get set }
   var textLayoutWidth: CGFloat { get }
 
+  #if canImport(UIKit)
   func moveNativeSelection(type: NativeSelectionModificationType, direction: UITextStorageDirection, granularity: UITextGranularity)
+  #elseif canImport(AppKit)
+  func moveNativeSelection(type: NativeSelectionModificationType, direction: NSTextStorageDirection, granularity: NSTextGranularity)
+  #endif
   func unmarkTextWithoutUpdate()
   func presentDeveloperFacingError(message: String)
   func updateNativeSelection(from selection: BaseSelection) throws

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
 import UIKit
 
@@ -553,3 +554,4 @@ extension LexicalView: LexicalTextViewDelegate {
     return true
   }
 }
+#endif

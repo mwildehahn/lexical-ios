@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
 import UIKit
 
@@ -46,3 +47,4 @@ class ResponderForNodeSelection: UIResponder, UIKeyInput {
     textView
   }
 }
+#endif
