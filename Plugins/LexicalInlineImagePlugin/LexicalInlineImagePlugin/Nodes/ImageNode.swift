@@ -52,6 +52,32 @@ public class ImageNode: DecoratorNode {
     from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil
   ) throws {
     try super.init(from: decoder, depth: depth, index: index, parentIndex: parentIndex)
+    // Decode custom properties if present
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    if let urlString = try container.decodeIfPresent(String.self, forKey: .url) {
+      self.url = URL(string: urlString)
+    }
+    if let w = try container.decodeIfPresent(CGFloat.self, forKey: .w),
+       let h = try container.decodeIfPresent(CGFloat.self, forKey: .h) {
+      self.size = CGSize(width: w, height: h)
+    }
+    self.sourceID = (try container.decodeIfPresent(String.self, forKey: .sourceID)) ?? ""
+  }
+
+  public override func encode(to encoder: Encoder) throws {
+    try super.encode(to: encoder)
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    if let url { try container.encode(url.absoluteString, forKey: .url) }
+    try container.encode(size.width, forKey: .w)
+    try container.encode(size.height, forKey: .h)
+    try container.encode(sourceID, forKey: .sourceID)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case url
+    case w
+    case h
+    case sourceID
   }
 
   override public func clone() -> Self {

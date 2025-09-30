@@ -1370,6 +1370,12 @@ internal enum OptimizedReconciler {
       }
     }
 
+    if editor.featureFlags.verboseLogging {
+      if let n = pendingEditorState.nodeMap[addedKey] {
+        let kind = (n is DecoratorNode) ? "decorator" : String(describing: type(of: n))
+        print("🔥 IMG-INSERT: planning insert addedKey=\(addedKey) kind=\(kind) parent=\(parentKey) at=\(insertIndex)")
+      }
+    }
     let attr = buildAttributedSubtree(nodeKey: addedKey, state: pendingEditorState, theme: theme)
     if let del = deleteOldPostRange { instructions.append(.delete(range: del)) }
     if attr.length > 0 {
@@ -1407,6 +1413,13 @@ internal enum OptimizedReconciler {
       // Ensure TextKit attributes are fixed after inserting attachments (e.g., decorators/images)
       // so LayoutManager can resolve TextAttachment runs immediately for view mounting.
       let stats = applyInstructions(instructions, editor: editor, fixAttributesEnabled: true)
+      if editor.featureFlags.verboseLogging {
+        if let n = pendingEditorState.nodeMap[addedKey] as? DecoratorNode {
+          let hasPos = editor.textStorage?.decoratorPositionCache[addedKey] != nil
+          let pos = editor.textStorage?.decoratorPositionCache[addedKey] ?? -1
+          print("🔥 IMG-INSERT: applied insert for decorator key=\(n.key) stats(ins=\(stats.inserts), del=\(stats.deletes)) posCache=\(hasPos ? String(pos) : "nil")")
+        }
+      }
       applyDuration = stats.duration
       // Ensure decorator cache/positions reflect additions under this parent
       reconcileDecoratorOpsForSubtree(
@@ -1415,6 +1428,13 @@ internal enum OptimizedReconciler {
         nextState: pendingEditorState,
         editor: editor
       )
+      if editor.featureFlags.verboseLogging {
+        if let n = pendingEditorState.nodeMap[addedKey] as? DecoratorNode {
+          let hasPos = editor.textStorage?.decoratorPositionCache[addedKey] != nil
+          let pos = editor.textStorage?.decoratorPositionCache[addedKey] ?? -1
+          print("🔥 DEC-RECON: post-insert parent=\(parentKey) key=\(n.key) pos=\(hasPos ? String(pos) : "nil") cacheCount=\(editor.textStorage?.decoratorPositionCache.count ?? -1)")
+        }
+      }
     }
 
     // Block attributes only for inserted node
@@ -2417,6 +2437,9 @@ internal enum OptimizedReconciler {
     // Removals: purge position + cache and destroy views
     let removed = prevDecos.subtracting(nextDecos)
     for k in removed {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 DEC-RECON: remove key=\(k)")
+      }
       decoratorView(forKey: k, createIfNecessary: false)?.removeFromSuperview()
       destroyCachedDecoratorView(forKey: k)
       textStorage.decoratorPositionCache[k] = nil
@@ -2427,14 +2450,23 @@ internal enum OptimizedReconciler {
     for k in added {
       if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
       if let loc = editor.rangeCache[k]?.location { textStorage.decoratorPositionCache[k] = loc }
+      if editor.featureFlags.verboseLogging {
+        let pos = editor.rangeCache[k]?.location ?? -1
+        print("🔥 DEC-RECON: add key=\(k) setPos=\(pos)")
+      }
     }
 
     // Persist positions for all present decorators in next subtree and mark dirty ones for decorating
     for k in nextDecos {
       if let loc = editor.rangeCache[k]?.location { textStorage.decoratorPositionCache[k] = loc }
+      if editor.featureFlags.verboseLogging {
+        let pos = editor.rangeCache[k]?.location ?? -1
+        print("🔥 DEC-RECON: pos key=\(k) loc=\(pos)")
+      }
       if editor.dirtyNodes[k] != nil {
         if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view {
           editor.decoratorCache[k] = .needsDecorating(view)
+          if editor.featureFlags.verboseLogging { print("🔥 DEC-RECON: needsDecorating key=\(k)") }
         }
       }
     }

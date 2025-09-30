@@ -406,10 +406,12 @@ public class ToolbarPlugin: Plugin {
       return
     }
     try? editor?.update {
+      print("🔥 TOOLBAR: inserting sample image…")
       let imageNode = ImageNode(url: url.absoluteString, size: CGSize(width: 300, height: 300), sourceID: "")
       if let selection = try getSelection() {
         _ = try selection.insertNodes(nodes: [imageNode], selectStart: false)
       }
+      print("🔥 TOOLBAR: sample image inserted key=\(imageNode.key)")
     }
   }
 
@@ -418,10 +420,12 @@ public class ToolbarPlugin: Plugin {
       return
     }
     try? editor?.update {
+      print("🔥 TOOLBAR: inserting selectable image…")
       let imageNode = SelectableImageNode(url: url.absoluteString, size: CGSize(width: 300, height: 300), sourceID: "")
       if let selection = try getSelection() {
         _ = try selection.insertNodes(nodes: [imageNode], selectStart: false)
       }
+      print("🔥 TOOLBAR: selectable image inserted key=\(imageNode.key)")
     }
   }
 

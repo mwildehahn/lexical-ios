@@ -636,6 +636,7 @@ public class Editor: NSObject {
       for (nodeKey, decoratorCacheItem) in decoratorCache {
         switch decoratorCacheItem {
         case .needsCreation:
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: create key=\(nodeKey)") }
           guard let view = decoratorView(forKey: nodeKey, createIfNecessary: true),
             let node = getNodeByKey(key: nodeKey) as? DecoratorNode
           else {
@@ -655,6 +656,7 @@ public class Editor: NSObject {
             "needsCreation -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
           )
         case .cachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: cached key=\(nodeKey)") }
           // This shouldn't be needed if our appear/disappear logic is perfect, but it turns out we do currently need this.
           superview.addSubview(view)
           self.log(
@@ -662,6 +664,7 @@ public class Editor: NSObject {
             "no-op, already cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
           )
         case .unmountedCachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: remount key=\(nodeKey)") }
           view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
           superview.addSubview(view)
           if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
@@ -673,6 +676,7 @@ public class Editor: NSObject {
             "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
           )
         case .needsDecorating(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: decorate key=\(nodeKey)") }
           superview.addSubview(view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
           if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {

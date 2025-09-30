@@ -737,6 +737,9 @@ public class RangeSelection: BaseSelection {
       didReplaceOrMerge = false
 
       let newTarget = try insertNodeIntoTarget(node: node, target: target)
+      if let editor = getActiveEditor(), editor.featureFlags.verboseLogging, node is DecoratorNode {
+        print("🔥 INSERT-NODE: decorator inserted key=\(node.key) into target=\(target.key)")
+      }
       guard let newTarget else {
         continue
       }
