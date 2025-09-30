@@ -124,6 +124,66 @@ class InlineImageTests: XCTestCase {
     }
   }
 
+  func testForwardDeleteMergesNextParagraphStartingWithImage() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imageKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p2 = createParagraphNode();
+      let img = ImageNode(url: "https://example.com/i.png", size: CGSize(width: 20, height: 20), sourceID: "i"); imageKey = img.getKey()
+      let t2 = createTextNode(text: "World")
+      try p1.append([t1]); try p2.append([img, t2]); try root.append([p1, p2])
+      try t1.select(anchorOffset: 5, focusOffset: 5)
+    }
+    try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
+    // Mount/draw
+    let lm = v.layoutManager; let tc = v.textView.textContainer; let gr = lm.glyphRange(for: tc)
+    UIGraphicsBeginImageContextWithOptions(CGSize(width: 320, height: 60), false, 0)
+    lm.drawGlyphs(forGlyphRange: gr, at: .zero)
+    UIGraphicsEndImageContext()
+    try ed.read {
+      let text = getRoot()?.getTextContent().trimmingCharacters(in: .whitespacesAndNewlines)
+      XCTAssertEqual(text, "HelloWorld")
+      // Expected behavior: forward delete at paragraph end removes the leading image of next paragraph
+      XCTAssertNil(getNodeByKey(key: imageKey))
+    }
+  }
+
+  func testBackspaceMergesPrevParagraphEndingWithImage() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imageKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p2 = createParagraphNode();
+      let img = ImageNode(url: "https://example.com/j.png", size: CGSize(width: 20, height: 20), sourceID: "j"); imageKey = img.getKey()
+      try p1.append([t1, img]); try p2.append([createTextNode(text: "World")]); try root.append([p1, p2])
+      if let t = p2.getFirstChild() as? TextNode { try t.select(anchorOffset: 0, focusOffset: 0) }
+    }
+    try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    // Mount/draw
+    let lm = v.layoutManager; let tc = v.textView.textContainer; let gr = lm.glyphRange(for: tc)
+    UIGraphicsBeginImageContextWithOptions(CGSize(width: 320, height: 60), false, 0)
+    lm.drawGlyphs(forGlyphRange: gr, at: .zero)
+    UIGraphicsEndImageContext()
+    try ed.read {
+      let text = getRoot()?.getTextContent().trimmingCharacters(in: .whitespacesAndNewlines)
+      XCTAssertEqual(text, "HelloWorld")
+      XCTAssertNotNil(ed.decoratorCache[imageKey])
+    }
+  }
+
   func testMultipleImagesMountImmediatelyAtStartMiddleEnd_Optimized() throws {
     let v = LexicalView(
       editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
