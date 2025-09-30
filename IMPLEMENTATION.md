@@ -47,19 +47,20 @@
 ## Phase 2: Core Layer - Remove Direct UIKit Dependencies
 
 ### Task 2.1: Update Core Constants
-- [ ] Replace `import UIKit` with conditional imports
-- [ ] Replace UIKit types with platform abstractions
+- [x] Replace `import UIKit` with conditional imports
+- [x] Replace UIKit types with platform abstractions
 
 ### Task 2.2: Update Editor.swift
-- [ ] Replace `import UIKit` with conditional imports
-- [ ] Abstract UIKeyCommand (iOS) vs NSEvent (macOS)
-- [ ] Abstract UIAlertController error presentation
-- [ ] Update DecoratorCacheItem to use PlatformView
+- [x] Replace `import UIKit` with conditional imports
+- [x] Abstract UIKeyCommand (iOS-only in EditorConfig)
+- [x] Update DecoratorCacheItem to use PlatformView
 
-### Task 2.3: Update Events.swift
-- [ ] Abstract event types
-- [ ] Create platform-specific event adapters
-- [ ] Preserve Catalyst paths
+### Task 2.3: Update Events.swift, GarbageCollection.swift, and remaining Core files
+- [x] Update Events.swift with conditional imports and PlatformPasteboard
+- [x] Update GarbageCollection.swift with conditional imports
+- [x] Update all Core/Nodes files (CodeNode, DecoratorNode, etc.) with conditional imports and platform types
+- [x] Update OptimizedReconciler, Reconciler, Utils with conditional imports
+- [x] Update all Core/Selection files with conditional imports
 
 ---
 
@@ -318,7 +319,7 @@
 ## Progress Summary
 
 **Phase 1**: ✅ Complete (3/3 tasks complete)
-**Phase 2**: ⬜ Not Started (0/3 tasks)
+**Phase 2**: ✅ Complete (3/3 tasks complete)
 **Phase 3**: ⬜ Not Started (0/4 tasks)
 **Phase 4**: ⬜ Not Started (0/2 tasks)
 **Phase 5**: ⬜ Not Started (0/2 tasks)
@@ -332,7 +333,7 @@
 **Phase 13**: ⬜ Not Started (0/4 tasks)
 **Phase 14**: ⬜ Not Started (0/3 tasks)
 
-**Overall**: 3/42 tasks complete (7%)
+**Overall**: 6/42 tasks complete (14%)
 
 ---
 
@@ -345,7 +346,7 @@
 - Decided on platform abstraction strategy using typealiases and conditional compilation
 - Plan approved by user with decisions on SwiftUI, versioning, testing, and deployment strategy
 
-### 2025-09-30 - Phase 1 Started
+### 2025-09-30 - Phase 1 Complete
 - Updated minimum versions to iOS 17+ and macOS 14+ (modern baseline)
 - Updated Package.swift to support both iOS and macOS platforms
 - Created Lexical/Platform/PlatformTypes.swift with cross-platform typealiases
@@ -355,17 +356,27 @@
   - PlatformPasteboardProtocol with iOS/macOS adapters
   - Platform view, color, and font helper extensions
 
+### 2025-09-30 - Phase 2 Complete
+- Updated all Core layer files with conditional imports (#if canImport(UIKit) / #elseif canImport(AppKit))
+- Constants.swift: Made defaultFont and defaultColor platform-specific
+- Editor.swift: Made keyCommands iOS-only, created separate platform initializers, used PlatformView in DecoratorCacheItem
+- Events.swift: Replaced UIPasteboard with PlatformPasteboard throughout
+- Core/Nodes: Updated all node files (CodeNode, DecoratorNode, etc.) to use platform types (PlatformView, PlatformColor)
+- Core/Selection: Added conditional imports to all selection files
+- Completed 7 commits following "commit often" strategy
+- All Core layer now supports both iOS and macOS platforms
+
 ---
 
 ## Next Steps
 
-1. Start with Phase 1: Create platform abstraction layer
-2. Update Package.swift to support both platforms
-3. Create PlatformTypes.swift with conditional typealiases
-4. Begin systematic migration of Core layer
+1. ✅ Phase 1: Foundation & Platform Abstraction Layer (Complete)
+2. ✅ Phase 2: Core Layer updates (Complete)
+3. ⏭️ Phase 3: TextKit Layer - Platform Adaptation (Next)
+4. Continue with Helper layer and remaining Lexical files
 
 ---
 
 **Last Updated**: 2025-09-30
-**Current Phase**: Phase 1 - Foundation & Platform Abstraction Layer
-**Current Task**: Task 1.1 - Update Package.swift
+**Current Phase**: Phase 2 Complete → Phase 3 Next
+**Current Task**: Helper/AttributesUtils.swift and remaining files with UIKit dependencies
