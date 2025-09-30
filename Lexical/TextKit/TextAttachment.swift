@@ -45,7 +45,7 @@ public class TextAttachment: NSTextAttachment {
   // necessary to stop UIKit drawing a placeholder image
   override public func image(
     forBounds imageBounds: CGRect, textContainer: NSTextContainer?, characterIndex charIndex: Int
-  ) -> UIImage? {
-    return UIImage()
+  ) -> PlatformImage? {
+    return PlatformImage()
   }
 }

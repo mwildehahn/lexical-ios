@@ -18,7 +18,7 @@ class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {
     shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
     properties: UnsafePointer<NSLayoutManager.GlyphProperty>,
     characterIndexes: UnsafePointer<Int>,
-    font: UIFont,
+    font: PlatformFont,
     forGlyphRange glyphRange: NSRange
   ) -> Int {
 

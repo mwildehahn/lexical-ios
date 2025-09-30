@@ -1209,7 +1209,7 @@ public class RangeSelection: BaseSelection {
         try possibleNode.selectStart()
         return
       }
-      try modify(alter: .extend, isBackward: isBackwards, granularity: .character)
+      try modify(alter: .extend, isBackward: isBackwards, granularity: PlatformTextGranularity.character)
 
       if !isCollapsed() {
         if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
@@ -1296,7 +1296,7 @@ public class RangeSelection: BaseSelection {
       }
       // Hint reconciler to avoid structural insert fast path for this update.
       getActiveEditor()?.suppressInsertFastPathOnce = true
-      try modify(alter: .extend, isBackward: isBackwards, granularity: .word)
+      try modify(alter: .extend, isBackward: isBackwards, granularity: PlatformTextGranularity.word)
       // Forward granularity around inline attachments (decorators): UIKit sometimes selects only the
       // attachment character (U+FFFC) or fails to advance. Normalize by extending selection over the
       // next visible word characters so deletion matches legacy behavior.
@@ -1371,7 +1371,7 @@ public class RangeSelection: BaseSelection {
 
   @MainActor
   internal func modify(
-    alter: NativeSelectionModificationType, isBackward: Bool, granularity: UITextGranularity
+    alter: NativeSelectionModificationType, isBackward: Bool, granularity: PlatformTextGranularity
   ) throws {
     let collapse = alter == .move
 
@@ -1381,7 +1381,7 @@ public class RangeSelection: BaseSelection {
 
     editor.moveNativeSelection(
       type: alter,
-      direction: isBackward ? .backward : .forward,
+      direction: isBackward ? PlatformTextStorageDirection.backward : PlatformTextStorageDirection.forward,
       granularity: granularity)
 
     let nativeSelection = editor.getNativeSelection()

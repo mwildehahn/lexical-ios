@@ -67,17 +67,17 @@ public class QuoteNode: ElementNode {
 }
 
 @objc public class QuoteCustomDrawingAttributes: NSObject {
-  public init(barColor: UIColor, barWidth: CGFloat, rounded: Bool, barInsets: UIEdgeInsets) {
+  public init(barColor: PlatformColor, barWidth: CGFloat, rounded: Bool, barInsets: PlatformEdgeInsets) {
     self.barColor = barColor
     self.barWidth = barWidth
     self.rounded = rounded
     self.barInsets = barInsets
   }
 
-  let barColor: UIColor
+  let barColor: PlatformColor
   let barWidth: CGFloat
   let rounded: Bool
-  let barInsets: UIEdgeInsets
+  let barInsets: PlatformEdgeInsets
 
   override public func isEqual(_ object: Any?) -> Bool {
     let lhs = self

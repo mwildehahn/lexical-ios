@@ -16,6 +16,7 @@ import AppKit
 
 import UniformTypeIdentifiers
 
+#if canImport(UIKit)
 @MainActor
 internal func setPasteboard(selection: BaseSelection, pasteboard: PlatformPasteboard) throws {
   guard let editor = getActiveEditor() else {
@@ -63,6 +64,35 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: PlatformPasteb
       ]
   }
 }
+#elseif canImport(AppKit)
+@MainActor
+internal func setPasteboard(selection: BaseSelection, pasteboard: PlatformPasteboard) throws {
+  guard let editor = getActiveEditor() else {
+    throw LexicalError.invariantViolation("Could not get editor")
+  }
+  let nodes = try generateArrayFromSelectedNodes(editor: editor, selection: selection).nodes
+  let text = try selection.getTextContent()
+  let encodedData = try JSONEncoder().encode(nodes)
+
+  // Clear and set pasteboard data
+  pasteboard.clearContents()
+
+  // Set RTF data
+  let attrString = try getAttributedStringFromFrontend()
+  if let rtfData = try? attrString.data(
+    from: NSRange(location: 0, length: attrString.length),
+    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+  {
+    pasteboard.setData(rtfData, forType: .rtf)
+  }
+
+  // Set Lexical JSON data
+  pasteboard.setData(encodedData, forType: NSPasteboard.PasteboardType(LexicalConstants.pasteboardIdentifier))
+
+  // Set plain text
+  pasteboard.setString(text, forType: .string)
+}
+#endif
 
 #if canImport(UIKit)
 @MainActor
@@ -245,17 +275,31 @@ internal func insertRTF(selection: RangeSelection, attributedString: NSAttribute
       let text = paragraph.attributedSubstring(from: attribute.range).string
       let textNode = createTextNode(text: text)
 
-      if (attribute.attributes.first(where: { $0.key == .font })?.value as? UIFont)?
+      #if canImport(UIKit)
+      if (attribute.attributes.first(where: { $0.key == .font })?.value as? PlatformFont)?
         .fontDescriptor.symbolicTraits.contains(.traitBold) ?? false
       {
         textNode.format.bold = true
       }
 
-      if (attribute.attributes.first(where: { $0.key == .font })?.value as? UIFont)?
+      if (attribute.attributes.first(where: { $0.key == .font })?.value as? PlatformFont)?
         .fontDescriptor.symbolicTraits.contains(.traitItalic) ?? false
       {
         textNode.format.italic = true
       }
+      #elseif canImport(AppKit)
+      if (attribute.attributes.first(where: { $0.key == .font })?.value as? PlatformFont)?
+        .fontDescriptor.symbolicTraits.contains(.bold) ?? false
+      {
+        textNode.format.bold = true
+      }
+
+      if (attribute.attributes.first(where: { $0.key == .font })?.value as? PlatformFont)?
+        .fontDescriptor.symbolicTraits.contains(.italic) ?? false
+      {
+        textNode.format.italic = true
+      }
+      #endif
 
       if let underlineAttribute = attribute.attributes[.underlineStyle] {
         if underlineAttribute as? NSNumber != 0 {
