@@ -348,6 +348,73 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
     }
   }
 
+  func testMultiNodeEditsInSingleUpdate_TextOnly() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t1 = createTextNode(text: "Hello")
+      let t2 = createTextNode(text: " Brave ")
+      let t3 = createTextNode(text: "World")
+      try p.append([t1, t2, t3]); try root.append([p])
+      // Place caret inside t2 before edits
+      try t2.select(anchorOffset: 1, focusOffset: 1)
+      // Single update mutating three nodes
+      try t1.setText("Hello!")
+      try t2.setText(" Brief ") // Brave -> Brief
+      try t3.setText("Wor")      // trim tail
+    }
+    try editor.read { XCTAssertEqual(getRoot()?.getTextContent(), "Hello! Brief Wor") }
+  }
+
+  func testStructuralAndTextInSameUpdate_InsertParagraphAndEdit() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "HelloWorld")
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: 5, focusOffset: 5)
+      // Insert paragraph and also edit neighbors in one update
+      try (getSelection() as? RangeSelection)?.insertParagraph()
+      // Edit left side: add space after Hello
+      if let p1 = root.getFirstChild() as? ParagraphNode, let tl = p1.getFirstChild() as? TextNode {
+        try tl.setText("Hello ")
+      }
+      // Edit right side: ensure World unchanged
+    }
+    try editor.read { XCTAssertEqual(getRoot()?.getTextContent(), "Hello\nWorld") }
+  }
+
+  func testSelectionStabilityUnderUnrelatedEdits() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      // Build 5 paragraphs
+      for i in 0..<5 {
+        let p = createParagraphNode(); let t = createTextNode(text: "Para \(i)")
+        try p.append([t]); try root.append([p])
+      }
+      // Put caret in first paragraph at offset 2
+      if let p0 = root.getFirstChild() as? ParagraphNode, let t0 = p0.getFirstChild() as? TextNode {
+        try t0.select(anchorOffset: 2, focusOffset: 2)
+      }
+    }
+    // Apply unrelated edits to later paragraphs in one update
+    try editor.update {
+      guard let root = getRoot() else { return }
+      if let p3 = root.getChildAtIndex(index: 3) as? ParagraphNode, let t3 = p3.getFirstChild() as? TextNode {
+        try t3.setText("Para 3 extended")
+      }
+      if let p4 = root.getChildAtIndex(index: 4) as? ParagraphNode, let t4 = p4.getFirstChild() as? TextNode {
+        try t4.setText("Para 4 appended!")
+      }
+    }
+    try editor.read {
+      guard let sel = try getSelection() as? RangeSelection else { return XCTFail("Need range selection") }
+      XCTAssertTrue(sel.isCollapsed())
+    }
+  }
+
   func testDeleteSelectionAcrossSiblingTextNodesMerges() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
     try editor.update {

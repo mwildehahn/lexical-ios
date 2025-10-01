@@ -7,6 +7,7 @@
 
 @testable import Lexical
 import XCTest
+@testable import LexicalInlineImagePlugin
 
 final class OptimizedReconcilerGranularityUITests: XCTestCase {
   private func makeOptimizedEditorView() -> (Editor, LexicalView) {
@@ -139,6 +140,71 @@ final class OptimizedReconcilerGranularityUITests: XCTestCase {
       let s = getRoot()?.getTextContent() ?? ""
       let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
       XCTAssertEqual(norm, "hiworld")
+    }
+  }
+
+  func testDeleteWordForwardAcrossInlineImage_UI() throws {
+    let flags = FeatureFlags.optimizedProfile(.aggressiveEditor)
+    let v = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]), featureFlags: flags)
+    let editor = v.editor
+    let view = v
+    let text1 = "Hello "
+    let text2 = "World Test"
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t1 = createTextNode(text: text1)
+      let img = ImageNode(url: "https://example.com/inline.png", size: CGSize(width: 16, height: 16), sourceID: "i")
+      let t2 = createTextNode(text: text2)
+      try p.append([t1, img, t2]); try root.append([p])
+      try t1.select(anchorOffset: t1.getTextPart().lengthAsNSString(), focusOffset: t1.getTextPart().lengthAsNSString())
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteWord(isBackwards: false) }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      // Expect the word "World" removed; attachment ignored for text content
+      XCTAssertEqual(norm, "Hello  Test")
+    }
+    _ = view // keep
+  }
+
+  func testAttributeToggleWhileTyping_UI() throws {
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "")
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: 0, focusOffset: 0)
+    }
+    // Toggle bold on collapsed caret, type, backspace, toggle off
+    try editor.update { try (getSelection() as? RangeSelection)?.formatText(formatType: .bold) }
+    try editor.update { try (getSelection() as? RangeSelection)?.insertText("Bold") }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) } // remove 'd'
+    try editor.update { try (getSelection() as? RangeSelection)?.formatText(formatType: .bold) }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "Bol") // "Bold" -> backspace -> "Bol"
+    }
+  }
+
+  func testPasteThenDeleteWord_UI() throws {
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "Start ")
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: t.getTextPart().lengthAsNSString(), focusOffset: t.getTextPart().lengthAsNSString())
+    }
+    // Simulate paste of a word + space (plain text)
+    try editor.update { try (getSelection() as? RangeSelection)?.insertRawText("Pasted Word ") }
+    // Delete word forward (should remove the next word if present; here caret at end, so no-op).
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteWord(isBackwards: false) }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "Start Pasted Word ")
     }
   }
 }
