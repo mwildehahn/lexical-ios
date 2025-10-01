@@ -25,9 +25,9 @@
 
 ### Task 1.1: Update Package.swift for Multi-Platform Support
 - [x] Change platforms to `[.iOS(.v17), .macOS(.v14)]`
-- [ ] Add macOS-specific targets where needed
-- [ ] Create separate products for macOS
-- [ ] Verify plugin targets compile for both platforms
+- [x] Add macOS-specific targets where needed (using shared targets with conditional compilation)
+- [x] Create separate products for macOS (not needed - all products work on both platforms)
+- [x] Verify plugin targets compile for both platforms (verified: 0 build errors on both iOS and macOS)
 
 ### Task 1.2: Create Platform Abstraction Types
 - [x] Create `Lexical/Platform/PlatformTypes.swift`
