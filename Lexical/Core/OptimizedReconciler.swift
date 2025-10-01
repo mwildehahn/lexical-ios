@@ -1040,7 +1040,9 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: optimized slow path applied (full rebuild)") }
+    if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+      print("🔥 OPTIMIZED RECONCILER: optimized slow path applied (full rebuild)")
+    }
     if let metrics = editor.metricsContainer {
       // Approximate wall time for slow path as pure apply time for the full replace
       // (We don't separate planning here.)
@@ -1137,7 +1139,9 @@ internal enum OptimizedReconciler {
               applyDuration: applyDur, deleteCount: 0, insertCount: 0, setAttributesCount: 1, fixAttributesCount: 1)
             metrics.record(.reconcilerRun(metric))
           }
-          if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: attribute-only fast path applied") }
+          if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+            print("🔥 OPTIMIZED RECONCILER: attribute-only fast path applied")
+          }
           return true
         }
       }
@@ -1260,7 +1264,9 @@ internal enum OptimizedReconciler {
         applyDuration: applyDur, deleteCount: 0, insertCount: 0, setAttributesCount: 0, fixAttributesCount: 1)
       metrics.record(.reconcilerRun(metric))
     }
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: text-only minimal replace applied (Δ=\(delta))") }
+    if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+      print("🔥 OPTIMIZED RECONCILER: text-only minimal replace applied (Δ=\(delta))")
+    }
     return true
   }
 
@@ -1483,7 +1489,7 @@ internal enum OptimizedReconciler {
         editor.rangeCache[addedKey] = item
       }
     }
-    if editor.featureFlags.useReconcilerShadowCompare {
+    if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
       print("🔥 OPTIMIZED RECONCILER: insert-block fast path (parent=\(parentKey), at=\(insertIndex))")
     }
     return true
@@ -1876,7 +1882,9 @@ internal enum OptimizedReconciler {
     // Compute LIS (stable children); if almost all children are stable, moves are few
     let prevChildren = parentPrev.getChildrenKeys(fromLatest: false)
     let stableSet = computeStableChildKeys(prev: prevChildren, next: nextChildren)
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: reorder candidates parent=\(parentKey) total=\(nextChildren.count) stable=\(stableSet.count)") }
+    if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+      print("🔥 OPTIMIZED RECONCILER: reorder candidates parent=\(parentKey) total=\(nextChildren.count) stable=\(stableSet.count)")
+    }
 
     // Build attributed string for children in new order and compute subtree lengths
     let theme = editor.getTheme()
@@ -1988,7 +1996,9 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-      if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey), moved=\(movedCount), total=\(nextChildren.count))") }
+      if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+        print("🔥 OPTIMIZED RECONCILER: children reorder fast path applied (parent=\(parentKey), moved=\(movedCount), total=\(nextChildren.count))")
+      }
       appliedAny = true
     }
     return appliedAny
@@ -2184,7 +2194,9 @@ internal enum OptimizedReconciler {
         setAttributesCount: stats.sets, fixAttributesCount: stats.fixes)
       metrics.record(.reconcilerRun(metric))
     }
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: pre/post fast path applied (key=\(dirtyKey))") }
+    if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+      print("🔥 OPTIMIZED RECONCILER: pre/post fast path applied (key=\(dirtyKey))")
+    }
     return true
   }
 
@@ -2242,7 +2254,9 @@ internal enum OptimizedReconciler {
         treatedAllNodesAsDirty: false, pathLabel: "composition-start")
       metrics.record(.reconcilerRun(metric))
     }
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: composition fast path applied (len=\(markedAttr.length))") }
+    if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+      print("🔥 OPTIMIZED RECONCILER: composition fast path applied (len=\(markedAttr.length))")
+    }
     return true
   }
 
@@ -2351,7 +2365,9 @@ internal enum OptimizedReconciler {
       try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
     }
 
-    if editor.featureFlags.useReconcilerShadowCompare { print("🔥 OPTIMIZED RECONCILER: coalesced contiguous region replace (ancestor=\(ancestorKey), dirty=\(editor.dirtyNodes.count))") }
+    if editor.featureFlags.useReconcilerShadowCompare && editor.featureFlags.verboseLogging {
+      print("🔥 OPTIMIZED RECONCILER: coalesced contiguous region replace (ancestor=\(ancestorKey), dirty=\(editor.dirtyNodes.count))")
+    }
     if let metrics = editor.metricsContainer {
       let metric = ReconcilerMetric(
         duration: 0, dirtyNodes: editor.dirtyNodes.count, rangesAdded: 0, rangesDeleted: 0,

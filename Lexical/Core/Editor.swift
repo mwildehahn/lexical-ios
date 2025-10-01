@@ -143,7 +143,7 @@ public class Editor: NSObject {
   // Used to help co-ordinate selection and events
   internal var compositionKey: NodeKey?
   public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
-  internal var featureFlags: FeatureFlags = FeatureFlags()
+  public var featureFlags: FeatureFlags = FeatureFlags()
 
   // Used for storing editor listener events
   internal var listeners = Listeners()

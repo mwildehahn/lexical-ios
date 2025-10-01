@@ -771,6 +771,21 @@ Comprehensive batch optimization leveraging iOS 16 SDK capabilities to dramatica
   - [x] Debug prints gated under `verboseLogging`
   - [ ] Optional: add integration test with `LexicalView` for engine toggle + persistence
 
+### 2025-10-01 — Verbose logging guard sweep
+
+- What changed
+  - Audited all “🔥” debug prints and ensured they are guarded by `FeatureFlags.verboseLogging`.
+  - Also gated shadow-compare diagnostics and Playground toolbar logs.
+
+- Key files
+  - `Lexical/Core/OptimizedReconciler.swift` — gate shadow-compare prints with `&& verboseLogging`.
+  - `Lexical/Helper/ReconcilerShadowCompare.swift` — guard all “🔥 SHADOW-COMPARE …” prints.
+  - `Playground/LexicalPlayground/ToolbarPlugin.swift` — guard TOOLBAR prints in sample image actions.
+
+- Verification
+  - Searched repo for `print("🔥` and spot-checked guards.
+  - In Playground, toggled “verbose-logging” flag to confirm logs appear only when enabled.
+
 ## 2025-09-29 — Live typing duplication + empty hydrate fix
 
 - What changed
