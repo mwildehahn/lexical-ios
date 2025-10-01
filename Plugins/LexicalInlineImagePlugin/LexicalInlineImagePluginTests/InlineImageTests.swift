@@ -362,6 +362,34 @@ class InlineImageTests: XCTestCase {
     XCTAssertTrue(v.superview === optimizedView.textView, "Image view should be mounted in textView")
   }
 
+  func testImageMountsImmediatelyAtStartOfSecondParagraph_AfterTextNewline() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imageKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p2 = createParagraphNode();
+      let img = ImageNode(url: "https://example.com/first.png", size: CGSize(width: 20, height: 20), sourceID: "first"); imageKey = img.getKey()
+      try p1.append([t1]); try p2.append([img]); try root.append([p1, p2])
+    }
+    // Force layout/draw so layout manager positions/unhides decorator
+    let lm = v.layoutManager; let tc = v.textView.textContainer
+    let gr = lm.glyphRange(for: tc)
+    UIGraphicsBeginImageContextWithOptions(CGSize(width: 320, height: 60), false, 0)
+    lm.drawGlyphs(forGlyphRange: gr, at: .zero)
+    UIGraphicsEndImageContext()
+    guard case let .cachedView(view)? = ed.decoratorCache[imageKey] else {
+      return XCTFail("Decorator view not cached for newly inserted image")
+    }
+    XCTAssertFalse(view.isHidden, "Decorator view should be visible immediately after insertion")
+    XCTAssertTrue(view.superview === v.textView)
+  }
+
   // Unmount semantics are covered by persistence tests which assert position cache
   // clearing and by reconciler tests that remove decorator keys from caches.
 }
