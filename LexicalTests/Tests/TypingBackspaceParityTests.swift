@@ -96,5 +96,78 @@ final class TypingBackspaceParityTests: XCTestCase {
     let b = try run(leg)
     XCTAssertEqual(a, b)
   }
-}
 
+  func testParity_BackspaceAfterNewline_PunctuationVariants() throws {
+    let (opt, leg) = makeViews()
+    func run(on v: LexicalView, punct: String) throws -> String {
+      let ed = v.editor
+      try ed.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode(); let t = createTextNode(text: "Say")
+        try p.append([t]); try root.append([p])
+        try t.select(anchorOffset: 3, focusOffset: 3)
+        try (getSelection() as? RangeSelection)?.insertText(punct)
+        try (getSelection() as? RangeSelection)?.insertParagraph()
+        try (getSelection() as? RangeSelection)?.insertText("ab")
+      }
+      try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+      return v.attributedText.string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    for punct in [".", "!", "?"] {
+      let a = try run(on: opt, punct: punct)
+      let b = try run(on: leg, punct: punct)
+      XCTAssertEqual(a, b, "Mismatch for punct=\(punct)")
+      XCTAssertTrue(a.contains("Say\(punct)"))
+    }
+  }
+
+  func testParity_BackspaceAtWordMiddle_DeletesSingleCharacter() throws {
+    let (opt, leg) = makeViews()
+    func run(_ v: LexicalView) throws -> String {
+      let ed = v.editor
+      try ed.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode(); let t = createTextNode(text: "word")
+        try p.append([t]); try root.append([p])
+        try t.select(anchorOffset: 3, focusOffset: 3) // after 'r'
+      }
+      try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+      return v.attributedText.string
+    }
+    XCTAssertEqual(try run(opt), try run(leg))
+  }
+
+  func testParity_BackspaceAtStartOfSecondWord_DeletesSpaceOnly() throws {
+    let (opt, leg) = makeViews()
+    func run(_ v: LexicalView) throws -> String {
+      let ed = v.editor
+      try ed.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode(); let t = createTextNode(text: "Hi world")
+        try p.append([t]); try root.append([p])
+        try t.select(anchorOffset: 3, focusOffset: 3) // position at start of "world" (after space)
+      }
+      try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+      return v.attributedText.string
+    }
+    XCTAssertEqual(try run(opt), try run(leg))
+  }
+
+  func testParity_Emoji_Newline_Type_Backspace_DeletesOneChar() throws {
+    let (opt, leg) = makeViews()
+    func run(_ v: LexicalView) throws -> String {
+      let ed = v.editor
+      try ed.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode(); let t = createTextNode(text: "😊")
+        try p.append([t]); try root.append([p])
+        try t.select(anchorOffset: 1, focusOffset: 1)
+        try (getSelection() as? RangeSelection)?.insertParagraph()
+        try (getSelection() as? RangeSelection)?.insertText("ab")
+      }
+      try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+      return v.attributedText.string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    XCTAssertEqual(try run(opt), try run(leg))
+  }
+}
