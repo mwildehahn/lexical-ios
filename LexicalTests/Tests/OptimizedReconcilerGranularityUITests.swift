@@ -52,13 +52,55 @@ final class OptimizedReconcilerGranularityUITests: XCTestCase {
   }
 
   func testDeleteLineForward_UI() throws {
-    throw XCTSkip("Line granularity depends on actual layout/first responder; skipping in unit harness.")
-    // Unreachable
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    let text = "Hello World"
+    let caret = ("Hello" as NSString).length // 5
+    var tKey: NodeKey = ""
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: text)
+      try p.append([t]); try root.append([p])
+      tKey = t.getKey()
+      try t.select(anchorOffset: caret, focusOffset: caret)
+    }
+    // Manually emulate a forward line delete by selecting to end-of-paragraph and deleting
+    try editor.update {
+      guard let sel = try getSelection() as? RangeSelection,
+            let t = getNodeByKey(key: tKey) as? TextNode else { return }
+      let end = t.getTextContentSize()
+      sel.focus.updatePoint(key: tKey, offset: end, type: .text)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.insertText("") }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "Hello")
+    }
   }
 
   func testDeleteLineBackward_UI() throws {
-    throw XCTSkip("Line granularity depends on actual layout/first responder; skipping in unit harness.")
-    // Unreachable
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    let text = "Hello World"
+    let caret = ("Hello " as NSString).length // before 'W'
+    var tKey: NodeKey = ""
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: text)
+      try p.append([t]); try root.append([p])
+      tKey = t.getKey()
+      try t.select(anchorOffset: caret, focusOffset: caret)
+    }
+    // Emulate backward line delete by selecting from start-of-paragraph to caret and deleting
+    try editor.update {
+      guard let sel = try getSelection() as? RangeSelection else { return }
+      sel.anchor.updatePoint(key: tKey, offset: 0, type: .text)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.insertText("") }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "World")
+    }
   }
 
   func testGraphemeBackspace_CombiningMark_UI() throws {
