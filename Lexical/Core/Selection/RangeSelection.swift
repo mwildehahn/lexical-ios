@@ -1064,19 +1064,42 @@ public class RangeSelection: BaseSelection {
         }
       }
     }
-    // Optimized: pre-clamp a single-character deletion when starting from a collapsed caret.
-    // This avoids relying on native tokenizer behavior that may expand to a word.
+    // Optimized: pre-clamp a single grapheme (composed character) deletion when starting
+    // from a collapsed caret. This avoids relying on native tokenizer behavior that may
     var didPreClampSingleChar = false
     if isBackwards && wasCollapsed, let editor = getActiveEditor(),
        editor.frontend is LexicalView, editor.featureFlags.useOptimizedReconciler {
       if let start = caretStringLocation, start > 0 {
-        let clamp = NSRange(location: start - 1, length: 1)
+        let clamp: NSRange
+        if let ns = editor.textStorage?.string as NSString?, editor.featureFlags.useOptimizedReconcilerStrictMode {
+          // Previous Unicode scalar (handle surrogate pairs)
+          let i = start - 1
+          if i >= 0 {
+            let c = ns.character(at: i)
+            if c >= 0xDC00 && c <= 0xDFFF, i - 1 >= 0 {
+              let h = ns.character(at: i - 1)
+              if h >= 0xD800 && h <= 0xDBFF { clamp = NSRange(location: i - 1, length: 2) } else { clamp = NSRange(location: i, length: 1) }
+            } else {
+              clamp = NSRange(location: i, length: 1)
+            }
+          } else {
+            clamp = NSRange(location: max(0, start - 1), length: 1)
+          }
+        } else if let ns = editor.textStorage?.string as NSString? {
+          clamp = ns.rangeOfComposedCharacterSequence(at: start - 1)
+        } else {
+          clamp = NSRange(location: start - 1, length: 1)
+        }
         // Map and apply explicit 1‑char selection; also set structural clamp for reconciler.
         try applySelectionRange(clamp, affinity: .backward)
         editor.pendingDeletionClampRange = clamp
         didPreClampSingleChar = true
         if editor.featureFlags.verboseLogging {
-          print("🔥 DELETE: pre-clamp 1-char at \(start-1); pendingClamp=\(NSStringFromRange(clamp))")
+          if editor.featureFlags.useOptimizedReconcilerStrictMode {
+            print("🔥 DELETE: pre-clamp scalar at \(NSStringFromRange(clamp))")
+          } else {
+            print("🔥 DELETE: pre-clamp grapheme at \(NSStringFromRange(clamp))")
+          }
         }
       }
     }
@@ -1251,17 +1274,31 @@ public class RangeSelection: BaseSelection {
             print("🔥 DELETE: native expansion detected start=\(start) a=\(a) b=\(b) len=\(len)")
           }
           if len > 1 {
-            let loc = isBackwards ? max(0, start - 1) : start
-            let clamp = NSRange(location: loc, length: 1)
+            // Clamp to either a single code unit (strict parity) or the full grapheme cluster
+            var clamp = NSRange(location: 0, length: 0)
+            if editor.featureFlags.useOptimizedReconcilerStrictMode {
+              let loc = isBackwards ? max(0, start - 1) : start
+              clamp = NSRange(location: loc, length: 1)
+            } else if let ns = editor.textStorage?.string as NSString? {
+              if isBackwards {
+                if start > 0 { clamp = ns.rangeOfComposedCharacterSequence(at: start - 1) }
+              } else {
+                if start < ns.length { clamp = ns.rangeOfComposedCharacterSequence(at: start) }
+              }
+            }
             try applySelectionRange(clamp, affinity: isBackwards ? .backward : .forward)
             // Additionally clamp structural fast paths in the optimized reconciler (one‑shot)
             editor.pendingDeletionClampRange = clamp
             if editor.featureFlags.verboseLogging {
-              print("🔥 DELETE: clamp native selection word→char at \(loc); pendingClamp=\(NSStringFromRange(clamp))")
+              if editor.featureFlags.useOptimizedReconcilerStrictMode {
+                print("🔥 DELETE: clamp native selection word→1-char at \(clamp.location)")
+              } else {
+                print("🔥 DELETE: clamp native selection word→grapheme cluster=\(NSStringFromRange(clamp))")
+              }
             }
           }
+          }
         }
-      }
 
       if !isCollapsed() {
         if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
@@ -1316,10 +1353,23 @@ public class RangeSelection: BaseSelection {
         let lo = min(a, b); let hi = max(a, b)
         selectionRange = NSRange(location: lo, length: hi - lo)
       }
+      // Determine a single composed character (grapheme cluster) to delete/forward-delete
+      // when the selection was collapsed. This ensures emoji and ZWJ sequences are handled
+      // as one unit (parity with legacy + UIKit behavior).
       var collapsedOneChar: NSRange? = nil
-      if wasCollapsed, let start = caretStringLocation {
-        let loc = isBackwards ? max(0, start - 1) : start
-        collapsedOneChar = NSRange(location: loc, length: 1)
+      if wasCollapsed, let start = caretStringLocation, let ns = ed.textStorage?.string as NSString? {
+        func oneGraphemeRange(around start: Int, backwards: Bool, in ns: NSString) -> NSRange? {
+          if backwards {
+            if start <= 0 { return nil }
+            let idx = max(0, start - 1)
+            if idx < ns.length { return ns.rangeOfComposedCharacterSequence(at: idx) }
+            return nil
+          } else {
+            if start >= ns.length { return nil }
+            return ns.rangeOfComposedCharacterSequence(at: start)
+          }
+        }
+        collapsedOneChar = oneGraphemeRange(around: start, backwards: isBackwards, in: ns)
       }
       let clamp = ed.pendingDeletionClampRange
       // Decide effective range used for deletion
