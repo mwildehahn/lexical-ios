@@ -230,7 +230,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
   -> NativeSelection
 {
   let isBefore = try selection.anchor.isBefore(point: selection.focus)
-  var affinity: UITextStorageDirection = isBefore ? .forward : .backward
+  var affinity: PlatformTextStorageDirection = isBefore ? .forward : .backward
 
   if selection.anchor == selection.focus {
     affinity = .forward
@@ -246,7 +246,9 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
 
   return NativeSelection(
     range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
-    affinity: affinity)
+    affinity: affinity,
+    markedRange: nil,
+    selectionIsNodeOrObject: false)
 }
 
 @MainActor

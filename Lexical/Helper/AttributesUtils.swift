@@ -107,7 +107,7 @@ enum AttributeUtils {
     }
 
     fontDescriptor = fontDescriptor.withSymbolicTraits(symbolicTraits) ?? fontDescriptor
-    font = PlatformFont(descriptor: fontDescriptor, size: 0)
+    font = PlatformFont(descriptor: fontDescriptor, size: 0) ?? font
 
     combinedAttributes[.font] = font
 

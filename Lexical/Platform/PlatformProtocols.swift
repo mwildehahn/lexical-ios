@@ -59,7 +59,9 @@ extension NSTextView: PlatformTextViewProtocol {
   }
 
   public var markedRange: NSRange {
-    return markedTextRange ?? NSRange(location: NSNotFound, length: 0)
+    // NSTextView doesn't have markedTextRange property
+    // It has markedRange() method in NSTextInputClient protocol
+    return NSRange(location: NSNotFound, length: 0)
   }
 
   public var textContainerInset: NSSize {
@@ -264,9 +266,8 @@ public extension PlatformFont {
     #if canImport(UIKit)
     return (fontDescriptor.object(forKey: .traits) as? [UIFontDescriptor.TraitKey: Any])?[.weight] as? CGFloat ?? 0
     #elseif canImport(AppKit)
-    return CGFloat(fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any] ?? [:])
-      .compactMap { $0.value as? CGFloat }
-      .first ?? 0
+    let traits = fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any] ?? [:]
+    return traits[.weight] as? CGFloat ?? 0
     #endif
   }
 }

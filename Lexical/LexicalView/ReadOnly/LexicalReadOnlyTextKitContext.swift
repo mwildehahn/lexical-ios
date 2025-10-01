@@ -322,7 +322,12 @@ internal class LexicalReadOnlySizeCache {
 
   public func draw(inContext context: CGContext, point: CGPoint = .zero) {
     context.saveGState()
+    #if canImport(UIKit)
     UIGraphicsPushContext(context)
+    #elseif canImport(AppKit)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+    #endif
 
     let glyphRange = layoutManager.glyphRange(for: textContainer)
     let insetPoint = CGPoint(
@@ -330,7 +335,11 @@ internal class LexicalReadOnlySizeCache {
     layoutManager.drawBackground(forGlyphRange: glyphRange, at: insetPoint)
     layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: insetPoint)
 
+    #if canImport(UIKit)
     UIGraphicsPopContext()
+    #elseif canImport(AppKit)
+    NSGraphicsContext.restoreGraphicsState()
+    #endif
     context.restoreGState()
   }
 }

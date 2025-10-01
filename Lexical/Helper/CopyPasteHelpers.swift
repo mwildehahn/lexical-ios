@@ -192,7 +192,7 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
   throws
 {
   // Try Lexical format first
-  if let pasteboardData = pasteboard.data(forType: LexicalConstants.pasteboardIdentifier) {
+  if let pasteboardData = pasteboard.data(forType: NSPasteboard.PasteboardType(LexicalConstants.pasteboardIdentifier)) {
     let deserializedNodes = try JSONDecoder().decode(SerializedNodeArray.self, from: pasteboardData)
     guard let editor = getActiveEditor() else { return }
     _ = try insertGeneratedNodes(
