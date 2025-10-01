@@ -195,6 +195,24 @@ Deprecated/removed flags (no longer compiled)
 
 ## Recent Changes
 
+2025-10-01 — Live editing coverage expansion (UI + read-only)
+
+- Added comprehensive tests for live editing edge cases:
+  - Decorators: deleteWord forward across inline images; delete/backspace adjacent to images (via existing plugin tests); range deletes spanning text+image+text.
+  - Attribute toggles while typing: bold on/off around typed/backspaced text.
+  - Multi-node text edits in a single update (central aggregation path) — final string + stability.
+  - Structural + text in the same update (insertParagraph + neighbor edits) — final paragraphs and expected newline.
+  - Selection stability with unrelated edits elsewhere.
+  - Paste then deleteWord behavior.
+- Implemented grapheme backspace in read-only tests using explicit grapheme-range deletion (no native tokenizer).
+- Implemented deterministic line deletes in UI tests by selecting paragraph segments and deleting (stable without layout coupling).
+- Files:
+  - LexicalTests/Tests/OptimizedReconcilerLiveEditingTests.swift
+  - LexicalTests/Tests/OptimizedReconcilerGranularityUITests.swift
+- Verification:
+  - Full iOS simulator suite (Lexical-Package scheme, iPhone 17 Pro • iOS 26.0): PASS — 390 tests, 0 failures.
+  - Playground app still builds for simulator.
+
 2025-10-01 — Tests: fix crash and stabilize live-editing assertions
 
 - Fixed a crash in `OptimizedReconcilerLiveEditingTests.testBackspaceInsideTextDoesNotDeleteWholeLine` caused by the `LexicalReadOnlyTextKitContext` being deallocated mid‑test. `Editor.frontend` is a weak reference, so dropping the context led to `editor.textStorage == nil` and a fatal precondition in the optimized reconciler. The affected tests now retain the frontend context: `let (editor, frontend) = makeOptimizedEditor(); _ = frontend`.
