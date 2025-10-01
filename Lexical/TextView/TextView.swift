@@ -45,6 +45,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   private let _keyCommands: [UIKeyCommand]?
 
   fileprivate var textViewDelegate: TextViewDelegate
+  private let modernTKOptimizations: Bool
 
   override public var keyCommands: [UIKeyCommand]? {
     return _keyCommands
@@ -55,6 +56,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
   init(editorConfig: EditorConfig, featureFlags: FeatureFlags) {
     let textStorage = TextStorage()
     let layoutManager = LayoutManager()
+    layoutManager.allowsNonContiguousLayout = true
     layoutManagerDelegate = LayoutManagerDelegate()
     layoutManager.delegate = layoutManagerDelegate
 
@@ -71,18 +73,39 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       reconcilerSanityCheck = false
     #endif
 
+    let adjustedFlags = FeatureFlags(
+      reconcilerSanityCheck: reconcilerSanityCheck,
+      proxyTextViewInputDelegate: featureFlags.proxyTextViewInputDelegate,
+      useOptimizedReconciler: featureFlags.useOptimizedReconciler,
+      useReconcilerFenwickDelta: featureFlags.useReconcilerFenwickDelta,
+      useReconcilerKeyedDiff: featureFlags.useReconcilerKeyedDiff,
+      useReconcilerBlockRebuild: featureFlags.useReconcilerBlockRebuild,
+      useOptimizedReconcilerStrictMode: featureFlags.useOptimizedReconcilerStrictMode,
+      useReconcilerFenwickCentralAggregation: featureFlags.useReconcilerFenwickCentralAggregation,
+      useReconcilerShadowCompare: featureFlags.useReconcilerShadowCompare,
+      useReconcilerInsertBlockFenwick: featureFlags.useReconcilerInsertBlockFenwick,
+      useReconcilerDeleteBlockFenwick: featureFlags.useReconcilerDeleteBlockFenwick,
+      useReconcilerPrePostAttributesOnly: featureFlags.useReconcilerPrePostAttributesOnly,
+      useModernTextKitOptimizations: featureFlags.useModernTextKitOptimizations,
+      verboseLogging: featureFlags.verboseLogging,
+      prePostAttrsOnlyMaxTargets: featureFlags.prePostAttrsOnlyMaxTargets
+    )
+
     editor = Editor(
-      featureFlags: FeatureFlags(reconcilerSanityCheck: reconcilerSanityCheck),
+      featureFlags: adjustedFlags,
       editorConfig: editorConfig)
     textStorage.editor = editor
     placeholderLabel = UILabel(frame: .zero)
 
     useInputDelegateProxy = featureFlags.proxyTextViewInputDelegate
+    modernTKOptimizations = featureFlags.useModernTextKitOptimizations
     inputDelegateProxy = InputDelegateProxy()
     textViewDelegate = TextViewDelegate(editor: editor)
     _keyCommands = editorConfig.keyCommands
 
     super.init(frame: .zero, textContainer: textContainer)
+
+    // TextKit 2 experimental A/B path removed.
 
     if useInputDelegateProxy {
       inputDelegateProxy.targetInputDelegate = self.inputDelegate
@@ -94,6 +117,14 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
     setUpPlaceholderLabel()
     registerRichText(editor: editor)
+
+    // Opportunistically drive viewport-only layout on iOS 16+ when enabled.
+    if modernTKOptimizations {
+      if #available(iOS 16.0, *) {
+        // Trigger an initial viewport layout; we’ll also refresh in layoutSubviews.
+        self.textLayoutManager?.textViewportLayoutController.layoutViewport()
+      }
+    }
   }
 
   /// This init method is used for unit tests
@@ -113,6 +144,13 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
       x: textContainer.lineFragmentPadding * 1.5 + textContainerInset.left,
       y: textContainerInset.top)
     placeholderLabel.sizeToFit()
+
+    // Keep viewport layout bounded to visible area when enabled (iOS 16+)
+    if modernTKOptimizations {
+      if #available(iOS 16.0, *) {
+        self.textLayoutManager?.textViewportLayoutController.layoutViewport()
+      }
+    }
   }
 
   override public var inputDelegate: UITextInputDelegate? {
@@ -153,6 +191,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     editor.log(.UITextView, .verbose, "deleteBackward()")
 
     let previousSelectedRange = selectedRange
+    let previousText = text
 
     inputDelegateProxy.isSuspended = true  // do not send selection changes during deleteBackwards, to not confuse third party keyboards
     defer {
@@ -160,6 +199,16 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
     }
 
     editor.dispatchCommand(type: .deleteCharacter, payload: true)
+
+    // Fallback: if nothing changed (text and selection), delegate to UIKit's default handling
+    if text == previousText && selectedRange == previousSelectedRange {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 TEXTVIEW: deleteBackward fallback → UIKit (no-op detected)")
+      }
+      super.deleteBackward()
+      resetTypingAttributes(for: selectedRange)
+      return
+    }
 
     if previousSelectedRange.length > 0 {
       // Expect new selection to be on the start of selection
@@ -502,7 +551,16 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
 
   public func textViewDidChangeSelection(_ textView: UITextView) {
     guard let textView = textView as? TextView else { return }
-
+    if editor.featureFlags.verboseLogging {
+      let range = textView.selectedRange
+      let marked = textView.markedTextRange
+      let mr = marked.map { (r: UITextRange) -> String in
+        let start = textView.offset(from: textView.beginningOfDocument, to: r.start)
+        let end = textView.offset(from: textView.beginningOfDocument, to: r.end)
+        return "{\(start), \(end-start)}"
+      } ?? "nil"
+      print("🔥 NATIVE-SEL: didChangeSelection selected=\(NSStringFromRange(range)) marked=\(mr) updating=\(textView.isUpdatingNativeSelection)")
+    }
     if textView.isUpdatingNativeSelection {
       return
     }

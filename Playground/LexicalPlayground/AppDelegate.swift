@@ -9,27 +9,14 @@ import UIKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-  var window: UIWindow?
 
-  func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-    window = UIWindow()
-    guard let window else { return false }
-    window.makeKeyAndVisible()
-    let viewController = ViewController()
-    let navigationController = UINavigationController(rootViewController: viewController)
-    window.rootViewController = navigationController
-    return true
+  func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+    let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    config.delegateClass = SceneDelegate.self
+    return config
   }
 
-  func applicationWillTerminate(_ application: UIApplication) {
-    persistEditorState()
-  }
-
-  func persistEditorState() {
-    guard let viewController = window?.rootViewController as? ViewController else {
-      return
-    }
-
-    viewController.persistEditorState()
+  func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
+    // no-op
   }
 }

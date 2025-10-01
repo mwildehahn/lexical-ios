@@ -70,8 +70,18 @@ public class TextStorage: NSTextStorage {
       return
     }
     // Since we're in either controller or non-controlled mode, call super -- this will in turn call
-    // both replaceCharacters and replaceAttributes.
-    super.replaceCharacters(in: range, with: attrString)
+    // both replaceCharacters and replaceAttributes. Clamp to storage bounds to avoid crashes
+    // if a caller provides an out-of-range NSRange (e.g., after concurrent length changes).
+    if let ed = editor, ed.featureFlags.verboseLogging {
+      print("🔥 TS-EDIT: replace(attr) mode=\(mode) range=\(range) repl.len=\(attrString.length) ts.len(before)=\(backingAttributedString.length)")
+    }
+    // Clamp start to [0, length], and end to [start, length]. For pure insertions with an
+    // out-of-bounds location, insert at the end rather than at 0.
+    let length = backingAttributedString.length
+    let start = max(0, min(range.location, length))
+    let end = max(start, min(range.location + range.length, length))
+    let safe = NSRange(location: start, length: end - start)
+    super.replaceCharacters(in: safe, with: attrString)
   }
 
   override open func replaceCharacters(in range: NSRange, with str: String) {
@@ -84,9 +94,17 @@ public class TextStorage: NSTextStorage {
     }
 
     // Mode is not none, so this change has already passed through Lexical
+    if let ed = editor, ed.featureFlags.verboseLogging {
+      print("🔥 TS-EDIT: replace(str) mode=\(mode) range=\(range) repl.len=\((str as NSString).length) ts.len(before)=\(backingAttributedString.length)")
+    }
+    // Clamp range to storage bounds to avoid NSRangeException from UIKit internals when fast paths race with length changes.
+    let length = backingAttributedString.length
+    let start = max(0, min(range.location, length))
+    let end = max(start, min(range.location + range.length, length))
+    let safe = NSRange(location: start, length: end - start)
     beginEditing()
-    backingAttributedString.replaceCharacters(in: range, with: str)
-    edited(.editedCharacters, range: range, changeInLength: (str as NSString).length - range.length)
+    backingAttributedString.replaceCharacters(in: safe, with: str)
+    edited(.editedCharacters, range: safe, changeInLength: (str as NSString).length - safe.length)
     endEditing()
 
     guard let editor, let frontend = editor.frontend else { return }
@@ -141,9 +159,19 @@ public class TextStorage: NSTextStorage {
       return
     }
 
+    if let ed = editor, ed.featureFlags.verboseLogging {
+      print("🔥 TS-EDIT: setAttributes mode=\(mode) range=\(range) attrs.keys=\(attrs?.keys.count ?? 0)")
+    }
+    // Clamp attributes range to safe bounds
+    let length = backingAttributedString.length
+    let start = max(0, min(range.location, length))
+    let end = max(start, min(range.location + range.length, length))
+    let safe = NSRange(location: start, length: end - start)
     beginEditing()
-    backingAttributedString.setAttributes(attrs, range: range)
-    edited(.editedAttributes, range: range, changeInLength: 0)
+    if safe.length > 0 {
+      backingAttributedString.setAttributes(attrs, range: safe)
+      edited(.editedAttributes, range: safe, changeInLength: 0)
+    }
     endEditing()
 
     guard let editor, let frontend = editor.frontend else { return }

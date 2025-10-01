@@ -538,8 +538,10 @@ open class Node: @preconcurrency Codable {
 
   /// Removes this LexicalNode from the EditorState. If the node isn't re-inserted somewhere, the Lexical garbage collector will eventually clean it up.
   open func remove() throws {
+    
     try errorOnReadOnly()
     try Node.removeNode(nodeToRemove: self, restoreSelection: true)
+    
   }
 
   public static func removeNode(nodeToRemove: Node, restoreSelection: Bool) throws {

@@ -10,6 +10,7 @@ import XCTest
 @testable import Lexical
 @testable import LexicalListPlugin
 
+@MainActor
 class ListItemNodeTests: XCTestCase {
   var view: LexicalView?
 

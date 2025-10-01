@@ -1,4 +1,4 @@
-// swift-tools-version: 5.6
+// swift-tools-version: 5.7
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -10,7 +10,7 @@ import PackageDescription
 
 let package = Package(
   name: "Lexical",
-  platforms: [.iOS(.v13)],
+  platforms: [.iOS(.v16)],
   products: [
     .library(
       name: "Lexical",
@@ -25,8 +25,14 @@ let package = Package(
       name: "LexicalHTML",
       targets: ["LexicalHTML"]),
     .library(
+      name: "LexicalAutoLinkPlugin",
+      targets: ["LexicalAutoLinkPlugin"]),
+    .library(
       name: "LexicalLinkPlugin",
       targets: ["LexicalLinkPlugin"]),
+    .library(
+      name: "LexicalLinkHTMLSupport",
+      targets: ["LexicalLinkHTMLSupport"]),
     .library(
       name: "LexicalInlineImagePlugin",
       targets: ["LexicalInlineImagePlugin"]),
@@ -51,7 +57,7 @@ let package = Package(
       path: "./Lexical"),
     .testTarget(
       name: "LexicalTests",
-      dependencies: ["Lexical"],
+      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin", "LexicalInlineImagePlugin"],
       path: "./LexicalTests"),
 
     .target(
@@ -77,6 +83,11 @@ let package = Package(
       path: "./Plugins/LexicalHTML/LexicalHTMLTests"),
 
     .target(
+      name: "LexicalAutoLinkPlugin",
+      dependencies: ["Lexical", "LexicalLinkPlugin"],
+      path: "./Plugins/LexicalAutoLinkPlugin/LexicalAutoLinkPlugin"),
+
+    .target(
       name: "LexicalLinkPlugin",
       dependencies: ["Lexical"],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPlugin"),
@@ -84,6 +95,10 @@ let package = Package(
       name: "LexicalLinkPluginTests",
       dependencies: ["Lexical", "LexicalLinkPlugin"],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPluginTests"),
+    .target(
+      name: "LexicalLinkHTMLSupport",
+      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalHTML"],
+      path: "./Plugins/LexicalLinkPlugin/LexicalLinkHTMLSupport"),
 
     .target(
       name: "LexicalInlineImagePlugin",

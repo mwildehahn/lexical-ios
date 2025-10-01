@@ -101,6 +101,20 @@ extension LexicalViewDelegate {
     addSubview(overlayView)
   }
 
+  /// Convenience initializer that uses the global runtime default feature flags.
+  /// When `LexicalRuntime.isOptimizedReconcilerEnabled == true`, this maps to
+  /// `FeatureFlags.optimizedProfile(.aggressiveEditor)`.
+  @objc public convenience init(
+    editorConfig: EditorConfig,
+    placeholderText: LexicalPlaceholderText? = nil
+  ) {
+    self.init(
+      editorConfig: editorConfig,
+      featureFlags: LexicalRuntime.defaultFeatureFlags,
+      placeholderText: placeholderText
+    )
+  }
+
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
@@ -181,7 +195,10 @@ extension LexicalViewDelegate {
     granularity: UITextGranularity
   ) {
     textView.isUpdatingNativeSelection = true
-
+    if editor.featureFlags.verboseLogging {
+      let rng = nativeSelection.range.map { NSStringFromRange($0) } ?? "nil"
+      print("🔥 NATIVE: request move type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) from=\(rng)")
+    }
     let selection = nativeSelection
 
     guard let opaqueRange = selection.opaqueRange else {
@@ -223,6 +240,10 @@ extension LexicalViewDelegate {
     let newTextRange = textView.textRange(from: start, to: end)
     textView.selectedTextRange = newTextRange
     textView.isUpdatingNativeSelection = false
+    if editor.featureFlags.verboseLogging {
+      let rng = nativeSelection.range.map { NSStringFromRange($0) } ?? "nil"
+      print("🔥 NATIVE: applied move → range=\(rng)")
+    }
   }
 
   func unmarkTextWithoutUpdate() {

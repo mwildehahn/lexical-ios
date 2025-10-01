@@ -81,10 +81,80 @@ internal enum Reconciler {
     shouldReconcileSelection: Bool,  // the situations where we would want to not do this include handling non-controlled mode
     markedTextOperation: MarkedTextOperation?
   ) throws {
+    let metricsStart = CFAbsoluteTimeGetCurrent()
+    var metricsShouldRecord = false
+    var metricsState: ReconcilerState?
+    defer {
+      if metricsShouldRecord, let state = metricsState {
+        let duration = CFAbsoluteTimeGetCurrent() - metricsStart
+        let metric = ReconcilerMetric(
+          duration: duration,
+          dirtyNodes: state.dirtyNodes.count,
+          rangesAdded: state.rangesToAdd.count,
+          rangesDeleted: state.rangesToDelete.count,
+          treatedAllNodesAsDirty: state.treatAllNodesAsDirty
+        )
+        editor.metricsContainer?.record(.reconcilerRun(metric))
+      }
+    }
+
     editor.log(.reconciler, .verbose)
 
     guard let textStorage = editor.textStorage else {
       fatalError("Cannot run reconciler on an editor with no text storage")
+    }
+
+    // Fresh-document hydration (legacy path): if TextStorage is empty but the pending state
+    // has non-empty content, build the full attributed string once and initialize caches.
+    if textStorage.length == 0 {
+      if let root = pendingEditorState.getRootNode() {
+        let childKeys = root.getChildrenKeys()
+        if !childKeys.isEmpty {
+          func subtreeTotalLengthLocal(nodeKey: NodeKey, state: EditorState) -> Int {
+            guard let node = state.nodeMap[nodeKey] else { return 0 }
+            var total = node.getPreamble().lengthAsNSString()
+            total += node.getTextPart().lengthAsNSString()
+            total += node.getPostamble().lengthAsNSString()
+            if let el = node as? ElementNode {
+              for c in el.getChildrenKeys() {
+                total += subtreeTotalLengthLocal(nodeKey: c, state: state)
+              }
+            }
+            return total
+          }
+          var total = 0
+          for k in childKeys { total += subtreeTotalLengthLocal(nodeKey: k, state: pendingEditorState) }
+          if total > 0 {
+            let t0 = CFAbsoluteTimeGetCurrent()
+            try OptimizedReconciler.hydrateFreshDocumentFully(pendingState: pendingEditorState, editor: editor)
+            let dt = CFAbsoluteTimeGetCurrent() - t0
+            if let metrics = editor.metricsContainer {
+              let added = editor.textStorage?.length ?? 0
+              let metric = ReconcilerMetric(
+                duration: dt,
+                dirtyNodes: editor.dirtyNodes.count,
+                rangesAdded: added,
+                rangesDeleted: 0,
+                treatedAllNodesAsDirty: editor.dirtyType == .fullReconcile,
+                pathLabel: "legacy-hydrate",
+                planningDuration: 0,
+                applyDuration: dt
+              )
+              metrics.record(.reconcilerRun(metric))
+            }
+            if shouldReconcileSelection {
+              let prevSelection = currentEditorState.selection
+              let nextSelection = pendingEditorState.selection
+              var selectionsAreDifferent = false
+              if let nextSelection, let prevSelection { selectionsAreDifferent = !nextSelection.isSelection(prevSelection) }
+              if editor.dirtyType != .noDirtyNodes || nextSelection == nil || selectionsAreDifferent {
+                try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+              }
+            }
+            return
+          }
+        }
+      }
     }
 
     if editor.dirtyNodes.isEmpty,
@@ -119,8 +189,21 @@ internal enum Reconciler {
       dirtyNodes: editor.dirtyNodes,
       treatAllNodesAsDirty: editor.dirtyType == .fullReconcile,
       markedTextOperation: markedTextOperation)
+    metricsShouldRecord = true
+    metricsState = reconcilerState
 
     try reconcileNode(key: kRootNodeKey, reconcilerState: reconcilerState)
+
+    // Safety: On full-reconcile updates in headless/read-only contexts, ensure we do not
+    // accidentally re-insert content on top of stale storage when no explicit deletions
+    // were scheduled (e.g., decorator-heavy documents or fresh state restores via History).
+    // In those cases, force a full delete so subsequent insertions rebuild from a clean slate.
+    if editor.dirtyType == .fullReconcile,
+       textStorage.length > 0,
+       reconcilerState.rangesToDelete.isEmpty
+    {
+      reconcilerState.rangesToDelete.append(NSRange(location: 0, length: textStorage.length))
+    }
 
     let previousMode = textStorage.mode
     textStorage.mode = .controllerMode
@@ -134,10 +217,20 @@ internal enum Reconciler {
     for deletionRange in reconcilerState.rangesToDelete.reversed() {
       if deletionRange.length > 0 {
         nonEmptyDeletionsCount += 1
-        editor.log(
-          .reconciler, .verboseIncludingUserContent,
-          "deleting range \(NSStringFromRange(deletionRange)) `\((textStorage.string as NSString).substring(with: deletionRange))`"
-        )
+        // Logging: avoid substring(with:) crashes if the range has drifted after prior deletions.
+        let full = textStorage.string as NSString
+        let safe = NSIntersectionRange(deletionRange, NSRange(location: 0, length: full.length))
+        if safe.length > 0 {
+          editor.log(
+            .reconciler, .verboseIncludingUserContent,
+            "deleting range \(NSStringFromRange(deletionRange)) `\(full.substring(with: safe))`"
+          )
+        } else {
+          editor.log(
+            .reconciler, .verboseIncludingUserContent,
+            "deleting range \(NSStringFromRange(deletionRange)) (skipped snippet)"
+          )
+        }
         textStorage.deleteCharacters(in: deletionRange)
       }
     }
@@ -157,6 +250,7 @@ internal enum Reconciler {
     }
 
     // Handle the decorators
+    editor.log(.reconciler, .verbose, "DEC: begin remove=\(reconcilerState.possibleDecoratorsToRemove.count) add=\(reconcilerState.decoratorsToAdd.count) decorate=\(reconcilerState.decoratorsToDecorate.count)")
     let decoratorsToRemove = reconcilerState.possibleDecoratorsToRemove.filter { key in
       return !reconcilerState.decoratorsToAdd.contains(key)
     }
@@ -164,6 +258,7 @@ internal enum Reconciler {
       return !reconcilerState.decoratorsToAdd.contains(key)
     }
     decoratorsToRemove.forEach { key in
+      editor.log(.reconciler, .verbose, "DEC: remove key=\(key)")
       decoratorView(forKey: key, createIfNecessary: false)?.removeFromSuperview()
       destroyCachedDecoratorView(forKey: key)
       textStorage.decoratorPositionCache[key] = nil
@@ -171,17 +266,22 @@ internal enum Reconciler {
     reconcilerState.decoratorsToAdd.forEach { key in
       if editor.decoratorCache[key] == nil {
         editor.decoratorCache[key] = DecoratorCacheItem.needsCreation
+        editor.log(.reconciler, .verbose, "DEC: add key=\(key) state=needsCreation")
       }
       guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
+      editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
     }
     decoratorsToDecorate.forEach { key in
       if let cacheItem = editor.decoratorCache[key], let view = cacheItem.view {
         editor.decoratorCache[key] = DecoratorCacheItem.needsDecorating(view)
+        editor.log(.reconciler, .verbose, "DEC: decorate key=\(key) state=needsDecorating")
       }
       guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
+      editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
     }
+    editor.log(.reconciler, .verbose, "DEC: end cacheCount=\(textStorage.decoratorPositionCache.count)")
 
     editor.log(
       .reconciler, .verbose, "about to do rangesToAdd: total \(reconcilerState.rangesToAdd.count)")
@@ -664,25 +764,47 @@ internal enum Reconciler {
   }
 }
 
+@MainActor
 internal func performReconcilerSanityCheck(
   editor sanityCheckEditor: Editor,
   expectedOutput: NSAttributedString
 ) throws {
-  // TODO @amyworrall: this was commented out during the Frontend refactor. Create a new Frontend that contains
-  // a TextKit stack but no selection or UI. Use that to re-implement the reconciler.
+  // Build a full attributed string from the current editor state and theme
+  guard let root = sanityCheckEditor.getEditorState().getRootNode() else { return }
+  let theme = sanityCheckEditor.getTheme()
 
-  //    // create new editor to reconcile within
-  //    let editor = Editor(
-  //      featureFlags: FeatureFlags(reconcilerSanityCheck: false),
-  //      editorConfig: EditorConfig(theme: sanityCheckEditor.getTheme(), plugins: []))
-  //    editor.textStorage = TextStorage()
-  //
-  //    try editor.setEditorState(sanityCheckEditor.getEditorState())
-  //
-  //    if let textStorage = editor.textStorage, !expectedOutput.isEqual(to: textStorage) {
-  //      throw LexicalError.sanityCheck(
-  //        errorMessage: "Failed sanity check",
-  //        textViewText: expectedOutput.string,
-  //        fullReconcileText: textStorage.string)
-  //    }
+  let built = NSMutableAttributedString()
+  for child in root.getChildrenKeys() {
+    built.append(try buildAttributedSubtree(nodeKey: child, state: sanityCheckEditor.getEditorState(), theme: theme))
+  }
+
+  if built != expectedOutput {
+    throw LexicalError.sanityCheck(
+      errorMessage: "Failed sanity check",
+      textViewText: expectedOutput.string,
+      fullReconcileText: built.string)
+  }
+}
+
+@MainActor
+private func buildAttributedSubtree(
+  nodeKey: NodeKey, state: EditorState, theme: Theme
+) throws -> NSAttributedString {
+  guard let node = state.nodeMap[nodeKey] else { return NSAttributedString() }
+  let output = NSMutableAttributedString()
+  let pre = AttributeUtils.attributedStringByAddingStyles(
+    NSAttributedString(string: node.getPreamble()), from: node, state: state, theme: theme)
+  output.append(pre)
+  if let element = node as? ElementNode {
+    for child in element.getChildrenKeys() {
+      output.append(try buildAttributedSubtree(nodeKey: child, state: state, theme: theme))
+    }
+  }
+  let text = AttributeUtils.attributedStringByAddingStyles(
+    NSAttributedString(string: node.getTextPart()), from: node, state: state, theme: theme)
+  output.append(text)
+  let post = AttributeUtils.attributedStringByAddingStyles(
+    NSAttributedString(string: node.getPostamble()), from: node, state: state, theme: theme)
+  output.append(post)
+  return output
 }

@@ -9,6 +9,7 @@
 @testable import Lexical
 import XCTest
 
+@MainActor
 class HistoryTests: XCTestCase {
 
   var view: LexicalView?

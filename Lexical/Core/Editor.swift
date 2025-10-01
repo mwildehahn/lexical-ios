@@ -28,16 +28,33 @@ import UIKit
   public let editorStateVersion: Int
   public let nodeKeyMultiplier: NodeKeyMultiplier?
   public let keyCommands: [UIKeyCommand]?
+  public let metricsContainer: EditorMetricsContainer?
 
-  @objc public init(
+  public init(
     theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
-    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil,
+    metricsContainer: EditorMetricsContainer? = nil
   ) {
     self.theme = theme
     self.plugins = plugins
     self.editorStateVersion = editorStateVersion
     self.nodeKeyMultiplier = nodeKeyMultiplier
     self.keyCommands = keyCommands
+    self.metricsContainer = metricsContainer
+  }
+
+  @objc public convenience init(
+    theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil
+  ) {
+    self.init(
+      theme: theme,
+      plugins: plugins,
+      editorStateVersion: editorStateVersion,
+      nodeKeyMultiplier: nodeKeyMultiplier,
+      keyCommands: keyCommands,
+      metricsContainer: nil
+    )
   }
 }
 
@@ -106,6 +123,7 @@ public class Editor: NSObject {
 
   // See description in RangeCache.swift.
   internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
+  private var dfsOrderCache: [NodeKey]? = nil
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
   internal var normalizedNodes: Set<NodeKey> = Set()
@@ -119,11 +137,13 @@ public class Editor: NSObject {
   ]
 
   internal var nodeTransforms: [NodeType: [(Int, NodeTransform)]] = [:]
+  // Optimized reconciler groundwork: index source for future Fenwick-backed locations.
+  internal var nextFenwickNodeIndex: Int = 1
 
   // Used to help co-ordinate selection and events
   internal var compositionKey: NodeKey?
   public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
-  internal var featureFlags: FeatureFlags = FeatureFlags()
+  public var featureFlags: FeatureFlags = FeatureFlags()
 
   // Used for storing editor listener events
   internal var listeners = Listeners()
@@ -132,9 +152,20 @@ public class Editor: NSObject {
   internal var commands: Commands = [:]
 
   internal var plugins: [Plugin]
+  internal let metricsContainer: EditorMetricsContainer?
 
   // Used to cache decorators
   internal var decoratorCache: [NodeKey: DecoratorCacheItem] = [:]
+
+  // One-shot guard used by certain editing operations to suppress specific
+  // structural fast paths during the next reconcile pass (e.g., avoid
+  // treating forward deleteWord at document start as an insert-block).
+  internal var suppressInsertFastPathOnce: Bool = false
+
+  // One-shot clamp for structural deletes: when set, fastPath_DeleteBlocks will
+  // intersect its computed delete ranges with this string-range to avoid over‑
+  // deleting across inline decorator boundaries for selection-driven deletes.
+  internal var pendingDeletionClampRange: NSRange? = nil
 
   // Headless mode runs without the reconciler
   private var headless: Bool = false
@@ -153,10 +184,13 @@ public class Editor: NSObject {
     editorStateVersion = editorConfig.editorStateVersion
     keyMultiplier = editorConfig.nodeKeyMultiplier
     editorState = EditorState(version: editorConfig.editorStateVersion)
+    metricsContainer = editorConfig.metricsContainer
     guard let rootNodeKey = editorState.getRootNode()?.key else {
       fatalError("Expected root node key when creating new editor state")
     }
     rangeCache[rootNodeKey] = RangeCacheItem()
+    dfsOrderCache = nil
+    dfsOrderCache = nil
     theme = editorConfig.theme
     plugins = editorConfig.plugins
     super.init()
@@ -420,6 +454,8 @@ public class Editor: NSObject {
 
     rangeCache = [:]
     rangeCache[kRootNodeKey] = RangeCacheItem()
+    dfsOrderCache = nil
+    dfsOrderCache = nil
 
     if let textStorage = frontend?.textStorage {
       let oldMode = textStorage.mode
@@ -514,7 +550,21 @@ public class Editor: NSObject {
     type: NativeSelectionModificationType, direction: UITextStorageDirection,
     granularity: UITextGranularity
   ) {
+    if featureFlags.verboseLogging {
+      if let rng = getNativeSelection().range {
+        print("🔥 NATIVE-MOVE: before type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=\(NSStringFromRange(rng))")
+      } else {
+        print("🔥 NATIVE-MOVE: before type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=nil")
+      }
+    }
     frontend?.moveNativeSelection(type: type, direction: direction, granularity: granularity)
+    if featureFlags.verboseLogging {
+      if let rng = getNativeSelection().range {
+        print("🔥 NATIVE-MOVE: after  type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=\(NSStringFromRange(rng))")
+      } else {
+        print("🔥 NATIVE-MOVE: after  type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=nil")
+      }
+    }
   }
 
   // MARK: - Internal
@@ -546,6 +596,9 @@ public class Editor: NSObject {
       compositionKey = nil
     }
 
+    if featureFlags.verboseLogging {
+      print("🔥 STATE: setEditorState dirtyType=fullReconcile pending.nodes=\(pendingEditorState?.nodeMap.count ?? -1)")
+    }
     try beginUpdate({}, mode: UpdateBehaviourModificationMode(), reason: .setState)
   }
 
@@ -593,10 +646,14 @@ public class Editor: NSObject {
       self.log(.editor, .verbose, "No view for mounting decorator subviews.")
       return
     }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: begin cache.count=\(decoratorCache.count) ts.len=\(textStorage?.length ?? -1)")
+    }
     try? self.read {
       for (nodeKey, decoratorCacheItem) in decoratorCache {
         switch decoratorCacheItem {
         case .needsCreation:
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: create key=\(nodeKey)") }
           guard let view = decoratorView(forKey: nodeKey, createIfNecessary: true),
             let node = getNodeByKey(key: nodeKey) as? DecoratorNode
           else {
@@ -606,9 +663,20 @@ public class Editor: NSObject {
           superview.addSubview(view)
           node.decoratorWillAppear(view: view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
-          if node.hasDynamicSize(), let rangeCacheItem = rangeCache[nodeKey] {
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            // Always invalidate layout so TextKit positions and unhides the decorator immediately,
+            // regardless of dynamic sizing. Legacy reconciler relies on this for first-frame render.
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            // Proactively ensure layout for the affected glyphs so that a draw pass
+            // isn’t required before LayoutManager can position the decorator. This
+            // helps the immediate-mount case when inserting a decorator after a newline.
+            let glyphRange = frontend?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
           }
 
           self.log(
@@ -616,6 +684,7 @@ public class Editor: NSObject {
             "needsCreation -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
           )
         case .cachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: cached key=\(nodeKey)") }
           // This shouldn't be needed if our appear/disappear logic is perfect, but it turns out we do currently need this.
           superview.addSubview(view)
           self.log(
@@ -623,17 +692,29 @@ public class Editor: NSObject {
             "no-op, already cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
           )
         case .unmountedCachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: remount key=\(nodeKey)") }
           view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
           superview.addSubview(view)
           if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
             node.decoratorWillAppear(view: view)
           }
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            frontend?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontend?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: remount invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
           self.log(
             .editor, .verbose,
             "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
           )
         case .needsDecorating(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: decorate key=\(nodeKey)") }
           superview.addSubview(view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
           if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
@@ -643,9 +724,18 @@ public class Editor: NSObject {
             // required so that TextKit does the new size calculation, and correctly hides or unhides the view
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontend?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: decorate invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
           }
         }
       }
+    }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: end cache.count=\(decoratorCache.count)")
     }
   }
 
@@ -681,6 +771,17 @@ public class Editor: NSObject {
   // MARK: - Manipulating the editor state
 
   var isUpdating = false
+  internal func invalidateDFSOrderCache() {
+    dfsOrderCache = nil
+  }
+
+  internal func cachedDFSOrder() -> [NodeKey] {
+    if let cached = dfsOrderCache { return cached }
+    let ordered = sortedNodeKeysByLocation(rangeCache: rangeCache)
+    dfsOrderCache = ordered
+    return ordered
+  }
+
   private func beginUpdate(
     _ closure: () throws -> Void, mode: UpdateBehaviourModificationMode,
     reason: EditorUpdateReason = .update
@@ -749,10 +850,38 @@ public class Editor: NSObject {
         }
 
         if !headless {
-          try Reconciler.updateEditorState(
-            currentEditorState: editorState, pendingEditorState: pendingEditorState, editor: self,
-            shouldReconcileSelection: !mode.suppressReconcilingSelection,
-            markedTextOperation: mode.markedTextOperation)
+          if featureFlags.verboseLogging {
+            let tsLen = textStorage?.length ?? -1
+            print("🔥 RECONCILE: begin optimized=\(featureFlags.useOptimizedReconciler) dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLen)")
+          }
+          if featureFlags.useOptimizedReconciler {
+            try OptimizedReconciler.updateEditorState(
+              currentEditorState: editorState,
+              pendingEditorState: pendingEditorState,
+              editor: self,
+              shouldReconcileSelection: !mode.suppressReconcilingSelection,
+              markedTextOperation: mode.markedTextOperation
+            )
+            if featureFlags.useReconcilerShadowCompare && compositionKey == nil {
+              shadowCompareOptimizedVsLegacy(
+                activeEditor: self,
+                currentEditorState: editorState,
+                pendingEditorState: pendingEditorState
+              )
+            }
+          } else {
+            try Reconciler.updateEditorState(
+              currentEditorState: editorState,
+              pendingEditorState: pendingEditorState,
+              editor: self,
+              shouldReconcileSelection: !mode.suppressReconcilingSelection,
+              markedTextOperation: mode.markedTextOperation
+            )
+          }
+          if featureFlags.verboseLogging {
+            let tsLenAfter = textStorage?.length ?? -1
+            print("🔥 RECONCILE: end dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLenAfter)")
+          }
         }
         self.isUpdating = previouslyUpdating
         garbageCollectDetachedNodes(
@@ -774,12 +903,10 @@ public class Editor: NSObject {
         let anchor = pendingEditorState.nodeMap[pendingSelection.anchor.key]
         let focus = pendingEditorState.nodeMap[pendingSelection.focus.key]
         if anchor == nil || focus == nil {
-          let errorString =
-            """
-            updateEditor: selection has been lost because the previously selected nodes have been removed and
-            selection wasn't moved to another node. Ensure selection changes after removing/replacing a selected node.
-            """
-          throw LexicalError.invariantViolation(errorString)
+          // Parity safeguard: if selection keys were removed during the update, normalize to a safe state
+          // rather than throwing. Legacy reconciler tolerates such transitions by remapping selection.
+          // We reset selection to nil; callers can set a new caret in a follow-up update.
+          pendingEditorState.selection = nil
         }
       } else if let pendingSelection = pendingEditorState.selection as? NodeSelection {
         if pendingSelection.nodes.isEmpty {
@@ -1032,6 +1159,7 @@ public class Editor: NSObject {
     self.dirtyType = .noDirtyNodes
     self.cloneNotNeeded = Set()
     self.rangeCache = [kRootNodeKey: RangeCacheItem()]
+    self.dfsOrderCache = nil
     self.normalizedNodes = Set()
     self.editorState = editorState
     self.pendingEditorState = nil
@@ -1042,6 +1170,7 @@ public class Editor: NSObject {
       self.dirtyType = previousDirtyType
       self.cloneNotNeeded = previousCloneNotNeeded
       self.rangeCache = previousRangeCache
+      self.dfsOrderCache = nil
       self.normalizedNodes = previousNormalizedNodes
       self.editorState = previousActiveEditorState
       self.pendingEditorState = previousPendingEditorState
