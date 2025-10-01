@@ -221,4 +221,86 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       }
     }
   }
+
+  func testBackspaceInsideTextTwiceRemovesTwoCharactersOnly() throws {
+    // Retain frontend to keep textStorage alive.
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "abcdef")
+      try p.append([t]); try root.append([p])
+      // Caret after 'd' at index 4
+      try t.select(anchorOffset: 4, focusOffset: 4)
+    }
+    // Backspace twice
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.read {
+      let docText = getRoot()?.getTextContent() ?? "<nil>"
+      XCTAssertEqual(docText, "abef")
+      if let sel = try getSelection() as? RangeSelection {
+        XCTAssertEqual(sel.anchor.offset, 2)
+        XCTAssertEqual(sel.focus.offset, 2)
+      }
+    }
+  }
+
+  func testForwardDeleteInsideTextTwiceRemovesTwoCharactersOnly() throws {
+    // Retain frontend to keep textStorage alive.
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "abcdef")
+      try p.append([t]); try root.append([p])
+      // Caret at index 2 (before 'c')
+      try t.select(anchorOffset: 2, focusOffset: 2)
+    }
+    // Forward delete twice
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
+    try editor.read {
+      let docText = getRoot()?.getTextContent() ?? "<nil>"
+      XCTAssertEqual(docText, "abef")
+      if let sel = try getSelection() as? RangeSelection {
+        XCTAssertEqual(sel.anchor.offset, 2)
+        XCTAssertEqual(sel.focus.offset, 2)
+      }
+    }
+  }
+
+  func testBackspaceAtAbsoluteDocumentStartIsNoOp() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "Hello")
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: 0, focusOffset: 0)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.read {
+      XCTAssertEqual(getRoot()?.getTextContent(), "Hello")
+      if let sel = try getSelection() as? RangeSelection {
+        XCTAssertEqual(sel.anchor.offset, 0)
+        XCTAssertEqual(sel.focus.offset, 0)
+      }
+    }
+  }
+
+  func testForwardDeleteAtAbsoluteDocumentEndIsNoOp() throws {
+    let (editor, frontend) = makeOptimizedEditor(); _ = frontend
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "Hello")
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: 5, focusOffset: 5)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
+    try editor.read {
+      XCTAssertEqual(getRoot()?.getTextContent(), "Hello")
+      if let sel = try getSelection() as? RangeSelection {
+        XCTAssertEqual(sel.anchor.offset, 5)
+        XCTAssertEqual(sel.focus.offset, 5)
+      }
+    }
+  }
 }
