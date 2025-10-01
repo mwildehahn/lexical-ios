@@ -390,6 +390,83 @@ class InlineImageTests: XCTestCase {
     XCTAssertTrue(view.superview === v.textView)
   }
 
+  func testImagePositionCachePopulates_NoDraw_InsertAtStartOfSecondParagraph_Optimized() throws {
+    // Optimized reconciler; do NOT draw. We assert internal caches are correct immediately.
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imageKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p2 = createParagraphNode();
+      let img = ImageNode(url: "https://example.com/nd.png", size: CGSize(width: 20, height: 20), sourceID: "nd"); imageKey = img.getKey()
+      try p1.append([t1]); try p2.append([img]); try root.append([p1, p2])
+    }
+    // Without any draw: position cache should already contain entry for the image
+    let ts = v.textStorage
+    XCTAssertNotNil(ts.decoratorPositionCache[imageKey], "Decorator position cache should populate immediately after insert (no draw)")
+    // View should be created and mounted (may remain hidden until draw, which is fine for this assertion)
+    guard let cacheItem = ed.decoratorCache[imageKey] else { return XCTFail("Decorator not cached") }
+    switch cacheItem {
+    case .cachedView(let view), .unmountedCachedView(let view), .needsDecorating(let view):
+      XCTAssertTrue(view.superview === v.textView, "Decorator view should be attached to textView")
+    case .needsCreation:
+      XCTFail("Decorator still marked as needsCreation after insert")
+    }
+  }
+
+  func testMultipleImagesSingleUpdate_Optimized_LexicalView() throws {
+    // Insert two images in one pass; both should mount and be positioned.
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 240)
+    let ed = v.editor
+    var i1: NodeKey!; var i2: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p2 = createParagraphNode();
+      let img1 = ImageNode(url: "https://example.com/a.png", size: CGSize(width: 20, height: 20), sourceID: "a"); i1 = img1.getKey()
+      let img2 = ImageNode(url: "https://example.com/b.png", size: CGSize(width: 20, height: 20), sourceID: "b"); i2 = img2.getKey()
+      try p1.append([t1]); try p2.append([img1, img2]); try root.append([p1, p2])
+    }
+    // Minimal offscreen draw to run positionAllDecorators
+    let lm = v.layoutManager; let tc = v.textView.textContainer; let gr = lm.glyphRange(for: tc)
+    UIGraphicsBeginImageContextWithOptions(CGSize(width: 320, height: 120), false, 0)
+    lm.drawGlyphs(forGlyphRange: gr, at: .zero)
+    UIGraphicsEndImageContext()
+    // Both views should be cached + visible
+    for key in [i1!, i2!] {
+      guard case let .cachedView(view)? = ed.decoratorCache[key] else { return XCTFail("Decorator view not cached for image \(key)") }
+      XCTAssertFalse(view.isHidden)
+      XCTAssertTrue(view.superview === v.textView)
+    }
+  }
+
+  func testImageInsertAtEndOfDocument_NoDraw_PositionCache() throws {
+    let v = LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [InlineImagePlugin()]),
+      featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor)
+    )
+    v.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    let ed = v.editor
+    var imgKey: NodeKey!
+    try ed.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: "Tail")
+      let img = ImageNode(url: "https://example.com/tail.png", size: CGSize(width: 16, height: 16), sourceID: "tail"); imgKey = img.getKey()
+      try p.append([t, img]); try root.append([p])
+    }
+    // No draw: ensure position cache populated
+    XCTAssertNotNil(v.textStorage.decoratorPositionCache[imgKey])
+  }
+
   // Unmount semantics are covered by persistence tests which assert position cache
   // clearing and by reconciler tests that remove decorator keys from caches.
 }

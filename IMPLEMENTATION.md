@@ -349,6 +349,13 @@ Verification checklist (to run on iOS simulator):
 - Pre/post‑only path adds attribute‑only updates when lengths are unchanged (SetAttributes+FixAttributes), reducing churn.
 - Removed TextKit 2 experimental A/B path and flags; simplified Playground results accordingly.
 - Adopted UIScene lifecycle in the Playground app.
+ - Decorator/image immediate render after insert (newline-after-text case):
+   - Editor: after invalidateLayout(forCharacterRange:), proactively ensureLayout(forGlyphRange:) so glyphs exist before any draw.
+   - LayoutManager: if glyph not in container yet, ensureLayout for that glyph and re-check before hiding the view.
+   - Optimized reconciler: when adding a decorator and rangeCache location is not yet available, fall back to scanning TextStorage for the attachment location; fix attributes over the single-character run.
+   - Tests added:
+     - LexicalTests/Tests/DecoratorPositionCacheTests.swift (new): position cache populates without draw; multiple decorators in one update; start/end of document inserts.
+     - Plugins/LexicalInlineImagePlugin/LexicalInlineImagePluginTests/InlineImageTests.swift: no‑draw cache assertion at start of second paragraph; multiple images in one update; end‑of‑document case.
 
 ## Next
  - Add unit tests for insert‑block (top/mid/end) and attribute‑only pre/post cases; compare optimized vs legacy string parity and selection mapping. [In progress; first suite added — InsertParityTests]

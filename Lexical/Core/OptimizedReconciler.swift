@@ -1434,6 +1434,9 @@ internal enum OptimizedReconciler {
          let range = editor.rangeCache[addedKey]?.range {
         editor.frontend?.layoutManager.invalidateLayout(forCharacterRange: range, actualCharacterRange: nil)
         editor.frontend?.layoutManager.invalidateDisplay(forCharacterRange: range)
+        // Proactively ensure glyph layout to avoid relying on an external draw pass.
+        let glyphRange = editor.frontend?.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil) ?? range
+        editor.frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
       }
       if editor.featureFlags.verboseLogging {
         if let n = pendingEditorState.nodeMap[addedKey] as? DecoratorNode {
@@ -2453,6 +2456,23 @@ internal enum OptimizedReconciler {
   ) {
     guard let textStorage = editor.textStorage else { return }
 
+    // Helper: derive a fallback character location for a decorator by scanning
+    // TextStorage for the TextAttachment carrying the same node key. This is
+    // robust when rangeCache has not yet been populated for newly inserted
+    // decorators within the same update pass (e.g., optimized insert fast path).
+    @inline(__always)
+    func fallbackAttachmentLocation(for key: NodeKey, in ts: TextStorage) -> Int? {
+      if ts.length == 0 { return nil }
+      var found: Int? = nil
+      ts.enumerateAttribute(.attachment, in: NSRange(location: 0, length: ts.length)) { value, range, stop in
+        if let att = value as? TextAttachment, att.key == key {
+          found = range.location
+          stop.pointee = true
+        }
+      }
+      return found
+    }
+
     func decoratorKeys(in state: EditorState, under root: NodeKey) -> Set<NodeKey> {
       let keys = subtreeKeysDFS(rootKey: root, state: state)
       var out: Set<NodeKey> = []
@@ -2478,7 +2498,9 @@ internal enum OptimizedReconciler {
     let added = nextDecos.subtracting(prevDecos)
     for k in added {
       if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
-      if let loc = editor.rangeCache[k]?.location {
+      // Prefer rangeCache if available; otherwise fall back to scanning the
+      // TextStorage for the newly inserted attachment run.
+      if let loc = editor.rangeCache[k]?.location ?? fallbackAttachmentLocation(for: k, in: textStorage) {
         textStorage.decoratorPositionCache[k] = loc
         // Ensure TextKit recognizes attachment attributes immediately at the new location
         // to avoid first-frame flicker. Fix attributes over the single-character attachment run.
@@ -2486,23 +2508,25 @@ internal enum OptimizedReconciler {
         if safe.length > 0 { textStorage.fixAttributes(in: safe) }
       }
       if editor.featureFlags.verboseLogging {
-        let pos = editor.rangeCache[k]?.location ?? -1
+        let pos = editor.rangeCache[k]?.location ?? fallbackAttachmentLocation(for: k, in: textStorage) ?? -1
         let len = textStorage.length
-        print("🔥 DEC-RECON: add key=\(k) setPos=\(pos) ts.len=\(len)")
+        let tsPtr = Unmanaged.passUnretained(textStorage).toOpaque()
+        print("🔥 DEC-RECON: add key=\(k) setPos=\(pos) ts.len=\(len) ts.ptr=\(tsPtr)")
       }
     }
 
     // Persist positions for all present decorators in next subtree and mark dirty ones for decorating
     for k in nextDecos {
-      if let loc = editor.rangeCache[k]?.location {
+      if let loc = editor.rangeCache[k]?.location ?? fallbackAttachmentLocation(for: k, in: textStorage) {
         textStorage.decoratorPositionCache[k] = loc
         let safe = NSIntersectionRange(NSRange(location: loc, length: 1), NSRange(location: 0, length: textStorage.length))
         if safe.length > 0 { textStorage.fixAttributes(in: safe) }
       }
       if editor.featureFlags.verboseLogging {
-        let pos = editor.rangeCache[k]?.location ?? -1
+        let pos = editor.rangeCache[k]?.location ?? fallbackAttachmentLocation(for: k, in: textStorage) ?? -1
         let len = textStorage.length
-        print("🔥 DEC-RECON: pos key=\(k) loc=\(pos) ts.len=\(len)")
+        let tsPtr = Unmanaged.passUnretained(textStorage).toOpaque()
+        print("🔥 DEC-RECON: pos key=\(k) loc=\(pos) ts.len=\(len) ts.ptr=\(tsPtr)")
       }
       if editor.dirtyNodes[k] != nil {
         if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view {
