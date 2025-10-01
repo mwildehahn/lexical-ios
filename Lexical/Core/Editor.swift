@@ -632,6 +632,9 @@ public class Editor: NSObject {
       self.log(.editor, .verbose, "No view for mounting decorator subviews.")
       return
     }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: begin cache.count=\(decoratorCache.count) ts.len=\(textStorage?.length ?? -1)")
+    }
     try? self.read {
       for (nodeKey, decoratorCacheItem) in decoratorCache {
         switch decoratorCacheItem {
@@ -651,6 +654,9 @@ public class Editor: NSObject {
             // regardless of dynamic sizing. Legacy reconciler relies on this for first-frame render.
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
           }
 
           self.log(
@@ -676,6 +682,9 @@ public class Editor: NSObject {
           if let rangeCacheItem = rangeCache[nodeKey] {
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: remount invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
           }
           self.log(
             .editor, .verbose,
@@ -692,9 +701,15 @@ public class Editor: NSObject {
             // required so that TextKit does the new size calculation, and correctly hides or unhides the view
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: decorate invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
           }
         }
       }
+    }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: end cache.count=\(decoratorCache.count)")
     }
   }
 

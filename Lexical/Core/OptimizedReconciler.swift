@@ -2478,19 +2478,31 @@ internal enum OptimizedReconciler {
     let added = nextDecos.subtracting(prevDecos)
     for k in added {
       if editor.decoratorCache[k] == nil { editor.decoratorCache[k] = .needsCreation }
-      if let loc = editor.rangeCache[k]?.location { textStorage.decoratorPositionCache[k] = loc }
+      if let loc = editor.rangeCache[k]?.location {
+        textStorage.decoratorPositionCache[k] = loc
+        // Ensure TextKit recognizes attachment attributes immediately at the new location
+        // to avoid first-frame flicker. Fix attributes over the single-character attachment run.
+        let safe = NSIntersectionRange(NSRange(location: loc, length: 1), NSRange(location: 0, length: textStorage.length))
+        if safe.length > 0 { textStorage.fixAttributes(in: safe) }
+      }
       if editor.featureFlags.verboseLogging {
         let pos = editor.rangeCache[k]?.location ?? -1
-        print("🔥 DEC-RECON: add key=\(k) setPos=\(pos)")
+        let len = textStorage.length
+        print("🔥 DEC-RECON: add key=\(k) setPos=\(pos) ts.len=\(len)")
       }
     }
 
     // Persist positions for all present decorators in next subtree and mark dirty ones for decorating
     for k in nextDecos {
-      if let loc = editor.rangeCache[k]?.location { textStorage.decoratorPositionCache[k] = loc }
+      if let loc = editor.rangeCache[k]?.location {
+        textStorage.decoratorPositionCache[k] = loc
+        let safe = NSIntersectionRange(NSRange(location: loc, length: 1), NSRange(location: 0, length: textStorage.length))
+        if safe.length > 0 { textStorage.fixAttributes(in: safe) }
+      }
       if editor.featureFlags.verboseLogging {
         let pos = editor.rangeCache[k]?.location ?? -1
-        print("🔥 DEC-RECON: pos key=\(k) loc=\(pos)")
+        let len = textStorage.length
+        print("🔥 DEC-RECON: pos key=\(k) loc=\(pos) ts.len=\(len)")
       }
       if editor.dirtyNodes[k] != nil {
         if let cacheItem = editor.decoratorCache[k], let view = cacheItem.view {

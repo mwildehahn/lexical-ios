@@ -156,6 +156,9 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
 
   private func positionAllDecorators() {
     guard let textStorage = textStorage as? TextStorage else { return }
+    if editor?.featureFlags.verboseLogging == true {
+      print("🔥 DEC-LM: positionAllDecorators count=\(textStorage.decoratorPositionCache.count)")
+    }
     for (key, location) in textStorage.decoratorPositionCache {
       positionDecorator(forKey: key, characterIndex: location)
     }
@@ -168,7 +171,9 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       return
     }
 
-    let glyphIndex = glyphIndexForCharacter(at: characterIndex)
+    if textStorage.length == 0 { return }
+    let clampedCharIndex = max(0, min(characterIndex, textStorage.length - 1))
+    let glyphIndex = glyphIndexForCharacter(at: clampedCharIndex)
     let glyphIsInTextContainer = NSLocationInRange(glyphIndex, glyphRange(for: textContainer))
 
     var glyphBoundingRect: CGRect = .zero
@@ -195,6 +200,9 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
     let textContainerInset = self.editor?.frontend?.textContainerInsets ?? UIEdgeInsets.zero
 
     try? editor.read {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 DEC-LM: key=\(key) charIndex=\(characterIndex) glyphIndex=\(glyphIndex) inContainer=\(glyphIsInTextContainer) hide=\(shouldHideView) ts.len=\(textStorage.length)")
+      }
       guard let decoratorView = decoratorView(forKey: key, createIfNecessary: !shouldHideView)
       else {
         editor.log(.TextView, .warning, "create decorator view failed")
@@ -202,6 +210,9 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       }
 
       if shouldHideView {
+        if editor.featureFlags.verboseLogging {
+          print("🔥 DEC-LM: hide view key=\(key)")
+        }
         decoratorView.isHidden = true
         return
       }
@@ -216,6 +227,9 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       decoratorOrigin.y += (glyphBoundingRect.height - attr.bounds.height)  // bottom left now!
 
       decoratorView.frame = CGRect(origin: decoratorOrigin, size: attr.bounds.size)
+      if editor.featureFlags.verboseLogging {
+        print("🔥 DEC-LM: positioned key=\(key) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
+      }
     }
   }
 
