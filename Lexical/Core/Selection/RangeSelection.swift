@@ -1036,6 +1036,12 @@ public class RangeSelection: BaseSelection {
       print("🔥 DELETE: begin backward=\(isBackwards) anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset) collapsed=\(isCollapsed())")
     }
     let wasCollapsed = isCollapsed()
+    // Remember caret string location to allow clamping to a single-character deletion
+    // if UIKit expands selection unexpectedly (e.g., predicts/selects the whole word).
+    var caretStringLocation: Int? = nil
+    if wasCollapsed, let editor = getActiveEditor() {
+      caretStringLocation = try? stringLocationForPoint(anchor, editor: editor)
+    }
     // Universal no-op: backspace at absolute document start should do nothing (parity with legacy)
     if isBackwards && wasCollapsed {
       if let editor = getActiveEditor() {
@@ -1206,6 +1212,24 @@ public class RangeSelection: BaseSelection {
       }
       try modify(alter: .extend, isBackward: isBackwards, granularity: .character)
 
+      // Clamp over-eager native selection expansions (observed with optimized reconciler
+      // on fast backspaces after typing a new word). If selection started collapsed and
+      // the native tokenizer expanded to more than one character (e.g., a whole word),
+      // force a single-character deletion to mirror legacy behavior.
+      if wasCollapsed, let editor = getActiveEditor(), editor.frontend is LexicalView, editor.featureFlags.useOptimizedReconciler {
+        if !isCollapsed(), let start = caretStringLocation,
+           let a = try? stringLocationForPoint(anchor, editor: editor),
+           let b = try? stringLocationForPoint(focus, editor: editor) {
+          let len = abs(a - b)
+          if len > 1 {
+            let loc = isBackwards ? max(0, start - 1) : start
+            let clamp = NSRange(location: loc, length: 1)
+            try applySelectionRange(clamp, affinity: isBackwards ? .backward : .forward)
+            if editor.featureFlags.verboseLogging { print("🔥 DELETE: clamp native selection word→char at \(loc)") }
+          }
+        }
+      }
+
       if !isCollapsed() {
         if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
           print("🔥 DELETE: after modify() collapsed=false; anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
@@ -1373,14 +1397,20 @@ public class RangeSelection: BaseSelection {
     guard let editor = getActiveEditor() else {
       throw LexicalError.invariantViolation("Cannot be called outside update loop")
     }
-
+    if editor.featureFlags.verboseLogging {
+      let rng = editor.getNativeSelection().range.map { NSStringFromRange($0) } ?? "nil"
+      print("🔥 MODIFY: request alter=\(alter) dir=\(isBackward ? "backward" : "forward") gran=\(granularity) native.before=\(rng)")
+    }
     editor.moveNativeSelection(
       type: alter,
       direction: isBackward ? .backward : .forward,
       granularity: granularity)
 
     let nativeSelection = editor.getNativeSelection()
-
+    if editor.featureFlags.verboseLogging {
+      let rng = nativeSelection.range.map { NSStringFromRange($0) } ?? "nil"
+      print("🔥 MODIFY: native.after=\(rng)")
+    }
     try applyNativeSelection(nativeSelection)
 
     // Because a range works on start and end, we might need to flip
@@ -1400,6 +1430,9 @@ public class RangeSelection: BaseSelection {
   @MainActor
   public func applyNativeSelection(_ nativeSelection: NativeSelection) throws {
     guard let range = nativeSelection.range else { return }
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+      print("🔥 APPLY-NATIVE: range=\(NSStringFromRange(range)) affinity=\(nativeSelection.affinity == .backward ? "backward" : "forward")")
+    }
     try applySelectionRange(
       range, affinity: range.length == 0 ? .backward : nativeSelection.affinity)
   }
@@ -1412,12 +1445,18 @@ public class RangeSelection: BaseSelection {
 
     let anchorOffset = affinity == .forward ? range.location : range.location + range.length
     let focusOffset = affinity == .forward ? range.location + range.length : range.location
+    if editor.featureFlags.verboseLogging {
+      print("🔥 APPLY-NATIVE: map range=\(NSStringFromRange(range)) → anchorOff=\(anchorOffset) focusOff=\(focusOffset)")
+    }
 
     if let anchor = try pointAtStringLocation(
       anchorOffset, searchDirection: affinity, rangeCache: editor.rangeCache),
       let focus = try pointAtStringLocation(
         focusOffset, searchDirection: affinity, rangeCache: editor.rangeCache)
     {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 APPLY-NATIVE: mapped anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
+      }
       self.anchor = anchor
       self.focus = focus
     }

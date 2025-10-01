@@ -550,7 +550,21 @@ public class Editor: NSObject {
     type: NativeSelectionModificationType, direction: UITextStorageDirection,
     granularity: UITextGranularity
   ) {
+    if featureFlags.verboseLogging {
+      if let rng = getNativeSelection().range {
+        print("🔥 NATIVE-MOVE: before type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=\(NSStringFromRange(rng))")
+      } else {
+        print("🔥 NATIVE-MOVE: before type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=nil")
+      }
+    }
     frontend?.moveNativeSelection(type: type, direction: direction, granularity: granularity)
+    if featureFlags.verboseLogging {
+      if let rng = getNativeSelection().range {
+        print("🔥 NATIVE-MOVE: after  type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=\(NSStringFromRange(rng))")
+      } else {
+        print("🔥 NATIVE-MOVE: after  type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=nil")
+      }
+    }
   }
 
   // MARK: - Internal

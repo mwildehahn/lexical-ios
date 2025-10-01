@@ -551,7 +551,16 @@ private class TextViewDelegate: NSObject, UITextViewDelegate {
 
   public func textViewDidChangeSelection(_ textView: UITextView) {
     guard let textView = textView as? TextView else { return }
-
+    if editor.featureFlags.verboseLogging {
+      let range = textView.selectedRange
+      let marked = textView.markedTextRange
+      let mr = marked.map { (r: UITextRange) -> String in
+        let start = textView.offset(from: textView.beginningOfDocument, to: r.start)
+        let end = textView.offset(from: textView.beginningOfDocument, to: r.end)
+        return "{\(start), \(end-start)}"
+      } ?? "nil"
+      print("🔥 NATIVE-SEL: didChangeSelection selected=\(NSStringFromRange(range)) marked=\(mr) updating=\(textView.isUpdatingNativeSelection)")
+    }
     if textView.isUpdatingNativeSelection {
       return
     }

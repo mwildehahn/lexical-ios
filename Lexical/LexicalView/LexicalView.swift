@@ -181,7 +181,10 @@ extension LexicalViewDelegate {
     granularity: UITextGranularity
   ) {
     textView.isUpdatingNativeSelection = true
-
+    if editor.featureFlags.verboseLogging {
+      let rng = nativeSelection.range.map { NSStringFromRange($0) } ?? "nil"
+      print("🔥 NATIVE: request move type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) from=\(rng)")
+    }
     let selection = nativeSelection
 
     guard let opaqueRange = selection.opaqueRange else {
@@ -223,6 +226,10 @@ extension LexicalViewDelegate {
     let newTextRange = textView.textRange(from: start, to: end)
     textView.selectedTextRange = newTextRange
     textView.isUpdatingNativeSelection = false
+    if editor.featureFlags.verboseLogging {
+      let rng = nativeSelection.range.map { NSStringFromRange($0) } ?? "nil"
+      print("🔥 NATIVE: applied move → range=\(rng)")
+    }
   }
 
   func unmarkTextWithoutUpdate() {
