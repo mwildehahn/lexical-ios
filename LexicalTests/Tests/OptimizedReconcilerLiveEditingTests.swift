@@ -305,28 +305,21 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
   }
 
   func testBackspaceRemovesWholeGrapheme_CombiningMark() throws {
-    throw XCTSkip("Read-only frontend lacks native tokenizer; grapheme-aware backspace validated in RangeCachePointMappingGraphemeParityTests.")
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
-    // "e is combining? We'll use e + combining acute (U+0301)
-    let combining = "e\u{0301}" // "é"
+    let combining = "e\u{0301}" // e + combining acute
     let text = "ab" + combining + "cd"
     let caretAfter = ("ab" + combining as NSString).length
     try editor.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode(); let t = createTextNode(text: text)
       try p.append([t]); try root.append([p])
-      try t.select(anchorOffset: caretAfter, focusOffset: caretAfter)
-    }
-    // In read-only tests, native tokenizer isn't available to extend over a grapheme.
-    // Simulate user backspace by selecting the whole grapheme and deleting.
-    try editor.update {
-      if let sel = try getSelection() as? RangeSelection,
-         let t = (getRoot()?.getFirstChild() as? ParagraphNode)?.getFirstChild() as? TextNode {
+      // Manually select the whole grapheme cluster and delete via insertText("")
+      if let sel = try getSelection() as? RangeSelection {
         sel.anchor.updatePoint(key: t.getKey(), offset: caretAfter - (combining as NSString).length, type: .text)
         sel.focus.updatePoint(key: t.getKey(), offset: caretAfter, type: .text)
       }
     }
-    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.update { try (getSelection() as? RangeSelection)?.insertText("") }
     try editor.read {
       XCTAssertEqual(getRoot()?.getTextContent(), "abcd")
       if let sel = try getSelection() as? RangeSelection { XCTAssertEqual(sel.anchor.offset, 2) }
@@ -334,7 +327,6 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
   }
 
   func testBackspaceRemovesWholeGrapheme_ZWJEmojiFamily() throws {
-    throw XCTSkip("Read-only frontend lacks native tokenizer; grapheme-aware backspace validated in RangeCachePointMappingGraphemeParityTests.")
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
     let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}" // 👨‍👩‍👧
     let prefix = "hi" + family
@@ -344,17 +336,12 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       guard let root = getRoot() else { return }
       let p = createParagraphNode(); let t = createTextNode(text: text)
       try p.append([t]); try root.append([p])
-      try t.select(anchorOffset: caretAfter, focusOffset: caretAfter)
-    }
-    // Simulate user backspace by selecting the whole emoji cluster and deleting.
-    try editor.update {
-      if let sel = try getSelection() as? RangeSelection,
-         let t = (getRoot()?.getFirstChild() as? ParagraphNode)?.getFirstChild() as? TextNode {
+      if let sel = try getSelection() as? RangeSelection {
         sel.anchor.updatePoint(key: t.getKey(), offset: caretAfter - (family as NSString).length, type: .text)
         sel.focus.updatePoint(key: t.getKey(), offset: caretAfter, type: .text)
       }
     }
-    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.update { try (getSelection() as? RangeSelection)?.insertText("") }
     try editor.read {
       XCTAssertEqual(getRoot()?.getTextContent(), "hiworld")
       if let sel = try getSelection() as? RangeSelection { XCTAssertEqual(sel.anchor.offset, 2) }
