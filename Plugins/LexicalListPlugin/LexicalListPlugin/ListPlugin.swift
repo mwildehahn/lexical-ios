@@ -7,7 +7,11 @@
 
 import Foundation
 import Lexical
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 extension CommandType {
   public static let insertUnorderedList = CommandType(rawValue: "insertUnorderedList")
@@ -97,12 +101,11 @@ open class ListPlugin: Plugin {
         }
         attributes.removeValue(forKey: .underlineStyle)
         attributes.removeValue(forKey: .strikethroughStyle)
-        let bulletDrawRect = firstLineFragment.inset(
-          by: UIEdgeInsets(
-            top: spacingBefore, left: attributeValue.characterIndentationPixels, bottom: 0, right: 0
-          ))
+        let bulletDrawRect = firstLineFragment.insetBy(
+          dx: attributeValue.characterIndentationPixels, dy: spacingBefore)
 
         if attributeValue.listType == .check {
+          #if canImport(UIKit)
           let configuration = UIImage.SymbolConfiguration(
             pointSize: bulletDrawRect.height, weight: .regular)
           let theme = editor.getTheme()
@@ -117,9 +120,9 @@ open class ListPlugin: Plugin {
           if let image = UIImage(systemName: symbolName, withConfiguration: configuration) {
 
             let checkForegroundColor =
-              attributes[.checkForegroundColor] as? UIColor ?? UIColor.label
+              attributes[.checkForegroundColor] as? PlatformColor ?? PlatformColor.label
             let checkedCheckForegroundColor =
-              checkedAtributes[.checkForegroundColor] as? UIColor ?? UIColor.label
+              checkedAtributes[.checkForegroundColor] as? PlatformColor ?? PlatformColor.label
 
             let textColor =
               attributeValue.isChecked ? checkedCheckForegroundColor : checkForegroundColor
@@ -130,6 +133,10 @@ open class ListPlugin: Plugin {
               x: bulletDrawRect.minX, y: bulletDrawRect.minY, width: height, height: height)
             tintedImage.draw(in: imageRect)
           }
+          #elseif canImport(AppKit)
+          // TODO: macOS checkbox drawing implementation
+          attributeValue.listItemCharacter.draw(in: bulletDrawRect, withAttributes: attributes)
+          #endif
         } else {
           // For bullet and number lists, use the existing drawing method
           attributeValue.listItemCharacter.draw(in: bulletDrawRect, withAttributes: attributes)
@@ -179,9 +186,11 @@ open class ListPlugin: Plugin {
         try node.setIsChecked(!isChecked)
 
         // TODO: make this configurable
+        #if canImport(UIKit)
         let impact = UIImpactFeedbackGenerator(style: .rigid)
         impact.prepare()
         impact.impactOccurred()
+        #endif
         handled = true
       }
     } catch {

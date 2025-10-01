@@ -8,7 +8,11 @@
 import AVFoundation
 import Foundation
 import Lexical
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 internal let minimumCellWidth: CGFloat = 150.0
 let lineWidth = CGFloat(1.0)

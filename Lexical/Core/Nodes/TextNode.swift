@@ -775,7 +775,7 @@ extension TextNode {
         #if canImport(UIKit)
         UIRectFill(rect)
         #elseif canImport(AppKit)
-        NSRectFill(rect)
+        rect.fill()
         #endif
       }
     }

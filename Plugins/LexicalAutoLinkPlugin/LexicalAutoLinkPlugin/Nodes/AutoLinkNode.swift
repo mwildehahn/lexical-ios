@@ -7,7 +7,11 @@
 
 import Lexical
 import LexicalLinkPlugin
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 extension NodeType {
   public static let autoLink = NodeType(rawValue: "autoLink")

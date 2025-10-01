@@ -9,7 +9,11 @@ import AVFoundation
 import Foundation
 import Lexical
 import SelectableDecoratorNode
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 extension NodeType {
   static let selectableImage = NodeType(rawValue: "selectableImage")
@@ -48,14 +52,14 @@ public class SelectableImageNode: SelectableDecoratorNode {
     Self(url: url?.absoluteString ?? "", size: size, sourceID: sourceID, key: key)
   }
 
-  override public func createContentView() -> UIImageView {
+  override public func createContentView() -> PlatformImageView {
     let imageView = createImageView()
     loadImage(imageView: imageView)
     return imageView
   }
 
-  override open func decorateContentView(view: UIView, wrapper: SelectableDecoratorView) {
-    if let view = view as? UIImageView {
+  override open func decorateContentView(view: PlatformView, wrapper: SelectableDecoratorView) {
+    if let view = view as? PlatformImageView {
       loadImage(imageView: view)
     }
   }
@@ -82,16 +86,20 @@ public class SelectableImageNode: SelectableDecoratorNode {
     try getWritable().sourceID = sourceID
   }
 
-  private func createImageView() -> UIImageView {
-    let view = UIImageView(frame: CGRect(origin: CGPoint.zero, size: size))
+  private func createImageView() -> PlatformImageView {
+    let view = PlatformImageView(frame: CGRect(origin: CGPoint.zero, size: size))
+    #if canImport(UIKit)
     view.isUserInteractionEnabled = true
-
     view.backgroundColor = .lightGray
+    #elseif canImport(AppKit)
+    view.wantsLayer = true
+    view.layer?.backgroundColor = PlatformColor.lightGray.cgColor
+    #endif
 
     return view
   }
 
-  private func loadImage(imageView: UIImageView) {
+  private func loadImage(imageView: PlatformImageView) {
     guard let url else { return }
 
     URLSession.shared.dataTask(with: url) { (data, response, error) in
@@ -104,7 +112,7 @@ public class SelectableImageNode: SelectableDecoratorNode {
       }
 
       DispatchQueue.main.async {
-        imageView.image = UIImage(data: data)
+        imageView.image = PlatformImage(data: data)
       }
     }.resume()
   }

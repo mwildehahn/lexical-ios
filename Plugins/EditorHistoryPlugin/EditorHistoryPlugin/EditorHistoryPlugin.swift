@@ -7,7 +7,11 @@
 
 import Foundation
 import Lexical
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 @MainActor
 open class EditorHistoryPlugin: Plugin {

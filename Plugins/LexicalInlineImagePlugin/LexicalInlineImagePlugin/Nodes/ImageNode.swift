@@ -8,7 +8,11 @@
 import AVFoundation
 import Foundation
 import Lexical
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 extension NodeType {
   static let image = NodeType(rawValue: "image")
@@ -84,19 +88,19 @@ public class ImageNode: DecoratorNode {
     Self(url: url?.absoluteString ?? "", size: size, sourceID: sourceID, key: key)
   }
 
-  override public func createView() -> UIImageView {
+  override public func createView() -> PlatformImageView {
     editorForTapHandling = getActiveEditor()
     let imageView = createImageView()
     loadImage(imageView: imageView)
     return imageView
   }
 
-  override open func decorate(view: UIView) {
-    if let view = view as? UIImageView {
+  override open func decorate(view: PlatformView) {
+    if let view = view as? PlatformImageView {
       for gr in view.gestureRecognizers ?? [] {
         view.removeGestureRecognizer(gr)
       }
-      let gestureRecognizer = UITapGestureRecognizer(
+      let gestureRecognizer = PlatformTapGestureRecognizer(
         target: self, action: #selector(handleTap(gestureRecognizer:)))
       view.addGestureRecognizer(gestureRecognizer)
       loadImage(imageView: view)
@@ -127,17 +131,21 @@ public class ImageNode: DecoratorNode {
     try getWritable().sourceID = sourceID
   }
 
-  private func createImageView() -> UIImageView {
-    let view = UIImageView(frame: CGRect(origin: CGPoint.zero, size: size))
+  private func createImageView() -> PlatformImageView {
+    let view = PlatformImageView(frame: CGRect(origin: CGPoint.zero, size: size))
+    #if canImport(UIKit)
     view.isUserInteractionEnabled = true
-
     view.backgroundColor = .lightGray
+    #elseif canImport(AppKit)
+    view.wantsLayer = true
+    view.layer?.backgroundColor = PlatformColor.lightGray.cgColor
+    #endif
 
     return view
   }
 
   private weak var editorForTapHandling: Editor?
-  @objc internal func handleTap(gestureRecognizer: UITapGestureRecognizer) {
+  @objc internal func handleTap(gestureRecognizer: PlatformTapGestureRecognizer) {
     guard let editorForTapHandling else { return }
     do {
       try editorForTapHandling.update {
@@ -148,7 +156,7 @@ public class ImageNode: DecoratorNode {
     }
   }
 
-  private func loadImage(imageView: UIImageView) {
+  private func loadImage(imageView: PlatformImageView) {
     guard let url else { return }
 
     URLSession.shared.dataTask(with: url) { (data, response, error) in
@@ -161,7 +169,7 @@ public class ImageNode: DecoratorNode {
       }
 
       DispatchQueue.main.async {
-        imageView.image = UIImage(data: data)
+        imageView.image = PlatformImage(data: data)
       }
     }.resume()
   }

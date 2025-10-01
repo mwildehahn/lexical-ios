@@ -119,7 +119,7 @@ extension QuoteNode {
           #if canImport(UIKit)
           UIRectFill(barRect)
           #elseif canImport(AppKit)
-          NSRectFill(barRect)
+          barRect.fill()
           #endif
         }
       }
