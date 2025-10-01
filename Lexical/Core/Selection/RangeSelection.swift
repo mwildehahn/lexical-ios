@@ -279,6 +279,10 @@ public class RangeSelection: BaseSelection {
 
   @MainActor
   public func insertText(_ text: String) throws {
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+      let preview = text.replacingOccurrences(of: "\n", with: "\\n")
+      print("🔥 TYPE: insertText text='\(preview)' len=\(text.lengthAsNSString()) at anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset) collapsed=\(isCollapsed())")
+    }
     let anchor = anchor
     let focus = focus
     let anchorIsBefore = try anchor.isBefore(point: focus)
@@ -1060,6 +1064,22 @@ public class RangeSelection: BaseSelection {
         }
       }
     }
+    // Optimized: pre-clamp a single-character deletion when starting from a collapsed caret.
+    // This avoids relying on native tokenizer behavior that may expand to a word.
+    var didPreClampSingleChar = false
+    if isBackwards && wasCollapsed, let editor = getActiveEditor(),
+       editor.frontend is LexicalView, editor.featureFlags.useOptimizedReconciler {
+      if let start = caretStringLocation, start > 0 {
+        let clamp = NSRange(location: start - 1, length: 1)
+        // Map and apply explicit 1‑char selection; also set structural clamp for reconciler.
+        try applySelectionRange(clamp, affinity: .backward)
+        editor.pendingDeletionClampRange = clamp
+        didPreClampSingleChar = true
+        if editor.featureFlags.verboseLogging {
+          print("🔥 DELETE: pre-clamp 1-char at \(start-1); pendingClamp=\(NSStringFromRange(clamp))")
+        }
+      }
+    }
     // Capture potential caret remap target for list/item merges when deleting backwards
     var preDeletePreviousTextKey: NodeKey? = nil
     if isBackwards && wasCollapsed && anchor.type == .text && anchor.offset == 0 {
@@ -1210,7 +1230,13 @@ public class RangeSelection: BaseSelection {
         try possibleNode.selectStart()
         return
       }
-      try modify(alter: .extend, isBackward: isBackwards, granularity: .character)
+      if didPreClampSingleChar {
+        if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+          print("🔥 DELETE: skip native modify (pre-clamped)")
+        }
+      } else {
+        try modify(alter: .extend, isBackward: isBackwards, granularity: .character)
+      }
 
       // Clamp over-eager native selection expansions (observed with optimized reconciler
       // on fast backspaces after typing a new word). If selection started collapsed and
@@ -1221,11 +1247,18 @@ public class RangeSelection: BaseSelection {
            let a = try? stringLocationForPoint(anchor, editor: editor),
            let b = try? stringLocationForPoint(focus, editor: editor) {
           let len = abs(a - b)
+          if editor.featureFlags.verboseLogging {
+            print("🔥 DELETE: native expansion detected start=\(start) a=\(a) b=\(b) len=\(len)")
+          }
           if len > 1 {
             let loc = isBackwards ? max(0, start - 1) : start
             let clamp = NSRange(location: loc, length: 1)
             try applySelectionRange(clamp, affinity: isBackwards ? .backward : .forward)
-            if editor.featureFlags.verboseLogging { print("🔥 DELETE: clamp native selection word→char at \(loc)") }
+            // Additionally clamp structural fast paths in the optimized reconciler (one‑shot)
+            editor.pendingDeletionClampRange = clamp
+            if editor.featureFlags.verboseLogging {
+              print("🔥 DELETE: clamp native selection word→char at \(loc); pendingClamp=\(NSStringFromRange(clamp))")
+            }
           }
         }
       }
@@ -1262,6 +1295,9 @@ public class RangeSelection: BaseSelection {
         // since our modify() accurately accounts for unicode boundaries
       } else if isBackwards && anchor.offset == 0 {
         // Special handling around rich text nodes
+        if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+          print("🔥 DELETE: at start-of-paragraph (offset=0) — will merge with previous if possible")
+        }
         let element =
           anchor.type == .element ? try anchor.getNode() : try anchor.getNode().getParentOrThrow()
         if let element = element as? ElementNode, try element.collapseAtStart(selection: self) {
@@ -1270,7 +1306,50 @@ public class RangeSelection: BaseSelection {
       }
     }
 
-    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging { print("🔥 DELETE: removeText()") }
+    // Log planned vs effective deletion (accounts for clamp + collapsed caret)
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+      let nsLen = ed.textStorage?.length ?? 0
+      let a = try? stringLocationForPoint(anchor, editor: ed)
+      let b = try? stringLocationForPoint(focus, editor: ed)
+      var selectionRange: NSRange? = nil
+      if let a, let b {
+        let lo = min(a, b); let hi = max(a, b)
+        selectionRange = NSRange(location: lo, length: hi - lo)
+      }
+      var collapsedOneChar: NSRange? = nil
+      if wasCollapsed, let start = caretStringLocation {
+        let loc = isBackwards ? max(0, start - 1) : start
+        collapsedOneChar = NSRange(location: loc, length: 1)
+      }
+      let clamp = ed.pendingDeletionClampRange
+      // Decide effective range used for deletion
+      var effective = NSRange(location: 0, length: 0)
+      if let clamp {
+        if let sel = selectionRange {
+          let inter = NSIntersectionRange(sel, clamp)
+          effective = inter.length > 0 ? inter : clamp
+        } else if let one = collapsedOneChar {
+          let inter = NSIntersectionRange(one, clamp)
+          effective = inter.length > 0 ? inter : clamp
+        } else {
+          effective = clamp
+        }
+      } else if let sel = selectionRange, sel.length > 0 {
+        effective = sel
+      } else if let one = collapsedOneChar {
+        effective = one
+      }
+      // Clamp to current TS length for preview
+      let safeEff = NSIntersectionRange(effective, NSRange(location: 0, length: nsLen))
+      var effText = ""
+      if safeEff.length > 0, let ns = ed.textStorage?.string as NSString? {
+        effText = ns.substring(with: safeEff)
+      }
+      let selStr = selectionRange.map { NSStringFromRange($0) } ?? "nil"
+      let clampStr = clamp.map { NSStringFromRange($0) } ?? "nil"
+      print("🔥 DELETE: plan sel=\(selStr) clamp=\(clampStr) → effective=\(NSStringFromRange(safeEff)) text='\(effText)')")
+      print("🔥 DELETE: removeText()")
+    }
     try removeText()
     if let ed = getActiveEditor(), ed.featureFlags.verboseLogging { print("🔥 DELETE: end") }
 
@@ -1457,8 +1536,27 @@ public class RangeSelection: BaseSelection {
       if editor.featureFlags.verboseLogging {
         print("🔥 APPLY-NATIVE: mapped anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
       }
-      self.anchor = anchor
-      self.focus = focus
+      // Guard against mismapped wide ranges (observed at line breaks) when the original
+      // native range length is 1. If the mapped points land on the same TextNode and span
+      // its full content, clamp to 1 char at the intended string offsets.
+      if range.length == 1,
+         anchor.type == .text, focus.type == .text, anchor.key == focus.key,
+         let tn = (try? anchor.getNode()) as? TextNode,
+         abs(anchor.offset - focus.offset) > 1,
+         abs(anchor.offset - focus.offset) >= tn.getTextContentSize() {
+        if editor.featureFlags.verboseLogging {
+          print("🔥 APPLY-NATIVE: clamp mapped len=\(abs(anchor.offset - focus.offset)) → 1 (node=\(anchor.key))")
+        }
+        if let aPt = try? pointAtStringLocation(anchorOffset, searchDirection: .backward, rangeCache: editor.rangeCache),
+           let fPt = try? pointAtStringLocation(focusOffset, searchDirection: .forward, rangeCache: editor.rangeCache) {
+          self.anchor = aPt; self.focus = fPt
+        } else {
+          self.anchor = anchor; self.focus = focus
+        }
+      } else {
+        self.anchor = anchor
+        self.focus = focus
+      }
     }
   }
 

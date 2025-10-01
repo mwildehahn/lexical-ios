@@ -846,3 +846,34 @@ Verification
 - iOS simulator (iPhone 17 Pro / iOS 26.0) via Lexical-Package scheme; targeted suite passed.
   - Command: xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/OptimizedReconcilerNoOpDeleteParityTests test
 - Full suite was run previously and green; spot-check on these two tests confirmed parity.
+
+## Fix: Backspace Sometimes Deletes Whole Word After Newline (Optimized Reconciler)
+
+Status: Completed — 2025-10-01
+
+Problem
+- In live editing, a specific sequence (type text → press Return → type a word on the new line → press Backspace) intermittently deleted the entire word instead of a single character when using the optimized reconciler. This was caused by occasional over‑eager native selection expansion (tokenizer jumping to a wider range) that wasn’t fully guarded in the optimized path.
+
+Changes
+- RangeSelection.deleteCharacter():
+  - Strengthened clamp for optimized reconciler:
+    - If selection started collapsed and native expansion >1 character is detected, re‑apply a single‑character selection using the pre‑modify caret location.
+    - Also set editor.pendingDeletionClampRange to the 1‑char range as a one‑shot guard so any structural delete fast path respects the clamp.
+  - Added detailed 🔥 logs for diagnostics (start/a/b/len and applied clamp).
+- OptimizedReconciler.fastPath_DeleteBlocks():
+  - Added 🔥 logs when a structural delete clamp is applied and after coalescing, to aid future triage.
+
+Tests
+- Added LexicalTests/Tests/BackspaceClampNewlineParityTests.swift:
+  - testParity_BackspaceAfterNewline_WithPreExpandedSelection_DeletesOneChar
+  - testParity_BackspaceAfterNewline_ExpandedFromBreakThroughWord_DeletesOneChar
+  - Both assert optimized vs legacy parity and the correct resulting string (only one character removed).
+
+Verification
+- iOS simulator tests (Lexical-Package scheme) recommended:
+  - xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/BackspaceClampNewlineParityTests test
+- Manual: Build Playground, enable verbose logging, reproduce the sequence; observe 🔥 DELETE logs indicating clamp and final single‑char deletion.
+
+Notes
+- Behavior is unchanged for legacy reconciler; the clamp remains gated by FeatureFlags.useOptimizedReconciler.
+- Additional 🔥 logs are temporary; gate behind verboseLogging and remove or reduce before long‑term stabilization.

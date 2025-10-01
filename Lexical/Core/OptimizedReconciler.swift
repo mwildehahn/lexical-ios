@@ -1061,13 +1061,23 @@ internal enum OptimizedReconciler {
     shouldReconcileSelection: Bool,
     fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
-    // Find a single TextNode whose text part changed (length may or may not change).
-    // We allow other dirty nodes (e.g., parents marked dirty), but only operate when
-    // exactly one TextNode's text is modified.
-    let textDirtyKeys = editor.dirtyNodes.keys.filter { key in
-      (currentEditorState.nodeMap[key] is TextNode) || (pendingEditorState.nodeMap[key] is TextNode)
+    // Find a single TextNode whose TEXT CONTENT changed. Parents may be dirty due to
+    // block attributes; ignore those. Only operate when exactly one TextNode's string
+    // actually differs between prev and next states.
+    let changedTextKeys: [NodeKey] = editor.dirtyNodes.keys.compactMap { key in
+      guard let prev = currentEditorState.nodeMap[key] as? TextNode,
+            let next = pendingEditorState.nodeMap[key] as? TextNode else { return nil }
+      return (prev.getTextPart() != next.getTextPart()) ? key : nil
     }
-    guard textDirtyKeys.count == 1, let dirtyKey = textDirtyKeys.first,
+    if changedTextKeys.count != 1 {
+      if editor.featureFlags.verboseLogging {
+        if !changedTextKeys.isEmpty {
+          print("🔥 TEXT-ONLY: skip (changedTextKeys=\(changedTextKeys.count))")
+        }
+      }
+      return false
+    }
+    guard let dirtyKey = changedTextKeys.first,
           let prevNode = currentEditorState.nodeMap[dirtyKey] as? TextNode,
           let nextNode = pendingEditorState.nodeMap[dirtyKey] as? TextNode,
           let prevRange = editor.rangeCache[dirtyKey]
@@ -1558,6 +1568,9 @@ internal enum OptimizedReconciler {
     // Apply deletes via batch path
     // If a clamp range was provided (selection-driven delete), intersect deletes.
     if let clamp = editor.pendingDeletionClampRange {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 DELETE-FAST: applying structural delete clamp=\(NSStringFromRange(clamp)) (pre-intersection)")
+      }
       var clamped: [Instruction] = []
       var newTotalDelta = 0
       var minStart: Int? = nil
@@ -1595,6 +1608,10 @@ internal enum OptimizedReconciler {
         }
         instructions = finalDeletes.sorted { $0.location > $1.location }.map { .delete(range: $0) }
         totalDelta = newTotalDelta
+        if editor.featureFlags.verboseLogging {
+          let preview = finalDeletes.map { NSStringFromRange($0) }.joined(separator: ",")
+          print("🔥 DELETE-FAST: clamped structural delete ranges=\(preview) totalΔ=\(totalDelta)")
+        }
       }
       editor.pendingDeletionClampRange = nil
     }
