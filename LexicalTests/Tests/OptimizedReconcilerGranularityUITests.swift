@@ -1,0 +1,102 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@testable import Lexical
+import XCTest
+
+final class OptimizedReconcilerGranularityUITests: XCTestCase {
+  private func makeOptimizedEditorView() -> (Editor, LexicalView) {
+    let flags = FeatureFlags.optimizedProfile(.aggressiveEditor)
+    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    return (view.editor, view)
+  }
+
+  func testDeleteWordForward_UI() throws {
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    let text = "The quick brown fox"
+    let caret = ("The " as NSString).length // at start of "quick"
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: text)
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: caret, focusOffset: caret)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteWord(isBackwards: false) }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "The  brown fox")
+    }
+  }
+
+  func testDeleteWordBackward_UI() throws {
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    let text = "The quick brown"
+    let caret = ("The quick" as NSString).length // after word "quick"
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: text)
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: caret, focusOffset: caret)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteWord(isBackwards: true) }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "The  brown")
+    }
+  }
+
+  func testDeleteLineForward_UI() throws {
+    throw XCTSkip("Line granularity depends on actual layout/first responder; skipping in unit harness.")
+    // Unreachable
+  }
+
+  func testDeleteLineBackward_UI() throws {
+    throw XCTSkip("Line granularity depends on actual layout/first responder; skipping in unit harness.")
+    // Unreachable
+  }
+
+  func testGraphemeBackspace_CombiningMark_UI() throws {
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    let combining = "e\u{0301}" // e + combining acute
+    let text = "ab" + combining + "cd"
+    let caretAfter = ("ab" + combining as NSString).length
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: text)
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: caretAfter, focusOffset: caretAfter)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "abcd")
+    }
+  }
+
+  func testGraphemeBackspace_ZWJEmojiFamily_UI() throws {
+    let (editor, view) = makeOptimizedEditorView(); _ = view
+    let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}" // 👨‍👩‍👧
+    let prefix = "hi" + family
+    let text = prefix + "world"
+    let caretAfter = (prefix as NSString).length
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode(); let t = createTextNode(text: text)
+      try p.append([t]); try root.append([p])
+      try t.select(anchorOffset: caretAfter, focusOffset: caretAfter)
+    }
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
+    try editor.read {
+      let s = getRoot()?.getTextContent() ?? ""
+      let norm = s.hasPrefix("\n") ? String(s.dropFirst(1)) : s
+      XCTAssertEqual(norm, "hiworld")
+    }
+  }
+}
