@@ -892,3 +892,36 @@ Verification
 Notes
 - Behavior is unchanged for legacy reconciler; the clamp remains gated by FeatureFlags.useOptimizedReconciler.
 - Additional 🔥 logs are temporary; gate behind verboseLogging and remove or reduce before long‑term stabilization.
+
+## Fix: Grapheme/Emoji Backspace Parity (UI + Optimized)
+
+Status: Completed — 2025-10-01
+
+Problem
+- Two UI granularity tests failed after earlier clamp hardening:
+  - OptimizedReconcilerGranularityUITests.testGraphemeBackspace_CombiningMark_UI
+  - OptimizedReconcilerGranularityUITests.testGraphemeBackspace_ZWJEmojiFamily_UI
+- Additionally, three emoji parity tests regressed when optimized used grapheme deletion at all times, diverging from legacy when the caret sits inside a composed cluster (e.g., between emoji base and skin tone).
+
+Changes
+- FeatureFlags.optimizedProfile(.aggressiveEditor)
+  - Default to grapheme deletion for UI typing: `useOptimizedReconcilerStrictMode = false`.
+- RangeSelection.deleteCharacter(isBackwards:)
+  - Pre‑clamp refinement (optimized reconciler only):
+    - If caret is at a cluster boundary → clamp to the full composed character (NSString.rangeOfComposedCharacterSequence) and delete one grapheme.
+    - If caret is inside a cluster (e.g., between emoji base and modifier) → mimic legacy/native parity by clamping to the previous Unicode scalar (surrogate‑aware) instead of deleting the whole cluster.
+  - Keep structural delete one‑shot clamp (editor.pendingDeletionClampRange) in sync with the chosen clamp.
+
+Verification
+- All tests PASS on iPhone 17 Pro (iOS 26.0) simulator:
+  - Full suite: 425 tests, 0 failures.
+  - Targeted:
+    - -only-testing:LexicalTests/OptimizedReconcilerGranularityUITests — PASS
+    - -only-testing:LexicalTests/EmojiParityTests/testParity_BackspaceEmojiCluster_DeletesSingleCluster — PASS
+    - -only-testing:LexicalTests/EmojiAdvancedParityTests/testParity_BackspaceZWJFamily_DeletesSingleCluster — PASS
+    - -only-testing:LexicalTests/EmojiAdvancedParityTests/testParity_BackspaceFlagEmoji_DeletesSingleCluster — PASS
+- Playground app build: PASS.
+
+Files
+- Lexical/Core/FeatureFlags.swift — `aggressiveEditor` profile sets `useOptimizedReconcilerStrictMode = false`.
+- Lexical/Core/Selection/RangeSelection.swift — inside‑cluster heuristic with surrogate‑aware scalar fallback; cluster‑boundary uses composed sequence range.

@@ -1086,7 +1086,30 @@ public class RangeSelection: BaseSelection {
             clamp = NSRange(location: max(0, start - 1), length: 1)
           }
         } else if let ns = editor.textStorage?.string as NSString? {
-          clamp = ns.rangeOfComposedCharacterSequence(at: start - 1)
+          // Default (non-strict): delete one user-perceived character (grapheme cluster).
+          // However, if the caret is positioned INSIDE a cluster (e.g., between emoji base and
+          // its skin‑tone modifier), mimic legacy/native parity by deleting only the "previous"
+          // scalar segment (typically the base). We detect this by checking whether the caret
+          // index lies within the same composed sequence as (start-1).
+          let left = ns.rangeOfComposedCharacterSequence(at: start - 1)
+          let insideSameCluster = (start > left.location) && (start < left.location + left.length)
+          if insideSameCluster {
+            // Delete previous scalar at (start-1), with surrogate awareness
+            let i = start - 1
+            if i >= 0 {
+              let c = ns.character(at: i)
+              if c >= 0xDC00 && c <= 0xDFFF, i - 1 >= 0 {
+                let h = ns.character(at: i - 1)
+                if h >= 0xD800 && h <= 0xDBFF { clamp = NSRange(location: i - 1, length: 2) } else { clamp = NSRange(location: i, length: 1) }
+              } else {
+                clamp = NSRange(location: i, length: 1)
+              }
+            } else {
+              clamp = NSRange(location: max(0, start - 1), length: 1)
+            }
+          } else {
+            clamp = left
+          }
         } else {
           clamp = NSRange(location: start - 1, length: 1)
         }
