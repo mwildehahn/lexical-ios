@@ -246,8 +246,10 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
 
   return NativeSelection(
     range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
+    opaqueRange: nil,
     affinity: affinity,
     markedRange: nil,
+    markedOpaqueRange: nil,
     selectionIsNodeOrObject: false)
 }
 

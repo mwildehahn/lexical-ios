@@ -74,11 +74,14 @@ public class SelectableDecoratorView: PlatformView {
     #if canImport(UIKit)
     borderView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     borderView.isUserInteractionEnabled = false
+    borderView.layer.borderColor = PlatformColor.red.cgColor
+    borderView.layer.borderWidth = 2.0
     #elseif canImport(AppKit)
     borderView.autoresizingMask = [.width, .height]
-    #endif
+    borderView.wantsLayer = true
     borderView.layer?.borderColor = PlatformColor.red.cgColor
     borderView.layer?.borderWidth = 2.0
+    #endif
     borderView.isHidden = true
   }
 

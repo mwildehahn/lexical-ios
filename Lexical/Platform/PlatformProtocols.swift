@@ -19,8 +19,8 @@ import AppKit
 /// This helps abstract the differences between UIKit and AppKit text input handling
 @MainActor
 public protocol PlatformTextViewProtocol: AnyObject {
-  var text: String { get set }
-  var attributedText: NSAttributedString { get set }
+  var text: String! { get set }
+  var attributedText: NSAttributedString! { get set }
   var font: PlatformFont? { get set }
   var textColor: PlatformColor? { get set }
   var isEditable: Bool { get set }
@@ -48,14 +48,14 @@ public protocol PlatformTextViewProtocol: AnyObject {
 extension UITextView: PlatformTextViewProtocol {}
 #elseif canImport(AppKit)
 extension NSTextView: PlatformTextViewProtocol {
-  public var text: String {
+  public var text: String! {
     get { string }
-    set { string = newValue }
+    set { string = newValue ?? "" }
   }
 
-  public var attributedText: NSAttributedString {
+  public var attributedText: NSAttributedString! {
     get { attributedString() }
-    set { textStorage?.setAttributedString(newValue) }
+    set { textStorage?.setAttributedString(newValue ?? NSAttributedString()) }
   }
 
   public var markedRange: NSRange {
