@@ -130,11 +130,7 @@ public class TextStorage: NSTextStorage {
     do {
       guard let editor, let frontend = editor.frontend else { return }
 
-      #if canImport(UIKit)
       let nativeSelection = NativeSelection(range: range, opaqueRange: nil, affinity: .forward, markedRange: nil, markedOpaqueRange: nil, selectionIsNodeOrObject: false)
-      #elseif canImport(AppKit)
-      let nativeSelection = NativeSelection(range: range, affinity: .forward, markedRange: nil, selectionIsNodeOrObject: false)
-      #endif
       try editor.update {
         guard let editorState = getActiveEditorState() else {
           return
