@@ -646,7 +646,9 @@ public class Editor: NSObject {
           superview.addSubview(view)
           node.decoratorWillAppear(view: view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
-          if node.hasDynamicSize(), let rangeCacheItem = rangeCache[nodeKey] {
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            // Always invalidate layout so TextKit positions and unhides the decorator immediately,
+            // regardless of dynamic sizing. Legacy reconciler relies on this for first-frame render.
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
           }
@@ -671,6 +673,10 @@ public class Editor: NSObject {
             node.decoratorWillAppear(view: view)
           }
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            frontend?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+          }
           self.log(
             .editor, .verbose,
             "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
