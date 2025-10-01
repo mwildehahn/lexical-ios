@@ -165,7 +165,7 @@ import Foundation
         useReconcilerDeleteBlockFenwick: true,
         useReconcilerPrePostAttributesOnly: false,
         useModernTextKitOptimizations: true,
-        verboseLogging: true,
+        verboseLogging: false,
         prePostAttrsOnlyMaxTargets: 0
       )
     }
