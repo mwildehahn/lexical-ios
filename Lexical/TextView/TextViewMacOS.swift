@@ -364,6 +364,19 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 
     // Check for Cmd+key combinations
     if modifiers.contains(.command) {
+      // Check for Cmd+Shift combinations first
+      if modifiers.contains(.shift) {
+        switch event.charactersIgnoringModifiers {
+        case "x", "X":
+          // Cmd+Shift+X = Strikethrough
+          editor.dispatchCommand(type: .formatText, payload: TextFormatType.strikethrough)
+          return
+        default:
+          break
+        }
+      }
+
+      // Regular Cmd+key combinations
       switch event.charactersIgnoringModifiers {
       case "c":
         copy(nil)
@@ -373,6 +386,12 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
         return
       case "v":
         paste(nil)
+        return
+      case "a":
+        // Cmd+A = Select All
+        if let textStorage = textStorage, textStorage.length > 0 {
+          setSelectedRange(NSRange(location: 0, length: textStorage.length))
+        }
         return
       case "b":
         // Cmd+B = Bold
