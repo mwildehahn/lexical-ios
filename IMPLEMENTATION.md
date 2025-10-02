@@ -989,15 +989,51 @@ struct ContentView: View {
 - **Build Status**: ✅ All 130 tests compile successfully
 - **Test Execution**: Tests designed for individual/batch execution (full suite may timeout due to size + legacy reconciler)
 
+### Merge exp-recon Branch ✅ COMPLETE (2025-10-02)
+- **Branch**: feature/exp-recon → feature/appkit-claude
+- **Commit**: ad4d00a - "Merge branch 'feature/exp-recon' into feature/appkit-claude"
+- **Conflicts Resolved**: RangeSelection.swift (2 locations)
+- **Strategy**: Preserve ALL exp-recon fixes while maintaining platform abstractions
+
+**Integrated from exp-recon**:
+1. **insertText logging** (line 287-290): Verbose logging for type operations
+2. **deleteCharacter pre-clamp logic** (lines 1048-1133):
+   - caretStringLocation tracking
+   - Pre-clamp single-character deletion with grapheme cluster handling
+   - Strict mode (scalars) + default mode (graphemes)
+   - Surrogate pair and emoji sequence handling
+3. **deleteCharacter post-modify clamping** (lines 1284-1329):
+   - Skip native modify when pre-clamped
+   - Clamp over-eager native selection expansions (word → 1 char)
+   - Prevents tokenizer from selecting entire words during single-char deletes
+4. **deleteCharacter detailed logging** (lines 1363-1432):
+   - Start-of-paragraph merge logging
+   - Comprehensive deletion plan logging (selection, clamp, effective ranges)
+   - Text preview of deletion target
+5. **modify() logging** (lines 1557-1570): Native selection before/after movement
+6. **applyNativeSelection() logging** (lines 1590-1592): Range and affinity logging
+
+**Platform Abstractions Maintained**:
+- ✅ Platform-conditional imports (#if canImport(UIKit) / AppKit)
+- ✅ PlatformTextGranularity instead of .character/.word
+- ✅ PlatformTextStorageDirection for selection affinity
+- ✅ Platform-specific affinity handling in applyNativeSelection
+
+**Build Status**: ✅ BUILD SUCCEEDED (iOS Simulator)
+**Impact**: Critical delete operations now have comprehensive logging and clamping for debugging/parity
+**Files Modified**: 1 (RangeSelection.swift)
+**Lines Changed**: ~300 additions (all exp-recon improvements)
+
 ### Summary
-- **4 Enhancements Completed** (from optional future work list)
+- **5 Enhancements Completed** (from optional future work list)
   1. ✅ macOS-iOS Parity Tests: 130 comprehensive tests
   2. ✅ Extended Keyboard Shortcuts: Cmd+A, Cmd+Shift+X
   3. ✅ Complete Selection Movement Granularities: sentence, line, paragraph, document
   4. ✅ Expanded Parity Tests: 130 total tests covering all scenarios
+  5. ✅ Merge exp-recon Branch: All critical delete/selection improvements integrated
 - **Remaining Optional Items**:
   - Test IME with Japanese/Chinese input (requires manual testing with physical keyboard)
   - Test decorator overlay interactions (requires runtime testing)
-- **Total New Lines**: ~3,290 lines (2,908 test + 19 shortcuts + 75 selection + 288 batch 1-4)
+- **Total New Lines**: ~3,590 lines (2,908 test + 19 shortcuts + 75 selection + 288 batch 1-4 + 300 exp-recon)
 - **Build Status**: ✅ All macOS and iOS builds passing
 - **Test Status**: ✅ All 130 parity tests compile and ready for execution
