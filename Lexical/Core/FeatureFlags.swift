@@ -156,14 +156,16 @@ import Foundation
         useReconcilerFenwickDelta: true,
         useReconcilerKeyedDiff: true,
         useReconcilerBlockRebuild: true,
-        useOptimizedReconcilerStrictMode: true,
+        // UI typing should delete a full grapheme cluster by default.
+        // Strict (scalar) mode remains available via explicit flags in tests.
+        useOptimizedReconcilerStrictMode: false,
         useReconcilerFenwickCentralAggregation: true,
         useReconcilerShadowCompare: false,
         useReconcilerInsertBlockFenwick: true,
         useReconcilerDeleteBlockFenwick: true,
         useReconcilerPrePostAttributesOnly: false,
         useModernTextKitOptimizations: true,
-        verboseLogging: true,
+        verboseLogging: false,
         prePostAttrsOnlyMaxTargets: 0
       )
     }

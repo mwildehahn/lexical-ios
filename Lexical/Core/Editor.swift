@@ -178,7 +178,7 @@ public class Editor: NSObject {
   // Used to help co-ordinate selection and events
   internal var compositionKey: NodeKey?
   public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
-  internal var featureFlags: FeatureFlags = FeatureFlags()
+  public var featureFlags: FeatureFlags = FeatureFlags()
 
   // Used for storing editor listener events
   internal var listeners = Listeners()
@@ -586,7 +586,21 @@ public class Editor: NSObject {
     type: NativeSelectionModificationType, direction: UITextStorageDirection,
     granularity: UITextGranularity
   ) {
+    if featureFlags.verboseLogging {
+      if let rng = getNativeSelection().range {
+        print("🔥 NATIVE-MOVE: before type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=\(NSStringFromRange(rng))")
+      } else {
+        print("🔥 NATIVE-MOVE: before type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=nil")
+      }
+    }
     frontend?.moveNativeSelection(type: type, direction: direction, granularity: granularity)
+    if featureFlags.verboseLogging {
+      if let rng = getNativeSelection().range {
+        print("🔥 NATIVE-MOVE: after  type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=\(NSStringFromRange(rng))")
+      } else {
+        print("🔥 NATIVE-MOVE: after  type=\(type) dir=\(direction == .backward ? "backward" : "forward") gran=\(granularity) range=nil")
+      }
+    }
   }
   #elseif canImport(AppKit)
   internal func getNativeSelection() -> NativeSelection {
@@ -680,6 +694,9 @@ public class Editor: NSObject {
       self.log(.editor, .verbose, "No view for mounting decorator subviews.")
       return
     }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: begin cache.count=\(decoratorCache.count) ts.len=\(textStorage?.length ?? -1)")
+    }
     try? self.read {
       for (nodeKey, decoratorCacheItem) in decoratorCache {
         switch decoratorCacheItem {
@@ -694,9 +711,20 @@ public class Editor: NSObject {
           superview.addSubview(view)
           node.decoratorWillAppear(view: view)
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
-          if node.hasDynamicSize(), let rangeCacheItem = rangeCache[nodeKey] {
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            // Always invalidate layout so TextKit positions and unhides the decorator immediately,
+            // regardless of dynamic sizing. Legacy reconciler relies on this for first-frame render.
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            // Proactively ensure layout for the affected glyphs so that a draw pass
+            // isn’t required before LayoutManager can position the decorator. This
+            // helps the immediate-mount case when inserting a decorator after a newline.
+            let glyphRange = frontend?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
           }
 
           self.log(
@@ -719,6 +747,16 @@ public class Editor: NSObject {
             node.decoratorWillAppear(view: view)
           }
           decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            frontend?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontend?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: remount invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
           self.log(
             .editor, .verbose,
             "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
@@ -734,9 +772,18 @@ public class Editor: NSObject {
             // required so that TextKit does the new size calculation, and correctly hides or unhides the view
             frontend?.layoutManager.invalidateLayout(
               forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontend?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: decorate invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
           }
         }
       }
+    }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: end cache.count=\(decoratorCache.count)")
     }
   }
 

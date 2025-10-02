@@ -91,4 +91,42 @@ final class InlineImagePersistenceTests: XCTestCase {
     }
     XCTAssertNotNil(key)
   }
+
+  func testDecoratorPositionCacheShiftsOnPrecedingTextInsert_Optimized() throws {
+    let (editor, ctx) = makeEditor(useOptimized: true)
+    var imageKey: NodeKey!
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t1 = TextNode(text: "Hello ")
+      let img = ImageNode(url: "https://e.com/i.png", size: CGSize(width: 12, height: 12), sourceID: "i"); imageKey = img.getKey()
+      let t2 = TextNode(text: "World")
+      try p.append([t1, img, t2]); try root.append([p])
+      try t1.select(anchorOffset: 0, focusOffset: 0)
+    }
+    let before = ctx.textStorage.decoratorPositionCache[imageKey] ?? -1
+    try editor.update { try (getSelection() as? RangeSelection)?.insertText("ABC") }
+    let after = ctx.textStorage.decoratorPositionCache[imageKey] ?? -1
+    XCTAssertTrue(after == before + 3, "Image position should shift by inserted length (expected +3)")
+  }
+
+  func testDecoratorPositionCacheShiftsOnPrecedingTextDelete_Optimized() throws {
+    let (editor, ctx) = makeEditor(useOptimized: true)
+    var imageKey: NodeKey!
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let t1 = TextNode(text: "Hello ")
+      let img = ImageNode(url: "https://e.com/i.png", size: CGSize(width: 12, height: 12), sourceID: "i"); imageKey = img.getKey()
+      let t2 = TextNode(text: "World")
+      try p.append([t1, img, t2]); try root.append([p])
+      try t1.select(anchorOffset: 6, focusOffset: 6) // end of "Hello "
+    }
+    let before = ctx.textStorage.decoratorPositionCache[imageKey] ?? -1
+    try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) } // delete one char before image
+    let after = ctx.textStorage.decoratorPositionCache[imageKey] ?? -1
+    XCTAssertTrue(after == before - 1, "Image position should shift left by 1 after delete")
+  }
+
+  // Multi-image delete sequences are exercised in LexicalView-based tests and parity tests.
 }

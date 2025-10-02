@@ -110,6 +110,13 @@ internal class LexicalReadOnlySizeCache {
     textStorage.editor = editor
   }
 
+  /// Convenience initializer that uses the global runtime default feature flags.
+  /// When `LexicalRuntime.isOptimizedReconcilerEnabled == true`, this maps to
+  /// `FeatureFlags.optimizedProfile(.aggressiveEditor)`.
+  @objc public convenience init(editorConfig: EditorConfig) {
+    self.init(editorConfig: editorConfig, featureFlags: LexicalRuntime.defaultFeatureFlags)
+  }
+
   internal func viewDidLayoutSubviews(viewBounds: CGRect) {
     setTextContainerSize(forWidth: viewBounds.width, maxHeight: self.targetHeight)
   }
