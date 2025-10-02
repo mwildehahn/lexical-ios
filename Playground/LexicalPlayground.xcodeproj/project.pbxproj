@@ -89,8 +89,6 @@
 		DCB488F12E8E909200F73B34 /* OutputFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OutputFormat.swift; path = LexicalPlaygroundMac/OutputFormat.swift; sourceTree = "<group>"; };
 		DCB488F22E8E909200F73B34 /* PlaygroundViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlaygroundViewController.swift; path = LexicalPlaygroundMac/PlaygroundViewController.swift; sourceTree = "<group>"; };
 		DCB488F42E8E909200F73B34 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = LexicalPlaygroundMac/Assets.xcassets; sourceTree = "<group>"; };
-		DCB488F52E8E909200F73B34 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = LexicalPlaygroundMac/Info.plist; sourceTree = "<group>"; };
-		DCB488F62E8E90D500F73B34 /* Main.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Main.storyboard; path = LexicalPlaygroundMac/Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -400,7 +398,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				DCB489012E8E909200F73B34 /* Assets.xcassets in Resources */,
-				DCB4890A2E8E90D500F73B34 /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
