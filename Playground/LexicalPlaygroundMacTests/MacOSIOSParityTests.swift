@@ -3936,4 +3936,547 @@ final class MacOSIOSParityTests: XCTestCase {
 
     XCTAssertEqual(macResult, iosResult, "Many small updates should match")
   }
+
+  // MARK: - Node Hierarchy Advanced Tests
+
+  func testParity_GetParentChain() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> [String] {
+      try setupBasicDocument(editor: editor)
+
+      var chain: [String] = []
+      try editor.read {
+        if let root = getRoot(),
+           let p = root.getFirstChild() as? ParagraphNode,
+           let t = p.getFirstChild() as? TextNode {
+
+          var node: Node? = t
+          while let current = node {
+            chain.append(String(describing: type(of: current)))
+            node = current.getParent()
+          }
+        }
+      }
+      return chain
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Parent chain should match")
+    XCTAssertEqual(macResult.count, 3) // TextNode -> ParagraphNode -> RootNode
+  }
+
+  func testParity_GetChildByIndex() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        for i in 1...3 {
+          let p = createParagraphNode()
+          let t = createTextNode(text: "Para\(i)")
+          try p.append([t])
+          try root.append([p])
+        }
+      }
+
+      var result = ""
+      try editor.read {
+        if let root = getRoot(),
+           let secondPara = root.getChildAtIndex(index: 1) as? ParagraphNode,
+           let text = secondPara.getFirstChild() as? TextNode {
+          result = text.getTextPart()
+        }
+      }
+      return result
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Child by index should match")
+    XCTAssertEqual(macResult, "Para2")
+  }
+
+  func testParity_GetAllChildren() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> Int {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        for _ in 1...5 {
+          let p = createParagraphNode()
+          try root.append([p])
+        }
+      }
+
+      var count = 0
+      try editor.read {
+        count = getRoot()?.getChildren().count ?? 0
+      }
+      return count
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Children count should match")
+    XCTAssertEqual(macResult, 5)
+  }
+
+  // MARK: - Text Content Extraction Tests
+
+  func testParity_GetTextContentMultipleParagraphs() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p1 = createParagraphNode()
+        let t1 = createTextNode(text: "First")
+        try p1.append([t1])
+
+        let p2 = createParagraphNode()
+        let t2 = createTextNode(text: "Second")
+        try p2.append([t2])
+
+        try root.append([p1, p2])
+      }
+
+      var content = ""
+      try editor.read {
+        content = getRoot()?.getTextContent() ?? ""
+      }
+      return content
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Multi-paragraph text content should match")
+    XCTAssertEqual(macResult, "FirstSecond")
+  }
+
+  func testParity_GetTextContentWithFormatting() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+
+        var boldFormat = TextFormat()
+        boldFormat.bold = true
+        try t.setFormat(format: boldFormat)
+      }
+
+      var content = ""
+      try editor.read {
+        content = getRoot()?.getTextContent() ?? ""
+      }
+      return content
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Formatted text content should match")
+    XCTAssertEqual(macResult, "Hello World")
+  }
+
+  // MARK: - Node Mutation Order Tests
+
+  func testParity_AppendThenModify() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode()
+        let t = createTextNode(text: "Initial")
+        try p.append([t])
+        try root.append([p])
+      }
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+        try t.setText("Modified")
+      }
+
+      var content = ""
+      try editor.read {
+        content = getRoot()?.getTextContent() ?? ""
+      }
+      return content
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Append then modify should match")
+    XCTAssertEqual(macResult, "Modified")
+  }
+
+  func testParity_CreateAndRemoveMultipleTimes() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> Int {
+      for _ in 1...3 {
+        try editor.update {
+          guard let root = getRoot() else { return }
+          let p = createParagraphNode()
+          let t = createTextNode(text: "Test")
+          try p.append([t])
+          try root.append([p])
+        }
+
+        try editor.update {
+          guard let root = getRoot(),
+                let p = root.getFirstChild() as? ParagraphNode else { return }
+          try p.remove()
+        }
+      }
+
+      var count = 0
+      try editor.read {
+        count = getRoot()?.getChildren().count ?? 0
+      }
+      return count
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Create/remove cycles should match")
+    XCTAssertEqual(macResult, 0)
+  }
+
+  // MARK: - Format Persistence Tests
+
+  func testParity_FormatPersistsAcrossReads() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> (Bool, Bool) {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+
+        var boldFormat = TextFormat()
+        boldFormat.bold = true
+        try t.setFormat(format: boldFormat)
+      }
+
+      var isBold1 = false
+      try editor.read {
+        if let root = getRoot(),
+           let p = root.getFirstChild() as? ParagraphNode,
+           let t = p.getFirstChild() as? TextNode {
+          isBold1 = t.getFormat().bold
+        }
+      }
+
+      var isBold2 = false
+      try editor.read {
+        if let root = getRoot(),
+           let p = root.getFirstChild() as? ParagraphNode,
+           let t = p.getFirstChild() as? TextNode {
+          isBold2 = t.getFormat().bold
+        }
+      }
+
+      return (isBold1, isBold2)
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult.0, iosResult.0, "First read should match")
+    XCTAssertEqual(macResult.1, iosResult.1, "Second read should match")
+    XCTAssertTrue(macResult.0)
+    XCTAssertTrue(macResult.1)
+  }
+
+  // MARK: - Edge Case Scenarios
+
+  func testParity_EmptyEditorState() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> (Int, String) {
+      var childCount = 0
+      var content = ""
+
+      try editor.read {
+        childCount = getRoot()?.getChildren().count ?? 0
+        content = getRoot()?.getTextContent() ?? ""
+      }
+
+      return (childCount, content)
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult.0, iosResult.0, "Empty editor child count should match")
+    XCTAssertEqual(macResult.1, iosResult.1, "Empty editor content should match")
+    XCTAssertEqual(macResult.0, 0)
+    XCTAssertEqual(macResult.1, "")
+  }
+
+  func testParity_OnlyParagraphNoText() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        let p = createParagraphNode()
+        try root.append([p])
+      }
+
+      var content = ""
+      try editor.read {
+        content = getRoot()?.getTextContent() ?? ""
+      }
+      return content
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Empty paragraph content should match")
+    XCTAssertEqual(macResult, "")
+  }
+
+  func testParity_MultipleEmptyParagraphs() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> Int {
+      try editor.update {
+        guard let root = getRoot() else { return }
+        for _ in 1...5 {
+          let p = createParagraphNode()
+          try root.append([p])
+        }
+      }
+
+      var count = 0
+      try editor.read {
+        count = getRoot()?.getChildren().count ?? 0
+      }
+      return count
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Multiple empty paragraphs should match")
+    XCTAssertEqual(macResult, 5)
+  }
+
+  // MARK: - Text Manipulation Patterns
+
+  func testParity_PrependText() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+        try t.spliceText(offset: 0, delCount: 0, newText: "Prepend ", moveSelection: false)
+      }
+
+      var content = ""
+      try editor.read {
+        content = getRoot()?.getTextContent() ?? ""
+      }
+      return content
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Prepend text should match")
+    XCTAssertEqual(macResult, "Prepend Hello World")
+  }
+
+  func testParity_AppendText() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+        let length = t.getTextPart().count
+        try t.spliceText(offset: length, delCount: 0, newText: " Appended", moveSelection: false)
+      }
+
+      var content = ""
+      try editor.read {
+        content = getRoot()?.getTextContent() ?? ""
+      }
+      return content
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Append text should match")
+    XCTAssertEqual(macResult, "Hello World Appended")
+  }
+
+  func testParity_InsertMiddleText() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+        try t.spliceText(offset: 5, delCount: 0, newText: " Inserted", moveSelection: false)
+      }
+
+      var content = ""
+      try editor.read {
+        content = getRoot()?.getTextContent() ?? ""
+      }
+      return content
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Insert middle text should match")
+    XCTAssertEqual(macResult, "Hello Inserted World")
+  }
+
+  // MARK: - Selection Range Tests
+
+  func testParity_SelectEntireText() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> (Int, Int) {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+        let length = t.getTextPart().count
+        try t.select(anchorOffset: 0, focusOffset: length)
+      }
+
+      var anchor = 0
+      var focus = 0
+      try editor.read {
+        if let sel = try getSelection() as? RangeSelection {
+          anchor = sel.anchor.offset
+          focus = sel.focus.offset
+        }
+      }
+      return (anchor, focus)
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult.0, iosResult.0, "Selection anchor should match")
+    XCTAssertEqual(macResult.1, iosResult.1, "Selection focus should match")
+    XCTAssertEqual(macResult.0, 0)
+    XCTAssertEqual(macResult.1, 11) // "Hello World".count
+  }
+
+  func testParity_SelectPartialText() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> (Int, Int) {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+        try t.select(anchorOffset: 2, focusOffset: 7)
+      }
+
+      var anchor = 0
+      var focus = 0
+      try editor.read {
+        if let sel = try getSelection() as? RangeSelection {
+          anchor = sel.anchor.offset
+          focus = sel.focus.offset
+        }
+      }
+      return (anchor, focus)
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult.0, iosResult.0, "Partial selection anchor should match")
+    XCTAssertEqual(macResult.1, iosResult.1, "Partial selection focus should match")
+  }
+
+  // MARK: - Complex Update Patterns
+
+  func testParity_InterleavedFormatAndText() throws {
+    let (macOS, iOS) = makeEditors()
+
+    func scenario(editor: Editor) throws -> String {
+      try setupBasicDocument(editor: editor)
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+
+        var boldFormat = TextFormat()
+        boldFormat.bold = true
+        try t.setFormat(format: boldFormat)
+        try t.setText("Bold Text")
+      }
+
+      try editor.update {
+        guard let root = getRoot(),
+              let p = root.getFirstChild() as? ParagraphNode,
+              let t = p.getFirstChild() as? TextNode else { return }
+
+        var italicFormat = TextFormat()
+        italicFormat.italic = true
+        try t.setFormat(format: italicFormat)
+      }
+
+      var result = ""
+      try editor.read {
+        if let root = getRoot(),
+           let p = root.getFirstChild() as? ParagraphNode,
+           let t = p.getFirstChild() as? TextNode {
+          let fmt = t.getFormat()
+          result = "\(t.getTextPart()):\(fmt.bold):\(fmt.italic)"
+        }
+      }
+      return result
+    }
+
+    let macResult = try scenario(editor: macOS)
+    let iosResult = try scenario(editor: iOS)
+
+    XCTAssertEqual(macResult, iosResult, "Interleaved format/text should match")
+  }
 }
