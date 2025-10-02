@@ -1024,16 +1024,43 @@ struct ContentView: View {
 **Files Modified**: 1 (RangeSelection.swift)
 **Lines Changed**: ~300 additions (all exp-recon improvements)
 
+### iOS Playground Deployment Target Fix ✅ COMPLETE (2025-10-02)
+- **Issue**: iOS Playground targeting 16.2, but package requires 17.0
+- **Fix**: Updated `IPHONEOS_DEPLOYMENT_TARGET` from 16.2 to 17.0
+- **File**: Playground/LexicalPlayground.xcodeproj/project.pbxproj
+- **Commit**: 5035a90 - "Fix: update iOS Playground deployment target to 17.0"
+- **Result**: ✅ iOS Playground now builds successfully
+
+### Manual Testing Guide ✅ COMPLETE (2025-10-02)
+- **Created**: `docs/MANUAL_TESTING_GUIDE.md` (349 lines)
+- **Coverage**:
+  - IME (Input Method Editor) testing with 5 scenarios
+    - Japanese Hiragana, Chinese Pinyin, Emoji input
+    - Multiple composition cycles, composition with selection
+  - Decorator overlay testing with 4 scenarios
+    - Inline image interaction, multiple decorators
+    - Size changes, formatting interactions
+  - Keyboard shortcuts verification (9 shortcuts)
+  - Complex mixed-input scenarios
+  - Performance testing procedures
+  - Logging patterns and debugging guide
+  - Quick 5-minute smoke test checklist
+- **Commit**: bb42896 - "Docs: add comprehensive manual testing guide"
+- **Purpose**: Provides step-by-step instructions for manual testing of features requiring physical interaction
+
 ### Summary
-- **5 Enhancements Completed** (from optional future work list)
+- **7 Enhancements Completed** (from optional future work list)
   1. ✅ macOS-iOS Parity Tests: 130 comprehensive tests
   2. ✅ Extended Keyboard Shortcuts: Cmd+A, Cmd+Shift+X
   3. ✅ Complete Selection Movement Granularities: sentence, line, paragraph, document
   4. ✅ Expanded Parity Tests: 130 total tests covering all scenarios
   5. ✅ Merge exp-recon Branch: All critical delete/selection improvements integrated
-- **Remaining Optional Items**:
-  - Test IME with Japanese/Chinese input (requires manual testing with physical keyboard)
-  - Test decorator overlay interactions (requires runtime testing)
-- **Total New Lines**: ~3,590 lines (2,908 test + 19 shortcuts + 75 selection + 288 batch 1-4 + 300 exp-recon)
-- **Build Status**: ✅ All macOS and iOS builds passing
+  6. ✅ iOS Playground Deployment Target Fix: 16.2 → 17.0
+  7. ✅ Manual Testing Guide: Comprehensive interactive testing procedures
+- **Manual Testing Items** (documented in MANUAL_TESTING_GUIDE.md):
+  - IME with Japanese/Chinese input (requires physical keyboard interaction)
+  - Decorator overlay interactions (requires runtime clicking/interaction)
+- **Total New Lines**: ~3,940 lines (2,908 test + 19 shortcuts + 75 selection + 288 batch 1-4 + 300 exp-recon + 349 manual testing guide)
+- **Build Status**: ✅ All macOS and iOS builds passing (both Playground apps build successfully)
 - **Test Status**: ✅ All 130 parity tests compile and ready for execution
+- **Documentation**: ✅ Complete guide for manual testing of interactive features
