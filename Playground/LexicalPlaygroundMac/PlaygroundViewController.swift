@@ -228,19 +228,39 @@ class PlaygroundViewController: NSViewController {
     }
 
     // Update hierarchy on editor changes
-    _ = lexicalView.editor.registerUpdateListener { [weak self] editorState, _, _ in
-      self?.updateHierarchyView(editorState: editorState)
-      self?.updateFormattingButtons()
+    // TEMPORARILY DISABLED TO DEBUG SELECTION ISSUE
+    // _ = lexicalView.editor.registerUpdateListener { [weak self] editorState, _, _ in
+    //   self?.updateHierarchyView(editorState: editorState)
+    // }
+
+    // Register for undo/redo commands to update toolbar buttons
+    _ = lexicalView.editor.registerCommand(type: .canUndo) { [weak self] _ in
+      DispatchQueue.main.async {
+        self?.updateUndoRedoButtons()
+      }
+      return false
     }
+
+    _ = lexicalView.editor.registerCommand(type: .canRedo) { [weak self] _ in
+      DispatchQueue.main.async {
+        self?.updateUndoRedoButtons()
+      }
+      return false
+    }
+  }
+
+  private func updateUndoRedoButtons() {
+    undoButton.isEnabled = editorHistoryPlugin?.canUndo ?? false
+    redoButton.isEnabled = editorHistoryPlugin?.canRedo ?? false
   }
 
   private func updateFormattingButtons() {
     guard let editor = lexicalView?.editor else { return }
 
-    // Update undo/redo
-    undoButton.isEnabled = editorHistoryPlugin?.canUndo ?? false
-    redoButton.isEnabled = editorHistoryPlugin?.canRedo ?? false
+    // Update undo/redo buttons
+    updateUndoRedoButtons()
 
+    // Update selection-dependent buttons - call this within a read block
     try? editor.read {
       if let selection = try? getSelection() as? RangeSelection {
         // Update text format buttons

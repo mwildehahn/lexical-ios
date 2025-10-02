@@ -627,6 +627,25 @@ internal enum OptimizedReconciler {
     }
     guard editor.textStorage != nil else { fatalError("Cannot run optimized reconciler on an editor with no text storage") }
 
+    // Early-out optimization: selection-only changes (no dirty nodes)
+    if editor.dirtyNodes.isEmpty && editor.dirtyType == .noDirtyNodes && markedTextOperation == nil {
+      if shouldReconcileSelection {
+        let prevSelection = currentEditorState.selection
+        let nextSelection = pendingEditorState.selection
+        var selectionsAreDifferent = false
+        if let nextSelection, let prevSelection {
+          selectionsAreDifferent = !nextSelection.isSelection(prevSelection)
+        }
+        if nextSelection == nil || selectionsAreDifferent {
+          try reconcileSelection(prevSelection: prevSelection, nextSelection: nextSelection, editor: editor)
+        }
+      }
+      if editor.featureFlags.verboseLogging {
+        print("🔥 RECONCILE: early-out (dirty=0, selection-only)")
+      }
+      return
+    }
+
     // Composition (marked text) fast path first
     if let mto = markedTextOperation {
       if try fastPath_Composition(
@@ -2393,6 +2412,14 @@ internal enum OptimizedReconciler {
         if let n = pendingEditorState.nodeMap[k] { for p in n.getParents() { nodesToApply.insert(p.getKey()) } }
       }
       if let affectedKeys { nodesToApply.formUnion(affectedKeys) }
+    }
+
+    // Skip if no nodes need attribute updates
+    if nodesToApply.isEmpty {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 BLOCK-ATTR: skipped (no nodes to update)")
+      }
+      return
     }
 
     let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(theme: theme) ?? [:]

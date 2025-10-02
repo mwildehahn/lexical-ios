@@ -181,6 +181,7 @@ public class TextStorage: NSTextStorage {
     let start = max(0, min(range.location, length))
     let end = max(start, min(range.location + range.length, length))
     let safe = NSRange(location: start, length: end - start)
+
     beginEditing()
     if safe.length > 0 {
       backingAttributedString.setAttributes(attrs, range: safe)

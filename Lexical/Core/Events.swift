@@ -228,7 +228,7 @@ internal func onSelectionChange(editor: Editor) {
       editor.dispatchCommand(type: .selectionChange, payload: nil)
     }
   } catch {
-    // log error "change selection: failed to update lexical selection"
+    // log error
   }
 }
 
