@@ -1,5 +1,7 @@
+#if canImport(UIKit)
 import XCTest
 @testable import Lexical
+import UIKit
 
 @MainActor
 final class OptimizedReconcilerDecoratorBlockBoundaryParityTests: XCTestCase {
@@ -48,3 +50,4 @@ final class OptimizedReconcilerDecoratorBlockBoundaryParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 }
+#endif

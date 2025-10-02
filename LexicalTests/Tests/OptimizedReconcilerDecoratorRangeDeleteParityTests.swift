@@ -1,5 +1,7 @@
+#if canImport(UIKit)
 import XCTest
 @testable import Lexical
+import UIKit
 
 @MainActor
 final class OptimizedReconcilerDecoratorRangeDeleteParityTests: XCTestCase {
@@ -50,4 +52,5 @@ final class OptimizedReconcilerDecoratorRangeDeleteParityTests: XCTestCase {
     XCTAssertEqual(aCache, bCache)
   }
 }
+#endif
 

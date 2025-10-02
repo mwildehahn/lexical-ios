@@ -244,6 +244,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
 
   let location = isBefore ? anchorLocation : focusLocation
 
+  #if canImport(UIKit)
   return NativeSelection(
     range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
     opaqueRange: nil,
@@ -251,6 +252,13 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
     markedRange: nil,
     markedOpaqueRange: nil,
     selectionIsNodeOrObject: false)
+  #elseif canImport(AppKit)
+  return NativeSelection(
+    range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
+    affinity: affinity,
+    markedRange: nil,
+    selectionIsNodeOrObject: false)
+  #endif
 }
 
 @MainActor

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import XCTest
 @testable import Lexical
 import UIKit
@@ -193,3 +194,4 @@ final class OptimizedReconcilerTests: XCTestCase {
     XCTAssertTrue(frontend.textStorage.string.contains("あ"))
   }
 }
+#endif

@@ -19,6 +19,26 @@ import AppKit
 
  To make your own decorators, you must subclass `DecoratorNode`.
 
+ ## Platform Availability
+
+ **iOS**: Fully supported using `UIView` subclasses.
+
+ **macOS**: Currently iOS-only. While the `DecoratorNode` API is cross-platform compatible, implementing
+ decorator nodes requires platform-specific view implementations:
+ - On iOS: Subclass and return a `UIView` from ``createView()``
+ - On macOS: Would require `NSView` subclass (not yet implemented)
+
+ To write cross-platform code that uses decorator nodes, wrap your decorator-dependent code in conditional
+ compilation:
+ ```swift
+ #if canImport(UIKit)
+ // iOS-specific decorator usage
+ let imageNode = InlineImageNode(url: url)
+ #endif
+ ```
+
+ For cross-platform projects, consider alternative approaches or wait for macOS `NSView` support.
+
  ## State Handling
 
  It is recommended that state is stored within your Node. This will allow it to be correctly serialized, moved

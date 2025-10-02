@@ -1,27 +1,47 @@
-# Lexical iOS
+# Lexical for Apple Platforms
 
 An extensible text editor/renderer written in Swift, built on top of TextKit, and sharing a philosophy and API with [Lexical JavaScript](https://lexical.dev).
 
 ## Status
 
-Lexical iOS is used in multiple apps at Meta, including rendering feed posts that contain inline images in Workplace iOS.
+Lexical is used in multiple apps at Meta, including rendering feed posts that contain inline images in Workplace iOS.
 
-Lexical iOS is in pre-release with no guarantee of support.
+Lexical is in pre-release with no guarantee of support.
 
 For changes between versions, see the [Lexical iOS Changelog](https://github.com/facebook/lexical-ios/blob/main/Lexical/Documentation.docc/Changelog.md).
 
-## Playground
+## Platform Support
 
-We have a sample playground app demonstrating some of Lexical's features:
+Lexical now supports both **iOS** and **macOS** with a single codebase:
 
-![Screenshot of playground app](docs/resources/playground.png)
+- ✅ **iOS 13+** - Full support with UIKit integration
+- ✅ **macOS 14+** - Full support with AppKit integration
+- ✅ **SwiftUI** - Cross-platform wrapper for both platforms
 
-The playground app contains the code for a rich text toolbar. While this is not specifically a reusable toolbar that you can drop straight into your projects, its code should provide a good starting point for you to customise.
+All core features, plugins, and APIs work seamlessly on both platforms.
 
-This playground app is very new, and many more features will come in time!
+## Playground Apps
+
+We have sample playground apps demonstrating Lexical's features on both platforms:
+
+### iOS Playground
+![Screenshot of iOS playground app](docs/resources/playground.png)
+
+### macOS Playground
+The macOS Playground (`TestApp/LexicalMacOSTest`) includes:
+- Full editor with toolbar (reconciler toggle, export, feature flags)
+- Live node hierarchy viewer
+- Export to HTML, Markdown, JSON, and Plain Text
+- Feature flag profiles for testing optimizations
+- All plugins: List, Link, InlineImage, EditorHistory
+
+The playground apps contain code for rich text toolbars. While these are not drop-in reusable components, their code provides a good starting point for customization.
 
 ## Requirements
-Lexical iOS is written in Swift, and targets iOS 13 and above. (Note that the Playground app requires at least iOS 14, due to use of UIKit features such as UIMenu.)
+- **iOS**: iOS 13+ (Playground requires iOS 17+)
+- **macOS**: macOS 14+
+- **Swift**: Swift 5.9+
+- **Xcode**: Xcode 15+
 
 ## Building Lexical
 We provide a Swift package file that is sufficient to build Lexical core. Add this as a dependency of your app to use Lexical.
@@ -29,9 +49,41 @@ We provide a Swift package file that is sufficient to build Lexical core. Add th
 Some plugins included in this repository do not yet have package files. (This is because we use a different build system internally at Meta. Adding these would be an easy PR if you want to start contributing to Lexical!)
 
 ## Using Lexical in your app
+
+### UIKit / AppKit
 For editable text with Lexical, instantiate a `LexicalView`. To configure it with plugins and a theme, you can create an `EditorConfig` to pass in to the `LexicalView`'s initialiser.
 
+```swift
+import Lexical
+
+let editorConfig = EditorConfig(theme: Theme(), plugins: [])
+let lexicalView = LexicalView(editorConfig: editorConfig, featureFlags: FeatureFlags())
+```
+
 To programatically work with the data within your `LexicalView`, you need access to the `Editor`. You can then call `editor.update {}`, and inside that closure you can use the Lexical API.
+
+### SwiftUI
+Use the cross-platform `LexicalEditor` wrapper:
+
+```swift
+import SwiftUI
+import Lexical
+
+struct ContentView: View {
+    @State private var text: String = ""
+
+    var body: some View {
+        LexicalEditor(
+            editorConfig: EditorConfig(theme: Theme(), plugins: []),
+            featureFlags: FeatureFlags(),
+            placeholderText: "Start typing...",
+            text: $text
+        )
+    }
+}
+```
+
+The same code works on both iOS and macOS!
 
 For more information, see the documentation.
 

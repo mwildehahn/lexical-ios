@@ -1,5 +1,7 @@
+#if canImport(UIKit)
 import XCTest
 @testable import Lexical
+import UIKit
 
 @MainActor
 final class OptimizedReconcilerDecoratorOpsTests: XCTestCase {
@@ -154,3 +156,4 @@ final class OptimizedReconcilerDecoratorOpsTests: XCTestCase {
     XCTAssertNotNil(ctx.textStorage.decoratorPositionCache[key])
   }
 }
+#endif

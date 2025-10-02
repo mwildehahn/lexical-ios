@@ -63,7 +63,7 @@ jobs:
             -destination "$DEST" \
             test
 
-      - name: Build Playground (sanity)
+      - name: Build iOS Playground (sanity)
         env:
           DEST: ${{ steps.dest.outputs.DEST }}
         run: |
@@ -71,5 +71,13 @@ jobs:
           xcodebuild -project Playground/LexicalPlayground.xcodeproj \
             -scheme LexicalPlayground -sdk iphonesimulator \
             -destination "$DEST" \
+            build
+
+      - name: Build macOS Playground (sanity)
+        run: |
+          set -euo pipefail
+          xcodebuild -project Playground/LexicalPlayground.xcodeproj \
+            -scheme LexicalPlaygroundMac \
+            -destination 'platform=macOS' \
             build
 

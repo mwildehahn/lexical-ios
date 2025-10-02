@@ -1,5 +1,7 @@
+#if canImport(UIKit)
 import XCTest
 @testable import Lexical
+import UIKit
 
 @MainActor
 final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
@@ -214,3 +216,4 @@ final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
 }
+#endif

@@ -1,17 +1,26 @@
 # Repository Guidelines
 
-This repo contains Lexical iOS — a Swift Package with a modular plugin architecture and an example Playground app. Baseline runtime: iOS 16+.
+This repo contains Lexical for Apple Platforms — a Swift Package with a modular plugin architecture and cross-platform Playground apps. Supports iOS 13+ and macOS 14+.
 
 ## Project Structure & Module Organization
-- `Lexical/` — core editor, nodes, selection, TextKit integration, `LexicalView`.
+- `Lexical/` — core editor, nodes, selection, TextKit integration, `LexicalView` (iOS + macOS).
 - `Plugins/` — modular targets (e.g., `LexicalHTML`, `LexicalMarkdown`, `LexicalLinkPlugin`).
-- `LexicalTests/` — XCTest suites and helpers; plugin tests live under each plugin’s `*Tests` target.
-- `Playground/` — Xcode demo app (`LexicalPlayground`).
+- `LexicalTests/` — XCTest suites and helpers; plugin tests live under each plugin's `*Tests` target.
+- `Playground/` — demo apps with two targets:
+  - `LexicalPlayground` — iOS UIKit demo
+  - `LexicalPlaygroundMac` — macOS AppKit demo
 - `docs/` — generated DocC site (deployed via GitHub Actions).
 
-## Build, Test, and Development Commands (iOS Only)
-- Always target iOS Simulator (iPhone 17 Pro, iOS 26.0). Do not build/test for macOS.
-- Never run macOS builds or tests. Use iOS Simulator destinations only (Xcodebuild or SwiftPM with iphonesimulator SDK).
+## Platform Support
+Lexical supports **iOS** and **macOS** with a single codebase. Most code works on both platforms via conditional compilation (`#if canImport(UIKit)` / `#if canImport(AppKit)`).
+
+### Platform-Specific Features:
+- **DecoratorNodes**: Currently iOS-only (uses UIView). macOS would require NSView equivalents.
+- **Tests**: Most tests run on both platforms. Decorator tests are iOS-only (wrapped in `#if canImport(UIKit)`).
+
+## Build, Test, and Development Commands
+
+### iOS Commands
 
 - SwiftPM (CLI):
   ```bash
@@ -45,7 +54,7 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - Unit tests (always use Lexical-Package scheme): `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
   - Filter tests: `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
 
-- Playground app (Xcode/iOS simulator):
+- iOS Playground app (Xcode/iOS simulator):
   ```bash
   # Build for iPhone 17 Pro on iOS 26
   xcodebuild -project Playground/LexicalPlayground.xcodeproj \
@@ -57,20 +66,55 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
     -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build
   ```
 
+### macOS Commands
+
+- SwiftPM (CLI):
+  ```bash
+  # Build the main package for macOS
+  swift build
+
+  # Note: swift test runs on macOS by default and will skip iOS-only tests
+  # For comprehensive testing, use iOS simulator commands above
+  swift test
+  ```
+
+- macOS Playground app (Xcode):
+  ```bash
+  # Build macOS Playground
+  xcodebuild -project Playground/LexicalPlayground.xcodeproj \
+    -scheme LexicalPlaygroundMac -destination 'platform=macOS' build
+
+  # Run macOS Playground
+  open Playground/LexicalPlayground.xcodeproj
+  # Then select LexicalPlaygroundMac scheme and Cmd+R to run
+  ```
+
+### Cross-Platform Verification
+
 ## Post-Change Verification
-- Always verify locally after making significant changes:
-  - Package build (iOS Simulator only):
-    - x86_64: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "x86_64-apple-ios16.0-simulator"`
-    - arm64: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "arm64-apple-ios16.0-simulator"`
-  - Run all tests on iOS simulator (authoritative; use Lexical-Package scheme):
-    `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
-    - Filter example:
-      `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
-  - Build Playground app on simulator:
-    `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
-  - Never use `swift test` (macOS). It targets macOS by default and will fail due to UIKit/TextKit iOS‑only APIs. Always use the Xcode iOS simulator command above.
-  - Never pass `-quiet` to `xcodebuild` for tests or builds; keep output visible for diagnosis and CI logs.
-- After each significant change, ensure all tests pass and the Playground build succeeds on the iPhone 17 Pro (iOS 26.0) simulator. Do not commit unless these checks pass.
+
+### iOS Verification
+- Package build (iOS Simulator):
+  - x86_64: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "x86_64-apple-ios16.0-simulator"`
+  - arm64: `swift build --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" -Xswiftc "-target" -Xswiftc "arm64-apple-ios16.0-simulator"`
+- Run all iOS tests (authoritative; use Lexical-Package scheme):
+  `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`
+  - Filter example:
+    `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/NodeTests test`
+- Build iOS Playground:
+  `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' build`
+
+### macOS Verification
+- Package build: `swift build`
+- Run macOS tests (includes MacOSFrontendTests): `swift test`
+- Build macOS Playground:
+  `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlaygroundMac -destination 'platform=macOS' build`
+
+### Best Practices
+- **After each significant change**: Verify both iOS and macOS builds succeed.
+- **For cross-platform code**: Test on both platforms before committing.
+- **For platform-specific code**: Wrap in `#if canImport(UIKit)` or `#if canImport(AppKit)`.
+- **Never pass `-quiet`** to `xcodebuild` for tests or builds; keep output visible for diagnosis and CI logs.
 
 ## Debug Logging
 - Use "🔥"-prefixed debug prints for temporary diagnostics to make logs easy to grep, e.g.:
@@ -107,25 +151,6 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
     install_app_sim({ simulatorUuid: "<SIM_UDID>", appPath })
     launch_app_sim({ simulatorName: "iPhone 17 Pro",
                      bundleId: "com.facebook.LexicalPlayground" })
-    ```
-  - Run unit tests via Xcode project scheme (Lexical-Package)
-    ```
-    // Use the project workspace so the SPM test scheme is visible
-    build_sim({
-      workspacePath: "Playground/LexicalPlayground.xcodeproj/project.xcworkspace",
-      scheme: "Lexical-Package",
-      simulatorName: "iPhone 17 Pro",
-      useLatestOS: true,
-      extraArgs: ["test"]
-    })
-    // Filter example
-    build_sim({
-      workspacePath: "Playground/LexicalPlayground.xcodeproj/project.xcworkspace",
-      scheme: "Lexical-Package",
-      simulatorName: "iPhone 17 Pro",
-      useLatestOS: true,
-      extraArgs: ["-only-testing:LexicalTests/NodeTests", "test"]
-    })
     ```
 - apple-docs (required for SDK/API research):
   ```

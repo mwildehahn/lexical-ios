@@ -34,6 +34,7 @@ class ListItemNodeTests: XCTestCase {
     print((try? editor.getEditorState().toJSON(outputFormatting: .sortedKeys)) ?? "")
   }
 
+  #if canImport(UIKit)
   func testItemCharacterWithNestedNumberedList() throws {
     guard let editor else {
       XCTFail("Editor unexpectedly nil")
@@ -560,5 +561,6 @@ class ListItemNodeTests: XCTestCase {
       try selection.deleteCharacter(isBackwards: true)
     }
   }
+  #endif
 
 }

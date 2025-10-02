@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -30,7 +30,39 @@
 		06F7CF942A542E4E0024CD5A /* LexicalInlineImagePlugin in Frameworks */ = {isa = PBXBuildFile; productRef = 06F7CF932A542E4E0024CD5A /* LexicalInlineImagePlugin */; };
 		06F7CF962A545C7C0024CD5A /* lexical-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 06F7CF952A545C7C0024CD5A /* lexical-logo.png */; };
 		3C48FEE42B04F2C5009BBFA2 /* LexicalMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = 3C48FEE32B04F2C5009BBFA2 /* LexicalMarkdown */; };
+		DCB488E62E8E908900F73B34 /* EditorHistoryPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488E52E8E908900F73B34 /* EditorHistoryPlugin */; };
+		DCB488E82E8E908900F73B34 /* Lexical in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488E72E8E908900F73B34 /* Lexical */; };
+		DCB488EA2E8E908900F73B34 /* LexicalAutoLinkPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488E92E8E908900F73B34 /* LexicalAutoLinkPlugin */; };
+		DCB488EC2E8E908900F73B34 /* LexicalHTML in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488EB2E8E908900F73B34 /* LexicalHTML */; };
+		DCB488EE2E8E908900F73B34 /* LexicalInlineImagePlugin in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488ED2E8E908900F73B34 /* LexicalInlineImagePlugin */; };
+		DCB488F02E8E908900F73B34 /* LexicalLinkHTMLSupport in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488EF2E8E908900F73B34 /* LexicalLinkHTMLSupport */; };
+		DCB488F22E8E908900F73B34 /* LexicalLinkPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488F12E8E908900F73B34 /* LexicalLinkPlugin */; };
+		DCB488F42E8E908900F73B34 /* LexicalListHTMLSupport in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488F32E8E908900F73B34 /* LexicalListHTMLSupport */; };
+		DCB488F62E8E908900F73B34 /* LexicalListPlugin in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488F52E8E908900F73B34 /* LexicalListPlugin */; };
+		DCB488F82E8E908900F73B34 /* LexicalMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488F72E8E908900F73B34 /* LexicalMarkdown */; };
+		DCB488FA2E8E908900F73B34 /* SelectableDecoratorNode in Frameworks */ = {isa = PBXBuildFile; productRef = DCB488F92E8E908900F73B34 /* SelectableDecoratorNode */; };
+		DCB488FC2E8E909200F73B34 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB488F02E8E909200F73B34 /* AppDelegate.swift */; };
+		DCB488FD2E8E909200F73B34 /* OutputFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB488F12E8E909200F73B34 /* OutputFormat.swift */; };
+		DCB488FE2E8E909200F73B34 /* PlaygroundViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB488F22E8E909200F73B34 /* PlaygroundViewController.swift */; };
+		DCB489012E8E909200F73B34 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DCB488F42E8E909200F73B34 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		DCB488BE2E8E906900F73B34 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0656CF6D29D1E438009CA08F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DCB488AD2E8E906700F73B34;
+			remoteInfo = LexicalPlaygroundMac;
+		};
+		DCB488C82E8E906900F73B34 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0656CF6D29D1E438009CA08F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DCB488AD2E8E906700F73B34;
+			remoteInfo = LexicalPlaygroundMac;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0656CF7529D1E438009CA08F /* LexicalPlayground.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LexicalPlayground.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -50,7 +82,22 @@
 		06D0BEEF2B1A000100AABBCC /* PerformanceViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceViewController.swift; sourceTree = "<group>"; };
 		06D0C0DE2B1A010100AABBCC /* PerfRunEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfRunEngine.swift; sourceTree = "<group>"; };
 		06F7CF952A545C7C0024CD5A /* lexical-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "lexical-logo.png"; sourceTree = "<group>"; };
+		DCB488AE2E8E906700F73B34 /* LexicalPlaygroundMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LexicalPlaygroundMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCB488BD2E8E906800F73B34 /* LexicalPlaygroundMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LexicalPlaygroundMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCB488C72E8E906900F73B34 /* LexicalPlaygroundMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LexicalPlaygroundMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCB488F02E8E909200F73B34 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = LexicalPlaygroundMac/AppDelegate.swift; sourceTree = "<group>"; };
+		DCB488F12E8E909200F73B34 /* OutputFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OutputFormat.swift; path = LexicalPlaygroundMac/OutputFormat.swift; sourceTree = "<group>"; };
+		DCB488F22E8E909200F73B34 /* PlaygroundViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlaygroundViewController.swift; path = LexicalPlaygroundMac/PlaygroundViewController.swift; sourceTree = "<group>"; };
+		DCB488F42E8E909200F73B34 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = LexicalPlaygroundMac/Assets.xcassets; sourceTree = "<group>"; };
+		DCB488F52E8E909200F73B34 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = LexicalPlaygroundMac/Info.plist; sourceTree = "<group>"; };
+		DCB488F62E8E90D500F73B34 /* Main.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Main.storyboard; path = LexicalPlaygroundMac/Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		DCB488AF2E8E906700F73B34 /* LexicalPlaygroundMac */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = LexicalPlaygroundMac; sourceTree = "<group>"; };
+		DCB488C02E8E906900F73B34 /* LexicalPlaygroundMacTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = LexicalPlaygroundMacTests; sourceTree = "<group>"; };
+		DCB488CA2E8E906900F73B34 /* LexicalPlaygroundMacUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = LexicalPlaygroundMacUITests; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		0656CF7229D1E438009CA08F /* Frameworks */ = {
@@ -69,6 +116,38 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DCB488AB2E8E906700F73B34 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCB488E62E8E908900F73B34 /* EditorHistoryPlugin in Frameworks */,
+				DCB488F22E8E908900F73B34 /* LexicalLinkPlugin in Frameworks */,
+				DCB488F82E8E908900F73B34 /* LexicalMarkdown in Frameworks */,
+				DCB488E82E8E908900F73B34 /* Lexical in Frameworks */,
+				DCB488F02E8E908900F73B34 /* LexicalLinkHTMLSupport in Frameworks */,
+				DCB488F62E8E908900F73B34 /* LexicalListPlugin in Frameworks */,
+				DCB488EC2E8E908900F73B34 /* LexicalHTML in Frameworks */,
+				DCB488FA2E8E908900F73B34 /* SelectableDecoratorNode in Frameworks */,
+				DCB488EA2E8E908900F73B34 /* LexicalAutoLinkPlugin in Frameworks */,
+				DCB488F42E8E908900F73B34 /* LexicalListHTMLSupport in Frameworks */,
+				DCB488EE2E8E908900F73B34 /* LexicalInlineImagePlugin in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB488BA2E8E906800F73B34 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB488C42E8E906900F73B34 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -77,8 +156,12 @@
 			children = (
 				0656CF9F29D4837C009CA08F /* Packages */,
 				0656CF7729D1E438009CA08F /* LexicalPlayground */,
+				DCB488AF2E8E906700F73B34 /* LexicalPlaygroundMac */,
+				DCB488C02E8E906900F73B34 /* LexicalPlaygroundMacTests */,
+				DCB488CA2E8E906900F73B34 /* LexicalPlaygroundMacUITests */,
 				0656CF7629D1E438009CA08F /* Products */,
 				0656CF9729D23743009CA08F /* Frameworks */,
+				DCB489A92E8E959700F73B34 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -86,6 +169,9 @@
 			isa = PBXGroup;
 			children = (
 				0656CF7529D1E438009CA08F /* LexicalPlayground.app */,
+				DCB488AE2E8E906700F73B34 /* LexicalPlaygroundMac.app */,
+				DCB488BD2E8E906800F73B34 /* LexicalPlaygroundMacTests.xctest */,
+				DCB488C72E8E906900F73B34 /* LexicalPlaygroundMacUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -127,6 +213,17 @@
 			name = Packages;
 			sourceTree = "<group>";
 		};
+		DCB489A92E8E959700F73B34 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				DCB488F02E8E909200F73B34 /* AppDelegate.swift */,
+				DCB488F12E8E909200F73B34 /* OutputFormat.swift */,
+				DCB488F22E8E909200F73B34 /* PlaygroundViewController.swift */,
+				DCB488F42E8E909200F73B34 /* Assets.xcassets */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -159,6 +256,85 @@
 			productReference = 0656CF7529D1E438009CA08F /* LexicalPlayground.app */;
 			productType = "com.apple.product-type.application";
 		};
+		DCB488AD2E8E906700F73B34 /* LexicalPlaygroundMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCB488CF2E8E906900F73B34 /* Build configuration list for PBXNativeTarget "LexicalPlaygroundMac" */;
+			buildPhases = (
+				DCB488AA2E8E906700F73B34 /* Sources */,
+				DCB488AB2E8E906700F73B34 /* Frameworks */,
+				DCB488AC2E8E906700F73B34 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DCB488AF2E8E906700F73B34 /* LexicalPlaygroundMac */,
+			);
+			name = LexicalPlaygroundMac;
+			packageProductDependencies = (
+				DCB488E52E8E908900F73B34 /* EditorHistoryPlugin */,
+				DCB488E72E8E908900F73B34 /* Lexical */,
+				DCB488E92E8E908900F73B34 /* LexicalAutoLinkPlugin */,
+				DCB488EB2E8E908900F73B34 /* LexicalHTML */,
+				DCB488ED2E8E908900F73B34 /* LexicalInlineImagePlugin */,
+				DCB488EF2E8E908900F73B34 /* LexicalLinkHTMLSupport */,
+				DCB488F12E8E908900F73B34 /* LexicalLinkPlugin */,
+				DCB488F32E8E908900F73B34 /* LexicalListHTMLSupport */,
+				DCB488F52E8E908900F73B34 /* LexicalListPlugin */,
+				DCB488F72E8E908900F73B34 /* LexicalMarkdown */,
+				DCB488F92E8E908900F73B34 /* SelectableDecoratorNode */,
+			);
+			productName = LexicalPlaygroundMac;
+			productReference = DCB488AE2E8E906700F73B34 /* LexicalPlaygroundMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DCB488BC2E8E906800F73B34 /* LexicalPlaygroundMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCB488D22E8E906900F73B34 /* Build configuration list for PBXNativeTarget "LexicalPlaygroundMacTests" */;
+			buildPhases = (
+				DCB488B92E8E906800F73B34 /* Sources */,
+				DCB488BA2E8E906800F73B34 /* Frameworks */,
+				DCB488BB2E8E906800F73B34 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DCB488BF2E8E906900F73B34 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				DCB488C02E8E906900F73B34 /* LexicalPlaygroundMacTests */,
+			);
+			name = LexicalPlaygroundMacTests;
+			packageProductDependencies = (
+			);
+			productName = LexicalPlaygroundMacTests;
+			productReference = DCB488BD2E8E906800F73B34 /* LexicalPlaygroundMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		DCB488C62E8E906900F73B34 /* LexicalPlaygroundMacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCB488D52E8E906900F73B34 /* Build configuration list for PBXNativeTarget "LexicalPlaygroundMacUITests" */;
+			buildPhases = (
+				DCB488C32E8E906900F73B34 /* Sources */,
+				DCB488C42E8E906900F73B34 /* Frameworks */,
+				DCB488C52E8E906900F73B34 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DCB488C92E8E906900F73B34 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				DCB488CA2E8E906900F73B34 /* LexicalPlaygroundMacUITests */,
+			);
+			name = LexicalPlaygroundMacUITests;
+			packageProductDependencies = (
+			);
+			productName = LexicalPlaygroundMacUITests;
+			productReference = DCB488C72E8E906900F73B34 /* LexicalPlaygroundMacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -166,11 +342,22 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1420;
+				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 1420;
 				TargetAttributes = {
 					0656CF7429D1E438009CA08F = {
 						CreatedOnToolsVersion = 14.2;
+					};
+					DCB488AD2E8E906700F73B34 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					DCB488BC2E8E906800F73B34 = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = DCB488AD2E8E906700F73B34;
+					};
+					DCB488C62E8E906900F73B34 = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = DCB488AD2E8E906700F73B34;
 					};
 				};
 			};
@@ -190,6 +377,9 @@
 			projectRoot = "";
 			targets = (
 				0656CF7429D1E438009CA08F /* LexicalPlayground */,
+				DCB488AD2E8E906700F73B34 /* LexicalPlaygroundMac */,
+				DCB488BC2E8E906800F73B34 /* LexicalPlaygroundMacTests */,
+				DCB488C62E8E906900F73B34 /* LexicalPlaygroundMacUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -202,6 +392,29 @@
 				06F7CF962A545C7C0024CD5A /* lexical-logo.png in Resources */,
 				0656CF8529D1E439009CA08F /* LaunchScreen.storyboard in Resources */,
 				0656CF8229D1E439009CA08F /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB488AC2E8E906700F73B34 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCB489012E8E909200F73B34 /* Assets.xcassets in Resources */,
+				DCB4890A2E8E90D500F73B34 /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB488BB2E8E906800F73B34 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB488C52E8E906900F73B34 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -226,12 +439,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DCB488AA2E8E906700F73B34 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCB488FC2E8E909200F73B34 /* AppDelegate.swift in Sources */,
+				DCB488FD2E8E909200F73B34 /* OutputFormat.swift in Sources */,
+				DCB488FE2E8E909200F73B34 /* PlaygroundViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB488B92E8E906800F73B34 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCB488C32E8E906900F73B34 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
 		0656CF9629D2373C009CA08F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			productRef = 0656CF9529D2373C009CA08F /* Lexical */;
+		};
+		DCB488BF2E8E906900F73B34 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DCB488AD2E8E906700F73B34 /* LexicalPlaygroundMac */;
+			targetProxy = DCB488BE2E8E906900F73B34 /* PBXContainerItemProxy */;
+		};
+		DCB488C92E8E906900F73B34 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DCB488AD2E8E906700F73B34 /* LexicalPlaygroundMac */;
+			targetProxy = DCB488C82E8E906900F73B34 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -304,6 +551,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
@@ -357,6 +605,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -413,6 +662,189 @@
 			};
 			name = Release;
 		};
+		DCB488D02E8E906900F73B34 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R2HSLTWQE5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.lexical.macos.LexicalPlaygroundMac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		DCB488D12E8E906900F73B34 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R2HSLTWQE5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.lexical.macos.LexicalPlaygroundMac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		DCB488D32E8E906900F73B34 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R2HSLTWQE5;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.lexical.macos.LexicalPlaygroundMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LexicalPlaygroundMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LexicalPlaygroundMac";
+			};
+			name = Debug;
+		};
+		DCB488D42E8E906900F73B34 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R2HSLTWQE5;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.lexical.macos.LexicalPlaygroundMacTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LexicalPlaygroundMac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LexicalPlaygroundMac";
+			};
+			name = Release;
+		};
+		DCB488D62E8E906900F73B34 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R2HSLTWQE5;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.lexical.macos.LexicalPlaygroundMacUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = LexicalPlaygroundMac;
+			};
+			name = Debug;
+		};
+		DCB488D72E8E906900F73B34 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = R2HSLTWQE5;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.lexical.macos.LexicalPlaygroundMacUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = LexicalPlaygroundMac;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -430,6 +862,33 @@
 			buildConfigurations = (
 				0656CF8A29D1E439009CA08F /* Debug */,
 				0656CF8B29D1E439009CA08F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCB488CF2E8E906900F73B34 /* Build configuration list for PBXNativeTarget "LexicalPlaygroundMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCB488D02E8E906900F73B34 /* Debug */,
+				DCB488D12E8E906900F73B34 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCB488D22E8E906900F73B34 /* Build configuration list for PBXNativeTarget "LexicalPlaygroundMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCB488D32E8E906900F73B34 /* Debug */,
+				DCB488D42E8E906900F73B34 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCB488D52E8E906900F73B34 /* Build configuration list for PBXNativeTarget "LexicalPlaygroundMacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCB488D62E8E906900F73B34 /* Debug */,
+				DCB488D72E8E906900F73B34 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -476,6 +935,50 @@
 		3C48FEE32B04F2C5009BBFA2 /* LexicalMarkdown */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = LexicalMarkdown;
+		};
+		DCB488E52E8E908900F73B34 /* EditorHistoryPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EditorHistoryPlugin;
+		};
+		DCB488E72E8E908900F73B34 /* Lexical */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Lexical;
+		};
+		DCB488E92E8E908900F73B34 /* LexicalAutoLinkPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalAutoLinkPlugin;
+		};
+		DCB488EB2E8E908900F73B34 /* LexicalHTML */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalHTML;
+		};
+		DCB488ED2E8E908900F73B34 /* LexicalInlineImagePlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalInlineImagePlugin;
+		};
+		DCB488EF2E8E908900F73B34 /* LexicalLinkHTMLSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalLinkHTMLSupport;
+		};
+		DCB488F12E8E908900F73B34 /* LexicalLinkPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalLinkPlugin;
+		};
+		DCB488F32E8E908900F73B34 /* LexicalListHTMLSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalListHTMLSupport;
+		};
+		DCB488F52E8E908900F73B34 /* LexicalListPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalListPlugin;
+		};
+		DCB488F72E8E908900F73B34 /* LexicalMarkdown */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LexicalMarkdown;
+		};
+		DCB488F92E8E908900F73B34 /* SelectableDecoratorNode */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SelectableDecoratorNode;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

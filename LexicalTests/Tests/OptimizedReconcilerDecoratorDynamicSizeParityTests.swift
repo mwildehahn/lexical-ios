@@ -1,5 +1,7 @@
+#if canImport(UIKit)
 import XCTest
 @testable import Lexical
+import UIKit
 
 private extension NodeType {
   static let resizableTestNode = NodeType(rawValue: "resizableTestNode")
@@ -109,3 +111,4 @@ final class OptimizedReconcilerDecoratorDynamicSizeParityTests: XCTestCase {
     }
   }
 }
+#endif

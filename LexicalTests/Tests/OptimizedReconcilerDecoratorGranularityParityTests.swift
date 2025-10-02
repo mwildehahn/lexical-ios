@@ -1,5 +1,7 @@
+#if canImport(UIKit)
 import XCTest
 @testable import Lexical
+import UIKit
 
 @MainActor
 final class OptimizedReconcilerDecoratorGranularityParityTests: XCTestCase {
@@ -65,3 +67,4 @@ final class OptimizedReconcilerDecoratorGranularityParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 }
+#endif

@@ -5,8 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 @testable import Lexical
 import XCTest
+import UIKit
 
 class TextViewTests: XCTestCase {
 
@@ -467,3 +469,4 @@ class TextViewTests: XCTestCase {
     XCTAssertNil(paragraphStyle, "Paragraph style has been cleared")
   }
 }
+#endif
