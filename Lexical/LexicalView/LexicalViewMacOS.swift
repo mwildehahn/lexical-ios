@@ -205,12 +205,13 @@ extension LexicalViewDelegate {
     var start = range.location
     var end = range.location + range.length
 
-    // On macOS, we use NSTextView's built-in movement methods
-    // This is a simplified implementation - full implementation would use NSTextView movement APIs
+    // On macOS, we use NSTextView's built-in selection range methods for granular movement
+    let textLength = (textView.string as NSString).length
+
     switch granularity {
     case .character:
       if direction == .forward {
-        end = min(end + 1, (textView.string as NSString).length)
+        end = min(end + 1, textLength)
         if type == .move {
           start = end
         }
@@ -220,6 +221,7 @@ extension LexicalViewDelegate {
           end = start
         }
       }
+
     case .word:
       // Use NSTextView's word boundary detection
       if direction == .forward {
@@ -233,8 +235,74 @@ extension LexicalViewDelegate {
           end = start
         }
       }
-    default:
-      break
+
+    case .sentence:
+      // NSSelectionGranularity doesn't have a sentence case, so use CFStringTokenizer for sentence boundaries
+      let text = textView.string as CFString
+      let locale = CFLocaleCopyCurrent()
+      if direction == .forward {
+        let tokenizer = CFStringTokenizerCreate(nil, text, CFRangeMake(end, textLength - end), kCFStringTokenizerUnitSentence, locale)
+        if CFStringTokenizerAdvanceToNextToken(tokenizer) != CFStringTokenizerTokenType() {
+          let range = CFStringTokenizerGetCurrentTokenRange(tokenizer)
+          end = range.location + range.length
+        }
+        if type == .move {
+          start = end
+        }
+      } else {
+        let tokenizer = CFStringTokenizerCreate(nil, text, CFRangeMake(0, start), kCFStringTokenizerUnitSentence, locale)
+        var lastSentenceStart = 0
+        while CFStringTokenizerAdvanceToNextToken(tokenizer) != CFStringTokenizerTokenType() {
+          lastSentenceStart = CFStringTokenizerGetCurrentTokenRange(tokenizer).location
+        }
+        start = lastSentenceStart
+        if type == .move {
+          end = start
+        }
+      }
+
+    case .line:
+      // Use NSTextView's paragraph (line) boundary detection
+      if direction == .forward {
+        end = textView.selectionRange(forProposedRange: NSRange(location: end, length: 0), granularity: .selectByParagraph).upperBound
+        if type == .move {
+          start = end
+        }
+      } else {
+        start = textView.selectionRange(forProposedRange: NSRange(location: start, length: 0), granularity: .selectByParagraph).lowerBound
+        if type == .move {
+          end = start
+        }
+      }
+
+    case .paragraph:
+      // For paragraph, we move to paragraph boundaries (blank line separated blocks)
+      // Use the same as line for now - NSTextView treats paragraphs and lines similarly
+      if direction == .forward {
+        end = textView.selectionRange(forProposedRange: NSRange(location: end, length: 0), granularity: .selectByParagraph).upperBound
+        if type == .move {
+          start = end
+        }
+      } else {
+        start = textView.selectionRange(forProposedRange: NSRange(location: start, length: 0), granularity: .selectByParagraph).lowerBound
+        if type == .move {
+          end = start
+        }
+      }
+
+    case .document:
+      // Move to start or end of document
+      if direction == .forward {
+        end = textLength
+        if type == .move {
+          start = end
+        }
+      } else {
+        start = 0
+        if type == .move {
+          end = start
+        }
+      }
     }
 
     textView.setSelectedRange(NSRange(location: start, length: end - start))
