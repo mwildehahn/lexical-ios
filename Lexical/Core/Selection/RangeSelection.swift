@@ -1835,6 +1835,10 @@ public class RangeSelection: BaseSelection {
           try textNode.setFormat(format: selectedNextFormat)
         }
       }
+
+      // Mark selection as dirty and set format to ensure selection is preserved after reconciliation
+      self.format = firstNextFormat
+      self.dirty = true
     }
   }
 
