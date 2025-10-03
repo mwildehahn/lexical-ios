@@ -547,21 +547,35 @@ class PlaygroundViewController: NSViewController {
   }
 
   @objc private func insertSampleImage() {
-    guard let url = Bundle.main.url(forResource: "lexical-logo", withExtension: "png") else { return }
+    // Try bundle resource first, then fall back to file in LexicalPlaygroundMac directory
+    let url = Bundle.main.url(forResource: "lexical-logo", withExtension: "png")
+      ?? URL(fileURLWithPath: #file).deletingLastPathComponent().appendingPathComponent("lexical-logo.png")
+    print("🔥 INSERT-IMAGE: Resolved URL = \(url.absoluteString)")
     try? lexicalView?.editor.update {
       let imageNode = ImageNode(url: url.absoluteString, size: CGSize(width: 300, height: 300), sourceID: "")
       if let selection = try getSelection() {
+        print("🔥 INSERT-IMAGE: Inserting node, selection=\(selection)")
         _ = try selection.insertNodes(nodes: [imageNode], selectStart: false)
+        print("🔥 INSERT-IMAGE: Node inserted successfully")
+      } else {
+        print("🔥 INSERT-IMAGE: ERROR - No selection")
       }
     }
   }
 
   @objc private func insertSelectableImage() {
-    guard let url = Bundle.main.url(forResource: "lexical-logo", withExtension: "png") else { return }
+    // Try bundle resource first, then fall back to file in LexicalPlaygroundMac directory
+    let url = Bundle.main.url(forResource: "lexical-logo", withExtension: "png")
+      ?? URL(fileURLWithPath: #file).deletingLastPathComponent().appendingPathComponent("lexical-logo.png")
+    print("🔥 INSERT-SELECTABLE-IMAGE: Resolved URL = \(url.absoluteString)")
     try? lexicalView?.editor.update {
       let imageNode = SelectableImageNode(url: url.absoluteString, size: CGSize(width: 300, height: 300), sourceID: "")
       if let selection = try getSelection() {
+        print("🔥 INSERT-SELECTABLE-IMAGE: Inserting node, selection=\(selection)")
         _ = try selection.insertNodes(nodes: [imageNode], selectStart: false)
+        print("🔥 INSERT-SELECTABLE-IMAGE: Node inserted successfully")
+      } else {
+        print("🔥 INSERT-SELECTABLE-IMAGE: ERROR - No selection")
       }
     }
   }
