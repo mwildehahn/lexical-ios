@@ -1069,15 +1069,46 @@ public class RangeSelection: BaseSelection {
         }
       }
     }
-    // Optimized: pre-clamp a single grapheme (composed character) deletion when starting
-    // from a collapsed caret. This avoids relying on native tokenizer behavior that may
+    // Pre-clamp a single grapheme (composed character) deletion when starting
+    // from a collapsed caret. For OPT, this provides precise control. For LEG, we only
+    // intervene for standalone zero-width characters that UIKit mishandles.
     var didPreClampSingleChar = false
-    if isBackwards && wasCollapsed, let editor = getActiveEditor(),
-       editor.frontend is LexicalView, editor.featureFlags.useOptimizedReconciler {
+    let shouldPreClamp: Bool
+    if isBackwards && wasCollapsed, let editor = getActiveEditor(), editor.frontend is LexicalView {
+      if editor.featureFlags.useOptimizedReconciler {
+        shouldPreClamp = true
+      } else if let start = caretStringLocation, start > 0, let ns = editor.textStorage?.string as NSString? {
+        // For LEG, pre-clamp for complex grapheme clusters to match OPT behavior
+        let prevChar = ns.character(at: start - 1)
+        let isZeroWidth = (prevChar == 0x200B || prevChar == 0x200D)
+        let cluster = ns.rangeOfComposedCharacterSequence(at: start - 1)
+
+        // Pre-clamp if:
+        // 1. Multi-unit grapheme cluster (complex emoji, diacritics, keycap, etc.)
+        // 2. Zero-width character that's part of the node content (not a boundary marker)
+        if cluster.length > 1 {
+          // Complex grapheme cluster - always pre-clamp for correct deletion
+          shouldPreClamp = true
+        } else if isZeroWidth, let anchorNode = try? anchor.getNode() as? TextNode {
+          // Check if the ZWSP/ZWJ is actually in the text node's content (not a system boundary marker)
+          let nodeText = anchorNode.getTextPart()
+          let nodeContainsZeroWidth = nodeText.unicodeScalars.contains { $0.value == 0x200B || $0.value == 0x200D }
+          shouldPreClamp = nodeContainsZeroWidth
+        } else {
+          shouldPreClamp = false
+        }
+      } else {
+        shouldPreClamp = false
+      }
+    } else {
+      shouldPreClamp = false
+    }
+    if shouldPreClamp, let editor = getActiveEditor() {
       if let start = caretStringLocation, start > 0 {
         let clamp: NSRange
-        if let ns = editor.textStorage?.string as NSString?, editor.featureFlags.useOptimizedReconcilerStrictMode {
-          // Previous Unicode scalar (handle surrogate pairs)
+        if let ns = editor.textStorage?.string as NSString?,
+           editor.featureFlags.useOptimizedReconciler && editor.featureFlags.useOptimizedReconcilerStrictMode {
+          // Previous Unicode scalar (handle surrogate pairs) - OPT strict mode only
           let i = start - 1
           if i >= 0 {
             let c = ns.character(at: i)
@@ -1096,24 +1127,40 @@ public class RangeSelection: BaseSelection {
           // its skin‑tone modifier), mimic legacy/native parity by deleting only the "previous"
           // scalar segment (typically the base). We detect this by checking whether the caret
           // index lies within the same composed sequence as (start-1).
+          // Special case: standalone zero-width characters (ZWSP U+200B, ZWJ U+200D) should be
+          // treated as single-char deletions. But if they're part of a legitimate multi-char
+          // cluster (like emoji with ZWJ), respect the cluster boundaries.
+          let prevChar = start - 1 < ns.length ? ns.character(at: start - 1) : 0
+          let isZeroWidthChar = (prevChar == 0x200B || prevChar == 0x200D)  // ZWSP, ZWJ
           let left = ns.rangeOfComposedCharacterSequence(at: start - 1)
-          let insideSameCluster = (start > left.location) && (start < left.location + left.length)
-          if insideSameCluster {
-            // Delete previous scalar at (start-1), with surrogate awareness
-            let i = start - 1
-            if i >= 0 {
-              let c = ns.character(at: i)
-              if c >= 0xDC00 && c <= 0xDFFF, i - 1 >= 0 {
-                let h = ns.character(at: i - 1)
-                if h >= 0xD800 && h <= 0xDBFF { clamp = NSRange(location: i - 1, length: 2) } else { clamp = NSRange(location: i, length: 1) }
+          // If the cluster is just the zero-width char (length 1), treat it standalone.
+          // If it's part of a larger cluster, use normal grapheme logic.
+          if isZeroWidthChar && left.length == 1 {
+            // Delete exactly the standalone zero-width character
+            clamp = NSRange(location: start - 1, length: 1)
+          } else {
+            // Check if we're truly in the middle of a cluster (not at the boundary)
+            // If caret is at the last position of the cluster or beyond, delete the whole cluster
+            let atOrBeyondBoundary = start >= left.location + left.length - 1
+            let insideSameCluster = (start > left.location) && !atOrBeyondBoundary
+            if insideSameCluster {
+              // Delete previous scalar at (start-1), with surrogate awareness (for partial deletions like removing skin tone modifier)
+              let i = start - 1
+              if i >= 0 {
+                let c = ns.character(at: i)
+                if c >= 0xDC00 && c <= 0xDFFF, i - 1 >= 0 {
+                  let h = ns.character(at: i - 1)
+                  if h >= 0xD800 && h <= 0xDBFF { clamp = NSRange(location: i - 1, length: 2) } else { clamp = NSRange(location: i, length: 1) }
+                } else {
+                  clamp = NSRange(location: i, length: 1)
+                }
               } else {
-                clamp = NSRange(location: i, length: 1)
+                clamp = NSRange(location: max(0, start - 1), length: 1)
               }
             } else {
-              clamp = NSRange(location: max(0, start - 1), length: 1)
+              // Delete the whole cluster
+              clamp = left
             }
-          } else {
-            clamp = left
           }
         } else {
           clamp = NSRange(location: start - 1, length: 1)
