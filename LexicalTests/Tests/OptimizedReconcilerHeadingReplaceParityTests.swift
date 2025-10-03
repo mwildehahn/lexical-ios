@@ -22,14 +22,17 @@ final class OptimizedReconcilerHeadingReplaceParityTests: XCTestCase {
         let p = createParagraphNode(); try p.append([ createTextNode(text: "Title") ])
         try root.append([p]); paraKey = p.getKey()
       }
+      var headingKey: NodeKey = ""
       try editor.update {
         guard let p: ParagraphNode = getNodeByKey(key: paraKey) else { return }
         let h = createHeadingNode(headingTag: .h2)
-        _ = try p.replace(replaceWith: h, includeChildren: true)
+        let replacedNode = try p.replace(replaceWith: h, includeChildren: true)
+        headingKey = replacedNode.getKey()
       }
       try editor.update {
-        guard let root = getRoot(), let h = root.getFirstChild() as? HeadingNode else { return }
-        let newP = createParagraphNode(); _ = try h.replace(replaceWith: newP, includeChildren: true)
+        guard let h: HeadingNode = getNodeByKey(key: headingKey) else { return }
+        let newP = createParagraphNode()
+        _ = try h.replace(replaceWith: newP, includeChildren: true)
       }
       return ctx.textStorage.string
     }

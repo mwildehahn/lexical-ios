@@ -100,9 +100,7 @@ public typealias PlatformAlert = NSAlert
 
 #if canImport(UIKit)
 public extension PlatformEdgeInsets {
-  static var zero: PlatformEdgeInsets {
-    return UIEdgeInsets.zero
-  }
+  // UIEdgeInsets already has .zero on UIKit, no need to redefine
 
   var leading: CGFloat { return left }
   var trailing: CGFloat { return right }
