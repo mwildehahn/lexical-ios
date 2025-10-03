@@ -1693,6 +1693,9 @@ public class RangeSelection: BaseSelection {
 
   @MainActor
   internal func formatText(formatType: TextFormatType) throws {
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+      print("🔥 FORMAT: formatText type=\(formatType) collapsed=\(isCollapsed()) anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
+    }
     if isCollapsed() {
       toggleFormat(type: formatType)
       return
@@ -1839,6 +1842,9 @@ public class RangeSelection: BaseSelection {
       // Mark selection as dirty and set format to ensure selection is preserved after reconciliation
       self.format = firstNextFormat
       self.dirty = true
+      if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+        print("🔥 FORMAT: multi-node complete, marked dirty. anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
+      }
     }
   }
 

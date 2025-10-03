@@ -12,9 +12,12 @@ public func updateTextFormat(type: TextFormatType, editor: Editor) throws {
   guard getActiveEditor() != nil else {
     throw LexicalError.invariantViolation("Must have editor")
   }
-  guard let selection = try getSelection() as? RangeSelection else {
-    return
-  }
 
-  try selection.formatText(formatType: type)
+  try editor.update {
+    guard let selection = try getSelection() as? RangeSelection else {
+      return
+    }
+
+    try selection.formatText(formatType: type)
+  }
 }
