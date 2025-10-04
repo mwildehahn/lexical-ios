@@ -213,9 +213,8 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
     let textContainerInset = self.editor?.frontend?.textContainerInsets ?? PlatformEdgeInsets.zero
 
     try? editor.read {
-      if editor.featureFlags.verboseLogging {
-        print("🔥 DEC-LM: key=\(key) charIndex=\(characterIndex) glyphIndex=\(glyphIndex) inContainer=\(glyphIsInTextContainer) hide=\(shouldHideView) ts.len=\(textStorage.length)")
-      }
+      print("🔥 DEC-LM: key=\(key) charIndex=\(characterIndex) glyphIndex=\(glyphIndex) inContainer=\(glyphIsInTextContainer) hide=\(shouldHideView) ts.len=\(textStorage.length)")
+
       guard let decoratorView = decoratorView(forKey: key, createIfNecessary: !shouldHideView)
       else {
         editor.log(.TextView, .warning, "create decorator view failed")
@@ -223,9 +222,7 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       }
 
       if shouldHideView {
-        if editor.featureFlags.verboseLogging {
-          print("🔥 DEC-LM: hide view key=\(key)")
-        }
+        print("🔥 DEC-LM: hide view key=\(key)")
         decoratorView.isHidden = true
         return
       }
@@ -233,16 +230,14 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       // we have a valid location, make sure view is not hidden
       decoratorView.isHidden = false
 
+      // On macOS, glyphBoundingRect doesn't reflect attachment bounds (only 1x1 for char)
+      // So we position decorator at the glyph origin directly using attachment bounds size
       var decoratorOrigin = glyphBoundingRect.offsetBy(
         dx: textContainerInset.left, dy: textContainerInset.top
-      ).origin  // top left
-
-      decoratorOrigin.y += (glyphBoundingRect.height - attr.bounds.height)  // bottom left now!
+      ).origin
 
       decoratorView.frame = CGRect(origin: decoratorOrigin, size: attr.bounds.size)
-      if editor.featureFlags.verboseLogging {
-        print("🔥 DEC-LM: positioned key=\(key) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
-      }
+      print("🔥 DEC-LM: positioned key=\(key) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
     }
   }
 

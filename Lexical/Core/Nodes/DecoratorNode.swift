@@ -168,6 +168,16 @@ open class DecoratorNode: Node {
     textAttachment.editor = editor
     textAttachment.key = key
 
+    // Calculate and set bounds directly for macOS compatibility
+    // macOS NSLayoutManager doesn't call attachmentBounds() without an attachmentCell,
+    // so we need to set the bounds upfront
+    let textLayoutWidth = editor.frontend?.textLayoutWidth ?? CGFloat(0)
+    let size = sizeForDecoratorView(textViewWidth: textLayoutWidth, attributes: [:])
+    let bounds = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+    textAttachment.bounds = bounds
+
+    print("🔥 DEC-NODE: getAttributedStringAttributes key=\(key ?? "nil") textLayoutWidth=\(textLayoutWidth) size=\(size) bounds=\(bounds)")
+
     return [.attachment: textAttachment]
   }
 
