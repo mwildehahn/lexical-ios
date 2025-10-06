@@ -114,6 +114,7 @@ Tasks:
     - [ ] Add integration tests for decorator hit-testing (mac target).
 5.6a [ ] **Priority:** Enable LexicalMacTests build + execution.
     - [ ] Split SPM targets so iOS code (UIKit/TextKit 1) lives under `LexicalUIKit`, while `LexicalCore` stays platform-neutral and `LexicalAppKit` depends only on core + AppKit shims.
+        - Attempt 2025-10-06: direct `Lexical`→`LexicalUIKit` rename caused empty target; revert. Need to migrate sources first (Core/Selection/Nodes/etc.) before adjusting Package.swift.
     - [ ] Guard shared sources with `canImport(UIKit)` / `canImport(AppKit)` and replace lingering UIKit types with PAL aliases (`UXView`, `UXColor`, `UXTextRange` wrappers) so macOS compiles.
     - [ ] Update `Package.swift` (platform declarations & dependencies) and product names so macOS targets avoid UIKit modules.
     - [ ] Restore mac build dependencies (include AppKit-specific helpers) and add any missing shims (e.g. TextKit availability wrappers, pasteboard helpers).
