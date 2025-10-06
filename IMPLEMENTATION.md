@@ -9,7 +9,7 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 1 — Platform Abstraction (PAL) foundation |
-| Next Task | 4.3 Run Selection suite + targeted SwiftUI smoke tests |
+| Next Task | Phase 5 kick-off (AppKit feature implementation) |
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
@@ -80,7 +80,8 @@ Tasks:
     - [x] Added `SwiftUIDecoratorNode` scaffolding using `UIHostingController`.
 4.2 [x] Gate macOS representable until AppKit frontend is functional.
     - [x] Added macOS placeholder view to keep API surface compiling without exposing unfinished functionality.
-4.3 [ ] Run Selection suite + targeted SwiftUI smoke tests (if any) and log results.
+4.3 [x] Run Selection suite + targeted SwiftUI smoke tests (if any) and log results.
+    - [x] Selection suite (`-only-testing:LexicalTests/SelectionTests`) @ 11:16 UTC.
 
 ### Phase 5 — AppKit Feature Implementation
 Goal: Implement macOS editing host with feature parity and verification.
@@ -133,6 +134,7 @@ Tasks:
 | 2025-10-06 | Phase 3 | Task 3.3 | iOS test checkpoint (no AppKit runtime yet); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 10:36 UTC) |
 | 2025-10-06 | Phase 4 | Task 4.1 | Created `LexicalSwiftUI` target + decorator scaffolding; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 10:46 UTC) |
 | 2025-10-06 | Phase 4 | Task 4.2 | Gated macOS SwiftUI representable behind placeholder; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 11:03 UTC) |
+| 2025-10-06 | Phase 4 | Task 4.3 | Selection suite checkpoint (`xcodebuild … -only-testing:LexicalTests/SelectionTests`); pass at 11:16 UTC |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.
