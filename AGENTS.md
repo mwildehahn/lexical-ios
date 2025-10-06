@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-> ⚠️ **Critical:** Keep Selection suite green as a quick preflight and run the full `Lexical-Package` suite after every change; record both commands and timestamps in the log.
+> ⚠️ **Critical:** Keep Selection suite green as a quick preflight and, after every change, run the iOS `Lexical-Package` suite (iPhone 17 Pro, iOS 26.0) followed by the macOS `LexicalMacTests` suite (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`). Log both commands with timestamps in the implementation plan.
 
 This repo contains Lexical iOS — a Swift Package with a modular plugin architecture and an example Playground app. Baseline runtime: iOS 16+.
 

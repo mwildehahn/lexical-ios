@@ -13,8 +13,10 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
+| Mac Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test` |
 | Verification Status | Selection suite PASS (2025-10-06 @ 08:35 UTC) |
-| Full Suite | PASS (2025-10-06 @ 15:32 UTC) |
+| Full Suite | PASS (2025-10-06 @ 18:06 UTC) |
+| Mac Suite | FAIL (2025-10-06 @ 18:06 UTC — missing AppKit-compatible build due to UIKit/MobileCoreServices imports) |
 | How to Resume | 1) Pull latest. 2) (Optional) Run Selection suite (command above). 3) Run full suite (command above). 4) Continue with Phase 1 task list |
 
 ## Current Status Summary
@@ -110,6 +112,12 @@ Tasks:
     - [x] Calculate overlay rects in AppKit coordinate space (selection/scroll aware).
     - [x] Forward pointer/tap events through adapter to decorator nodes.
     - [ ] Add integration tests for decorator hit-testing (mac target).
+5.6a [ ] **Priority:** Enable LexicalMacTests build + execution.
+    - [ ] Split SPM targets so iOS code (UIKit/TextKit 1) lives under `LexicalUIKit`, while `LexicalCore` stays platform-neutral and `LexicalAppKit` depends only on core + AppKit shims.
+    - [ ] Guard shared sources with `canImport(UIKit)` / `canImport(AppKit)` and replace lingering UIKit types with PAL aliases (`UXView`, `UXColor`, `UXTextRange` wrappers) so macOS compiles.
+    - [ ] Update `Package.swift` (platform declarations & dependencies) and product names so macOS targets avoid UIKit modules.
+    - [ ] Restore mac build dependencies (include AppKit-specific helpers) and add any missing shims (e.g. TextKit availability wrappers, pasteboard helpers).
+    - [ ] Get `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test` passing locally; record command + timestamp.
 5.7 [ ] Performance / QA passes (scrolling, typing perf, keyboard shortcuts) and prepare macOS sample harness.
     - [ ] Benchmark typing/scrolling responsiveness (profiling scripts).
     - [ ] Validate keyboard shortcuts (movement/deletion/format).
@@ -145,7 +153,7 @@ Tasks:
 
 ## Operational Protocols
 - **Testing cadence**
-  - After every code change run the full suite command listed above (Lexical-Package).
+  - After every code change run the full suite command listed above (Lexical-Package), then immediately run the macOS suite command (LexicalMacTests).
   - Optionally run the Selection suite command before the full run for faster feedback, but it does **not** replace the full suite requirement.
   - Record PASS/FAIL plus command in the **Progress Log** every time a suite runs.
 - **Documentation**
@@ -193,6 +201,8 @@ Tasks:
 | 2025-10-06 | Phase 5 | Discipline | Post-change verification (follow-up run); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 13:10 UTC) |
 | 2025-10-06 | Phase 5 | Task 5.5 | Added AppKit pasteboard bridging (`CopyPasteHelpers` hooks), copy/cut/paste overrides, command routing tests; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 13:32 UTC) |
 | 2025-10-06 | Phase 5 | Task 5.6 | Implemented AppKit decorator mount parity, overlay rect refresh, and tap forwarding via adapter/overlay; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 15:32 UTC) |
+| 2025-10-06 | Phase 5 | Discipline | Post-instruction update: iOS suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 18:06 UTC) |
+| 2025-10-06 | Phase 5 | Discipline | macOS suite FAIL (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`, 18:06 UTC) — build blocked by UIKit/MobileCoreServices imports on macOS |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.

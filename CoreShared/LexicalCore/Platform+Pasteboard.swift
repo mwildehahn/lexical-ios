@@ -1,4 +1,6 @@
 import Foundation
+
+#if canImport(UIKit)
 import UniformTypeIdentifiers
 
 /// Shared pasteboard helper values for platform-neutral code.
@@ -15,3 +17,13 @@ public enum UXPasteboardContentType {
   /// Rich text UTType reference.
   public static let richText = UTType.rtf
 }
+#elseif canImport(AppKit)
+import AppKit
+
+public enum UXPasteboardContentType {
+  public static let plainTextIdentifier = NSPasteboard.PasteboardType.string.rawValue
+  public static let richTextIdentifier = NSPasteboard.PasteboardType.rtf.rawValue
+  public static let plainText = NSPasteboard.PasteboardType.string
+  public static let richText = NSPasteboard.PasteboardType.rtf
+}
+#endif

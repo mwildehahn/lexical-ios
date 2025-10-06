@@ -40,7 +40,7 @@ public extension NSEdgeInsets {
   static let zero = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
 }
 
-public typealias UXTextRange = NSTextRange
+public typealias UXTextRange = AnyObject
 
 #else
 #error("Unsupported platform: Lexical requires either UIKit or AppKit")
