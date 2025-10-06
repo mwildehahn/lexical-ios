@@ -72,6 +72,7 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - Never pass `-quiet` to `xcodebuild` for tests or builds; keep output visible for diagnosis and CI logs.
 - After each significant change, ensure all tests pass and the Playground build succeeds on the iPhone 17 Pro (iOS 26.0) simulator. Do not commit unless these checks pass.
 - After **every** code change, run the full `Lexical-Package` test suite (`xcodebuild … test`). Targeted slices (e.g. Selection-only) may be run for faster iteration, but they never replace the full run.
+- ⚠️ Non-negotiable: if the full suite has not completed successfully after a change, that change is considered incomplete—run it before moving to the next task.
 
 ## Debug Logging
 - Use "🔥"-prefixed debug prints for temporary diagnostics to make logs easy to grep, e.g.:

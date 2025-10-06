@@ -8,10 +8,10 @@
 import UIKit
 
 /**
- A node that renders an arbitrary `UIView` inline in the text.
+ A node that renders an arbitrary `UXView` inline in the text.
 
  Behind the scenes, decorator nodes work by instructing TextKit to reserve some rectangular space, then
- creating and positioning a UIView inside that space. Lexical handles the lifecycle of this UIView.
+ creating and positioning a UXView inside that space. Lexical handles the lifecycle of this view.
 
  To make your own decorators, you must subclass `DecoratorNode`.
 
@@ -26,7 +26,7 @@ import UIKit
  node's properties.
 
  To handle communication from your View to your Node, e.g. tap handling or any other interaction, it is recommended
- that your View keeps a weak reference to its ``Editor``. This will require you to use a custom subclass of `UIView` of course.
+ that your View keeps a weak reference to its ``Editor``. This will require you to use a custom subclass of `UXView`, of course.
  Set your view's Editor in ``decorate(view:)`` (it is safe to use ``getActiveEditor()`` in this method). Then in your view,
  you can call an ``Editor/update(_:)`` and either dispatch a command, or obtain and modify your node using ``getNodeByKey(key:)``.
 
@@ -65,24 +65,24 @@ open class DecoratorNode: Node {
     Self(key)
   }
 
-  /// Create your `UIView` here.
-  ///
-  /// Do not add it to the view hierarchy or size it; Lexical will do that later.
-  open func createView() -> UIView {
+/// Create your `UXView` here.
+///
+/// Do not add it to the view hierarchy or size it; Lexical will do that later.
+  open func createView() -> UXView {
     fatalError("createView: base method not extended")
   }
 
   /// Called by Lexical when reconciling a dirty decorator node. This is where you update your view to match
   /// the state encapsulated in the decorator node.
-  open func decorate(view: UIView) {
+  open func decorate(view: UXView) {
     fatalError("decorate: base method not extended")
   }
 
-  open func decoratorWillAppear(view: UIView) {
+  open func decoratorWillAppear(view: UXView) {
     // no-op unless overridden
   }
 
-  open func decoratorDidDisappear(view: UIView) {
+  open func decoratorDidDisappear(view: UXView) {
     // no-op unless overridden
   }
 

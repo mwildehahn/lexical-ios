@@ -316,7 +316,7 @@ open class TextNode: Node {
         attributeDictionary.merge(themeDict) { (_, new) in new }
       } else {
         attributeDictionary[NSAttributedString.Key.fontFamily] = "Courier"
-        attributeDictionary[NSAttributedString.Key.backgroundColor] = UIColor.lightGray
+        attributeDictionary[NSAttributedString.Key.backgroundColor] = UXColor.lightGray
       }
     }
 
@@ -766,7 +766,7 @@ extension TextNode {
   internal static var inlineCodeBackgroundDrawing: CustomDrawingHandler {
     get {
       return { attributeKey, attributeValue, layoutManager, attributeRunCharacterRange, granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
-        guard let attributeValue = attributeValue as? UIColor else { return }
+        guard let attributeValue = attributeValue as? UXColor else { return }
         attributeValue.setFill()
         UIRectFill(rect)
       }
