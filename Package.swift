@@ -52,8 +52,12 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "Lexical",
+      name: "LexicalCore",
       dependencies: [],
+      path: "./CoreShared/LexicalCore"),
+    .target(
+      name: "Lexical",
+      dependencies: ["LexicalCore"],
       path: "./Lexical"),
     .testTarget(
       name: "LexicalTests",

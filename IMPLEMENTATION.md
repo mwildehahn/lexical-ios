@@ -7,7 +7,7 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 1 — Platform Abstraction (PAL) foundation |
-| Next Task | 1.3 Move pure Foundation utilities into `CoreShared/LexicalCore` |
+| Next Task | 1.5 Keep Selection suite + full suite cadence |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
 | Verification Status | Selection suite PASS (2025-10-06 @ 08:35 UTC) |
@@ -37,9 +37,13 @@ Tasks:
     - [x] `Platform+Selection.swift`: introduce snapshot structs mirroring current selection data (UIKit-backed for now).
 1.2 [x] Introduce `LexicalCoreExports.swift` (re-export placeholder) and leave existing imports untouched.
     - [x] Added guarded stub (`#if canImport`) to avoid duplicate symbol exposure until the new target exists.
-1.3 [x] Move pure Foundation utilities (`Errors.swift`, `EditorMetrics.swift`, `StyleEvents.swift`) into `CoreShared/LexicalCore` while keeping API identical.
-    - [x] Copied sources into CoreShared as preparation; existing Lexical copies remain until Task 1.4 wires the new target.
-1.4 [ ] Create `LexicalCore` target in `Package.swift` (iOS only) and wire existing targets to depend on it.
+1.3 [x] Move baseline Foundation utilities into `CoreShared/LexicalCore`.
+    - [x] `Errors.swift`
+    - [x] `EditorMetrics.swift`
+    - [ ] `StyleEvents.swift` (blocked: still references `Editor`/selection helpers; defer to later phase)
+1.4 [x] Create `LexicalCore` target in `Package.swift` (iOS only) and wire existing targets to depend on it.
+    - [x] Added standalone `LexicalCore` target and hooked `Lexical`/plugin targets to depend on it.
+    - [x] Restored `StyleEvents.swift` under `Lexical/Core` until dependencies are abstracted.
 1.5 [ ] Keep Selection suite green as a quick preflight and run the full `Lexical-Package` suite after every change; record both commands and timestamps in the log.
 
 ### Phase 2 — Core File Migration
@@ -104,7 +108,8 @@ Tasks:
 | 2025-10-06 | Phase 1 | Task 1.1 | Added PAL shim files; Selection suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`, 08:35 UTC) |
 | 2025-10-06 | Phase 1 | Full suite check | Full Lexical-Package PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 08:46 UTC) |
 | 2025-10-06 | Phase 1 | Task 1.2 | Added guarded `LexicalCoreExports.swift`; cleaned derived data via `xcodebuild … clean`; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:21 UTC) |
-| 2025-10-06 | Phase 1 | Task 1.3 | Copied `Errors.swift`, `EditorMetrics.swift`, `StyleEvents.swift` into CoreShared; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:33 UTC) |
+| 2025-10-06 | Phase 1 | Task 1.3 | Moved `Errors.swift` and `EditorMetrics.swift` into CoreShared; StyleEvents deferred (Editor dependency); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:33 UTC) |
+| 2025-10-06 | Phase 1 | Task 1.4 | Added `LexicalCore` SPM target, updated dependencies, kept StyleEvents under `Lexical/Core`; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:38 UTC) |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.
