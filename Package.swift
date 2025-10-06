@@ -45,6 +45,9 @@ let package = Package(
     .library(
       name: "LexicalMarkdown",
       targets: ["LexicalMarkdown"]),
+    .library(
+      name: "LexicalSwiftUI",
+      targets: ["LexicalSwiftUI"]),
   ],
   dependencies: [
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
@@ -144,5 +147,9 @@ let package = Package(
         .product(name: "Markdown", package: "swift-markdown"),
       ],
       path: "./Plugins/LexicalMarkdown/LexicalMarkdownTests"),
+    .target(
+      name: "LexicalSwiftUI",
+      dependencies: ["Lexical"],
+      path: "./SwiftUI/LexicalSwiftUI"),
   ]
 )
