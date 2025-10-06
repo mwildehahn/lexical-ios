@@ -4,7 +4,9 @@ import AppKit
 /// Placeholder overlay view for AppKit decorator hit-testing.
 @MainActor
 public final class LexicalOverlayViewMac: NSView {
-  public var tappableRects: [NSValue] = []
+  public override var isFlipped: Bool { true }
+
+  public var tappableRects: [NSRect] = []
   public var tapHandler: ((NSPoint) -> Void)?
 
   public override init(frame frameRect: NSRect) {
@@ -24,13 +26,13 @@ public final class LexicalOverlayViewMac: NSView {
   }
 
   public func updateTappableRects(_ rects: [NSRect]) {
-    tappableRects = rects.map { NSValue(rect: $0) }
+    tappableRects = rects
     needsDisplay = true
   }
 
   public override func mouseDown(with event: NSEvent) {
     let location = convert(event.locationInWindow, from: nil)
-    if tappableRects.contains(where: { $0.rectValue.contains(location) }) {
+    if tappableRects.contains(where: { $0.contains(location) }) {
       tapHandler?(location)
     } else {
       super.mouseDown(with: event)

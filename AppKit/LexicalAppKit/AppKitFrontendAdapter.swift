@@ -26,6 +26,44 @@ public final class AppKitFrontendAdapter {
       self?.overlayTapHandler?(point)
     }
     editor.frontend = self
+    refreshOverlayTargets()
+  }
+
+  public func refreshOverlayTargets() {
+    guard let textStorage = textView.lexicalTextStorage as? TextStorage else {
+      overlayView.updateTappableRects([])
+      return
+    }
+
+    let inset = textView.lexicalTextContainerInsets
+    let layoutManager = textView.lexicalLayoutManager
+    guard let textContainer = layoutManager.textContainers.first else {
+      overlayView.updateTappableRects([])
+      return
+    }
+
+    var rects: [NSRect] = []
+
+    for (key, location) in textStorage.decoratorPositionCache {
+      guard textStorage.length > 0 else { continue }
+      let clamped = max(0, min(location, textStorage.length - 1))
+      let glyphIndex = layoutManager.glyphIndexForCharacter(at: clamped)
+      layoutManager.ensureLayout(forGlyphRange: NSRange(location: glyphIndex, length: 1))
+
+      guard let attachment = textStorage.attribute(.attachment, at: clamped, effectiveRange: nil) as? TextAttachment,
+        attachment.key == key else { continue }
+
+      let glyphRect = layoutManager.boundingRect(
+        forGlyphRange: NSRange(location: glyphIndex, length: 1), in: textContainer)
+
+      var origin = CGPoint(
+        x: glyphRect.origin.x + inset.left,
+        y: glyphRect.origin.y + inset.top + (glyphRect.height - attachment.bounds.height))
+
+      rects.append(NSRect(origin: origin, size: attachment.bounds.size))
+    }
+
+    overlayView.updateTappableRects(rects)
   }
 }
 
@@ -62,7 +100,7 @@ extension AppKitFrontendAdapter: Frontend {
   }
 
   var viewForDecoratorSubviews: UXView? {
-    hostView.overlayView
+    textView
   }
 
   var isEmpty: Bool {
@@ -96,6 +134,7 @@ extension AppKitFrontendAdapter: Frontend {
     textView.selectionAffinity = direction
     textView.doCommand(by: selector)
     textView.isUpdatingNativeSelection = false
+    refreshOverlayTargets()
   }
 
   func unmarkTextWithoutUpdate() {
@@ -109,14 +148,17 @@ extension AppKitFrontendAdapter: Frontend {
   func updateNativeSelection(from selection: BaseSelection) throws {
     guard let rangeSelection = selection as? RangeSelection else { return }
     try textView.updateNativeSelection(from: rangeSelection)
+    refreshOverlayTargets()
   }
 
   func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
     textView.setMarkedTextFromReconciler(markedText, selectedRange: selectedRange)
+    refreshOverlayTargets()
   }
 
   func resetSelectedRange() {
     textView.resetSelectedRange()
+    refreshOverlayTargets()
   }
 
   func showPlaceholderText() {
@@ -125,6 +167,11 @@ extension AppKitFrontendAdapter: Frontend {
 
   func resetTypingAttributes(for selectedNode: Node) {
     // TODO: AppKit parity – map selected node styling to AppKit typing attributes.
+  }
+
+  func updateOverlayTargets(_ rects: [CGRect]) {
+    let nsRects = rects.map { NSRect(origin: NSPoint(x: $0.origin.x, y: $0.origin.y), size: NSSize(width: $0.size.width, height: $0.size.height)) }
+    overlayView.updateTappableRects(nsRects)
   }
 
   private func selector(

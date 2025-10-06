@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import CoreGraphics
 
 /// A Lexical Frontend is an object that contains the TextKit stack used by Lexical, along with handling
 /// user interactions, incoming events, etc. The Frontend protocol provides a hard boundary for what are
@@ -39,4 +40,9 @@ internal protocol Frontend: AnyObject {
   func resetSelectedRange()
   func showPlaceholderText()
   func resetTypingAttributes(for selectedNode: Node)
+  func updateOverlayTargets(_ rects: [CGRect])
+}
+
+extension Frontend {
+  func updateOverlayTargets(_ rects: [CGRect]) { }
 }

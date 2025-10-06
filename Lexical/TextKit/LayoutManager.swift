@@ -5,7 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+typealias UIFont = NSFont
+typealias UIColor = NSColor
+#endif
 
 @MainActor
 public class LayoutManager: NSLayoutManager, @unchecked Sendable {
@@ -156,23 +162,28 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
 
   private func positionAllDecorators() {
     guard let textStorage = textStorage as? TextStorage else { return }
+    var overlayRects: [CGRect] = []
     if editor?.featureFlags.verboseLogging == true {
       let tsPtr = Unmanaged.passUnretained(textStorage).toOpaque()
       print("🔥 DEC-LM: positionAllDecorators count=\(textStorage.decoratorPositionCache.count) ts.ptr=\(tsPtr)")
     }
     for (key, location) in textStorage.decoratorPositionCache {
-      positionDecorator(forKey: key, characterIndex: location)
+      if let rect = positionDecorator(forKey: key, characterIndex: location) {
+        overlayRects.append(rect)
+      }
     }
+    editor?.frontend?.updateOverlayTargets(overlayRects)
   }
 
   private func positionDecorator(forKey key: NodeKey, characterIndex: TextStorage.CharacterLocation)
+    -> CGRect?
   {
     guard let textContainer = textContainers.first, let textStorage else {
       editor?.log(.TextView, .warning, "called with no container or storage")
-      return
+      return nil
     }
 
-    if textStorage.length == 0 { return }
+    if textStorage.length == 0 { return nil }
     let clampedCharIndex = max(0, min(characterIndex, textStorage.length - 1))
     let glyphIndex = glyphIndexForCharacter(at: clampedCharIndex)
     var glyphIsInTextContainer = NSLocationInRange(glyphIndex, glyphRange(for: textContainer))
@@ -203,11 +214,12 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
 
     guard let attr = attribute, let key = attr.key, let editor = attr.editor else {
       editor?.log(.TextView, .warning, "called with no attachment")
-      return
+      return nil
     }
 
     let textContainerInset = self.editor?.frontend?.textContainerInsets ?? UIEdgeInsets.zero
 
+    var positionedRect: CGRect?
     try? editor.read {
       if editor.featureFlags.verboseLogging {
         print("🔥 DEC-LM: key=\(key) charIndex=\(characterIndex) glyphIndex=\(glyphIndex) inContainer=\(glyphIsInTextContainer) hide=\(shouldHideView) ts.len=\(textStorage.length)")
@@ -235,13 +247,17 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
 
       decoratorOrigin.y += (glyphBoundingRect.height - attr.bounds.height)  // bottom left now!
 
-      decoratorView.frame = CGRect(origin: decoratorOrigin, size: attr.bounds.size)
+      let frame = CGRect(origin: decoratorOrigin, size: attr.bounds.size)
+      decoratorView.frame = frame
       if editor.featureFlags.verboseLogging {
-        print("🔥 DEC-LM: positioned key=\(key) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
+        print("🔥 DEC-LM: positioned key=\(key) frame=\(frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
       }
+      positionedRect = frame
     }
+    return positionedRect
   }
 
+#if canImport(UIKit)
   @available(iOS 13.0, *)
   override public func showCGGlyphs(
     _ glyphs: UnsafePointer<CGGlyph>, positions: UnsafePointer<CGPoint>, count glyphCount: Int,
@@ -258,4 +274,5 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       glyphs, positions: positions, count: glyphCount, font: font, textMatrix: textMatrix,
       attributes: attributes, in: context)
   }
+#endif
 }
