@@ -71,6 +71,7 @@ This repo contains Lexical iOS — a Swift Package with a modular plugin archite
   - Never use `swift test` (macOS). It targets macOS by default and will fail due to UIKit/TextKit iOS‑only APIs. Always use the Xcode iOS simulator command above.
   - Never pass `-quiet` to `xcodebuild` for tests or builds; keep output visible for diagnosis and CI logs.
 - After each significant change, ensure all tests pass and the Playground build succeeds on the iPhone 17 Pro (iOS 26.0) simulator. Do not commit unless these checks pass.
+- After **every** code change, run the full `Lexical-Package` test suite (`xcodebuild … test`). Targeted slices (e.g. Selection-only) may be run for faster iteration, but they never replace the full run.
 
 ## Debug Logging
 - Use "🔥"-prefixed debug prints for temporary diagnostics to make logs easy to grep, e.g.:
