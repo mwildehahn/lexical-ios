@@ -9,7 +9,7 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 1 — Platform Abstraction (PAL) foundation |
-| Next Task | 3.3 Selection + full suite checkpoint (iOS) |
+| Next Task | 4.1 Create `LexicalSwiftUI` target |
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
@@ -70,7 +70,7 @@ Tasks:
 3.2 [x] Add AppKit adapters and placeholder overlay view (no functionality yet).
     - [x] Added `AppKitFrontendAdapter` skeleton wiring editor, host view, text view, and overlay.
     - [x] Extended stubs to track attached subviews and tappable rects.
-3.3 [ ] Selection suite + full iOS suite → PASS.
+3.3 [x] Selection suite + full iOS suite → PASS.
 
 ### Phase 4 — SwiftUI Wrappers
 Goal: Provide SwiftUI representations for iOS (and placeholder for macOS once ready).
@@ -127,6 +127,7 @@ Tasks:
 | 2025-10-06 | Phase 2 | Task 2.3 | Migrated Events + copy/paste bridges to `UXPasteboard`; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 10:15 UTC) |
 | 2025-10-06 | Phase 3 | Task 3.1 | Added AppKit scaffolding stubs (`LexicalNSView`, `TextViewMac`, `LexicalOverlayViewMac`); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 10:24 UTC) |
 | 2025-10-06 | Phase 3 | Task 3.2 | Stubbed `AppKitFrontendAdapter` and overlay plumbing; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 10:31 UTC) |
+| 2025-10-06 | Phase 3 | Task 3.3 | iOS test checkpoint (no AppKit runtime yet); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 10:36 UTC) |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.
