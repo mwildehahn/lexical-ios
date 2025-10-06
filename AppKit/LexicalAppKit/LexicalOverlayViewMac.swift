@@ -5,11 +5,17 @@ import AppKit
 @MainActor
 public final class LexicalOverlayViewMac: NSView {
   public var tappableRects: [NSValue] = []
+  public var tapHandler: ((NSPoint) -> Void)?
 
   public override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
+    addTrackingArea(NSTrackingArea(
+      rect: bounds,
+      options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+      owner: self,
+      userInfo: nil))
   }
 
   @available(*, unavailable)
@@ -20,6 +26,15 @@ public final class LexicalOverlayViewMac: NSView {
   public func updateTappableRects(_ rects: [NSRect]) {
     tappableRects = rects.map { NSValue(rect: $0) }
     needsDisplay = true
+  }
+
+  public override func mouseDown(with event: NSEvent) {
+    let location = convert(event.locationInWindow, from: nil)
+    if tappableRects.contains(where: { $0.rectValue.contains(location) }) {
+      tapHandler?(location)
+    } else {
+      super.mouseDown(with: event)
+    }
   }
 }
 #endif

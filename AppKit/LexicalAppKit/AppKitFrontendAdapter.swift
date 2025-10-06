@@ -9,6 +9,7 @@ public final class AppKitFrontendAdapter {
   public let hostView: LexicalNSView
   public let textView: TextViewMac
   public let overlayView: LexicalOverlayViewMac
+  public var overlayTapHandler: ((NSPoint) -> Void)?
 
   public init(editor: Editor, hostView: LexicalNSView, textView: TextViewMac, overlayView: LexicalOverlayViewMac) {
     self.editor = editor
@@ -20,6 +21,9 @@ public final class AppKitFrontendAdapter {
   public func bind() {
     hostView.attach(textView: textView)
     hostView.attach(overlayView: overlayView)
+    overlayView.tapHandler = { [weak self] point in
+      self?.overlayTapHandler?(point)
+    }
   }
 }
 #endif
