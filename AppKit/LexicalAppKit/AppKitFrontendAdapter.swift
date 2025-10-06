@@ -1,5 +1,6 @@
 #if canImport(AppKit)
 import AppKit
+import Lexical
 
 /// Lightweight placeholder that will eventually coordinate the AppKit frontend objects.
 @MainActor
@@ -17,7 +18,8 @@ public final class AppKitFrontendAdapter {
   }
 
   public func bind() {
-    // To be implemented in subsequent phases.
+    hostView.attach(textView: textView)
+    hostView.attach(overlayView: overlayView)
   }
 }
 #endif
