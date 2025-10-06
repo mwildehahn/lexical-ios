@@ -151,5 +151,15 @@ let package = Package(
       name: "LexicalSwiftUI",
       dependencies: ["Lexical"],
       path: "./SwiftUI/LexicalSwiftUI"),
+    .target(
+      name: "LexicalAppKit",
+      dependencies: ["Lexical"],
+      path: "./AppKit/LexicalAppKit",
+      condition: .when(platforms: [.macOS])),
+    .testTarget(
+      name: "LexicalMacTests",
+      dependencies: ["Lexical", "LexicalAppKit"],
+      path: "./AppKit/Tests/LexicalMacTests",
+      condition: .when(platforms: [.macOS])),
   ]
 )
