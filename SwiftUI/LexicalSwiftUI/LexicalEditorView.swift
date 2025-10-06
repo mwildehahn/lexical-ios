@@ -1,7 +1,8 @@
-#if canImport(SwiftUI) && os(iOS)
+#if canImport(SwiftUI)
 import SwiftUI
 import Lexical
 
+#if os(iOS)
 @available(iOS 17.0, *)
 @MainActor
 public struct LexicalEditorView: View {
@@ -32,4 +33,18 @@ public struct LexicalEditorView: View {
     }
   }
 }
+#elseif os(macOS)
+@available(macOS 14.0, *)
+@MainActor
+public struct LexicalEditorView: View {
+  public init(editorConfig: EditorConfig = EditorConfig(theme: Theme(), plugins: []),
+              featureFlags: FeatureFlags = FeatureFlags()) {}
+
+  public var body: some View {
+    Text("LexicalEditorView is not yet available on macOS")
+      .font(.system(.body, design: .rounded))
+      .foregroundStyle(.secondary)
+  }
+}
+#endif
 #endif
