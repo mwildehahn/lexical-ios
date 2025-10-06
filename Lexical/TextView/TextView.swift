@@ -27,7 +27,7 @@ protocol LexicalTextViewDelegate: NSObjectProtocol {
 @objc public class TextView: UITextView {
   let editor: Editor
 
-  internal let pasteboard = UIPasteboard.general
+  internal let pasteboard = UXPasteboard.general
   internal let pasteboardIdentifier = "x-lexical-nodes"
   internal var isUpdatingNativeSelection = false
   internal var layoutManagerDelegate: LayoutManagerDelegate

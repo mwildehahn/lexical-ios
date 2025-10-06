@@ -120,7 +120,7 @@ internal func onFormatTextFromUITextView(editor: Editor, type: TextFormatType) t
 }
 
 @MainActor
-internal func onCopyFromUITextView(editor: Editor, pasteboard: UIPasteboard) throws {
+internal func onCopyFromUITextView(editor: Editor, pasteboard: UXPasteboard) throws {
   guard getActiveEditor() != nil, let selection = try getSelection() else {
     throw LexicalError.invariantViolation("No editor or selection")
   }
@@ -128,7 +128,7 @@ internal func onCopyFromUITextView(editor: Editor, pasteboard: UIPasteboard) thr
 }
 
 @MainActor
-internal func onCutFromUITextView(editor: Editor, pasteboard: UIPasteboard) throws {
+internal func onCutFromUITextView(editor: Editor, pasteboard: UXPasteboard) throws {
   guard getActiveEditor() != nil, let selection = try getSelection() as? RangeSelection else {
     throw LexicalError.invariantViolation("No editor or selection")
   }
@@ -139,7 +139,7 @@ internal func onCutFromUITextView(editor: Editor, pasteboard: UIPasteboard) thro
 }
 
 @MainActor
-internal func onPasteFromUITextView(editor: Editor, pasteboard: UIPasteboard) throws {
+internal func onPasteFromUITextView(editor: Editor, pasteboard: UXPasteboard) throws {
   guard getActiveEditor() != nil, let selection = try getSelection() as? RangeSelection else {
     throw LexicalError.invariantViolation("No editor or selection")
   }
@@ -371,7 +371,7 @@ public func registerRichText(editor: Editor) {
     listener: { [weak editor] payload in
       guard let editor else { return false }
       do {
-        guard let text = payload as? UIPasteboard else { return false }
+        guard let text = payload as? UXPasteboard else { return false }
 
         try onCopyFromUITextView(editor: editor, pasteboard: text)
         return true
@@ -386,7 +386,7 @@ public func registerRichText(editor: Editor) {
     listener: { [weak editor] payload in
       guard let editor else { return false }
       do {
-        guard let text = payload as? UIPasteboard else { return false }
+        guard let text = payload as? UXPasteboard else { return false }
 
         try onCutFromUITextView(editor: editor, pasteboard: text)
         return true
@@ -401,7 +401,7 @@ public func registerRichText(editor: Editor) {
     listener: { [weak editor] payload in
       guard let editor else { return false }
       do {
-        guard let text = payload as? UIPasteboard else { return false }
+        guard let text = payload as? UXPasteboard else { return false }
 
         try onPasteFromUITextView(editor: editor, pasteboard: text)
         return true

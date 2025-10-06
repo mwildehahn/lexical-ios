@@ -11,7 +11,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 @MainActor
-internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) throws {
+internal func setPasteboard(selection: BaseSelection, pasteboard: UXPasteboard) throws {
   guard let editor = getActiveEditor() else {
     throw LexicalError.invariantViolation("Could not get editor")
   }
@@ -59,7 +59,7 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UIPasteboard) 
 }
 
 @MainActor
-internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: UIPasteboard)
+internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: UXPasteboard)
   throws
 {
   let itemSet: IndexSet?
