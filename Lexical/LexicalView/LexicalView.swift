@@ -191,8 +191,8 @@ extension LexicalViewDelegate {
   }
 
   func moveNativeSelection(
-    type: NativeSelectionModificationType, direction: UITextStorageDirection,
-    granularity: UITextGranularity
+    type: NativeSelectionModificationType, direction: UXTextStorageDirection,
+    granularity: UXTextGranularity
   ) {
     textView.isUpdatingNativeSelection = true
     if editor.featureFlags.verboseLogging {
@@ -214,7 +214,7 @@ extension LexicalViewDelegate {
       end =
         textView.tokenizer.position(
           from: end, toBoundary: granularity,
-          inDirection: UITextDirection(rawValue: UITextStorageDirection.forward.rawValue)) ?? end
+          inDirection: UITextDirection(rawValue: direction.rawValue)) ?? end
       end = validatePosition(textView: textView, position: end, direction: direction)
       start = validatePosition(textView: textView, position: start, direction: direction)
 
@@ -225,7 +225,7 @@ extension LexicalViewDelegate {
       start =
         textView.tokenizer.position(
           from: start, toBoundary: granularity,
-          inDirection: UITextDirection(rawValue: UITextStorageDirection.backward.rawValue)) ?? start
+          inDirection: UITextDirection(rawValue: direction.rawValue)) ?? start
       start = validatePosition(textView: textView, position: start, direction: direction)
       end = validatePosition(textView: textView, position: end, direction: direction)
 

@@ -32,7 +32,7 @@ internal protocol Frontend: AnyObject {
   var interceptNextSelectionChangeAndReplaceWithRange: NSRange? { get set }
   var textLayoutWidth: CGFloat { get }
 
-  func moveNativeSelection(type: NativeSelectionModificationType, direction: UITextStorageDirection, granularity: UITextGranularity)
+  func moveNativeSelection(type: NativeSelectionModificationType, direction: UXTextStorageDirection, granularity: UXTextGranularity)
   func unmarkTextWithoutUpdate()
   func presentDeveloperFacingError(message: String)
   func updateNativeSelection(from selection: BaseSelection) throws

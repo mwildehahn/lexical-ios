@@ -1542,7 +1542,7 @@ public class RangeSelection: BaseSelection {
 
   @MainActor
   internal func modify(
-    alter: NativeSelectionModificationType, isBackward: Bool, granularity: UITextGranularity
+    alter: NativeSelectionModificationType, isBackward: Bool, granularity: UXTextGranularity
   ) throws {
     let collapse = alter == .move
 
@@ -1590,7 +1590,7 @@ public class RangeSelection: BaseSelection {
   }
 
   @MainActor
-  internal func applySelectionRange(_ range: NSRange, affinity: UITextStorageDirection) throws {
+  internal func applySelectionRange(_ range: NSRange, affinity: UXTextStorageDirection) throws {
     guard let editor = getActiveEditor() else {
       throw LexicalError.invariantViolation("Calling applyNativeSelection when no active editor")
     }

@@ -9,12 +9,12 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 1 — Platform Abstraction (PAL) foundation |
-| Next Task | 2.2 Update `RangeSelection` & helpers to PAL enums |
+| Next Task | 2.3 Convert `Events.swift` and TextView bridges to PAL types |
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
 | Verification Status | Selection suite PASS (2025-10-06 @ 08:35 UTC) |
-| Full Suite | PASS (2025-10-06 @ 09:50 UTC) |
+| Full Suite | PASS (2025-10-06 @ 10:07 UTC) |
 | How to Resume | 1) Pull latest. 2) (Optional) Run Selection suite (command above). 3) Run full suite (command above). 4) Continue with Phase 1 task list |
 
 ## Current Status Summary
@@ -56,7 +56,9 @@ Tasks:
     - [x] TextNode default highlight colors use `UXColor`.
     - [x] Code/Quote custom drawing attributes migrated to `UXColor`/`UXEdgeInsets`.
     - [x] ParagraphNode now imports only Foundation (no UIKit dependency).
-2.2 [ ] Update `RangeSelection`, `SelectionUtils`, and related helpers to use PAL types (no AppKit yet).
+2.2 [x] Update `RangeSelection`, `SelectionUtils`, and related helpers to use PAL types (no AppKit yet).
+    - [x] Replaced `UITextStorageDirection`/`UITextGranularity` with `UX` aliases across RangeSelection, SelectionUtils, RangeCache, NativeSelection, Editor, and frontends.
+    - [x] Bridged frontend protocol + implementations (LexicalView, read-only context) to the PAL enums.
 2.3 [ ] Convert `Events.swift` and `TextView` bridges to PAL types (guarded by `canImport`).
 2.4 [ ] Tests: Selection suite after each sub-task; full suite before exiting phase. Document outcomes.
 
@@ -118,6 +120,7 @@ Tasks:
 | 2025-10-06 | Phase 1 | Task 1.4 | Added `LexicalCore` SPM target, updated dependencies, kept StyleEvents under `Lexical/Core`; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:38 UTC) |
 | 2025-10-06 | Phase 2 | Task 2.1 | Converted Decorator/Code/Quote/Text nodes to `UX*` aliases; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:50 UTC) |
 | 2025-10-06 | Phase 2 | Discipline | Re-confirmed test mandate warning in docs; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:55 UTC) |
+| 2025-10-06 | Phase 2 | Task 2.2 | Swapped selection helpers to `UXTextStorageDirection`/`UXTextGranularity`; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 10:07 UTC) |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.

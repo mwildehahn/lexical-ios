@@ -225,7 +225,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
   -> NativeSelection
 {
   let isBefore = try selection.anchor.isBefore(point: selection.focus)
-  var affinity: UITextStorageDirection = isBefore ? .forward : .backward
+  var affinity: UXTextStorageDirection = isBefore ? .forward : .backward
 
   if selection.anchor == selection.focus {
     affinity = .forward
@@ -708,7 +708,7 @@ internal func normalizeSelectionPointsForBoundaries(
 
 @MainActor
 func validatePosition(
-  textView: UITextView, position: UITextPosition, direction: UITextStorageDirection
+  textView: UITextView, position: UITextPosition, direction: UXTextStorageDirection
 ) -> UITextPosition {
   var currentPosition = position
   let nsText = textView.text as NSString

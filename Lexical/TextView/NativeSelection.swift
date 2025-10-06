@@ -10,7 +10,7 @@ import UIKit
 
 public class NativeSelection {
 
-  internal init(range: NSRange?, opaqueRange: UITextRange?, affinity: UITextStorageDirection, markedRange: NSRange?, markedOpaqueRange: UITextRange?, selectionIsNodeOrObject: Bool) {
+  internal init(range: NSRange?, opaqueRange: UITextRange?, affinity: UXTextStorageDirection, markedRange: NSRange?, markedOpaqueRange: UITextRange?, selectionIsNodeOrObject: Bool) {
     self.range = range
     self.opaqueRange = opaqueRange
     self.affinity = affinity
@@ -28,7 +28,7 @@ public class NativeSelection {
     self.selectionIsNodeOrObject = false // may reconsider this default later
   }
 
-  public convenience init(range: NSRange, affinity: UITextStorageDirection) {
+  public convenience init(range: NSRange, affinity: UXTextStorageDirection) {
     self.init(range: range,
               opaqueRange: nil,
               affinity: affinity,
@@ -46,7 +46,7 @@ public class NativeSelection {
   // numerical range is useful for matching up with our range cache.
   let opaqueRange: UITextRange?
 
-  let affinity: UITextStorageDirection
+  let affinity: UXTextStorageDirection
 
   // marked text is the iOS term for what Lexical calls `composing`.
   // If these properties are nil, there is no marked text.

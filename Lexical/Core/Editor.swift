@@ -547,8 +547,8 @@ public class Editor: NSObject {
   }
 
   internal func moveNativeSelection(
-    type: NativeSelectionModificationType, direction: UITextStorageDirection,
-    granularity: UITextGranularity
+    type: NativeSelectionModificationType, direction: UXTextStorageDirection,
+    granularity: UXTextGranularity
   ) {
     if featureFlags.verboseLogging {
       if let rng = getNativeSelection().range {

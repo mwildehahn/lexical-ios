@@ -57,7 +57,7 @@ struct RangeCacheItem {
  */
 @MainActor
 internal func pointAtStringLocation(
-  _ location: Int, searchDirection: UITextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
+  _ location: Int, searchDirection: UXTextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> Point? {
   do {
     let searchResult = try evaluateNode(
@@ -82,7 +82,7 @@ internal func pointAtStringLocation(
 
 @MainActor
 private func evaluateNode(
-  _ nodeKey: NodeKey, stringLocation: Int, searchDirection: UITextStorageDirection,
+  _ nodeKey: NodeKey, stringLocation: Int, searchDirection: UXTextStorageDirection,
   rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> RangeCacheSearchResult? {
   guard let rangeCacheItem = rangeCache[nodeKey], let node = getNodeByKey(key: nodeKey) else {
