@@ -154,12 +154,10 @@ let package = Package(
     .target(
       name: "LexicalAppKit",
       dependencies: ["Lexical"],
-      path: "./AppKit/LexicalAppKit",
-      condition: .when(platforms: [.macOS])),
+      path: "./AppKit/LexicalAppKit"),
     .testTarget(
       name: "LexicalMacTests",
       dependencies: ["Lexical", "LexicalAppKit"],
-      path: "./AppKit/Tests/LexicalMacTests",
-      condition: .when(platforms: [.macOS])),
+      path: "./AppKit/Tests/LexicalMacTests"),
   ]
 )

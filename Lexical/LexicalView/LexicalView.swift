@@ -139,7 +139,7 @@ extension LexicalViewDelegate {
     return layoutManager
   }
 
-  @objc public var textContainerInsets: UIEdgeInsets {
+  @objc public var textContainerInsets: UXEdgeInsets {
     textView.textContainerInset
   }
 
@@ -186,7 +186,7 @@ extension LexicalViewDelegate {
     textView.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
-  var viewForDecoratorSubviews: UIView? {
+  var viewForDecoratorSubviews: UXView? {
     textView
   }
 

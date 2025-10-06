@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 
 /// Snapshot of native selection state used for bridging platform frontends.
 public struct UXSelectionSnapshot {

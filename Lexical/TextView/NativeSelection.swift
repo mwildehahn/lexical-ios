@@ -6,11 +6,13 @@
  */
 
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 public class NativeSelection {
 
-  internal init(range: NSRange?, opaqueRange: UITextRange?, affinity: UXTextStorageDirection, markedRange: NSRange?, markedOpaqueRange: UITextRange?, selectionIsNodeOrObject: Bool) {
+  public init(range: NSRange?, opaqueRange: UXTextRange?, affinity: UXTextStorageDirection, markedRange: NSRange?, markedOpaqueRange: UXTextRange?, selectionIsNodeOrObject: Bool) {
     self.range = range
     self.opaqueRange = opaqueRange
     self.affinity = affinity
@@ -41,10 +43,8 @@ public class NativeSelection {
   // the caret is being displayed.
   public let range: NSRange?
 
-  // UITextRange can only be turned into a numerical range in the context of a text field. We're storing
-  // both things in this object -- the opaque range is useful for modifying the selection, whereas the
-  // numerical range is useful for matching up with our range cache.
-  let opaqueRange: UITextRange?
+  // Platform-native range representation (UITextRange / NSTextRange). Stored for interoperability.
+  let opaqueRange: UXTextRange?
 
   let affinity: UXTextStorageDirection
 
@@ -52,7 +52,7 @@ public class NativeSelection {
   // If these properties are nil, there is no marked text.
   // The opaque range comes straight from the text view; the range (as an NSRange) is calculated by us.
   let markedRange: NSRange?
-  let markedOpaqueRange: UITextRange?
+  let markedOpaqueRange: UXTextRange?
 
   // The selection is something that cannot be represented by a character range. Usually corresponds with
   // NodeSelection or similar within Lexical.

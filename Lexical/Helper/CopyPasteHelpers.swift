@@ -6,8 +6,13 @@
  */
 
 import Foundation
+#if canImport(UIKit)
 import MobileCoreServices
 import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 @MainActor
@@ -27,58 +32,64 @@ internal func setPasteboard(selection: BaseSelection, pasteboard: UXPasteboard) 
     completionHandler?(data, nil)
   }
 
+#if canImport(UIKit)
   if #available(iOS 14.0, *) {
-    pasteboard.items =
+    pasteboard.items = [
       [
-        [
-          (UTType.rtf.identifier): try getAttributedStringFromFrontend().data(
-            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
-            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
-        ],
-        [LexicalConstants.pasteboardIdentifier: encodedData],
-      ]
+        (UTType.rtf.identifier): try getAttributedStringFromFrontend().data(
+          from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+          documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+      ],
+      [LexicalConstants.pasteboardIdentifier: encodedData],
+    ]
     if ProcessInfo.processInfo.isMacCatalystApp {
-      // added this to enable copy/paste in the mac catalyst app
-      // the problem is in the TextView.canPerformAction
-      // after copy on iOS pasteboard.hasStrings returns true but on Mac it returns false for some reason
-      // setting this string here will make it return true, pasting will take serialized nodes from the pasteboard
-      // anyhow so this should not have any adverse effect
       pasteboard.string = text
     }
   } else {
-    pasteboard.items =
+    pasteboard.items = [
       [
-        [
-          (kUTTypeRTF as String): try getAttributedStringFromFrontend().data(
-            from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
-            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
-        ],
-        [LexicalConstants.pasteboardIdentifier: encodedData],
-      ]
+        (kUTTypeRTF as String): try getAttributedStringFromFrontend().data(
+          from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+          documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+      ],
+      [LexicalConstants.pasteboardIdentifier: encodedData],
+    ]
   }
+#elseif canImport(AppKit)
+  pasteboard.clearContents()
+
+  let rtfData = try getAttributedStringFromFrontend().data(
+    from: NSRange(location: 0, length: getAttributedStringFromFrontend().length),
+    documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+
+  pasteboard.setData(rtfData, forType: .rtf)
+  pasteboard.setData(
+    encodedData,
+    forType: NSPasteboard.PasteboardType(LexicalConstants.pasteboardIdentifier))
+  pasteboard.setString(text, forType: .string)
+#endif
 }
 
 @MainActor
 internal func insertDataTransferForRichText(selection: RangeSelection, pasteboard: UXPasteboard)
   throws
 {
+#if canImport(UIKit)
   let itemSet: IndexSet?
   if #available(iOS 14.0, *) {
     itemSet = pasteboard.itemSet(
       withPasteboardTypes: [
-        (UTType.utf8PlainText.identifier),
-        (UTType.url.identifier),
+        UTType.utf8PlainText.identifier,
+        UTType.url.identifier,
         LexicalConstants.pasteboardIdentifier,
-      ]
-    )
+      ])
   } else {
     itemSet = pasteboard.itemSet(
       withPasteboardTypes: [
-        (kUTTypeUTF8PlainText as String),
-        (kUTTypeURL as String),
+        kUTTypeUTF8PlainText as String,
+        kUTTypeURL as String,
         LexicalConstants.pasteboardIdentifier,
-      ]
-    )
+      ])
   }
 
   if let pasteboardData = pasteboard.data(
@@ -148,6 +159,36 @@ internal func insertDataTransferForRichText(selection: RangeSelection, pasteboar
     try insertPlainText(selection: selection, text: string)
     return
   }
+#elseif canImport(AppKit)
+  let customType = NSPasteboard.PasteboardType(LexicalConstants.pasteboardIdentifier)
+  if let pasteboardData = pasteboard.data(forType: customType) {
+    let deserializedNodes = try JSONDecoder().decode(SerializedNodeArray.self, from: pasteboardData)
+    guard let editor = getActiveEditor() else { return }
+    _ = try insertGeneratedNodes(
+      editor: editor, nodes: deserializedNodes.nodeArray, selection: selection)
+    return
+  }
+
+  if let pasteboardRTFData = pasteboard.data(forType: .rtf) {
+    let attributedString = try NSAttributedString(
+      data: pasteboardRTFData,
+      options: [.documentType: NSAttributedString.DocumentType.rtf],
+      documentAttributes: nil
+    )
+    try insertRTF(selection: selection, attributedString: attributedString)
+    return
+  }
+
+  if let plainText = pasteboard.string(forType: .string) {
+    try insertPlainText(selection: selection, text: plainText)
+    return
+  }
+
+  if let urlString = pasteboard.string(forType: .URL), let url = URL(string: urlString) {
+    try insertPlainText(selection: selection, text: url.absoluteString)
+    return
+  }
+#endif
 }
 
 @MainActor

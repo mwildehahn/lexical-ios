@@ -263,14 +263,14 @@ internal class LexicalReadOnlySizeCache {
 
   // MARK: - Frontend
 
-  @objc public var textContainerInsets: UIEdgeInsets = UIEdgeInsets(
+  @objc public var textContainerInsets: UXEdgeInsets = UXEdgeInsets(
     top: 5, left: 5, bottom: 5, right: 5)
 
   var nativeSelection: NativeSelection {
     NativeSelection()
   }
 
-  var viewForDecoratorSubviews: UIView? {
+  var viewForDecoratorSubviews: UXView? {
     return self.attachedView
   }
 

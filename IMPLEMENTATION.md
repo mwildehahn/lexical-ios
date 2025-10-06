@@ -14,7 +14,7 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
 | Verification Status | Selection suite PASS (2025-10-06 @ 08:35 UTC) |
-| Full Suite | PASS (2025-10-06 @ 11:37 UTC) |
+| Full Suite | PASS (2025-10-06 @ 13:32 UTC) |
 | How to Resume | 1) Pull latest. 2) (Optional) Run Selection suite (command above). 3) Run full suite (command above). 4) Continue with Phase 1 task list |
 
 ## Current Status Summary
@@ -95,16 +95,16 @@ Tasks:
 5.3 [x] Add macOS unit tests (pending enablement) behind new test target.
     - [x] Added `LexicalMacTests` SPM target conditioned on macOS with placeholder assertions/skip.
 5.4 [ ] Complete selection + IME parity on AppKit.
-    - [ ] Generalize `Frontend` protocol to PAL types and add AppKit frontend implementation.
-    - [ ] Map native selection changes (NSRange/NSTextRange) to `RangeSelection` and back.
-    - [ ] Handle marked-text lifecycle (start/update/end) with IME-friendly behavior.
-    - [ ] Route key commands (delete, movement, formatting) through Lexical commands.
-    - [ ] Unit-test selection/IME bridging in `LexicalMacTests`.
+    - [x] Generalize `Frontend` protocol to PAL types and add AppKit frontend implementation scaffolding.
+    - [x] Map native selection changes (NSRange/NSTextRange) to `RangeSelection` and back.
+    - [x] Handle marked-text lifecycle (start/update/end) with IME-friendly behavior.
+    - [x] Route key commands (delete, movement, formatting) through Lexical commands.
+    - [x] Unit-test selection/IME bridging in `LexicalMacTests`.
 5.5 [ ] Bridge pasteboard + command surfaces.
-    - [ ] Mirror `CopyPasteHelpers` using AppKit APIs (`NSPasteboard`, UTType mapping).
-    - [ ] Wire copy/cut/paste commands from `TextViewMac` into Lexical commands.
-    - [ ] Implement delete word/line / tab / newline command routing via menu/key equivalents.
-    - [ ] Add macOS-specific unit coverage for pasteboard + command routing.
+    - [x] Mirror `CopyPasteHelpers` using AppKit APIs (`NSPasteboard`, UTType mapping).
+    - [x] Wire copy/cut/paste commands from `TextViewMac` into Lexical commands.
+    - [x] Implement delete word/line / tab / newline command routing via menu/key equivalents.
+    - [x] Add macOS-specific unit coverage for pasteboard + command routing.
 5.6 [ ] Decorator lifecycle + overlay hit-testing.
     - [ ] Implement AppKit decorator mount/unmount API parity (reuse `DecoratorNode`).
     - [ ] Calculate overlay rects in AppKit coordinate space (selection/scroll aware).
@@ -183,6 +183,15 @@ Tasks:
 | 2025-10-06 | Phase 5 | Task 5.1 | AppKit TextView scaffolding + adapter binding; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 11:24 UTC) |
 | 2025-10-06 | Phase 5 | Task 5.2 | Overlay tap scaffolding; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 11:31 UTC) |
 | 2025-10-06 | Phase 5 | Task 5.3 | Added macOS test target scaffolding; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 11:37 UTC) |
+| 2025-10-06 | Phase 5 | Task 5.4 | Generalized Frontend to PAL types, extended PAL aliases (UXTextRange) and adjusted Package.swift gating; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 12:36 UTC) |
+| 2025-10-06 | Phase 5 | Discipline | Verification rerun after user request; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 12:38 UTC) |
+| 2025-10-06 | Phase 5 | Task 5.4 | Added AppKit frontend bridging for native selection + editor sync, extended TextViewMac helpers, added AppKit unit smoke test; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 12:51 UTC) |
+| 2025-10-06 | Phase 5 | Discipline | Post-update verification (no code changes); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 12:52 UTC) |
+| 2025-10-06 | Phase 5 | Task 5.4 | Implemented AppKit IME lifecycle + key command routing scaffolding (`setMarkedText`, `unmarkText`, command dispatch), expanded AppKit tests; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 13:03 UTC) |
+| 2025-10-06 | Phase 5 | Discipline | Post-change verification (follow-up run); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 13:05 UTC) |
+| 2025-10-06 | Phase 5 | Task 5.4 | Routed AppKit `doCommand` selectors to Lexical command dispatch, registered rich-text listeners for TextViewMac, added mac-only selector + IME tests; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 13:09 UTC) |
+| 2025-10-06 | Phase 5 | Discipline | Post-change verification (follow-up run); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 13:10 UTC) |
+| 2025-10-06 | Phase 5 | Task 5.5 | Added AppKit pasteboard bridging (`CopyPasteHelpers` hooks), copy/cut/paste overrides, command routing tests; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 13:32 UTC) |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.

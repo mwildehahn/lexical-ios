@@ -6,7 +6,6 @@
  */
 
 import Foundation
-import UIKit
 
 /// A Lexical Frontend is an object that contains the TextKit stack used by Lexical, along with handling
 /// user interactions, incoming events, etc. The Frontend protocol provides a hard boundary for what are
@@ -22,11 +21,11 @@ import UIKit
 internal protocol Frontend: AnyObject {
   var textStorage: TextStorage { get }
   var layoutManager: LayoutManager { get }
-  var textContainerInsets: UIEdgeInsets { get }
+  var textContainerInsets: UXEdgeInsets { get }
   var editor: Editor { get }
   var nativeSelection: NativeSelection { get }
   var isFirstResponder: Bool { get }
-  var viewForDecoratorSubviews: UIView? { get }
+  var viewForDecoratorSubviews: UXView? { get }
   var isEmpty: Bool { get }
   var isUpdatingNativeSelection: Bool { get set }
   var interceptNextSelectionChangeAndReplaceWithRange: NSRange? { get set }
