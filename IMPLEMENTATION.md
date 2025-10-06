@@ -94,11 +94,32 @@ Tasks:
     - [x] Overlay view now tracks tappable rects and forwards tap callbacks via adapter.
 5.3 [x] Add macOS unit tests (pending enablement) behind new test target.
     - [x] Added `LexicalMacTests` SPM target conditioned on macOS with placeholder assertions/skip.
-5.4 [ ] Complete selection + IME parity on AppKit (native selection sync, marked text lifecycle, key command routing).
-5.5 [ ] Bridge pasteboard + command surfaces (copy/cut/paste, delete word/line, tab handling).
-5.6 [ ] Decorator lifecycle + overlay hit-testing (AppKit equivalents for decorators, pointer interactions).
+5.4 [ ] Complete selection + IME parity on AppKit.
+    - [ ] Generalize `Frontend` protocol to PAL types and add AppKit frontend implementation.
+    - [ ] Map native selection changes (NSRange/NSTextRange) to `RangeSelection` and back.
+    - [ ] Handle marked-text lifecycle (start/update/end) with IME-friendly behavior.
+    - [ ] Route key commands (delete, movement, formatting) through Lexical commands.
+    - [ ] Unit-test selection/IME bridging in `LexicalMacTests`.
+5.5 [ ] Bridge pasteboard + command surfaces.
+    - [ ] Mirror `CopyPasteHelpers` using AppKit APIs (`NSPasteboard`, UTType mapping).
+    - [ ] Wire copy/cut/paste commands from `TextViewMac` into Lexical commands.
+    - [ ] Implement delete word/line / tab / newline command routing via menu/key equivalents.
+    - [ ] Add macOS-specific unit coverage for pasteboard + command routing.
+5.6 [ ] Decorator lifecycle + overlay hit-testing.
+    - [ ] Implement AppKit decorator mount/unmount API parity (reuse `DecoratorNode`).
+    - [ ] Calculate overlay rects in AppKit coordinate space (selection/scroll aware).
+    - [ ] Forward pointer/tap events through adapter to decorator nodes.
+    - [ ] Add integration tests for decorator hit-testing (mac target).
 5.7 [ ] Performance / QA passes (scrolling, typing perf, keyboard shortcuts) and prepare macOS sample harness.
-5.8 [ ] Add a lot of unit tests for the new AppKit logic, especially the new lexical AppKit view. Make sure all the functionality is supported as the iOS one. Make sure all editor functionality works. Unit test all the cases. 
+    - [ ] Benchmark typing/scrolling responsiveness (profiling scripts).
+    - [ ] Validate keyboard shortcuts (movement/deletion/format).
+    - [ ] Build lightweight macOS sample harness for manual QA.
+    - [ ] Document known gaps / perf notes.
+5.8 [ ] Expand unit/integration test suite for AppKit.
+    - [ ] Add selection/IME regression tests (mac target).
+    - [ ] Cover pasteboard/command cases.
+    - [ ] Cover decorator mount/hit-test flows.
+    - [ ] Ensure snapshot/placeholder tests for placeholder rendering.
 5.9 [ ] Iterate until macOS build + tests pass locally.
 
 ### Phase 6 — macOS Enablement & Packaging
