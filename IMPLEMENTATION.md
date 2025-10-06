@@ -94,14 +94,33 @@ Tasks:
     - [x] Overlay view now tracks tappable rects and forwards tap callbacks via adapter.
 5.3 [x] Add macOS unit tests (pending enablement) behind new test target.
     - [x] Added `LexicalMacTests` SPM target conditioned on macOS with placeholder assertions/skip.
-5.4 [ ] Iterate until macOS build + tests pass locally.
+5.4 [ ] Complete selection + IME parity on AppKit (native selection sync, marked text lifecycle, key command routing).
+5.5 [ ] Bridge pasteboard + command surfaces (copy/cut/paste, delete word/line, tab handling).
+5.6 [ ] Decorator lifecycle + overlay hit-testing (AppKit equivalents for decorators, pointer interactions).
+5.7 [ ] Performance / QA passes (scrolling, typing perf, keyboard shortcuts) and prepare macOS sample harness.
+5.8 [ ] Add a lot of unit tests for the new AppKit logic, especially the new lexical AppKit view. Make sure all the functionality is supported as the iOS one. Make sure all editor functionality works. Unit test all the cases. 
+5.9 [ ] Iterate until macOS build + tests pass locally.
 
 ### Phase 6 — macOS Enablement & Packaging
 Goal: Turn on macOS products in `Package.swift`, add CI coverage.
 Tasks:
-6.1 [ ] Update `Package.swift` with macOS platform entry; expose `LexicalAppKit` product.
-6.2 [ ] Build macOS demo / playground target.
-6.3 [ ] Document enablement steps and verify CI scripts.
+6.1 [ ] Expose `LexicalAppKit` product + macOS platform in SPM.
+6.2 [ ] Build macOS sample app / playground target.
+6.3 [ ] Publish migration notes + API docs for AppKit consumers.
+
+### Phase 7 — Cross-Platform SwiftUI Surface
+Goal: Provide a unified SwiftUI layer that selects the appropriate platform implementation.
+Tasks:
+7.1 [ ] Hook `LexicalEditorView` to `LexicalAppKit` when running on macOS.
+7.2 [ ] Provide decorator bridging helpers so SwiftUI decorators render on both platforms.
+7.3 [ ] Expand SwiftUI documentation + samples (macOS/iOS side-by-side).
+
+### Phase 8 — Quality, Docs, & Release Readiness
+Goal: Finalize AppKit support and ensure readiness for downstream adoption.
+Tasks:
+8.1 [ ] Execute end-to-end regression test plans (selection, pasteboard, decorators, accessibility).
+8.2 [ ] Update public docs / README with AppKit guidance and SwiftUI usage.
+8.3 [ ] Prepare release notes + adoption checklist.
 
 ## Operational Protocols
 - **Testing cadence**
