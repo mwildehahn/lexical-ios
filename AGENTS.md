@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+> ⚠️ **Critical:** Keep Selection suite green as a quick preflight and run the full `Lexical-Package` suite after every change; record both commands and timestamps in the log.
+
 This repo contains Lexical iOS — a Swift Package with a modular plugin architecture and an example Playground app. Baseline runtime: iOS 16+.
 
 ## Project Structure & Module Organization

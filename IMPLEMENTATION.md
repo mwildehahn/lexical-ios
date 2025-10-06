@@ -1,5 +1,7 @@
 # AppKit Enablement Plan for Lexical
 
+> ⚠️ **Critical:** Keep Selection suite green as a quick preflight and run the full `Lexical-Package` suite after every change; record both commands and timestamps in the log.
+
 _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 
 ## Quick Reference
@@ -45,7 +47,6 @@ Tasks:
 1.4 [x] Create `LexicalCore` target in `Package.swift` (iOS only) and wire existing targets to depend on it.
     - [x] Added standalone `LexicalCore` target and hooked `Lexical`/plugin targets to depend on it.
     - [x] Restored `StyleEvents.swift` under `Lexical/Core` until dependencies are abstracted.
-1.5 [ ] Keep Selection suite green as a quick preflight and run the full `Lexical-Package` suite after every change; record both commands and timestamps in the log.
 
 ### Phase 2 — Core File Migration
 Goal: Gradually migrate selection, range cache, and utility files to PAL types.
@@ -116,6 +117,7 @@ Tasks:
 | 2025-10-06 | Phase 1 | Task 1.3 | Moved `Errors.swift` and `EditorMetrics.swift` into CoreShared; StyleEvents deferred (Editor dependency); full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:33 UTC) |
 | 2025-10-06 | Phase 1 | Task 1.4 | Added `LexicalCore` SPM target, updated dependencies, kept StyleEvents under `Lexical/Core`; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:38 UTC) |
 | 2025-10-06 | Phase 2 | Task 2.1 | Converted Decorator/Code/Quote/Text nodes to `UX*` aliases; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:50 UTC) |
+| 2025-10-06 | Phase 2 | Discipline | Re-confirmed test mandate warning in docs; full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 09:55 UTC) |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.
