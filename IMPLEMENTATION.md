@@ -157,8 +157,25 @@ Tasks:
 Goal: Turn on macOS products in `Package.swift`, add CI coverage.
 Tasks:
 6.1 [ ] Expose `LexicalAppKit` product + macOS platform in SPM.
+    6.1a [ ] Audit current targets/products for platform assumptions (Lexical, LexicalUIKit, plugins, tests).
+    6.1b [ ] Update `Package.swift` (add `.macOS(.v14)` platform, conditional dependencies, public `LexicalAppKit` product, ensure mac-only targets don’t drag UIKit).
+    6.1c [ ] Verify SPM graph (`swift package describe`) and run required suites (`Lexical-Package` + `LexicalMacTests`) to confirm iOS + mac builds remain green.
+    6.1d [ ] Capture packaging changes in `IMPLEMENTATION.md` progress log (commands, timestamps) and note any targets still iOS-only.
 6.2 [ ] Build macOS sample app / playground target.
+    6.2a [ ] Evaluate existing `Examples/AppKitHarness` and decide whether to promote it or create a new Xcode target/SwiftPM demo.
+    6.2b [ ] Implement the chosen sample (project settings, bundle identifiers, minimal UI wiring) and ensure it links against the SPM `LexicalAppKit` product.
+    6.2c [ ] Add build/run instructions plus troubleshooting notes to docs (likely `Examples/AppKitHarness/README.md` or new doc section).
+    6.2d [ ] Run mac build of the sample (`xcodebuild -scheme <sample> -destination 'platform=macOS,arch=arm64' build`) and log results.
 6.3 [ ] Publish migration notes + API docs for AppKit consumers.
+    6.3a [ ] Update README / DocC with instructions for selecting iOS vs. macOS products (including SwiftUI integration expectations).
+    6.3b [ ] Document known gaps (e.g., plugins still UIKit-only) and recommended minimum OS versions.
+    6.3c [ ] Prepare adoption checklist + release notes draft, referencing new package products and required verification commands.
+
+**Phase 6 Planning Notes (2025-10-07)**
+- Package.swift currently declares only `.iOS(.v16)` and exports iOS-centric products; enabling macOS will require conditionalising iOS-only targets (LexicalUIKit + dependent plugins) so mac builds resolve cleanly.
+- LexicalAppKit already exists as a target but is not exposed as a product; once macOS is listed in `platforms`, ensure plugins/tests that rely on UIKit remain gated or wrapped with `#if canImport(UIKit)` to avoid compilation errors.
+- mac sample deliverable should re-use `Examples/AppKitHarness` where possible to minimise duplication; final plan is to wire it as a standalone Xcode target that consumes the SwiftPM package.
+- Documentation work (6.3) should cover product selection, minimum macOS version (14+), and caveats about remaining UIKit-only plugins until future phases.
 
 ### Phase 7 — Cross-Platform SwiftUI Surface
 Goal: Provide a unified SwiftUI layer that selects the appropriate platform implementation.
