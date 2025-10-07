@@ -1,4 +1,4 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 5.9
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -10,7 +10,10 @@ import PackageDescription
 
 let package = Package(
   name: "Lexical",
-  platforms: [.iOS(.v16)],
+  platforms: [
+    .iOS(.v16),
+    .macOS(.v14)
+  ],
   products: [
     .library(
       name: "Lexical",
@@ -51,6 +54,9 @@ let package = Package(
     .library(
       name: "LexicalSwiftUI",
       targets: ["LexicalSwiftUI"]),
+    .library(
+      name: "LexicalAppKit",
+      targets: ["LexicalAppKit"]),
   ],
   dependencies: [
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),

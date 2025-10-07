@@ -157,8 +157,8 @@ Tasks:
 Goal: Turn on macOS products in `Package.swift`, add CI coverage.
 Tasks:
 6.1 [ ] Expose `LexicalAppKit` product + macOS platform in SPM.
-    6.1a [ ] Audit current targets/products for platform assumptions (Lexical, LexicalUIKit, plugins, tests).
-    6.1b [ ] Update `Package.swift` (add `.macOS(.v14)` platform, conditional dependencies, public `LexicalAppKit` product, ensure mac-only targets don’t drag UIKit).
+    6.1a [x] Audit current targets/products for platform assumptions (Lexical, LexicalUIKit, plugins, tests).
+    6.1b [x] Update `Package.swift` (add `.macOS(.v14)` platform, conditional dependencies, public `LexicalAppKit` product, ensure mac-only targets don’t drag UIKit).
     6.1c [ ] Verify SPM graph (`swift package describe`) and run required suites (`Lexical-Package` + `LexicalMacTests`) to confirm iOS + mac builds remain green.
     6.1d [ ] Capture packaging changes in `IMPLEMENTATION.md` progress log (commands, timestamps) and note any targets still iOS-only.
 6.2 [ ] Build macOS sample app / playground target.
@@ -176,6 +176,12 @@ Tasks:
 - LexicalAppKit already exists as a target but is not exposed as a product; once macOS is listed in `platforms`, ensure plugins/tests that rely on UIKit remain gated or wrapped with `#if canImport(UIKit)` to avoid compilation errors.
 - mac sample deliverable should re-use `Examples/AppKitHarness` where possible to minimise duplication; final plan is to wire it as a standalone Xcode target that consumes the SwiftPM package.
 - Documentation work (6.3) should cover product selection, minimum macOS version (14+), and caveats about remaining UIKit-only plugins until future phases.
+- **6.1a audit findings:**
+  - `LexicalCore` and `Lexical` targets already use `#if canImport(UIKit)/AppKit` wrappers for TextKit, selection, and decorator code; no unconditional UIKit imports remain.
+  - `LexicalUIKit` and all plugin targets (`LexicalMarkdown`, `LexicalListPlugin`, `LexicalHTML`, etc.) depend directly on UIKit and should stay iOS-only when enabling macOS packaging.
+  - `LexicalAppKit` and `LexicalUIKitAppKit` compile on mac today; `LexicalMacTests` exercises these targets while `LexicalTests` stays iOS-only.
+  - `LexicalSwiftUI` currently depends on `LexicalUIKit` and remains an iOS/macCatalyst-only surface pending Phase 7 work.
+  - Package.swift now targets Swift tools 5.9 to access `.macOS(.v14)`; confirm CI/toolchain baseline (Xcode 15+) before landing.
 
 ### Phase 7 — Cross-Platform SwiftUI Surface
 Goal: Provide a unified SwiftUI layer that selects the appropriate platform implementation.
@@ -287,6 +293,11 @@ Tasks:
 | 2025-10-07 | Phase 5 | Discipline | Selection suite PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
+| 2025-10-07 | Phase 6 | Task 6.1a | Audited targets/products for mac enablement; catalogued UIKit-only dependencies (plugins, SwiftUI) vs. cross-platform targets; no code changes, plan updated. |
+| 2025-10-07 | Phase 6 | Task 6.1b | Updated `Package.swift` (swift-tools 5.9, added `.macOS(.v14)`, exposed `LexicalAppKit` product). |
+| 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (12:52 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
+| 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (12:53 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (12:53 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
 
 
 ## Appendix — Deferred / Optional Items
