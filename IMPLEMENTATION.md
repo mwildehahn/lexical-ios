@@ -192,6 +192,27 @@ Tasks:
         - [x] Sidebar defaults to Node Hierarchy (listed first and pre-selected) for quicker debugging parity with iOS playground.
         - [x] Restored the iOS playground build by importing `LexicalUIKit` where `LexicalView` is used and wiring the Xcode target to the new product dependency.
         - [x] Moved the mac toolbar into the window toolbar (`.toolbar { ... }`) to stop the detail pane from dedicating vertical space to controls while keeping all actions accessible.
+        - [ ] **In Progress:** Mac typing parity plan
+            - Diagnose caret drift by tracing `TextViewMac.insertText`/`performInsert` and comparing with UIKit.
+            - Audit AppKitFrontendAdapter selection bridges to ensure we don’t collapse selection to the tail after each edit.
+            - Confirm session helpers (placeholder toggles, scripted inserts) aren’t resetting selection during typing.
+            - Apply AppKit-only fix once culprit found; keep UIKit code untouched.
+            - After fixes: rerun Lexical-Package + LexicalMacTests, rebuild iOS playground, and log manual mac typing QA in the Progress Log.
+        - [ ] **Mac Editor QA Tactics:** create a repeatable checklist to verify parity with iOS after each change:
+            - Typing/edits: insert characters in middle, backspace, delete word (⌥⌫), undo/redo.
+            - Format toggles: bold/italic/underline/code hotkeys and toolbar buttons.
+            - Block changes: paragraph → heading/code/list, indent/outdent, list toggles.
+            - Placeholder: toggle on/off, ensure visibility matches content.
+            - Decorators/images: insert sample decorator, ensure overlay hit-tests and removal work.
+            - Pasteboard: copy/cut/paste commands dispatch (`⌘C`, `⌘X`, `⌘V`).
+            - Selection navigation: arrow keys, ⇧+arrow extend, word jumps (⌥+arrow).
+            - Scripts menu: reset document, insert lorem, restore cursor location.
+            - Performance panel (placeholder until ported) doesn’t affect editor state.
+        - [ ] **Future Mac Tests:** Add AppKit UI/unit tests mirroring critical iOS coverage:
+            - Selection round-trip: adopt `LexicalMacTests` to simulate caret insertions (`TextViewMac.insertText`) and assert selection range.
+            - Formatting commands: dispatch format/indent commands via adapter and assert node attributes.
+            - Placeholder regression: reuse existing mac placeholder tests for typing scenarios (empty vs. non-empty).
+            - Copy/cut/paste payload checks (there is already partial coverage—expand once parity is achieved).
     6.3e [ ] Document build/run commands (`xcodebuild -scheme LexicalPlayground-macOS …`) and update README/DocC with mac playground usage notes.
     6.3f [ ] Run full suite + playground build on both platforms before marking complete.
 6.4 [ ] Publish migration notes + API docs for AppKit consumers.
