@@ -8,6 +8,56 @@ import AppKit
 @testable import LexicalUIKitAppKit
 
 @MainActor final class LexicalMacTests: XCTestCase {
+  private static let decoratorSize = CGSize(width: 42, height: 28)
+
+  private final class TestMacDecoratorNode: DecoratorNode {
+    override func createView() -> UXView {
+      let view = UXView(frame: NSRect(origin: .zero, size: LexicalMacTests.decoratorSize))
+      view.wantsLayer = true
+      view.layer?.backgroundColor = NSColor.systemBlue.cgColor
+      return view
+    }
+
+    override func decorate(view: UXView) {
+      // no-op for test
+    }
+
+    override func sizeForDecoratorView(textViewWidth: CGFloat, attributes: [NSAttributedString.Key : Any]) -> CGSize {
+      LexicalMacTests.decoratorSize
+    }
+  }
+
+  private func makeBoundAdapter() -> (adapter: AppKitFrontendAdapter, host: LexicalNSView, textView: TextViewMac, overlay: LexicalOverlayViewMac) {
+    let host = LexicalNSView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
+    let textView = TextViewMac()
+    textView.frame = host.bounds
+    let overlay = LexicalOverlayViewMac(frame: host.bounds)
+    let adapter = AppKitFrontendAdapter(editor: textView.editor, hostView: host, textView: textView, overlayView: overlay)
+    adapter.bind()
+    host.layoutSubtreeIfNeeded()
+    return (adapter, host, textView, overlay)
+  }
+
+  private func realizeDecoratorLayout(in textView: TextViewMac) {
+    let textStorage = textView.lexicalTextStorage
+    let layoutManager = textView.lexicalLayoutManager
+    let textContainer = textView.lexicalTextContainer
+
+    for (_, location) in textStorage.decoratorPositionCache {
+      let clamped = max(0, min(location, max(textStorage.length - 1, 0)))
+      let glyphIndex = layoutManager.glyphIndexForCharacter(at: clamped)
+      layoutManager.ensureLayout(forGlyphRange: NSRange(location: glyphIndex, length: 1))
+      if let attachment = textStorage.attribute(.attachment, at: clamped, effectiveRange: nil) as? TextAttachment {
+        let width = textView.bounds.width > 0 ? textView.bounds.width : 320
+        _ = attachment.attachmentBounds(
+          for: textContainer,
+          proposedLineFragment: CGRect(x: 0, y: 0, width: width, height: 1000),
+          glyphPosition: .zero,
+          characterIndex: clamped)
+      }
+    }
+  }
+
   func testAppKitScaffoldingInitializes() throws {
     let editor = Editor(featureFlags: FeatureFlags(), editorConfig: EditorConfig(theme: Theme(), plugins: []))
     let host = LexicalNSView(frame: .zero)
@@ -101,6 +151,63 @@ import AppKit
     XCTAssertTrue(copyCalled)
     XCTAssertTrue(cutCalled)
     XCTAssertTrue(pasteCalled)
+  }
+
+  func testOverlayRectsPopulateForDecorator() throws {
+    let setup = makeBoundAdapter()
+    let editor = setup.textView.editor
+    try editor.registerNode(nodeType: NodeType(rawValue: "macTestDecorator"), class: TestMacDecoratorNode.self)
+
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let paragraph = createParagraphNode()
+      let text = createTextNode(text: "Hello ")
+      let decorator = TestMacDecoratorNode()
+      try paragraph.append([text, decorator])
+      try root.append([paragraph])
+    }
+
+    realizeDecoratorLayout(in: setup.textView)
+    setup.adapter.refreshOverlayTargets()
+
+    let rects = setup.overlay.tappableRects
+    XCTAssertEqual(rects.count, 1)
+    if let rect = rects.first {
+      XCTAssertEqual(rect.size.width, Self.decoratorSize.width, accuracy: 0.5)
+      XCTAssertEqual(rect.size.height, Self.decoratorSize.height, accuracy: 0.5)
+    }
+  }
+
+  func testOverlayTapHandlerInvoked() throws {
+    let setup = makeBoundAdapter()
+    let editor = setup.textView.editor
+    try editor.registerNode(nodeType: NodeType(rawValue: "macTapDecorator"), class: TestMacDecoratorNode.self)
+
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let paragraph = createParagraphNode()
+      let decorator = TestMacDecoratorNode()
+      try paragraph.append([decorator])
+      try root.append([paragraph])
+    }
+
+    var tapPoints: [NSPoint] = []
+    setup.adapter.overlayTapHandler = { tapPoints.append($0) }
+    realizeDecoratorLayout(in: setup.textView)
+    setup.adapter.refreshOverlayTargets()
+
+    guard let rect = setup.overlay.tappableRects.first else {
+      return XCTFail("Expected tappable rect for decorator")
+    }
+
+    let center = NSPoint(x: rect.midX, y: rect.midY)
+    setup.overlay.tapHandler?(center)
+
+    XCTAssertEqual(tapPoints.count, 1)
+    if let recorded = tapPoints.first {
+      XCTAssertEqual(recorded.x, center.x, accuracy: 0.01)
+      XCTAssertEqual(recorded.y, center.y, accuracy: 0.01)
+    }
   }
 }
 #else

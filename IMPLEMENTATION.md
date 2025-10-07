@@ -9,7 +9,7 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 5 — AppKit Feature Implementation |
-| Next Task | 5.4 Iterate until macOS build + tests pass |
+| Next Task | 5.7 Performance/QA + mac sample harness |
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
@@ -107,16 +107,16 @@ Tasks:
     - [x] Wire copy/cut/paste commands from `TextViewMac` into Lexical commands.
     - [x] Implement delete word/line / tab / newline command routing via menu/key equivalents.
     - [x] Add macOS-specific unit coverage for pasteboard + command routing.
-5.6 [ ] Decorator lifecycle + overlay hit-testing.
+5.6 [x] Decorator lifecycle + overlay hit-testing.
     - [x] Implement AppKit decorator mount/unmount API parity (reuse `DecoratorNode`).
     - [x] Calculate overlay rects in AppKit coordinate space (selection/scroll aware).
     - [x] Forward pointer/tap events through adapter to decorator nodes.
-    - [ ] Add integration tests for decorator hit-testing (mac target).
-5.6a [ ] **Priority:** Enable LexicalMacTests build + execution.
+    - [x] Add integration tests for decorator hit-testing (mac target).
+5.6a [x] **Priority:** Enable LexicalMacTests build + execution.
     - [x] Added `LexicalUIKitAppKit` shim target (re-exports `LexicalUIKit`) and updated `LexicalMacTests` imports; Selection + mac suites green (08:35/08:36 UTC).
-    - [ ] Verify remaining UIKit dependencies in core rely on PAL/guards; document outcome.
-    - [ ] Update `Package.swift` / target membership so `Lexical` stays platform-neutral; document final layout.
-    - [ ] Restore mac build dependencies (include AppKit-specific helpers) and add any missing shims (e.g. TextKit availability wrappers, pasteboard helpers).
+    - [x] Verify remaining UIKit dependencies in core rely on PAL/guards; audited shared sources (`Lexical/Core/**`, TextKit, helpers) and confirmed every UIKit import is wrapped in `#if canImport(UIKit)` with AppKit/PAL fallbacks where required.
+    - [x] Update `Package.swift` / target membership so `Lexical` stays platform-neutral; documented layout: `Lexical` target now owns Core, Helper, TextKit, PAL, read-only view stacks; `LexicalUIKit` hosts interactive UIKit view + input pipeline; `LexicalAppKit` links shared core via PAL.
+    - [x] Restore mac build dependencies (include AppKit-specific helpers) and add any missing shims (e.g. TextKit availability wrappers, pasteboard helpers). Outcome: verified `LexicalAppKit` links only against shared PAL types; no additional shims required beyond existing Platform helpers. Documented shared layout and ensured mac target resolves without pulling UIKit-only sources.
     - [x] `xcodebuild ... LexicalMacTests ...` PASS logged (21:23 UTC, 2 tests skipped).
     - [x] Full Lexical-Package suite PASS logged (09:06 UTC) after shim/audit.
 5.7 [ ] Performance / QA passes (scrolling, typing perf, keyboard shortcuts) and prepare macOS sample harness.
@@ -218,6 +218,15 @@ Tasks:
 | 2025-10-07 | Phase 5 | Discipline | Selection suite PASS (09:03 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -only-testing:LexicalTests/SelectionTests test`; verifies TextKit files restored to core before further moves. |
 | 2025-10-07 | Phase 5 | Task 5.6a | Audit remaining UIKit imports in core; most files already guard with `#if canImport(UIKit)` and rely on PAL types. No structural changes needed—focus next on packaging adjustments. |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (09:06 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' test`; confirms baseline remains green after shim/audit. |
+| 2025-10-07 | Phase 5 | Task 5.6a | Audited shared sources for UIKit imports; confirmed all remaining UIKit usages are wrapped in `#if canImport(UIKit)` with AppKit/PAL fallbacks. |
+| 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (07:25 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (07:25 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 2 tests skipped pending implementation. |
+| 2025-10-07 | Phase 5 | Task 5.6a | Confirmed mac target dependencies/shims sufficient; no additional AppKit helper files required. |
+| 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (09:43 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (09:43 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 2 tests skipped pending implementation. |
+| 2025-10-07 | Phase 5 | Task 5.6 | Added AppKit decorator overlay integration tests (rect sizing + tap forwarding). |
+| 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (07:50 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (07:50 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 2 tests skipped pending implementation. |
 
 
 ## Appendix — Deferred / Optional Items
