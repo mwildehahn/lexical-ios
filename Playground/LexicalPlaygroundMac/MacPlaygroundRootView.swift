@@ -5,16 +5,16 @@ import LexicalAppKit
 
 struct MacPlaygroundRootView: View {
   @StateObject private var session = MacPlaygroundSession()
-  @State private var selectedSidebarItem: SidebarItem? = .flags
+  @State private var selectedSidebarItem: SidebarItem? = .hierarchy
 
   var body: some View {
     NavigationSplitView {
       List(selection: $selectedSidebarItem) {
         Section("Inspector") {
-          Label("Feature Flags", systemImage: "slider.horizontal.3")
-            .tag(SidebarItem.flags)
           Label("Node Hierarchy", systemImage: "tree")
             .tag(SidebarItem.hierarchy)
+          Label("Feature Flags", systemImage: "slider.horizontal.3")
+            .tag(SidebarItem.flags)
           Label("Performance Runs", systemImage: "speedometer")
             .tag(SidebarItem.performance)
           Label("Export & Console", systemImage: "terminal")
@@ -26,13 +26,12 @@ struct MacPlaygroundRootView: View {
     } content: {
       InspectorContainer(session: session, selection: selectedSidebarItem)
     } detail: {
-      VStack(spacing: 0) {
-        MacPlaygroundToolbar(session: session)
-        Divider()
-        MacPlaygroundEditorContainer(session: session)
-      }
-      .background(Color(NSColor.windowBackgroundColor))
-      .navigationTitle("Editor")
+      MacPlaygroundEditorContainer(session: session)
+        .background(Color(NSColor.windowBackgroundColor))
+        .navigationTitle("Editor")
+        .toolbar {
+          MacPlaygroundToolbar(session: session)
+        }
     }
   }
 
@@ -53,6 +52,11 @@ final class MacPlaygroundSession: ObservableObject {
   @Published var consoleText: String = ""
   @Published var placeholderVisible: Bool = true
   private var logEntries: [String] = []
+  private static let logFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "HH:mm:ss"
+    return formatter
+  }()
 
   private var updateListener: Editor.RemovalHandler?
 
@@ -242,15 +246,16 @@ final class MacPlaygroundSession: ObservableObject {
   }
 
   func logEvent(_ message: String) {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "HH:mm:ss"
-    let timestamp = formatter.string(from: Date())
+    let timestamp = Self.logFormatter.string(from: Date())
     let entry = "[\(timestamp)] \(message)"
-    logEntries.append(entry)
-    if logEntries.count > 200 {
-      logEntries.removeFirst(logEntries.count - 200)
+    Task { @MainActor [weak self] in
+      guard let self else { return }
+      self.logEntries.append(entry)
+      if self.logEntries.count > 200 {
+        self.logEntries.removeFirst(self.logEntries.count - 200)
+      }
+      self.consoleText = self.logEntries.joined(separator: "\n")
     }
-    consoleText = logEntries.joined(separator: "\n")
   }
 
   func exportPlainText() -> String {
@@ -283,172 +288,116 @@ final class MacPlaygroundSession: ObservableObject {
   }
 }
 
-private struct MacPlaygroundToolbar: View {
+private struct MacPlaygroundToolbar: ToolbarContent {
   @ObservedObject var session: MacPlaygroundSession
 
-  var body: some View {
-    HStack(spacing: 12) {
+  var body: some ToolbarContent {
+    ToolbarItemGroup(placement: .automatic) {
       Button {
         session.dispatch(CommandType(rawValue: "undo"))
       } label: {
-        Label("Undo", systemImage: "arrow.uturn.backward")
-          .labelStyle(.iconOnly)
+        Image(systemName: "arrow.uturn.backward")
       }
       .keyboardShortcut("z", modifiers: .command)
 
       Button {
         session.dispatch(CommandType(rawValue: "redo"))
       } label: {
-        Label("Redo", systemImage: "arrow.uturn.forward")
-          .labelStyle(.iconOnly)
+        Image(systemName: "arrow.uturn.forward")
       }
       .keyboardShortcut("Z", modifiers: [.command, .shift])
 
-      Divider()
-
-      formatButtons
-
-      Divider()
-
-      blockStyleMenu
-      profileMenu
-
-      Divider()
-
-      scriptMenu
-
-      Spacer()
-    }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
-  }
-
-  private var formatButtons: some View {
-    Group {
       Button {
         session.toggleFormat(.bold)
-      } label: {
-        Label("Bold", systemImage: "bold")
-          .labelStyle(.iconOnly)
-      }
+      } label: { Image(systemName: "bold") }
       .keyboardShortcut("b", modifiers: .command)
 
       Button {
         session.toggleFormat(.italic)
-      } label: {
-        Label("Italic", systemImage: "italic")
-          .labelStyle(.iconOnly)
-      }
+      } label: { Image(systemName: "italic") }
       .keyboardShortcut("i", modifiers: .command)
 
       Button {
         session.toggleFormat(.underline)
-      } label: {
-        Label("Underline", systemImage: "underline")
-          .labelStyle(.iconOnly)
-      }
+      } label: { Image(systemName: "underline") }
       .keyboardShortcut("u", modifiers: .command)
 
       Button {
         session.toggleFormat(.code)
-      } label: {
-        Label("Inline Code", systemImage: "curlybraces")
-          .labelStyle(.iconOnly)
-      }
+      } label: { Image(systemName: "curlybraces") }
       .keyboardShortcut("`", modifiers: .command)
 
       Button {
         session.toggleStrikethrough()
-      } label: {
-        Label("Strikethrough", systemImage: "strikethrough")
-          .labelStyle(.iconOnly)
-      }
+      } label: { Image(systemName: "strikethrough") }
       .keyboardShortcut("x", modifiers: [.command, .shift])
 
       Button {
         session.indent()
-      } label: {
-        Label("Increase Indent", systemImage: "increase.indent")
-          .labelStyle(.iconOnly)
-      }
+      } label: { Image(systemName: "increase.indent") }
       .keyboardShortcut("]", modifiers: .command)
 
       Button {
         session.outdent()
-      } label: {
-        Label("Decrease Indent", systemImage: "decrease.indent")
-          .labelStyle(.iconOnly)
-      }
+      } label: { Image(systemName: "decrease.indent") }
       .keyboardShortcut("[", modifiers: .command)
-    }
-  }
 
-  private var blockStyleMenu: some View {
-    Menu {
-      ForEach(MacPlaygroundSession.BlockOption.allCases, id: \.self) { option in
-        Button {
-          session.applyBlock(option)
-        } label: {
-          Label(option.title, systemImage: option.symbol)
+      Menu {
+        ForEach(MacPlaygroundSession.BlockOption.allCases, id: \.self) { option in
+          Button {
+            session.applyBlock(option)
+          } label: {
+            Label(option.title, systemImage: option.symbol)
+          }
         }
+      } label: {
+        Image(systemName: "text.justify")
       }
-    } label: {
-      Label("Block Style", systemImage: "text.justify")
-    }
-  }
 
-  private var profileMenu: some View {
-    Menu {
-      ForEach(profiles, id: \.self) { profile in
-        Button {
-          session.applyProfile(profile)
-        } label: {
-          HStack {
-            Text(title(for: profile))
-            if session.activeProfile == profile {
-              Spacer()
-              Image(systemName: "checkmark")
+      Menu {
+        ForEach(blockProfiles, id: \.self) { profile in
+          Button {
+            session.applyProfile(profile)
+          } label: {
+            HStack {
+              Text(title(for: profile))
+              if session.activeProfile == profile {
+                Spacer()
+                Image(systemName: "checkmark")
+              }
             }
           }
         }
+      } label: {
+        Image(systemName: "switch.2")
       }
-    } label: {
-      Label("Profile", systemImage: "switch.2")
+
+      Menu {
+        Button("Reset Document", systemImage: "arrow.counterclockwise") {
+          session.resetDocument()
+        }
+
+        Button(
+          session.placeholderVisible ? "Hide Placeholder" : "Show Placeholder",
+          systemImage: session.placeholderVisible ? "eye.slash" : "eye"
+        ) {
+          session.togglePlaceholder()
+        }
+
+        Button("Insert Sample Decorator", systemImage: "rectangle.fill") {
+          session.insertSampleDecorator()
+        }
+
+        Button("Insert Lorem Ipsum", systemImage: "text.append") {
+          session.insertLoremIpsum()
+        }
+      } label: {
+        Image(systemName: "wand.and.stars")
+      }
     }
   }
 
-  private var scriptMenu: some View {
-    Menu {
-      Button {
-        session.resetDocument()
-      } label: {
-        Label("Reset Document", systemImage: "arrow.counterclockwise")
-      }
-
-      Button {
-        session.togglePlaceholder()
-      } label: {
-        Label(session.placeholderVisible ? "Hide Placeholder" : "Show Placeholder",
-              systemImage: session.placeholderVisible ? "eye.slash" : "eye")
-      }
-
-      Button {
-        session.insertSampleDecorator()
-      } label: {
-        Label("Insert Sample Decorator", systemImage: "rectangle.fill")
-      }
-
-      Button {
-        session.insertLoremIpsum()
-      } label: {
-        Label("Insert Lorem Ipsum", systemImage: "text.append")
-      }
-    } label: {
-      Label("Scripts", systemImage: "wand.and.stars")
-    }
-  }
-
-  private var profiles: [FeatureFlags.OptimizedProfile] {
+  private var blockProfiles: [FeatureFlags.OptimizedProfile] {
     [.minimal, .balanced, .aggressive, .aggressiveEditor]
   }
 

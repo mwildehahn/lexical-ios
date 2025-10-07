@@ -13,11 +13,6 @@ public final class LexicalOverlayViewMac: NSView {
     super.init(frame: frameRect)
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
-    addTrackingArea(NSTrackingArea(
-      rect: bounds,
-      options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
-      owner: self,
-      userInfo: nil))
   }
 
   @available(*, unavailable)
@@ -28,6 +23,21 @@ public final class LexicalOverlayViewMac: NSView {
   public func updateTappableRects(_ rects: [NSRect]) {
     tappableRects = rects
     needsDisplay = true
+  }
+
+  public override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    trackingAreas.forEach(removeTrackingArea)
+    let area = NSTrackingArea(
+      rect: bounds,
+      options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+      owner: self,
+      userInfo: nil)
+    addTrackingArea(area)
+  }
+
+  public override func hitTest(_ point: NSPoint) -> NSView? {
+    tappableRects.contains(where: { $0.contains(point) }) ? self : nil
   }
 
   public override func mouseDown(with event: NSEvent) {

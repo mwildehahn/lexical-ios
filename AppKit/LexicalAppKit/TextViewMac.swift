@@ -37,9 +37,19 @@ public class TextViewMac: NSTextView {
 
     super.init(frame: .zero, textContainer: lexicalTextContainer)
 
+    isVerticallyResizable = true
+    isHorizontallyResizable = false
+    textContainer?.widthTracksTextView = true
+    textContainer?.heightTracksTextView = false
+    textContainer?.containerSize = NSSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude)
+    minSize = NSSize(width: 0, height: 0)
+    maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+    autoresizingMask = [.width, .height]
+
     isEditable = true
     isRichText = true
     drawsBackground = true
+    backgroundColor = NSColor.textBackgroundColor
     defaultTextColor = (textColor ?? defaultTextColor)
     textColor = defaultTextColor
     if #available(macOS 10.15, *) {

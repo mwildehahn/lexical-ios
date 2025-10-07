@@ -5,21 +5,25 @@ import Lexical
 @testable import LexicalAppKit
 
 @MainActor final class LexicalMacPerformanceTests: XCTestCase {
-  private func makeEditorStack() -> (adapter: AppKitFrontendAdapter, editor: Editor, textView: TextViewMac) {
+  private func makeEditorStack() -> (adapter: AppKitFrontendAdapter, editor: Editor, textView: TextViewMac, host: LexicalNSView) {
+    let hostFrame = NSRect(x: 0, y: 0, width: 320, height: 200)
+    let host = LexicalNSView(frame: hostFrame)
+    host.translatesAutoresizingMaskIntoConstraints = true
+
     let textView = TextViewMac()
-    let host = LexicalNSView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
     let overlay = LexicalOverlayViewMac(frame: host.bounds)
     let adapter = AppKitFrontendAdapter(editor: textView.editor, hostView: host, textView: textView, overlayView: overlay)
     adapter.bind()
     host.layoutSubtreeIfNeeded()
-    return (adapter, textView.editor, textView)
+    textView.layoutSubtreeIfNeeded()
+    return (adapter, textView.editor, textView, host)
   }
 
   func testTypingPerformanceSmoke() throws {
     let sample = "The quick brown fox jumps over the lazy dog."
 
     measure {
-      let (adapter, editor, textView) = makeEditorStack()
+      let (adapter, editor, textView, host) = makeEditorStack()
       try? editor.update {
         guard let root = getRoot() else { return }
         let paragraph = createParagraphNode()
@@ -28,6 +32,8 @@ import Lexical
         }
         try root.append([paragraph])
       }
+      host.layoutSubtreeIfNeeded()
+      textView.layoutSubtreeIfNeeded()
       _ = textView.string
       withExtendedLifetime(adapter) {}
     }
@@ -35,7 +41,7 @@ import Lexical
 
   func testScrollLayoutPerformanceSmoke() throws {
     measure {
-      let (adapter, editor, textView) = makeEditorStack()
+      let (adapter, editor, textView, host) = makeEditorStack()
       try? editor.update {
         guard let root = getRoot() else { return }
         let paragraph = createParagraphNode()
@@ -44,6 +50,8 @@ import Lexical
         }
         try root.append([paragraph])
       }
+      host.layoutSubtreeIfNeeded()
+      textView.layoutSubtreeIfNeeded()
       textView.scrollToBeginningOfDocument(nil)
       textView.scrollPageDown(nil)
       textView.scrollPageDown(nil)

@@ -6,7 +6,7 @@
  */
 
 import EditorHistoryPlugin
-import Lexical
+import LexicalUIKit
 import LexicalInlineImagePlugin
 import LexicalLinkPlugin
 import LexicalListPlugin

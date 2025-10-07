@@ -20,6 +20,7 @@ final class MacPlaygroundViewController: NSViewController {
   private(set) var activeProfile: FeatureFlags.OptimizedProfile
   private let defaultPlaceholder = "Start typing…"
   private(set) var isPlaceholderVisible = true
+  private var didSeedDocument = false
 
   init(theme: Theme = Theme(), plugins: [Plugin] = []) {
     self.hostView = LexicalNSView(frame: .zero)
@@ -49,14 +50,13 @@ final class MacPlaygroundViewController: NSViewController {
     view = hostView
   }
 
+  override func viewDidAppear() {
+    super.viewDidAppear()
+    view.window?.makeFirstResponder(textView)
+  }
+
   private func seedDocumentIfNeeded(force: Bool = false) {
-    let editorState = adapter.editor.getEditorState()
-    let shouldSeed = force || (editorState.getRootNode()?.getChildren().isEmpty ?? true)
-
-    guard shouldSeed else {
-      return
-    }
-
+    guard force || !didSeedDocument else { return }
     seedDocument()
   }
 
@@ -68,6 +68,7 @@ final class MacPlaygroundViewController: NSViewController {
 
   func resetDocument() {
     clearDocument()
+    didSeedDocument = false
     seedDocumentIfNeeded(force: true)
   }
 
@@ -148,6 +149,7 @@ final class MacPlaygroundViewController: NSViewController {
 
         try root.append([intro, body])
       }
+      didSeedDocument = true
     } catch {
       adapter.editor.log(.editor, .error, "Failed to seed mac playground document: \(error)")
     }
