@@ -14,9 +14,9 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
 | Mac Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test` |
-| Verification Status | Selection suite PASS (2025-10-06 @ 08:35 UTC) |
-| Full Suite | PASS (2025-10-06 @ 18:06 UTC) |
-| Mac Suite | FAIL (2025-10-06 @ 18:06 UTC — missing AppKit-compatible build due to UIKit/MobileCoreServices imports) |
+| Verification Status | Full + mac suites PASS (2025-10-07 @ 10:12 UTC) |
+| Full Suite | PASS (2025-10-07 @ 10:12 UTC) |
+| Mac Suite | PASS (2025-10-07 @ 10:12 UTC; 2 tests skipped pending implementation) |
 | How to Resume | 1) Pull latest. 2) (Optional) Run Selection suite (command above). 3) Run full suite (command above). 4) Continue with Phase 1 task list |
 
 ## Current Status Summary
@@ -120,10 +120,17 @@ Tasks:
     - [x] `xcodebuild ... LexicalMacTests ...` PASS logged (21:23 UTC, 2 tests skipped).
     - [x] Full Lexical-Package suite PASS logged (09:06 UTC) after shim/audit.
 5.7 [ ] Performance / QA passes (scrolling, typing perf, keyboard shortcuts) and prepare macOS sample harness.
-    - [ ] Benchmark typing/scrolling responsiveness (profiling scripts).
-    - [ ] Validate keyboard shortcuts (movement/deletion/format).
-    - [ ] Build lightweight macOS sample harness for manual QA.
-    - [ ] Document known gaps / perf notes.
+    5.7a [ ] Benchmark typing/scrolling responsiveness
+        - [x] Add XCTest `measure` harness for typing throughput (AppKit).
+        - [x] Capture baseline numbers and log in plan. Baseline (2025-10-07 @ 10:12 UTC): typing insert batch average ≈1.7ms, scroll paging loop average ≈11ms (first iteration 120ms warm-up).
+    5.7b [ ] Validate keyboard shortcuts (movement/deletion/format)
+        - [ ] Expand mac tests to assert command dispatch coverage.
+        - [ ] Document any missing shortcuts / TODOs.
+    5.7c [ ] Build lightweight macOS sample harness for manual QA
+        - [ ] Scaffold sample app or playground snippet using AppKit frontend.
+        - [ ] Document launch instructions in plan/docs.
+    5.7d [ ] Document known gaps / perf notes
+        - [ ] Summarize findings in IMPLEMENTATION.md.
 5.8 [ ] Expand unit/integration test suite for AppKit.
     - [ ] Add selection/IME regression tests (mac target).
     - [ ] Cover pasteboard/command cases.
@@ -227,6 +234,9 @@ Tasks:
 | 2025-10-07 | Phase 5 | Task 5.6 | Added AppKit decorator overlay integration tests (rect sizing + tap forwarding). |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (07:50 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (07:50 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 2 tests skipped pending implementation. |
+| 2025-10-07 | Phase 5 | Task 5.7a | Added AppKit performance smoke tests (typing + scroll); baseline averages ≈1.7 ms per typing batch and ≈11 ms per scroll loop. |
+| 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (10:12 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (10:12 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; includes new performance smoke tests (2 measured, 2 skipped). |
 
 
 ## Appendix — Deferred / Optional Items
