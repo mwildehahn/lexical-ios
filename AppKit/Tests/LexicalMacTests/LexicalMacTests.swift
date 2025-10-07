@@ -38,6 +38,37 @@ import AppKit
     return (adapter, host, textView, overlay)
   }
 
+  private func assertCommandDispatch(
+    selector: Selector,
+    command: CommandType,
+    payloadVerifier: ((Any?) -> Void)? = nil,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) throws {
+    let setup = makeBoundAdapter()
+    let expectation = expectation(description: "command-\(command.rawValue)")
+    let removal = setup.textView.editor.registerCommand(
+      type: command,
+      listener: { payload in
+        payloadVerifier?(payload)
+        expectation.fulfill()
+        return false
+      },
+      priority: .Critical,
+      shouldWrapInUpdateBlock: false)
+    defer { removal() }
+
+    setup.textView.doCommand(by: selector)
+
+    waitForExpectations(timeout: 0.5) { error in
+      if let error {
+        XCTFail("Command \(command.rawValue) not dispatched: \(error)", file: file, line: line)
+      }
+    }
+
+    withExtendedLifetime(setup.adapter) {}
+  }
+
   private func realizeDecoratorLayout(in textView: TextViewMac) {
     let textStorage = textView.lexicalTextStorage
     let layoutManager = textView.lexicalLayoutManager
@@ -208,6 +239,37 @@ import AppKit
       XCTAssertEqual(recorded.x, center.x, accuracy: 0.01)
       XCTAssertEqual(recorded.y, center.y, accuracy: 0.01)
     }
+  }
+
+  func testDeleteBackwardDispatchesDeleteCharacterCommand() throws {
+    try assertCommandDispatch(
+      selector: #selector(NSTextView.deleteBackward(_:)),
+      command: .deleteCharacter)
+  }
+
+  func testDeleteWordBackwardDispatchesDeleteWordCommand() throws {
+    try assertCommandDispatch(
+      selector: #selector(NSResponder.deleteWordBackward(_:)),
+      command: .deleteWord)
+  }
+
+  func testIndentCommandDispatchesIndentContent() throws {
+    try assertCommandDispatch(
+      selector: #selector(NSResponder.insertTab(_:)),
+      command: .indentContent)
+  }
+
+  func testToggleBoldDispatchesFormatTextWithBoldPayload() throws {
+    try assertCommandDispatch(
+      selector: NSSelectorFromString("toggleBoldface:"),
+      command: .formatText,
+      payloadVerifier: { payload in
+        guard let format = payload as? TextFormatType else {
+          XCTFail("Expected TextFormatType payload")
+          return
+        }
+        XCTAssertEqual(format, .bold)
+      })
   }
 }
 #else
