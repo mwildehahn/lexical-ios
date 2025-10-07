@@ -9,7 +9,7 @@ _Last updated: 2025-10-06 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 5 — AppKit Feature Implementation |
-| Next Task | 5.7 Performance/QA + mac sample harness |
+| Next Task | 5.8c Decorator mount/hit-test regression (AppKit) |
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
@@ -142,6 +142,11 @@ Tasks:
 - Typing benchmark (20 paragraphs of pangram) averages ≈1.7 ms per update; scroll paging loop averages ≈11 ms after the first warm-up iteration (≈120 ms).
 - Keyboard shortcuts validated: delete backward, delete word backward (⌥⌫), indent (Tab), toggle bold (⌘B). Copy/cut/paste dispatch remains to be verified once AppKit pasteboard parity lands (tests currently skipped).
 - Manual QA harness available under `Examples/AppKitHarness`, mirroring the seeded document used in tests.
+
+**Phase 5.8 Running Notes**
+- 5.8a (IME regression) is now covered by `testMarkedTextInsertionBridgesThroughEditor`, which exercises `setMarkedText` + `unmarkText` and confirms the editor clears any marked range after commit.
+- Copy/cut/paste command dispatch tests (5.8b) run interception-only listeners so platform handlers still execute; no regressions seen.
+- Upcoming focus (5.8c) is to add richer decorator mount/hit-test assertions (multiple decorators, frame transforms) followed by placeholder rendering checks (5.8d).
 
 ### Phase 6 — macOS Enablement & Packaging
 Goal: Turn on macOS products in `Package.swift`, add CI coverage.
