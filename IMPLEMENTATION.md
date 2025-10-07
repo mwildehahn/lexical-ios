@@ -129,14 +129,19 @@ Tasks:
     5.7c [ ] Build lightweight macOS sample harness for manual QA
         - [x] Scaffold sample harness (`Examples/AppKitHarness/LexicalMacHarness.swift`).
         - [x] Document launch instructions (`Examples/AppKitHarness/README.md`).
-    5.7d [ ] Document known gaps / perf notes
-        - [ ] Summarize findings in IMPLEMENTATION.md.
+    5.7d [x] Document known gaps / perf notes
+        - [x] Summarized perf baselines and remaining TODOs (copy/cut/paste command validation) below.
 5.8 [ ] Expand unit/integration test suite for AppKit.
     - [ ] Add selection/IME regression tests (mac target).
     - [ ] Cover pasteboard/command cases.
     - [ ] Cover decorator mount/hit-test flows.
     - [ ] Ensure snapshot/placeholder tests for placeholder rendering.
 5.9 [ ] Iterate until macOS build + tests pass locally.
+
+**Phase 5.7 Notes (2025-10-07)**
+- Typing benchmark (20 paragraphs of pangram) averages ≈1.7 ms per update; scroll paging loop averages ≈11 ms after the first warm-up iteration (≈120 ms).
+- Keyboard shortcuts validated: delete backward, delete word backward (⌥⌫), indent (Tab), toggle bold (⌘B). Copy/cut/paste dispatch remains to be verified once AppKit pasteboard parity lands (tests currently skipped).
+- Manual QA harness available under `Examples/AppKitHarness`, mirroring the seeded document used in tests.
 
 ### Phase 6 — macOS Enablement & Packaging
 Goal: Turn on macOS products in `Package.swift`, add CI coverage.
