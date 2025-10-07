@@ -39,7 +39,8 @@ import AppKit
   }
 
   private func assertCommandDispatch(
-    selector: Selector,
+    selector: Selector? = nil,
+    invocation: ((TextViewMac) -> Void)? = nil,
     command: CommandType,
     payloadVerifier: ((Any?) -> Void)? = nil,
     file: StaticString = #filePath,
@@ -58,7 +59,13 @@ import AppKit
       shouldWrapInUpdateBlock: false)
     defer { removal() }
 
-    setup.textView.doCommand(by: selector)
+    if let invocation {
+      invocation(setup.textView)
+    } else if let selector {
+      setup.textView.doCommand(by: selector)
+    } else {
+      XCTFail("Either selector or invocation must be provided", file: file, line: line)
+    }
 
     waitForExpectations(timeout: 0.5) { error in
       if let error {
@@ -269,6 +276,33 @@ import AppKit
           return
         }
         XCTAssertEqual(format, .bold)
+      })
+  }
+
+  func testCopyDispatchesCopyCommand() throws {
+    try assertCommandDispatch(
+      invocation: { $0.copy(nil) },
+      command: .copy,
+      payloadVerifier: { payload in
+        XCTAssertTrue(payload is UXPasteboard)
+      })
+  }
+
+  func testCutDispatchesCutCommand() throws {
+    try assertCommandDispatch(
+      invocation: { $0.cut(nil) },
+      command: .cut,
+      payloadVerifier: { payload in
+        XCTAssertTrue(payload is UXPasteboard)
+      })
+  }
+
+  func testPasteDispatchesPasteCommand() throws {
+    try assertCommandDispatch(
+      invocation: { $0.paste(nil) },
+      command: .paste,
+      payloadVerifier: { payload in
+        XCTAssertTrue(payload is UXPasteboard)
       })
   }
 }
