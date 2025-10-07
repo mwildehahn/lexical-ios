@@ -17,6 +17,8 @@ struct MacPlaygroundRootView: View {
             .tag(SidebarItem.hierarchy)
           Label("Performance Runs", systemImage: "speedometer")
             .tag(SidebarItem.performance)
+          Label("Export & Console", systemImage: "terminal")
+            .tag(SidebarItem.console)
         }
       }
       .navigationTitle("Playground")
@@ -38,6 +40,7 @@ struct MacPlaygroundRootView: View {
     case flags
     case hierarchy
     case performance
+    case console
   }
 }
 
@@ -47,6 +50,8 @@ private final class MacPlaygroundSession: ObservableObject {
   @Published var activeProfile: FeatureFlags.OptimizedProfile = .aggressiveEditor
   @Published fileprivate var flagBuilder = FeatureFlagsBuilder(flags: FeatureFlags.optimizedProfile(.aggressiveEditor))
   @Published var hierarchyText: String = "-"
+  @Published var consoleText: String = ""
+  private var logEntries: [String] = []
 
   private var updateListener: Editor.RemovalHandler?
 
@@ -57,18 +62,22 @@ private final class MacPlaygroundSession: ObservableObject {
   func dispatch(_ type: CommandType, payload: Any? = nil) {
     guard let editor else { return }
     _ = editor.dispatchCommand(type: type, payload: payload)
+    logEvent("Dispatch command: \(type.rawValue)")
   }
 
   func toggleFormat(_ format: TextFormatType) {
     dispatch(.formatText, payload: format)
+    logEvent("Toggle format: \(format)")
   }
 
   func indent() {
     dispatch(CommandType(rawValue: "indentContent"))
+    logEvent("Increase indent")
   }
 
   func outdent() {
     dispatch(CommandType(rawValue: "outdentContent"))
+    logEvent("Decrease indent")
   }
 
   func applyProfile(_ profile: FeatureFlags.OptimizedProfile) {
@@ -77,6 +86,7 @@ private final class MacPlaygroundSession: ObservableObject {
     controller.applyFeatureFlags(flags, profile: profile)
     activeProfile = profile
     flagBuilder = FeatureFlagsBuilder(flags: flags)
+    logEvent("Switched profile -> \(profile)")
   }
 
   func applyBlock(_ option: BlockOption) {
@@ -99,6 +109,7 @@ private final class MacPlaygroundSession: ObservableObject {
     case .checklist:
       controller.insertList(type: .checklist)
     }
+    logEvent("Apply block style -> \(option.title)")
   }
 
   enum BlockOption: CaseIterable {
@@ -163,15 +174,16 @@ private final class MacPlaygroundSession: ObservableObject {
     FlagDescriptor(id: "verbose", title: "Verbose Logging", keyPath: \.verboseLogging, section: .misc),
   ]
 
-  func binding(for keyPath: WritableKeyPath<FeatureFlagsBuilder, Bool>) -> Binding<Bool> {
+  func binding(for descriptor: FlagDescriptor) -> Binding<Bool> {
     Binding(get: {
-      self.flagBuilder[keyPath: keyPath]
+      self.flagBuilder[keyPath: descriptor.keyPath]
     }, set: { newValue in
-      self.flagBuilder[keyPath: keyPath] = newValue
+      self.flagBuilder[keyPath: descriptor.keyPath] = newValue
       if let controller = self.controller {
         let flags = self.flagBuilder.build()
         controller.applyFeatureFlags(flags, profile: self.activeProfile)
       }
+      self.logEvent("Flag \(descriptor.title) -> \(newValue ? "ON" : "OFF")")
     })
   }
 
@@ -193,6 +205,46 @@ private final class MacPlaygroundSession: ObservableObject {
       self.flagBuilder = FeatureFlagsBuilder(flags: controller.activeFeatureFlags)
       self.hierarchyText = (try? getNodeHierarchy(editorState: editor.getEditorState())) ?? "-"
     }
+    logEvent("Editor session bound")
+  }
+
+  func logEvent(_ message: String) {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "HH:mm:ss"
+    let timestamp = formatter.string(from: Date())
+    let entry = "[\(timestamp)] \(message)"
+    logEntries.append(entry)
+    if logEntries.count > 200 {
+      logEntries.removeFirst(logEntries.count - 200)
+    }
+    consoleText = logEntries.joined(separator: "\n")
+  }
+
+  func exportPlainText() -> String {
+    guard let editor else { return "" }
+    var text = ""
+    do {
+      try editor.read {
+        text = getTextContent()
+      }
+    } catch {
+      text = "Error generating text: \(error)"
+    }
+    return text
+  }
+
+  func exportJSON() -> String {
+    guard let json = try? editor?.getEditorState().toJSON() else {
+      return "Error generating JSON"
+    }
+    return json
+  }
+
+  func copy(_ string: String) {
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString(string, forType: .string)
+    logEvent("Copied export to clipboard (\(string.count) chars)")
   }
 }
 
@@ -379,6 +431,8 @@ private struct InspectorContainer: View {
       HierarchyInspectorView(session: session)
     case .performance:
       PerformanceInspectorPlaceholder()
+    case .console:
+      ConsoleInspectorView(session: session)
     }
   }
 }
@@ -391,7 +445,7 @@ private struct FlagsInspectorView: View {
       ForEach(MacPlaygroundSession.FlagSection.allCases) { section in
         Section(section.rawValue) {
           ForEach(session.descriptors(for: section)) { descriptor in
-            Toggle(descriptor.title, isOn: session.binding(for: descriptor.keyPath))
+            Toggle(descriptor.title, isOn: session.binding(for: descriptor))
           }
         }
       }
@@ -428,6 +482,42 @@ private struct PerformanceInspectorPlaceholder: View {
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .padding()
+  }
+}
+
+private struct ConsoleInspectorView: View {
+  @ObservedObject var session: MacPlaygroundSession
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Export")
+        .font(.headline)
+      HStack {
+        Button("Copy Plain Text") {
+          session.copy(session.exportPlainText())
+        }
+        Button("Copy JSON") {
+          session.copy(session.exportJSON())
+        }
+        Spacer()
+      }
+
+      Divider()
+
+      Text("Console")
+        .font(.headline)
+      ScrollView {
+        Text(session.consoleText.isEmpty ? "No events yet." : session.consoleText)
+          .font(.system(.callout, design: .monospaced))
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .textSelection(.enabled)
+          .padding()
+      }
+      .background(Color(NSColor.textBackgroundColor))
+      .frame(minHeight: 240)
+    }
+    .padding()
+    .frame(minWidth: 260, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 

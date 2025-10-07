@@ -9,7 +9,7 @@ _Last updated: 2025-10-07 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 6 — macOS Enablement & Packaging |
-| Next Task | 6.3c.iii Add side panels for flags + hierarchy |
+| Next Task | 6.3c.v Wire performance panels |
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
@@ -177,8 +177,9 @@ Tasks:
         6.3c.ii [x] Implement mac toolbar + command toggles (SwiftUI toolbar mirroring iOS actions; hook into editor commands/feature flags).
             - Added SwiftUI toolbar with undo/redo, format toggles, indent/outdent controls, block-style menu, and optimized profile picker that forwards commands through `MacPlaygroundSession`.
             - Feature flag profiles now update the active editor via `MacPlaygroundViewController.applyFeatureFlags`.
-        6.3c.iii [ ] Add side panels for flags + node hierarchy (shared data models + SwiftUI List/Table views).
-        6.3c.iv [ ] Provide export/log console surfaces (hook up existing exporter + console logging).
+        6.3c.iii [x] Add side panels for flags + node hierarchy (shared data models + SwiftUI List/Table views).
+        6.3c.iv [x] Provide export/log console surfaces (copy helpers for plain text/JSON; rolling log view).
+            - Added Export & Console inspector with clipboard buttons for plain text / JSON output and a live log stream wired to `MacPlaygroundSession`.
         6.3c.v [ ] Wire performance runners (PerfRunEngine / PerformanceView) into mac UI or flag for deferred parity.
     6.3d [ ] Ensure keyboard shortcut testing, placeholder/decorator tools, and scripted scenarios behave the same as iOS.
     6.3e [ ] Document build/run commands (`xcodebuild -scheme LexicalPlayground-macOS …`) and update README/DocC with mac playground usage notes.
@@ -359,6 +360,8 @@ Tasks:
 | 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (12:20 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
 | 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (12:20 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (12:21 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
+| 2025-10-07 | Phase 6 | Task 6.3c.iii | Added SwiftUI inspector views for feature flags and hierarchy (live update listener mirrors iOS NodeHierarchyView). |
+| 2025-10-07 | Phase 6 | Task 6.3c.iv | Added Export & Console inspector (plain-text/JSON clipboard helpers + rolling command log). |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.
