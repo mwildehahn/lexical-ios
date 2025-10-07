@@ -209,10 +209,15 @@ Tasks:
             - Scripts menu: reset document, insert lorem, restore cursor location.
             - Performance panel (placeholder until ported) doesn’t affect editor state.
         - [ ] **Future Mac Tests:** Add AppKit UI/unit tests mirroring critical iOS coverage:
-            - Selection round-trip: adopt `LexicalMacTests` to simulate caret insertions (`TextViewMac.insertText`) and assert selection range.
-            - Formatting commands: dispatch format/indent commands via adapter and assert node attributes.
-            - Placeholder regression: reuse existing mac placeholder tests for typing scenarios (empty vs. non-empty).
-            - Copy/cut/paste payload checks (there is already partial coverage—expand once parity is achieved).
+            - `testInsertTextRespectsCaretPosition`: seed a multi-paragraph doc, position caret mid-text, call `insertText`, and assert content plus selection advance match the anchor offset.
+            - `testDeleteBackwardHonorsSelection`: set selection inside text, invoke `deleteBackward`, confirm the node shrinks and caret shifts left exactly one code point.
+            - `testMoveNativeSelectionMatchesUIKit`: use `adapter.moveNativeSelection` with different granularities (character/word/line) and compare the resulting range to the expected UITextView behavior.
+            - `testToggleBoldAppliesAttribute` & `testIndentOutdent`: dispatch formatting/indent commands and verify node attributes / list structure mirror iOS.
+            - `testSetBlockToHeading` & `testInsertListCommands`: ensure block-style changes via the session produce the same node graph as the UIKit playground.
+            - `testDecoratorInsertionCreatesOverlayRect` & `testOverlayTapDispatchesToNode`: insert the sample decorator node, refresh overlay, and assert overlay rectangles plus tap forwarding.
+            - `testPlaceholderHiddenAfterTyping`: ensure placeholder disappears when content is present and returns when cleared.
+            - `testPasteboardRoundTrip`: run copy/cut/paste and assert `NSPasteboard.general` contents and editor state.
+            - Extend existing mac tests to cover script menu helpers (`resetDocument`, `insertLoremIpsum`) so QA buttons remain functional.
     6.3e [ ] Document build/run commands (`xcodebuild -scheme LexicalPlayground-macOS …`) and update README/DocC with mac playground usage notes.
     6.3f [ ] Run full suite + playground build on both platforms before marking complete.
 6.4 [ ] Publish migration notes + API docs for AppKit consumers.
