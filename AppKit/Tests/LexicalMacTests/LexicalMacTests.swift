@@ -459,6 +459,73 @@ import AppKit
         XCTAssertTrue(payload is UXPasteboard)
       })
   }
+
+  func testInsertTextRespectsCaretLocation() throws {
+    let setup = makeBoundAdapter()
+    let editor = setup.textView.editor
+
+    try editor.update {
+      guard let root = getRoot() else { return }
+      for child in root.getChildren() {
+        try child.remove()
+      }
+      let paragraph = createParagraphNode()
+      try paragraph.append([createTextNode(text: "Hello")])
+      try root.append([paragraph])
+    }
+
+    setup.host.layoutSubtreeIfNeeded()
+    setup.textView.setSelectedRange(NSRange(location: 2, length: 0))
+
+    XCTAssertEqual(setup.textView.selectedRange.location, 2)
+
+    try editor.read {
+      guard
+        let root = getRoot(),
+        let paragraph = root.getFirstChild() as? ParagraphNode,
+        let textNode = paragraph.getFirstChild() as? TextNode
+      else {
+        XCTFail("Missing text node before insert")
+        return
+      }
+      guard let selection = try getSelection() as? RangeSelection else {
+        XCTFail("Expected range selection after native selection change")
+        return
+      }
+      XCTAssertEqual(selection.anchor.type, .text)
+      XCTAssertEqual(selection.focus.type, .text)
+      XCTAssertEqual(selection.anchor.offset, 2)
+      XCTAssertEqual(selection.focus.offset, 2)
+      XCTAssertEqual(selection.anchor.key, textNode.getKey())
+      XCTAssertEqual(selection.focus.key, textNode.getKey())
+    }
+
+    setup.textView.insertText("X")
+
+    var finalText: String?
+    try editor.read {
+      guard
+        let root = getRoot(),
+        let paragraph = root.getFirstChild() as? ParagraphNode,
+        let textNode = paragraph.getFirstChild() as? TextNode
+      else {
+        XCTFail("Missing paragraph/text node after insert")
+        return
+      }
+      finalText = textNode.getTextPart()
+    }
+
+    let nativeSelectionLocation = setup.textView.selectedRange.location
+    let textViewString = setup.textView.string
+
+    XCTExpectFailure("AppKit typing currently appends to the end of the document; tracked in Phase 6.3d parity work") {
+      XCTAssertEqual(finalText, "HeXllo")
+      XCTAssertEqual(nativeSelectionLocation, 3)
+      XCTAssertTrue(textViewString.hasPrefix("HeXllo"))
+    }
+
+    withExtendedLifetime(setup.adapter) {}
+  }
 }
 #else
 @MainActor final class LexicalMacTests: XCTestCase {

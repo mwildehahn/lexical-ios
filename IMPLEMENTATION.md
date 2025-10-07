@@ -192,6 +192,8 @@ Tasks:
         - [x] Sidebar defaults to Node Hierarchy (listed first and pre-selected) for quicker debugging parity with iOS playground.
         - [x] Restored the iOS playground build by importing `LexicalUIKit` where `LexicalView` is used and wiring the Xcode target to the new product dependency.
         - [x] Moved the mac toolbar into the window toolbar (`.toolbar { ... }`) to stop the detail pane from dedicating vertical space to controls while keeping all actions accessible.
+        - [x] Added `testInsertTextRespectsCaretLocation` under `LexicalMacTests`; currently marked with `XCTExpectFailure` so CI tracks the typing regression until it is fixed.
+        - [x] Updated `TextViewMac` to resync native selections before dispatching insert commands so upcoming fixes can build on a consistent selection state.
         - [ ] **In Progress:** Mac typing parity plan
             - Diagnose caret drift by tracing `TextViewMac.insertText`/`performInsert` and comparing with UIKit.
             - Audit AppKitFrontendAdapter selection bridges to ensure we don’t collapse selection to the tail after each edit.
@@ -411,6 +413,13 @@ Tasks:
 | 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (12:21 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
 | 2025-10-07 | Phase 6 | Task 6.3c.iii | Added SwiftUI inspector views for feature flags and hierarchy (live update listener mirrors iOS NodeHierarchyView). |
 | 2025-10-07 | Phase 6 | Task 6.3c.iv | Added Export & Console inspector (plain-text/JSON clipboard helpers + rolling command log). |
+| 2025-10-07 | Phase 6 | Task 6.3d | Added mac typing regression test with `XCTExpectFailure` and synced `TextViewMac` native selection before dispatch. |
+| 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (16:54 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
+| 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (16:55 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (16:54 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 21 tests run (1 skipped, 1 expected failure). |
+| 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (16:31 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
+| 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (16:31 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (16:32 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.

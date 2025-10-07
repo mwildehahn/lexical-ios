@@ -21,6 +21,7 @@ public class TextViewMac: NSTextView {
   internal var interceptNextSelectionChangeAndReplaceWithRange: NSRange?
   internal var lexicalSelectionAffinity: UXTextStorageDirection = .forward
   internal let pasteboard = UXPasteboard.general
+  private var selectionObserver: NSObjectProtocol?
 
   public init(editorConfig: EditorConfig = EditorConfig(theme: Theme(), plugins: []),
               featureFlags: FeatureFlags = FeatureFlags()) {
@@ -65,11 +66,25 @@ public class TextViewMac: NSTextView {
 
     applyTextContainerInset()
     registerRichText(editor: editor)
+
+    selectionObserver = NotificationCenter.default.addObserver(
+      forName: NSTextView.didChangeSelectionNotification,
+      object: self,
+      queue: nil
+    ) { [weak self] _ in
+      self?.handleSelectionDidChange()
+    }
   }
 
   @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+
+  deinit {
+    if let selectionObserver {
+      NotificationCenter.default.removeObserver(selectionObserver)
+    }
   }
 
   public func updatePlaceholder(_ placeholder: String?) {
@@ -123,6 +138,41 @@ public class TextViewMac: NSTextView {
     } else {
       applyTextColor(defaultTextColor)
     }
+  }
+
+  public override func becomeFirstResponder() -> Bool {
+    let became = super.becomeFirstResponder()
+    if became, editor.frontend != nil {
+      onSelectionChange(editor: editor)
+    }
+    return became
+  }
+
+  public override func setSelectedRange(_ charRange: NSRange) {
+    super.setSelectedRange(charRange)
+    handleSelectionDidChange()
+  }
+
+  @objc private func handleSelectionDidChange() {
+    if isUpdatingNativeSelection {
+      return
+    }
+
+    if let interception = interceptNextSelectionChangeAndReplaceWithRange {
+      interceptNextSelectionChangeAndReplaceWithRange = nil
+      isUpdatingNativeSelection = true
+      setSelectedRange(interception)
+      isUpdatingNativeSelection = false
+      return
+    }
+
+    lexicalSelectionAffinity = .forward
+
+    guard editor.frontend != nil else {
+      return
+    }
+
+    onSelectionChange(editor: editor)
   }
 
   public override func copy(_ sender: Any?) {
@@ -301,6 +351,8 @@ public class TextViewMac: NSTextView {
       lexicalTextStorage.mode = .none
     }
 
+    reconcileSelectionWithNativeRange()
+
     editor.dispatchCommand(type: .insertText, payload: text)
     lexicalSelectionAffinity = .forward
     showPlaceholderText()
@@ -369,6 +421,46 @@ public class TextViewMac: NSTextView {
       editor.log(.TextView, .error, "IME marked text insert failed: \(error)")
       unmarkTextWithoutUpdate()
       return
+    }
+  }
+
+  private func reconcileSelectionWithNativeRange() {
+    let nativeRange = selectedRange
+    guard nativeRange.location != NSNotFound else { return }
+    var applied = false
+    do {
+      try editor.update {
+        guard let editorState = getActiveEditorState() else { return }
+
+        let startLocation = nativeRange.location
+        let endLocation = nativeRange.location + nativeRange.length
+
+        guard
+          let anchorPoint = try pointAtStringLocation(
+            startLocation,
+            searchDirection: lexicalSelectionAffinity,
+            rangeCache: editor.rangeCache
+          ),
+          let focusPoint = try pointAtStringLocation(
+            endLocation,
+            searchDirection: lexicalSelectionAffinity,
+            rangeCache: editor.rangeCache
+          )
+        else {
+          return
+        }
+
+        let currentFormat = (editorState.selection as? RangeSelection)?.format ?? TextFormat()
+        let newSelection = RangeSelection(anchor: anchorPoint, focus: focusPoint, format: currentFormat)
+        editorState.selection = newSelection
+        applied = true
+      }
+    } catch {
+      editor.log(.TextView, .error, "Failed to reconcile selection before insert: \(error)")
+    }
+
+    if !applied, editor.frontend != nil {
+      onSelectionChange(editor: editor)
     }
   }
 }
