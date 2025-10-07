@@ -42,6 +42,7 @@ struct MacPlaygroundRootView: View {
 @MainActor
 private final class MacPlaygroundSession: ObservableObject {
   @Published var controller: MacPlaygroundViewController?
+  @Published var activeProfile: FeatureFlags.OptimizedProfile = .aggressiveEditor
 
   var editor: Editor? {
     controller?.adapter.editor
@@ -54,6 +55,73 @@ private final class MacPlaygroundSession: ObservableObject {
 
   func toggleFormat(_ format: TextFormatType) {
     dispatch(.formatText, payload: format)
+  }
+
+  func indent() {
+    dispatch(CommandType(rawValue: "indentContent"))
+  }
+
+  func outdent() {
+    dispatch(CommandType(rawValue: "outdentContent"))
+  }
+
+  func applyProfile(_ profile: FeatureFlags.OptimizedProfile) {
+    guard let controller else { return }
+    let flags = FeatureFlags.optimizedProfile(profile)
+    controller.applyFeatureFlags(flags, profile: profile)
+    activeProfile = profile
+  }
+
+  func applyBlock(_ option: BlockOption) {
+    guard let controller else { return }
+    switch option {
+    case .paragraph:
+      controller.setBlock { createParagraphNode() }
+    case .heading1:
+      controller.setBlock { createHeadingNode(headingTag: .h1) }
+    case .heading2:
+      controller.setBlock { createHeadingNode(headingTag: .h2) }
+    case .code:
+      controller.setBlock { createCodeNode() }
+    case .quote:
+      controller.setBlock { createQuoteNode() }
+    case .bullet:
+      controller.insertList(type: .unordered)
+    case .numbered:
+      controller.insertList(type: .ordered)
+    case .checklist:
+      controller.insertList(type: .checklist)
+    }
+  }
+
+  enum BlockOption: CaseIterable {
+    case paragraph, heading1, heading2, code, quote, bullet, numbered, checklist
+
+    var title: String {
+      switch self {
+      case .paragraph: return "Paragraph"
+      case .heading1: return "Heading 1"
+      case .heading2: return "Heading 2"
+      case .code: return "Code Block"
+      case .quote: return "Quote"
+      case .bullet: return "Bulleted List"
+      case .numbered: return "Numbered List"
+      case .checklist: return "Checklist"
+      }
+    }
+
+    var symbol: String {
+      switch self {
+      case .paragraph: return "text.justify"
+      case .heading1: return "textformat.size.larger"
+      case .heading2: return "textformat.size"
+      case .code: return "chevron.left.forwardslash.chevron.right"
+      case .quote: return "quote.bubble"
+      case .bullet: return "list.bullet"
+      case .numbered: return "list.number"
+      case .checklist: return "checklist"
+      }
+    }
   }
 }
 
@@ -80,6 +148,21 @@ private struct MacPlaygroundToolbar: View {
 
       Divider()
 
+      formatButtons
+
+      Divider()
+
+      blockStyleMenu
+      profileMenu
+
+      Spacer()
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+  }
+
+  private var formatButtons: some View {
+    Group {
       Button {
         session.toggleFormat(.bold)
       } label: {
@@ -104,10 +187,76 @@ private struct MacPlaygroundToolbar: View {
       }
       .keyboardShortcut("u", modifiers: .command)
 
-      Spacer()
+      Button {
+        session.toggleFormat(.code)
+      } label: {
+        Label("Inline Code", systemImage: "curlybraces")
+          .labelStyle(.iconOnly)
+      }
+
+      Button {
+        session.indent()
+      } label: {
+        Label("Increase Indent", systemImage: "increase.indent")
+          .labelStyle(.iconOnly)
+      }
+
+      Button {
+        session.outdent()
+      } label: {
+        Label("Decrease Indent", systemImage: "decrease.indent")
+          .labelStyle(.iconOnly)
+      }
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 8)
+  }
+
+  private var blockStyleMenu: some View {
+    Menu {
+      ForEach(MacPlaygroundSession.BlockOption.allCases, id: \.self) { option in
+        Button {
+          session.applyBlock(option)
+        } label: {
+          Label(option.title, systemImage: option.symbol)
+        }
+      }
+    } label: {
+      Label("Block Style", systemImage: "text.justify")
+    }
+  }
+
+  private var profileMenu: some View {
+    Menu {
+      ForEach(profiles, id: \.self) { profile in
+        Button {
+          session.applyProfile(profile)
+        } label: {
+          HStack {
+            Text(title(for: profile))
+            if session.activeProfile == profile {
+              Spacer()
+              Image(systemName: "checkmark")
+            }
+          }
+        }
+      }
+    } label: {
+      Label("Profile", systemImage: "switch.2")
+    }
+  }
+
+  private var profiles: [FeatureFlags.OptimizedProfile] {
+    [.minimal, .balanced, .aggressive, .aggressiveEditor]
+  }
+
+  private func title(for profile: FeatureFlags.OptimizedProfile) -> String {
+    switch profile {
+    case .minimal: return "Minimal"
+    case .minimalDebug: return "Minimal (Debug)"
+    case .balanced: return "Balanced"
+    case .aggressive: return "Aggressive"
+    case .aggressiveDebug: return "Aggressive (Debug)"
+    case .aggressiveEditor: return "Aggressive (Editor)"
+    }
   }
 }
 
@@ -141,6 +290,7 @@ private struct MacPlaygroundEditorContainer: NSViewControllerRepresentable {
       guard controller !== newController else { return }
       controller = newController
       session.controller = newController
+      session.activeProfile = newController.activeProfile
     }
   }
 }

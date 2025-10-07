@@ -12,6 +12,8 @@ final class MacPlaygroundViewController: NSViewController {
   let textView: TextViewMac
   let overlayView: LexicalOverlayViewMac
   let adapter: AppKitFrontendAdapter
+  private(set) var activeFeatureFlags: FeatureFlags
+  private(set) var activeProfile: FeatureFlags.OptimizedProfile
 
   init(theme: Theme = Theme(), plugins: [Plugin] = []) {
     self.hostView = LexicalNSView(frame: .zero)
@@ -23,6 +25,9 @@ final class MacPlaygroundViewController: NSViewController {
       textView: textView,
       overlayView: overlayView
     )
+    self.activeProfile = .aggressiveEditor
+    self.activeFeatureFlags = FeatureFlags.optimizedProfile(.aggressiveEditor)
+    textView.editor.featureFlags = activeFeatureFlags
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -63,6 +68,38 @@ final class MacPlaygroundViewController: NSViewController {
     } catch {
       adapter.editor.log(.editor, .error, "Failed to seed mac playground document: \(error)")
     }
+  }
+
+  func applyFeatureFlags(_ flags: FeatureFlags, profile: FeatureFlags.OptimizedProfile) {
+    activeFeatureFlags = flags
+    activeProfile = profile
+    adapter.editor.featureFlags = flags
+  }
+
+  func setBlock(_ builder: @escaping () -> ElementNode) {
+    try? adapter.editor.update {
+      if let selection = try getSelection() as? RangeSelection {
+        setBlocksType(selection: selection, createElement: builder)
+        adapter.editor.resetTypingAttributes(for: try selection.anchor.getNode())
+      }
+    }
+  }
+
+  func insertList(type: FeatureFlagsListType) {
+    switch type {
+    case .unordered:
+      adapter.editor.dispatchCommand(type: CommandType(rawValue: "insertUnorderedList"))
+    case .ordered:
+      adapter.editor.dispatchCommand(type: CommandType(rawValue: "insertOrderedList"))
+    case .checklist:
+      adapter.editor.dispatchCommand(type: CommandType(rawValue: "insertCheckList"))
+    }
+  }
+
+  enum FeatureFlagsListType {
+    case unordered
+    case ordered
+    case checklist
   }
 }
 #endif
