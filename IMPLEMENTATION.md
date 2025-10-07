@@ -198,6 +198,12 @@ Tasks:
             - Confirm session helpers (placeholder toggles, scripted inserts) aren’t resetting selection during typing.
             - Apply AppKit-only fix once culprit found; keep UIKit code untouched.
             - After fixes: rerun Lexical-Package + LexicalMacTests, rebuild iOS playground, and log manual mac typing QA in the Progress Log.
+            - **iOS guardrails while fixing mac:**
+                - Constrain code changes to `AppKit/` and mac playground files; if a shared file must change, wrap the logic in compile checks (`#if canImport(AppKit)`) and add/retain iOS unit coverage for the affected path.
+                - Before opening a PR-worthy diff, execute the Selection smoke, full Lexical-Package suite, and an iOS playground manual typing/formatting sweep; record timestamps in the Progress Log.
+                - Keep a running diff watch on `LexicalUIKit`/UIKit targets; if any UIKit source changes, capture why in-line via comments and verify behaviour with at least one targeted iOS test (new or existing).
+                - Maintain the mac typing plan behind feature toggles when possible (e.g., session flags) so partial fixes never ship by default on iOS builds.
+                - After each mac fix iteration, compare editor behaviours (typing, selection, decorators) between platforms and only merge once parity is confirmed.
         - [ ] **Mac Editor QA Tactics:** create a repeatable checklist to verify parity with iOS after each change:
             - Typing/edits: insert characters in middle, backspace, delete word (⌥⌫), undo/redo.
             - Format toggles: bold/italic/underline/code hotkeys and toolbar buttons.
