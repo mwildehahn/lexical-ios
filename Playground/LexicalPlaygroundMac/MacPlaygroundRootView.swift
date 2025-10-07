@@ -21,6 +21,8 @@ struct MacPlaygroundRootView: View {
       }
       .navigationTitle("Playground")
       .frame(minWidth: 220)
+    } content: {
+      InspectorContainer(session: session, selection: selectedSidebarItem)
     } detail: {
       VStack(spacing: 0) {
         MacPlaygroundToolbar(session: session)
@@ -43,6 +45,10 @@ struct MacPlaygroundRootView: View {
 private final class MacPlaygroundSession: ObservableObject {
   @Published var controller: MacPlaygroundViewController?
   @Published var activeProfile: FeatureFlags.OptimizedProfile = .aggressiveEditor
+  @Published fileprivate var flagBuilder = FeatureFlagsBuilder(flags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+  @Published var hierarchyText: String = "-"
+
+  private var updateListener: Editor.RemovalHandler?
 
   var editor: Editor? {
     controller?.adapter.editor
@@ -70,6 +76,7 @@ private final class MacPlaygroundSession: ObservableObject {
     let flags = FeatureFlags.optimizedProfile(profile)
     controller.applyFeatureFlags(flags, profile: profile)
     activeProfile = profile
+    flagBuilder = FeatureFlagsBuilder(flags: flags)
   }
 
   func applyBlock(_ option: BlockOption) {
@@ -121,6 +128,70 @@ private final class MacPlaygroundSession: ObservableObject {
       case .numbered: return "list.number"
       case .checklist: return "checklist"
       }
+    }
+  }
+
+  enum FlagSection: String, CaseIterable, Identifiable {
+    case reconciler = "Reconciler"
+    case fenwick = "Fenwick / Locations"
+    case misc = "Misc"
+
+    var id: String { rawValue }
+  }
+
+  struct FlagDescriptor: Identifiable {
+    let id: String
+    let title: String
+    let keyPath: WritableKeyPath<FeatureFlagsBuilder, Bool>
+    let section: FlagSection
+  }
+
+  private(set) lazy var flagDescriptors: [FlagDescriptor] = [
+    FlagDescriptor(id: "optimized", title: "Use Optimized Reconciler", keyPath: \.useOptimizedReconciler, section: .reconciler),
+    FlagDescriptor(id: "strict", title: "Strict Mode (no legacy)", keyPath: \.useOptimizedReconcilerStrictMode, section: .reconciler),
+    FlagDescriptor(id: "keyedDiff", title: "Keyed Diff (reorder)", keyPath: \.useReconcilerKeyedDiff, section: .reconciler),
+    FlagDescriptor(id: "blockRebuild", title: "Block Rebuild", keyPath: \.useReconcilerBlockRebuild, section: .reconciler),
+    FlagDescriptor(id: "shadowCompare", title: "Shadow Compare (debug)", keyPath: \.useReconcilerShadowCompare, section: .reconciler),
+    FlagDescriptor(id: "fenwickDelta", title: "Fenwick Delta (locations)", keyPath: \.useReconcilerFenwickDelta, section: .fenwick),
+    FlagDescriptor(id: "centralAgg", title: "Central Aggregation", keyPath: \.useReconcilerFenwickCentralAggregation, section: .fenwick),
+    FlagDescriptor(id: "insertBlock", title: "Insert-Block Fenwick", keyPath: \.useReconcilerInsertBlockFenwick, section: .fenwick),
+    FlagDescriptor(id: "deleteBlock", title: "Delete-Block Fenwick", keyPath: \.useReconcilerDeleteBlockFenwick, section: .fenwick),
+    FlagDescriptor(id: "sanityCheck", title: "Reconciler Sanity Check", keyPath: \.reconcilerSanityCheck, section: .misc),
+    FlagDescriptor(id: "proxyInput", title: "Proxy InputDelegate", keyPath: \.proxyTextViewInputDelegate, section: .misc),
+    FlagDescriptor(id: "prePost", title: "Pre/Post Attrs Only", keyPath: \.useReconcilerPrePostAttributesOnly, section: .misc),
+    FlagDescriptor(id: "modernTextKit", title: "Modern TextKit Optimizations", keyPath: \.useModernTextKitOptimizations, section: .misc),
+    FlagDescriptor(id: "verbose", title: "Verbose Logging", keyPath: \.verboseLogging, section: .misc),
+  ]
+
+  func binding(for keyPath: WritableKeyPath<FeatureFlagsBuilder, Bool>) -> Binding<Bool> {
+    Binding(get: {
+      self.flagBuilder[keyPath: keyPath]
+    }, set: { newValue in
+      self.flagBuilder[keyPath: keyPath] = newValue
+      if let controller = self.controller {
+        let flags = self.flagBuilder.build()
+        controller.applyFeatureFlags(flags, profile: self.activeProfile)
+      }
+    })
+  }
+
+  func descriptors(for section: FlagSection) -> [FlagDescriptor] {
+    flagDescriptors.filter { $0.section == section }
+  }
+
+  func observeEditor(_ controller: MacPlaygroundViewController) {
+    updateListener?()
+    let editor = controller.adapter.editor
+    updateListener = editor.registerUpdateListener { [weak self] activeState, _, _ in
+      guard let self else { return }
+      Task { @MainActor in
+        self.flagBuilder = FeatureFlagsBuilder(flags: controller.activeFeatureFlags)
+        self.hierarchyText = (try? getNodeHierarchy(editorState: activeState)) ?? "-"
+      }
+    }
+    Task { @MainActor in
+      self.flagBuilder = FeatureFlagsBuilder(flags: controller.activeFeatureFlags)
+      self.hierarchyText = (try? getNodeHierarchy(editorState: editor.getEditorState())) ?? "-"
     }
   }
 }
@@ -291,7 +362,128 @@ private struct MacPlaygroundEditorContainer: NSViewControllerRepresentable {
       controller = newController
       session.controller = newController
       session.activeProfile = newController.activeProfile
+      session.observeEditor(newController)
     }
+  }
+}
+
+private struct InspectorContainer: View {
+  @ObservedObject var session: MacPlaygroundSession
+  var selection: MacPlaygroundRootView.SidebarItem?
+
+  var body: some View {
+    switch selection {
+    case .flags, .none:
+      FlagsInspectorView(session: session)
+    case .hierarchy:
+      HierarchyInspectorView(session: session)
+    case .performance:
+      PerformanceInspectorPlaceholder()
+    }
+  }
+}
+
+private struct FlagsInspectorView: View {
+  @ObservedObject var session: MacPlaygroundSession
+
+  var body: some View {
+    List {
+      ForEach(MacPlaygroundSession.FlagSection.allCases) { section in
+        Section(section.rawValue) {
+          ForEach(session.descriptors(for: section)) { descriptor in
+            Toggle(descriptor.title, isOn: session.binding(for: descriptor.keyPath))
+          }
+        }
+      }
+    }
+    .listStyle(.insetGrouped)
+    .frame(minWidth: 260)
+  }
+}
+
+private struct HierarchyInspectorView: View {
+  @ObservedObject var session: MacPlaygroundSession
+
+  var body: some View {
+    ScrollView {
+      Text(session.hierarchyText)
+        .font(.system(.body, design: .monospaced))
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+    }
+    .background(Color(NSColor.textBackgroundColor))
+    .frame(minWidth: 260)
+  }
+}
+
+private struct PerformanceInspectorPlaceholder: View {
+  var body: some View {
+    VStack(spacing: 12) {
+      Text("Performance tools coming soon")
+        .font(.headline)
+      Text("The mac playground will surface the same PerfRunEngine scenarios as iOS once the panels are ported.")
+        .multilineTextAlignment(.center)
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding()
+  }
+}
+
+private struct FeatureFlagsBuilder {
+  var reconcilerSanityCheck: Bool
+  var proxyTextViewInputDelegate: Bool
+  var useOptimizedReconciler: Bool
+  var useReconcilerFenwickDelta: Bool
+  var useReconcilerKeyedDiff: Bool
+  var useReconcilerBlockRebuild: Bool
+  var useOptimizedReconcilerStrictMode: Bool
+  var useReconcilerFenwickCentralAggregation: Bool
+  var useReconcilerShadowCompare: Bool
+  var useReconcilerInsertBlockFenwick: Bool
+  var useReconcilerDeleteBlockFenwick: Bool
+  var useReconcilerPrePostAttributesOnly: Bool
+  var useModernTextKitOptimizations: Bool
+  var verboseLogging: Bool
+  var prePostAttrsOnlyMaxTargets: Int
+
+  init(flags: FeatureFlags) {
+    self.reconcilerSanityCheck = flags.reconcilerSanityCheck
+    self.proxyTextViewInputDelegate = flags.proxyTextViewInputDelegate
+    self.useOptimizedReconciler = flags.useOptimizedReconciler
+    self.useReconcilerFenwickDelta = flags.useReconcilerFenwickDelta
+    self.useReconcilerKeyedDiff = flags.useReconcilerKeyedDiff
+    self.useReconcilerBlockRebuild = flags.useReconcilerBlockRebuild
+    self.useOptimizedReconcilerStrictMode = flags.useOptimizedReconcilerStrictMode
+    self.useReconcilerFenwickCentralAggregation = flags.useReconcilerFenwickCentralAggregation
+    self.useReconcilerShadowCompare = flags.useReconcilerShadowCompare
+    self.useReconcilerInsertBlockFenwick = flags.useReconcilerInsertBlockFenwick
+    self.useReconcilerDeleteBlockFenwick = flags.useReconcilerDeleteBlockFenwick
+    self.useReconcilerPrePostAttributesOnly = flags.useReconcilerPrePostAttributesOnly
+    self.useModernTextKitOptimizations = flags.useModernTextKitOptimizations
+    self.verboseLogging = flags.verboseLogging
+    self.prePostAttrsOnlyMaxTargets = flags.prePostAttrsOnlyMaxTargets
+  }
+
+  func build() -> FeatureFlags {
+    FeatureFlags(
+      reconcilerSanityCheck: reconcilerSanityCheck,
+      proxyTextViewInputDelegate: proxyTextViewInputDelegate,
+      useOptimizedReconciler: useOptimizedReconciler,
+      useReconcilerFenwickDelta: useReconcilerFenwickDelta,
+      useReconcilerKeyedDiff: useReconcilerKeyedDiff,
+      useReconcilerBlockRebuild: useReconcilerBlockRebuild,
+      useOptimizedReconcilerStrictMode: useOptimizedReconcilerStrictMode,
+      useReconcilerFenwickCentralAggregation: useReconcilerFenwickCentralAggregation,
+      useReconcilerShadowCompare: useReconcilerShadowCompare,
+      useReconcilerInsertBlockFenwick: useReconcilerInsertBlockFenwick,
+      useReconcilerDeleteBlockFenwick: useReconcilerDeleteBlockFenwick,
+      useReconcilerPrePostAttributesOnly: useReconcilerPrePostAttributesOnly,
+      useModernTextKitOptimizations: useModernTextKitOptimizations,
+      verboseLogging: verboseLogging,
+      prePostAttrsOnlyMaxTargets: prePostAttrsOnlyMaxTargets
+    )
   }
 }
 
