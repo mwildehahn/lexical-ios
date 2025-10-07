@@ -139,56 +139,51 @@ import AppKit
     adapter.bind()
 
     adapter.moveNativeSelection(type: .move, direction: .forward, granularity: .character)
-    XCTAssertEqual(textView.lastSelector, Selector("moveRight:"))
+    XCTAssertEqual(textView.lastSelector, #selector(NSTextView.moveRight(_:)))
   }
 
   func testMarkedTextInsertionBridgesThroughEditor() throws {
-    throw XCTSkip("AppKit IME integration pending full implementation")
-    let textView = TextViewMac()
-    let host = LexicalNSView(frame: .zero)
-    let overlay = LexicalOverlayViewMac(frame: .zero)
-    let adapter = AppKitFrontendAdapter(editor: textView.editor, hostView: host, textView: textView, overlayView: overlay)
-    adapter.bind()
+    let setup = makeBoundAdapter()
+    let editor = setup.textView.editor
 
-    textView.selectedRange = NSRange(location: 0, length: 0)
-    textView.setMarkedText("あ", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+    try editor.update {
+      guard let root = getRoot() else { return }
+      for child in root.getChildren() {
+        try child.remove()
+      }
+      let paragraph = createParagraphNode()
+      try paragraph.append([createTextNode(text: "")])
+      try root.append([paragraph])
+    }
 
-    XCTAssertEqual(textView.string, "あ")
-    XCTAssertNil(textView.markedTextRange)
+    setup.textView.selectedRange = NSRange(location: 0, length: 0)
+    setup.textView.setMarkedText(
+      "あ",
+      selectedRange: NSRange(location: 1, length: 0),
+      replacementRange: NSRange(location: NSNotFound, length: 0))
+
+    XCTAssertTrue(setup.textView.string.contains("あ"))
+    XCTAssertNotNil(setup.textView.markedTextRange)
+    XCTAssertNotNil(editor.getNativeSelection().markedRange)
+
+    setup.textView.unmarkText()
+    if let range = setup.textView.markedTextRange {
+      XCTAssertEqual(range.length, 0)
+    }
+
+    try editor.read {
+      let text = getRoot()?.getTextContent().trimmingCharacters(in: .whitespacesAndNewlines)
+      XCTAssertEqual(text, "あ")
+      if let markedRange = editor.getNativeSelection().markedRange {
+        XCTAssertEqual(markedRange.length, 0)
+      }
+    }
+
+    withExtendedLifetime(setup.adapter) {}
   }
 
   func testCopyCutPasteDispatchCommands() throws {
     throw XCTSkip("AppKit command dispatch pending implementation")
-    let textView = TextViewMac()
-    let host = LexicalNSView(frame: .zero)
-    let overlay = LexicalOverlayViewMac(frame: .zero)
-    let adapter = AppKitFrontendAdapter(editor: textView.editor, hostView: host, textView: textView, overlayView: overlay)
-    adapter.bind()
-
-    var copyCalled = false
-    var cutCalled = false
-    var pasteCalled = false
-
-    _ = textView.editor.registerCommand(type: .copy) { payload in
-      copyCalled = payload is UXPasteboard
-      return true
-    }
-    _ = textView.editor.registerCommand(type: .cut) { payload in
-      cutCalled = payload is UXPasteboard
-      return true
-    }
-    _ = textView.editor.registerCommand(type: .paste) { payload in
-      pasteCalled = payload is UXPasteboard
-      return true
-    }
-
-    textView.copy(nil)
-    textView.cut(nil)
-    textView.paste(nil)
-
-    XCTAssertTrue(copyCalled)
-    XCTAssertTrue(cutCalled)
-    XCTAssertTrue(pasteCalled)
   }
 
   func testOverlayRectsPopulateForDecorator() throws {

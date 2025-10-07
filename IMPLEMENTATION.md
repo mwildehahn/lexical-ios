@@ -132,7 +132,7 @@ Tasks:
     5.7d [x] Document known gaps / perf notes
         - [x] Summarized perf baselines and remaining TODOs (copy/cut/paste command validation) below.
 5.8 [ ] Expand unit/integration test suite for AppKit.
-    5.8a [ ] Add selection/IME regression tests (mac target).
+    5.8a [x] Add selection/IME regression tests (mac target).
     5.8b [x] Cover pasteboard/command cases.
     5.8c [ ] Cover decorator mount/hit-test flows.
     5.8d [ ] Ensure snapshot/placeholder tests for placeholder rendering.
@@ -249,6 +249,9 @@ Tasks:
 | 2025-10-07 | Phase 5 | Task 5.8b | Added copy/cut/paste command dispatch tests (payload verified as `UXPasteboard`). |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (10:37 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (10:37 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 16 tests run (2 skipped). |
+| 2025-10-07 | Phase 5 | Task 5.8a | Added marked-text regression coverage (AppKit) ensuring set/unmark flows propagate to the editor. |
+| 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (10:43 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (11:06 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 16 tests run (1 skipped). |
 
 
 ## Appendix — Deferred / Optional Items
