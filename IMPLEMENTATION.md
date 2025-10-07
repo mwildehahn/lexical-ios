@@ -166,10 +166,17 @@ Tasks:
     6.2b [x] Implement the chosen sample (project settings, bundle identifiers, minimal UI wiring) and ensure it links against the SPM `LexicalAppKit` product.
     6.2c [x] Add build/run instructions plus troubleshooting notes to docs (likely `Examples/AppKitHarness/README.md` or new doc section).
     6.2d [x] Run mac build of the sample (`swift build --product LexicalMacHarnessApp`) and log results.
-6.3 [ ] Publish migration notes + API docs for AppKit consumers.
-    6.3a [ ] Update README / DocC with instructions for selecting iOS vs. macOS products (including SwiftUI integration expectations).
-    6.3b [ ] Document known gaps (e.g., plugins still UIKit-only) and recommended minimum OS versions.
-    6.3c [ ] Prepare adoption checklist + release notes draft, referencing new package products and required verification commands.
+6.3 [ ] Ship macOS Playground app with feature parity to iOS playground.
+    6.3a [ ] Audit the existing iOS playground features (panels, toggles, scripted actions) and list required counterparts for macOS.
+    6.3b [ ] Create a macOS playground target inside `Playground/LexicalPlayground.xcodeproj` that links against `LexicalAppKit`, plugins, and shared utilities.
+    6.3c [ ] Port/shared UI components (consider SwiftUI) to replicate the inspector panels, logging console, and scripted test buttons.
+    6.3d [ ] Ensure keyboard shortcut testing, placeholder/decorator tools, and scripted scenarios behave the same as iOS.
+    6.3e [ ] Document build/run commands (`xcodebuild -scheme LexicalPlayground-macOS …`) and update README/DocC with mac playground usage notes.
+    6.3f [ ] Run full suite + playground build on both platforms before marking complete.
+6.4 [ ] Publish migration notes + API docs for AppKit consumers.
+    6.4a [ ] Update README / DocC with instructions for selecting iOS vs. macOS products (including SwiftUI integration expectations).
+    6.4b [ ] Document known gaps (e.g., plugins still UIKit-only) and recommended minimum OS versions.
+    6.4c [ ] Prepare adoption checklist + release notes draft, referencing new package products and required verification commands.
 
 **Phase 6 Planning Notes (2025-10-07)**
 - Package.swift currently declares only `.iOS(.v16)` and exports iOS-centric products; enabling macOS will require conditionalising iOS-only targets (LexicalUIKit + dependent plugins) so mac builds resolve cleanly.
@@ -187,6 +194,11 @@ Tasks:
   - Added a SwiftUI `@main` entry point (macOS 14+) that embeds `LexicalMacHarnessViewController` via `NSViewControllerRepresentable` and enforces a sensible default window size.
   - `swift run LexicalMacHarnessApp` now produces a runnable macOS harness; README documents both integration and sample usage paths.
   - Build verification uses `swift build --product LexicalMacHarnessApp` because there is no Xcode scheme (keeps sample pure SwiftPM).
+- **6.3 macOS playground planning:**
+  - New target will live inside `Playground/LexicalPlayground.xcodeproj`, sharing infrastructure with the iOS playground but using AppKit/SwiftUI chrome.
+  - Need to port inspector panels, selection debugging, document seeding, logging console, and scripted actions from iOS so QA workflows match.
+  - Keyboard shortcut testing, placeholder/decorator tools, and scripted mutation buttons must behave identically to iOS to maintain parity.
+  - Documentation will point to both iOS and macOS playgrounds so contributors know how to validate changes on either platform.
 
 ### Phase 7 — Cross-Platform SwiftUI Surface
 Goal: Provide a unified SwiftUI layer that selects the appropriate platform implementation.
