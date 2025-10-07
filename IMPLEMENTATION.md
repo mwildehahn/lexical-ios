@@ -14,9 +14,9 @@ _Last updated: 2025-10-07 • Owner: Core iOS Editor_
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
 | Mac Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test` |
-| Verification Status | Full + mac suites PASS (2025-10-07 @ 11:41 UTC) |
-| Full Suite | PASS (2025-10-07 @ 11:41 UTC) |
-| Mac Suite | PASS (2025-10-07 @ 11:41 UTC; 2 tests skipped pending implementation) |
+| Verification Status | Full + mac suites PASS (2025-10-07 @ 12:12 UTC) |
+| Full Suite | PASS (2025-10-07 @ 12:11 UTC) |
+| Mac Suite | PASS (2025-10-07 @ 12:12 UTC; 2 tests skipped pending implementation) |
 | How to Resume | 1) Pull latest. 2) (Optional) Run Selection suite (command above). 3) Run full suite (command above). 4) Continue with Phase 1 task list |
 
 ## Current Status Summary
@@ -347,6 +347,11 @@ Tasks:
 | 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (11:56 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
 | 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (11:56 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (11:57 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
+| 2025-10-07 | Phase 6 | Task 6.3c.i | Embedded AppKit editor via `MacPlaygroundViewController` and SwiftUI `NavigationSplitView`; sidebar scaffolding in place for upcoming inspector panels. |
+| 2025-10-07 | Phase 6 | Discipline | Mac playground build PASS (12:10 UTC) — `xcodebuild -project Playground/LexicalPlayground.xcodeproj -scheme LexicalPlayground-macOS -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData build`. |
+| 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (12:11 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
+| 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (12:11 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (12:12 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
 
 ## Appendix — Deferred / Optional Items
 - Reinstate helper scripts (`run-ios-tests.sh`, `run-ios-test-suites.sh`) with timeout wrappers after Phase 1.
