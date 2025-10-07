@@ -193,13 +193,14 @@ Tasks:
         - [x] Restored the iOS playground build by importing `LexicalUIKit` where `LexicalView` is used and wiring the Xcode target to the new product dependency.
         - [x] Moved the mac toolbar into the window toolbar (`.toolbar { ... }`) to stop the detail pane from dedicating vertical space to controls while keeping all actions accessible.
         - [x] Added `testInsertTextRespectsCaretLocation` under `LexicalMacTests`; currently marked with `XCTExpectFailure` so CI tracks the typing regression until it is fixed.
-        - [x] Updated `TextViewMac` to resync native selections before dispatching insert commands so upcoming fixes can build on a consistent selection state.
+        - [x] Updated `TextViewMac` to resync native selections via `NSTextView.didChangeSelectionNotification` before dispatching insert commands so upcoming fixes can build on a consistent selection state.
         - [ ] **In Progress:** Mac typing parity plan
             - Diagnose caret drift by tracing `TextViewMac.insertText`/`performInsert` and comparing with UIKit.
             - Audit AppKitFrontendAdapter selection bridges to ensure we don’t collapse selection to the tail after each edit.
             - Confirm session helpers (placeholder toggles, scripted inserts) aren’t resetting selection during typing.
             - Apply AppKit-only fix once culprit found; keep UIKit code untouched.
             - After fixes: rerun Lexical-Package + LexicalMacTests, rebuild iOS playground, and log manual mac typing QA in the Progress Log.
+            - Current status: mac typing still appends at the document tail; `testInsertTextRespectsCaretLocation` intentionally expects failure until parity is restored.
             - **iOS guardrails while fixing mac:**
                 - Constrain code changes to `AppKit/` and mac playground files; if a shared file must change, wrap the logic in compile checks (`#if canImport(AppKit)`) and add/retain iOS unit coverage for the affected path.
                 - Before opening a PR-worthy diff, execute the Selection smoke, full Lexical-Package suite, and an iOS playground manual typing/formatting sweep; record timestamps in the Progress Log.
