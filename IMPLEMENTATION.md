@@ -113,15 +113,12 @@ Tasks:
     - [x] Forward pointer/tap events through adapter to decorator nodes.
     - [ ] Add integration tests for decorator hit-testing (mac target).
 5.6a [ ] **Priority:** Enable LexicalMacTests build + execution.
-    - [ ] Split SPM targets so iOS code (UIKit/TextKit 1) lives under `LexicalUIKit`, while `LexicalCore` stays platform-neutral and `LexicalAppKit` depends only on core + AppKit shims.
-        - Attempt 2025-10-06: direct `Lexical`→`LexicalUIKit` rename caused empty target; revert. Need to migrate sources first (Core/Selection/Nodes/etc.) before adjusting Package.swift.
-        - In progress 2025-10-06: moved `LexicalView` + `TextView` under `UIKit/LexicalUIKit`; kept read-only context in core for now; pending public surface/Package.swift updates.
-        - 2025-10-07: exposed shared helpers (`AttributeUtils`, `LexicalConstants`, `SelectionUtils.validatePosition`, `RangeSelection.applySelectionRange`, `canShowPlaceholder`, `onSelectionChange`) and updated plugins/tests to import `LexicalUIKit`; Selection suite PASS logged (06:43 UTC).
-        - 2025-10-07: added `LexicalUIKitAppKit` shim target (re-exports `LexicalUIKit`) and updated `LexicalMacTests` dependencies/imports; Selection + mac suites back to green (08:35/08:36 UTC).
-    - [x] Guard shared sources with `canImport(UIKit)` / `canImport(AppKit)` and replace lingering UIKit types with PAL aliases (`UXView`, `UXColor`, `UXTextRange` wrappers) so macOS compiles.
-    - [ ] Update `Package.swift` (platform declarations & dependencies) and product names so macOS targets avoid UIKit modules.
+    - [x] Added `LexicalUIKitAppKit` shim target (re-exports `LexicalUIKit`) and updated `LexicalMacTests` imports; Selection + mac suites green (08:35/08:36 UTC).
+    - [ ] Verify remaining UIKit dependencies in core rely on PAL/guards; document outcome.
+    - [ ] Update `Package.swift` / target membership so `Lexical` stays platform-neutral; document final layout.
     - [ ] Restore mac build dependencies (include AppKit-specific helpers) and add any missing shims (e.g. TextKit availability wrappers, pasteboard helpers).
-    - [x] Get `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64e,id=00006001-000460342181801E' -derivedDataPath .build/DerivedData test` passing locally; record command + timestamp (21:23 UTC, 2 tests skipped pending implementation).
+    - [x] `xcodebuild ... LexicalMacTests ...` PASS logged (21:23 UTC, 2 tests skipped).
+    - [x] Full Lexical-Package suite PASS logged (09:06 UTC) after shim/audit.
 5.7 [ ] Performance / QA passes (scrolling, typing perf, keyboard shortcuts) and prepare macOS sample harness.
     - [ ] Benchmark typing/scrolling responsiveness (profiling scripts).
     - [ ] Validate keyboard shortcuts (movement/deletion/format).
