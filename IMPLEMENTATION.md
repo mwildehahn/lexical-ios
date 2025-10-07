@@ -127,8 +127,8 @@ Tasks:
         - [x] Expand mac tests to assert command dispatch coverage (delete char/word, indent/outdent, bold toggle).
         - [x] Document any missing shortcuts / TODOs (none observed for covered commands; copy/cut/paste still pending implementation test support).
     5.7c [ ] Build lightweight macOS sample harness for manual QA
-        - [ ] Scaffold sample app or playground snippet using AppKit frontend.
-        - [ ] Document launch instructions in plan/docs.
+        - [x] Scaffold sample harness (`Examples/AppKitHarness/LexicalMacHarness.swift`).
+        - [x] Document launch instructions (`Examples/AppKitHarness/README.md`).
     5.7d [ ] Document known gaps / perf notes
         - [ ] Summarize findings in IMPLEMENTATION.md.
 5.8 [ ] Expand unit/integration test suite for AppKit.
@@ -240,6 +240,7 @@ Tasks:
 | 2025-10-07 | Phase 5 | Task 5.7b | Added AppKit keyboard shortcut dispatch tests (delete char/word, indent, bold). No additional gaps observed beyond existing paste/cut/copy TODO. |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (10:23 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (10:23 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 13 tests run (2 skipped). |
+| 2025-10-07 | Phase 5 | Task 5.7c | Added `Examples/AppKitHarness` with reusable view controller + README for manual QA. |
 
 
 ## Appendix — Deferred / Optional Items
