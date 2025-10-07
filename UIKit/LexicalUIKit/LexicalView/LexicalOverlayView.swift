@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 //
 //  LexicalOverlayView.swift
 //
@@ -5,6 +6,7 @@
 //  Created by Michael Hahn on 7/30/24.
 //
 import UIKit
+import Lexical
 
 final class LexicalOverlayView: UIView {
 
@@ -135,3 +137,5 @@ final class LexicalOverlayView: UIView {
     }
   }
 }
+
+#endif

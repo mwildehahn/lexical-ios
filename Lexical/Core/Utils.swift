@@ -6,7 +6,7 @@
  */
 
 import Foundation
-import UIKit
+import LexicalCore
 
 @MainActor
 public func getNodeByKey<N: Node>(key: NodeKey) -> N? {
@@ -116,7 +116,7 @@ private func internallyMarkParentElementsAsDirty(
 // the cloning heuristic. Instead use node.getWritable().
 
 @MainActor
-internal func internallyMarkNodeAsDirty(node: Node, cause: DirtyStatusCause = .editorInitiated) {
+public func internallyMarkNodeAsDirty(node: Node, cause: DirtyStatusCause = .editorInitiated) {
   let latest = node.getLatest()
   guard
     let editorState = getActiveEditorState(),
@@ -448,7 +448,7 @@ public func sliceSelectedTextNodeContent(selection: BaseSelection, textNode: Tex
 }
 
 @MainActor
-public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UIView? {
+public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UXView? {
   guard let editor = getActiveEditor() else {
     return nil
   }

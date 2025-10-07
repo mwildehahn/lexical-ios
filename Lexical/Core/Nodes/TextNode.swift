@@ -5,7 +5,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
+#if canImport(UIKit)
 import UIKit
+#endif
+import LexicalCore
 
 public enum TextNodeThemeSubtype {
   public static let code = "code"
@@ -768,7 +775,9 @@ extension TextNode {
       return { attributeKey, attributeValue, layoutManager, attributeRunCharacterRange, granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
         guard let attributeValue = attributeValue as? UXColor else { return }
         attributeValue.setFill()
-        UIRectFill(rect)
+        if let context = UXGraphicsGetCurrentContext() {
+          context.fill(rect)
+        }
       }
     }
   }

@@ -217,7 +217,7 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       return nil
     }
 
-    let textContainerInset = self.editor?.frontend?.textContainerInsets ?? UIEdgeInsets.zero
+    let textContainerInset = self.editor?.frontend?.textContainerInsets ?? UXEdgeInsets.zero
 
     var positionedRect: CGRect?
     try? editor.read {

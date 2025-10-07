@@ -16,6 +16,9 @@ let package = Package(
       name: "Lexical",
       targets: ["Lexical"]),
     .library(
+      name: "LexicalUIKit",
+      targets: ["LexicalUIKit"]),
+    .library(
       name: "LexicalListPlugin",
       targets: ["LexicalListPlugin"]),
     .library(
@@ -62,78 +65,86 @@ let package = Package(
       name: "Lexical",
       dependencies: ["LexicalCore"],
       path: "./Lexical"),
+    .target(
+      name: "LexicalUIKit",
+      dependencies: ["Lexical"],
+      path: "./UIKit/LexicalUIKit"),
+    .target(
+      name: "LexicalUIKitAppKit",
+      dependencies: ["LexicalUIKit"],
+      path: "./AppKit/LexicalUIKitAppKit"),
     .testTarget(
       name: "LexicalTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin", "LexicalInlineImagePlugin"],
+      dependencies: ["LexicalUIKit", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin", "LexicalInlineImagePlugin"],
       path: "./LexicalTests"),
 
     .target(
       name: "LexicalListPlugin",
-      dependencies: ["Lexical"],
+      dependencies: ["LexicalUIKit"],
       path: "./Plugins/LexicalListPlugin/LexicalListPlugin"),
     .testTarget(
       name: "LexicalListPluginTests",
-      dependencies: ["Lexical", "LexicalListPlugin"],
+      dependencies: ["LexicalUIKit", "LexicalListPlugin"],
       path: "./Plugins/LexicalListPlugin/LexicalListPluginTests"),
     .target(
       name: "LexicalListHTMLSupport",
-      dependencies: ["Lexical", "LexicalListPlugin", "LexicalHTML"],
+      dependencies: ["LexicalUIKit", "LexicalListPlugin", "LexicalHTML"],
       path: "./Plugins/LexicalListPlugin/LexicalListHTMLSupport"),
 
     .target(
       name: "LexicalHTML",
-      dependencies: ["Lexical", "SwiftSoup"],
+      dependencies: ["LexicalUIKit", "SwiftSoup"],
       path: "./Plugins/LexicalHTML/LexicalHTML"),
     .testTarget(
       name: "LexicalHTMLTests",
-      dependencies: ["Lexical", "LexicalHTML", "SwiftSoup"],
+      dependencies: ["LexicalUIKit", "LexicalHTML", "SwiftSoup"],
       path: "./Plugins/LexicalHTML/LexicalHTMLTests"),
 
     .target(
       name: "LexicalAutoLinkPlugin",
-      dependencies: ["Lexical", "LexicalLinkPlugin"],
+      dependencies: ["LexicalUIKit", "LexicalLinkPlugin"],
       path: "./Plugins/LexicalAutoLinkPlugin/LexicalAutoLinkPlugin"),
 
     .target(
       name: "LexicalLinkPlugin",
-      dependencies: ["Lexical"],
+      dependencies: ["LexicalUIKit"],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPlugin"),
     .testTarget(
       name: "LexicalLinkPluginTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin"],
+      dependencies: ["LexicalUIKit", "LexicalLinkPlugin"],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPluginTests"),
     .target(
       name: "LexicalLinkHTMLSupport",
-      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalHTML"],
+      dependencies: ["LexicalUIKit", "LexicalLinkPlugin", "LexicalHTML"],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkHTMLSupport"),
 
     .target(
       name: "LexicalInlineImagePlugin",
-      dependencies: ["Lexical", "SelectableDecoratorNode"],
+      dependencies: ["LexicalUIKit", "SelectableDecoratorNode"],
       path: "./Plugins/LexicalInlineImagePlugin/LexicalInlineImagePlugin"),
     .testTarget(
       name: "LexicalInlineImagePluginTests",
-      dependencies: ["Lexical", "LexicalInlineImagePlugin"],
+      dependencies: ["LexicalUIKit", "LexicalInlineImagePlugin"],
       path: "./Plugins/LexicalInlineImagePlugin/LexicalInlineImagePluginTests"),
 
     .target(
       name: "SelectableDecoratorNode",
-      dependencies: ["Lexical"],
+      dependencies: ["LexicalUIKit"],
       path: "./Plugins/SelectableDecoratorNode/SelectableDecoratorNode"),
 
     .target(
       name: "EditorHistoryPlugin",
-      dependencies: ["Lexical"],
+      dependencies: ["LexicalUIKit"],
       path: "./Plugins/EditorHistoryPlugin/EditorHistoryPlugin"),
     .testTarget(
       name: "EditorHistoryPluginTests",
-      dependencies: ["Lexical", "EditorHistoryPlugin"],
+      dependencies: ["LexicalUIKit", "EditorHistoryPlugin"],
       path: "./Plugins/EditorHistoryPlugin/EditorHistoryPluginTests"),
 
     .target(
       name: "LexicalMarkdown",
       dependencies: [
-        "Lexical",
+        "LexicalUIKit",
         "LexicalLinkPlugin",
         "LexicalListPlugin",
         .product(name: "Markdown", package: "swift-markdown")
@@ -142,14 +153,14 @@ let package = Package(
     .testTarget(
       name: "LexicalMarkdownTests",
       dependencies: [
-        "Lexical",
+        "LexicalUIKit",
         "LexicalMarkdown",
         .product(name: "Markdown", package: "swift-markdown"),
       ],
       path: "./Plugins/LexicalMarkdown/LexicalMarkdownTests"),
     .target(
       name: "LexicalSwiftUI",
-      dependencies: ["Lexical"],
+      dependencies: ["LexicalUIKit"],
       path: "./SwiftUI/LexicalSwiftUI"),
     .target(
       name: "LexicalAppKit",
@@ -157,7 +168,7 @@ let package = Package(
       path: "./AppKit/LexicalAppKit"),
     .testTarget(
       name: "LexicalMacTests",
-      dependencies: ["Lexical", "LexicalAppKit"],
+      dependencies: ["Lexical", "LexicalUIKitAppKit", "LexicalAppKit"],
       path: "./AppKit/Tests/LexicalMacTests"),
   ]
 )

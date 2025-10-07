@@ -8,6 +8,7 @@
 import XCTest
 
 @testable import Lexical
+@testable import LexicalUIKit
 
 extension NodeType {
   static let testDecoratorBlockNode = NodeType(rawValue: "testDecoratorBlockNode")

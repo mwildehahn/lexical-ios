@@ -6,7 +6,8 @@
  */
 
 import Foundation
-import UIKit
+import CoreGraphics
+import LexicalCore
 
 public struct NodeType: Hashable, RawRepresentable, Sendable {
   public init(rawValue: String) {
@@ -34,26 +35,36 @@ public enum Mode: String, Codable {
   case inert
 }
 
-enum LexicalConstants {
+public enum LexicalConstants {
   // If we provide a systemFont as our default, it causes trouble for modifying font family.
   // Apple sets a private key NSCTFontUIUsageAttribute on the font descriptor, and that
   // key overrides any face or family key that we set. Hence we provide a default font of
   // Helvetica instead. Note that we need a fallback to something non-optional, hence
   // we do use system font if Helvetica cannot be found. This should never happen.
-  static let defaultFont = UIFont(name: "Helvetica", size: 15.0) ?? UIFont.systemFont(ofSize: 15.0)
+  public static let defaultFont: UXFont = {
+#if canImport(UIKit)
+    return UXFont(name: "Helvetica", size: 15.0) ?? UXFont.systemFont(ofSize: 15.0)
+#else
+    return UXFont.systemFont(ofSize: 15.0)
+#endif
+  }()
 
-  static let defaultColor: UIColor = {
+  public static let defaultColor: UXColor = {
+#if canImport(UIKit)
     if #available(iOS 13.0, *) {
-      return UIColor.label
+      return UXColor.label
     } else {
-      return UIColor.black
+      return UXColor.black
     }
+#else
+    return UXColor.labelColor
+#endif
   }()
 
   // Sigil value used during node initialization
-  static let uninitializedNodeKey = "uninitializedNodeKey"
+  public static let uninitializedNodeKey = "uninitializedNodeKey"
 
-  static let pasteboardIdentifier = "x-lexical-nodes"
+  public static let pasteboardIdentifier = "x-lexical-nodes"
 }
 
 public typealias DirtyNodeMap = [NodeKey: DirtyStatusCause]
@@ -102,7 +113,7 @@ public enum Destination: Codable {
   case html
 }
 
-enum TextStorageEditingMode {
+public enum TextStorageEditingMode {
   case none
   case controllerMode
 }

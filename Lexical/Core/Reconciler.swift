@@ -6,7 +6,6 @@
  */
 
 import Foundation
-import UIKit
 
 public enum NodePart {
   case preamble
@@ -63,12 +62,19 @@ private class ReconcilerState {
  * is held by the iOS keyboard. We can't set or read that state, so we have to make sure we do the things
  * that the keyboard is expecting.
  */
-internal struct MarkedTextOperation {
+public struct MarkedTextOperation {
 
-  let createMarkedText: Bool
-  let selectionRangeToReplace: NSRange
-  let markedTextString: String
-  let markedTextInternalSelection: NSRange
+  public let createMarkedText: Bool
+  public let selectionRangeToReplace: NSRange
+  public let markedTextString: String
+  public let markedTextInternalSelection: NSRange
+
+  public init(createMarkedText: Bool, selectionRangeToReplace: NSRange, markedTextString: String, markedTextInternalSelection: NSRange) {
+    self.createMarkedText = createMarkedText
+    self.selectionRangeToReplace = selectionRangeToReplace
+    self.markedTextString = markedTextString
+    self.markedTextInternalSelection = markedTextInternalSelection
+  }
 }
 
 internal enum Reconciler {

@@ -6,6 +6,7 @@
  */
 
 @testable import Lexical
+@testable import LexicalUIKit
 @testable import LexicalLinkPlugin
 import XCTest
 

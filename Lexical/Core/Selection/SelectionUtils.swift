@@ -6,7 +6,11 @@
  */
 
 import Foundation
+import LexicalCore
+
+#if canImport(UIKit)
 import UIKit
+#endif
 
 func createPoint(key: NodeKey, offset: Int, type: SelectionType) -> Point {
   Point(key: key, offset: offset, type: type)
@@ -245,7 +249,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
 }
 
 @MainActor
-func createEmptyRangeSelection() -> RangeSelection {
+public func createEmptyRangeSelection() -> RangeSelection {
   let anchor = Point(key: kRootNodeKey, offset: 0, type: .element)
   let focus = Point(key: kRootNodeKey, offset: 0, type: .element)
 
@@ -706,8 +710,9 @@ internal func normalizeSelectionPointsForBoundaries(
   }
 }
 
+#if canImport(UIKit)
 @MainActor
-func validatePosition(
+public func validatePosition(
   textView: UITextView, position: UITextPosition, direction: UXTextStorageDirection
 ) -> UITextPosition {
   var currentPosition = position
@@ -741,3 +746,4 @@ func validatePosition(
 
   return currentPosition
 }
+#endif

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -7,6 +8,7 @@
 
 import Foundation
 import UIKit
+import Lexical
 
 /// The LexicalViewDelegate allows customisation of certain things, most of which correspond to
 /// UITextView delegate methods.
@@ -56,7 +58,7 @@ extension LexicalViewDelegate {
 /// as below the abstraction level for developers using Lexical.
 @MainActor
 @objc public class LexicalView: UIView, Frontend {
-  var textLayoutWidth: CGFloat {
+  public var textLayoutWidth: CGFloat {
     return max(
       textView.bounds.width - textView.textContainerInset.left - textView.textContainerInset.right
         - 2 * textView.textContainer.lineFragmentPadding, 0)
@@ -121,7 +123,7 @@ extension LexicalViewDelegate {
 
   // MARK: - Frontend protocol
 
-  var textStorage: TextStorage {
+  public var textStorage: TextStorage {
     guard let textStorage = self.textView.textStorage as? TextStorage else {
       // this will never happen
       editor.log(.TextView, .error, "Text view had no text storage")
@@ -143,7 +145,7 @@ extension LexicalViewDelegate {
     textView.textContainerInset
   }
 
-  var nativeSelection: NativeSelection {
+  public var nativeSelection: NativeSelection {
     if responderForNodeSelection.isFirstResponder {
       return NativeSelection(
         range: nil, opaqueRange: nil, affinity: .forward, markedRange: nil, markedOpaqueRange: nil,
@@ -173,7 +175,7 @@ extension LexicalViewDelegate {
       selectionIsNodeOrObject: false)
   }
 
-  var isUpdatingNativeSelection: Bool {
+  public var isUpdatingNativeSelection: Bool {
     get {
       textView.isUpdatingNativeSelection
     }
@@ -182,15 +184,15 @@ extension LexicalViewDelegate {
     }
   }
 
-  var isEmpty: Bool {
+  public var isEmpty: Bool {
     textView.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
-  var viewForDecoratorSubviews: UXView? {
+  public var viewForDecoratorSubviews: UXView? {
     textView
   }
 
-  func moveNativeSelection(
+  public func moveNativeSelection(
     type: NativeSelectionModificationType, direction: UXTextStorageDirection,
     granularity: UXTextGranularity
   ) {
@@ -246,15 +248,15 @@ extension LexicalViewDelegate {
     }
   }
 
-  func unmarkTextWithoutUpdate() {
+  public func unmarkTextWithoutUpdate() {
     textView.unmarkTextWithoutUpdate()
   }
 
-  func presentDeveloperFacingError(message: String) {
+  public func presentDeveloperFacingError(message: String) {
     textView.presentDeveloperFacingError(message: message)
   }
 
-  func updateNativeSelection(from selection: BaseSelection) throws {
+  public func updateNativeSelection(from selection: BaseSelection) throws {
     guard let selection = selection as? RangeSelection else {
       // we don't have a range selection.
       _ = responderForNodeSelection.becomeFirstResponder()
@@ -263,11 +265,11 @@ extension LexicalViewDelegate {
     try textView.updateNativeSelection(from: selection)
   }
 
-  func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
+  public func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
     textView.setMarkedTextFromReconciler(markedText, selectedRange: selectedRange)
   }
 
-  func resetSelectedRange() {
+  public func resetSelectedRange() {
     textView.resetSelectedRange()
   }
 
@@ -275,7 +277,7 @@ extension LexicalViewDelegate {
     textView.resetTypingAttributes(for: selectedNode)
   }
 
-  var interceptNextSelectionChangeAndReplaceWithRange: NSRange? {
+  public var interceptNextSelectionChangeAndReplaceWithRange: NSRange? {
     get {
       textView.interceptNextSelectionChangeAndReplaceWithRange
     }
@@ -574,3 +576,5 @@ extension LexicalView: LexicalTextViewDelegate {
     return true
   }
 }
+
+#endif

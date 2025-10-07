@@ -8,7 +8,10 @@
 import Foundation
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
 #endif
+
 
 public class NativeSelection {
 
@@ -21,7 +24,7 @@ public class NativeSelection {
     self.selectionIsNodeOrObject = selectionIsNodeOrObject
   }
 
-  internal init() {
+  public init() {
     self.range = nil
     self.opaqueRange = nil
     self.affinity = .forward
@@ -44,17 +47,17 @@ public class NativeSelection {
   public let range: NSRange?
 
   // Platform-native range representation (UITextRange / NSTextRange). Stored for interoperability.
-  let opaqueRange: UXTextRange?
+  public let opaqueRange: UXTextRange?
 
-  let affinity: UXTextStorageDirection
+  public let affinity: UXTextStorageDirection
 
   // marked text is the iOS term for what Lexical calls `composing`.
   // If these properties are nil, there is no marked text.
   // The opaque range comes straight from the text view; the range (as an NSRange) is calculated by us.
-  let markedRange: NSRange?
-  let markedOpaqueRange: UXTextRange?
+  public let markedRange: NSRange?
+  public let markedOpaqueRange: UXTextRange?
 
   // The selection is something that cannot be represented by a character range. Usually corresponds with
   // NodeSelection or similar within Lexical.
-  let selectionIsNodeOrObject: Bool
+  public let selectionIsNodeOrObject: Bool
 }

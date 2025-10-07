@@ -5,7 +5,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import Foundation
+import CoreGraphics
+import LexicalCore
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /**
  A node that renders an arbitrary `UXView` inline in the text.

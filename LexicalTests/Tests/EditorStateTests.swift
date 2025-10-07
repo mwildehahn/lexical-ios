@@ -8,6 +8,7 @@
 import XCTest
 
 @testable import Lexical
+@testable import LexicalUIKit
 
 @MainActor
 class EditorStateTests: XCTestCase {

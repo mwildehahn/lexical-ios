@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import UIKit
+import Foundation
 
 public class RootNode: ElementNode {
 
@@ -49,9 +49,11 @@ public class RootNode: ElementNode {
       includeInert: includeInert,
       includeDirectionless: includeDirectionless,
       maxLength: maxLength)
-    if let ed = getActiveEditor(), ed.frontend is LexicalReadOnlyTextKitContext, s.hasPrefix("\n") {
+#if canImport(UIKit)
+    if let ed = getActiveEditor(), ed.frontend is ReadOnlyFrontend, s.hasPrefix("\n") {
       return String(s.dropFirst(1))
     }
+#endif
     return s
   }
 

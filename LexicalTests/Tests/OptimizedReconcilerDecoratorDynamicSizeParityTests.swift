@@ -1,5 +1,6 @@
 import XCTest
 @testable import Lexical
+@testable import LexicalUIKit
 
 private extension NodeType {
   static let resizableTestNode = NodeType(rawValue: "resizableTestNode")

@@ -29,7 +29,7 @@ internal func rootTextContent() -> String {
 }
 
 @MainActor
-internal func canShowPlaceholder(isComposing: Bool) -> Bool {
+public func canShowPlaceholder(isComposing: Bool) -> Bool {
   if !isRootTextContentEmpty(isEditorComposing: isComposing, trim: false) {
     return false
   }

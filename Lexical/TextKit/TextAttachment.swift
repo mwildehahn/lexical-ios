@@ -5,7 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import LexicalCore
 
 @MainActor
 public class TextAttachment: NSTextAttachment {
@@ -41,7 +46,7 @@ public class TextAttachment: NSTextAttachment {
   // necessary to stop UIKit drawing a placeholder image
   override public func image(
     forBounds imageBounds: CGRect, textContainer: NSTextContainer?, characterIndex charIndex: Int
-  ) -> UIImage? {
-    return UIImage()
+  ) -> UXImage? {
+    return UXImage()
   }
 }

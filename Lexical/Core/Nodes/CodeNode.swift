@@ -5,7 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#endif
+import Foundation
+import CoreGraphics
+import LexicalCore
 
 // This is an ObjC class because it needs to conform to NSObject's equality, otherwise the Layout Manager
 // can't iterate through attributes properly.
@@ -158,9 +163,15 @@ extension CodeNode {
     return {
       attributeKey, attributeValue, layoutManager, attributeRunCharacterRange,
       granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
+      #if canImport(UIKit)
       guard let context = UIGraphicsGetCurrentContext(),
         let attributeValue = attributeValue as? CodeBlockCustomDrawingAttributes
       else { return }
+      #else
+      guard let context = UXGraphicsGetCurrentContext(),
+        let attributeValue = attributeValue as? CodeBlockCustomDrawingAttributes
+      else { return }
+      #endif
       context.setFillColor(attributeValue.background.cgColor)
       context.fill(rect)
 

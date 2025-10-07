@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -8,6 +9,7 @@
 import MobileCoreServices
 import UIKit
 import UniformTypeIdentifiers
+import Lexical
 
 @MainActor
 protocol LexicalTextViewDelegate: NSObjectProtocol {
@@ -717,3 +719,5 @@ private class CustomSelectionRect: UITextSelectionRect {
     return baseRect.isVertical
   }
 }
+
+#endif

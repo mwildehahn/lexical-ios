@@ -6,8 +6,8 @@
  */
 
 import Foundation
-import UIKit
 import QuartzCore
+import LexicalCore
 
 // Optimized reconciler entry point. Initially a thin wrapper so we can land
 // the feature flag, metrics, and supporting data structures incrementally.
@@ -246,7 +246,7 @@ internal enum OptimizedReconciler {
     
     // Step 5: Batch decorator operations without animations
     if !decoratorOps.isEmpty {
-      UIView.performWithoutAnimation {
+      UXPerformWithoutAnimation {
         for op in decoratorOps {
           switch op {
           case .decoratorAdd(let key):
@@ -442,7 +442,7 @@ internal enum OptimizedReconciler {
     }
     
     // Apply all updates in single pass without animations
-    UIView.performWithoutAnimation {
+    UXPerformWithoutAnimation {
       for (key, location) in updates {
         textStorage.decoratorPositionCache[key] = location
       }
@@ -1241,7 +1241,8 @@ internal enum OptimizedReconciler {
 
     // Headless/read-only contexts still need decorator cache state updates for parity
     // (e.g., dirty -> needsDecorating) even when taking the text-only path.
-    if editor.frontend is LexicalReadOnlyTextKitContext {
+#if canImport(UIKit)
+    if editor.frontend is ReadOnlyFrontend {
       reconcileDecoratorOpsForSubtree(
         ancestorKey: kRootNodeKey,
         prevState: currentEditorState,
@@ -1249,6 +1250,7 @@ internal enum OptimizedReconciler {
         editor: editor
       )
     }
+#endif
 
     // Selection reconcile
     if shouldReconcileSelection {
@@ -1285,7 +1287,9 @@ internal enum OptimizedReconciler {
     }
     // Read-only contexts (no real TextView) can have different layout/spacing ordering.
     // Keep optimized active but skip this structural fast path in read-only to preserve parity.
-    if editor.frontend is LexicalReadOnlyTextKitContext { return false }
+#if canImport(UIKit)
+    if editor.frontend is ReadOnlyFrontend { return false }
+#endif
 
     // Find a parent Element whose children gained exactly one child (no removals)
     // and no other structural deltas.
@@ -2106,7 +2110,9 @@ internal enum OptimizedReconciler {
     fenwickAggregatedDeltas: inout [NodeKey: Int]
   ) throws -> Bool {
     // Skip attributes-only structural path in read-only to avoid spacing/order mismatches.
-    if editor.frontend is LexicalReadOnlyTextKitContext { return false }
+#if canImport(UIKit)
+    if editor.frontend is ReadOnlyFrontend { return false }
+#endif
     guard editor.dirtyNodes.count == 1, let dirtyKey = editor.dirtyNodes.keys.first else {
       return false
     }

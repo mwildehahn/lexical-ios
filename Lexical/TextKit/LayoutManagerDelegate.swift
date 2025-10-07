@@ -5,16 +5,21 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import LexicalCore
 
 @MainActor
-class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {
-  func layoutManager(
+public final class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {
+  public func layoutManager(
     _ layoutManager: NSLayoutManager,
     shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
     properties: UnsafePointer<NSLayoutManager.GlyphProperty>,
     characterIndexes: UnsafePointer<Int>,
-    font: UIFont,
+    font: UXFont,
     forGlyphRange glyphRange: NSRange
   ) -> Int {
 

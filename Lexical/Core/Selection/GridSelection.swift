@@ -6,7 +6,6 @@
  */
 
 import Foundation
-import UIKit
 
 @MainActor
 public class GridSelection: BaseSelection {

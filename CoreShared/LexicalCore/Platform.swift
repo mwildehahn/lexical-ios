@@ -1,3 +1,7 @@
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
+
 #if canImport(UIKit)
 import UIKit
 
@@ -11,6 +15,16 @@ public typealias UXPasteboard = UIPasteboard
 public typealias UXTextStorageDirection = UITextStorageDirection
 public typealias UXTextGranularity = UITextGranularity
 public typealias UXTextRange = UITextRange
+public typealias UXKeyCommand = UIKeyCommand
+
+@MainActor
+public func UXPerformWithoutAnimation(_ updates: () -> Void) {
+  UIView.performWithoutAnimation(updates)
+}
+
+public func UXGraphicsGetCurrentContext() -> CGContext? {
+  UIGraphicsGetCurrentContext()
+}
 
 #elseif canImport(AppKit)
 import AppKit
@@ -21,6 +35,9 @@ public typealias UXImage = NSImage
 public typealias UXEdgeInsets = NSEdgeInsets
 public typealias UXView = NSView
 public typealias UXPasteboard = NSPasteboard
+
+public class LexicalView: NSView {}
+public class LexicalReadOnlyTextKitContext {}
 
 public enum UXTextStorageDirection {
   case forward
@@ -41,6 +58,16 @@ public extension NSEdgeInsets {
 }
 
 public typealias UXTextRange = AnyObject
+public typealias UXKeyCommand = AnyObject
+
+@MainActor
+public func UXPerformWithoutAnimation(_ updates: () -> Void) {
+  updates()
+}
+
+public func UXGraphicsGetCurrentContext() -> CGContext? {
+  NSGraphicsContext.current?.cgContext
+}
 
 #else
 #error("Unsupported platform: Lexical requires either UIKit or AppKit")

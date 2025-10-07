@@ -19,7 +19,7 @@ import CoreGraphics
 /// In the future it will be possible to use Lexical without a Frontend, in Headless mode (allowing editing
 /// an EditorState but providing no conversion to NSAttributedString).
 @MainActor
-internal protocol Frontend: AnyObject {
+public protocol Frontend: AnyObject {
   var textStorage: TextStorage { get }
   var layoutManager: LayoutManager { get }
   var textContainerInsets: UXEdgeInsets { get }
@@ -43,6 +43,10 @@ internal protocol Frontend: AnyObject {
   func updateOverlayTargets(_ rects: [CGRect])
 }
 
-extension Frontend {
-  func updateOverlayTargets(_ rects: [CGRect]) { }
+@MainActor
+public protocol ReadOnlyFrontend: Frontend {}
+
+public extension Frontend {
+
+  public func updateOverlayTargets(_ rects: [CGRect]) { }
 }

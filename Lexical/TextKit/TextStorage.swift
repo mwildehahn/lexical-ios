@@ -5,17 +5,22 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import LexicalCore
 
 @MainActor
 public class TextStorage: NSTextStorage {
 
-  internal typealias CharacterLocation = Int
-  @objc internal var decoratorPositionCache: [NodeKey: CharacterLocation] = [:]
+  public typealias CharacterLocation = Int
+  @objc public var decoratorPositionCache: [NodeKey: CharacterLocation] = [:]
 
   private var backingAttributedString: NSMutableAttributedString
-  var mode: TextStorageEditingMode
-  weak var editor: Editor?
+  public var mode: TextStorageEditingMode
+  public weak var editor: Editor?
 
   override public init() {
     backingAttributedString = NSMutableAttributedString()
@@ -23,7 +28,7 @@ public class TextStorage: NSTextStorage {
     super.init()
   }
 
-  convenience init(editor: Editor) {
+  public convenience init(editor: Editor) {
     self.init()
     self.editor = editor
     self.backingAttributedString = NSMutableAttributedString()
@@ -34,6 +39,13 @@ public class TextStorage: NSTextStorage {
   required init?(coder: NSCoder) {
     fatalError("\(#function) has not been implemented")
   }
+#if canImport(AppKit)
+  public required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
+    backingAttributedString = NSMutableAttributedString()
+    mode = .none
+    super.init()
+  }
+#endif
 
   override open var string: String {
     return backingAttributedString.string

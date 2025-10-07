@@ -17,7 +17,7 @@ public class TextViewMac: NSTextView {
   /// native selection is being synchronised.
   internal var isUpdatingNativeSelection = false
   internal var interceptNextSelectionChangeAndReplaceWithRange: NSRange?
-  internal var selectionAffinity: UXTextStorageDirection = .forward
+  internal var lexicalSelectionAffinity: UXTextStorageDirection = .forward
   internal let pasteboard = UXPasteboard.general
 
   public init(editorConfig: EditorConfig = EditorConfig(theme: Theme(), plugins: []),
@@ -38,7 +38,13 @@ public class TextViewMac: NSTextView {
     isEditable = true
     isRichText = true
     drawsBackground = true
-    font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    if #available(macOS 10.15, *) {
+      font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+    } else if let fixed = NSFont.userFixedPitchFont(ofSize: 14) {
+      font = fixed
+    } else {
+      font = NSFont.systemFont(ofSize: 14)
+    }
     if #available(macOS 10.14, *) {
       usesAdaptiveColorMappingForDarkAppearance = true
     }
@@ -67,18 +73,18 @@ public class TextViewMac: NSTextView {
 
     let nativeSelection = try createNativeSelection(from: selection, editor: editor)
     if let range = nativeSelection.range {
-      selectedRange = range
-      selectionAffinity = nativeSelection.affinity
+      setSelectedRange(range)
+      lexicalSelectionAffinity = nativeSelection.affinity
     }
   }
 
   internal func resetSelectedRange() {
-    selectedRange = NSRange(location: 0, length: 0)
-    selectionAffinity = .forward
+    setSelectedRange(NSRange(location: 0, length: 0))
+    lexicalSelectionAffinity = .forward
   }
 
   internal func unmarkTextWithoutUpdate() {
-    super.unmarkText(nil)
+    super.unmarkText()
   }
 
   internal func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
@@ -214,18 +220,18 @@ public class TextViewMac: NSTextView {
     }
 
     if markedText.isEmpty {
-      unmarkText(nil)
+      unmarkText()
       return
     }
 
     setMarkedTextInternal(markedText, selectedRange: selectedRange, replacementRange: replacementRange)
   }
 
-  public override func unmarkText(_ sender: Any?) {
+  public override func unmarkText() {
     let previousMarkedRange = editor.getNativeSelection().markedRange
     let previousUpdatingState = isUpdatingNativeSelection
     isUpdatingNativeSelection = true
-    super.unmarkText(sender)
+    super.unmarkText()
     isUpdatingNativeSelection = previousUpdatingState
 
     guard let previousMarkedRange else {
@@ -275,7 +281,7 @@ public class TextViewMac: NSTextView {
     }
 
     editor.dispatchCommand(type: .insertText, payload: text)
-    selectionAffinity = .forward
+    lexicalSelectionAffinity = .forward
     showPlaceholderText()
   }
 
@@ -301,7 +307,7 @@ public class TextViewMac: NSTextView {
     let rangeToReplace: NSRange
     if replacementRange.location != NSNotFound {
       rangeToReplace = replacementRange
-      selectedRange = replacementRange
+      setSelectedRange(replacementRange)
     } else if let markedRange = editor.getNativeSelection().markedRange {
       rangeToReplace = markedRange
     } else {

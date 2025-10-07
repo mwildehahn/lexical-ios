@@ -6,7 +6,9 @@
  */
 
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @MainActor
 internal func shadowCompareOptimizedVsLegacy(
@@ -14,6 +16,7 @@ internal func shadowCompareOptimizedVsLegacy(
   currentEditorState: EditorState,
   pendingEditorState: EditorState
 ) {
+#if canImport(UIKit)
   guard let optimizedText = activeEditor.frontend?.textStorage else { return }
 
   func verifyRangeCacheInvariants(editor: Editor, label: String) {
@@ -89,11 +92,18 @@ internal func shadowCompareOptimizedVsLegacy(
 
   if optimizedText.string != legacyText.string {
     if activeEditor.featureFlags.verboseLogging {
-      print("🔥 SHADOW-COMPARE: MISMATCH optimized vs legacy:\nOPT: \(optimizedText.string)\nLEG: \(legacyText.string)")
+      print("""
+🔥 SHADOW-COMPARE: MISMATCH optimized vs legacy:
+OPT: \(optimizedText.string)
+LEG: \(legacyText.string)
+""")
     }
   }
 
   // Range cache invariants for both editors
   verifyRangeCacheInvariants(editor: activeEditor, label: "optimized")
   verifyRangeCacheInvariants(editor: legacyEditor, label: "legacy")
+#else
+  activeEditor.log(.editor, .verbose, "shadowCompareOptimizedVsLegacy unavailable on this platform")
+#endif
 }

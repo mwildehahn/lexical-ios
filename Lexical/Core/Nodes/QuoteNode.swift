@@ -5,7 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import UIKit
+import Foundation
+import CoreGraphics
+import LexicalCore
 
 public class QuoteNode: ElementNode {
   override public init() {
@@ -83,7 +85,10 @@ public class QuoteNode: ElementNode {
     return lhs.barColor == rhs.barColor &&
       lhs.barWidth == rhs.barWidth &&
       lhs.rounded == rhs.rounded &&
-      lhs.barInsets == rhs.barInsets
+      lhs.barInsets.top == rhs.barInsets.top &&
+      lhs.barInsets.left == rhs.barInsets.left &&
+      lhs.barInsets.bottom == rhs.barInsets.bottom &&
+      lhs.barInsets.right == rhs.barInsets.right
   }
 }
 
@@ -103,11 +108,14 @@ extension QuoteNode {
                              height: rect.height - attributeValue.barInsets.top - attributeValue.barInsets.bottom)
         attributeValue.barColor.setFill()
 
-        if attributeValue.rounded {
-          let bezierPath = UIBezierPath(roundedRect: barRect, cornerRadius: attributeValue.barWidth / 2)
-          bezierPath.fill()
-        } else {
-          UIRectFill(barRect)
+        if let context = UXGraphicsGetCurrentContext() {
+          if attributeValue.rounded {
+            let path = CGPath(roundedRect: barRect, cornerWidth: attributeValue.barWidth / 2, cornerHeight: attributeValue.barWidth / 2, transform: nil)
+            context.addPath(path)
+            context.fillPath()
+          } else {
+            context.fill(barRect)
+          }
         }
       }
     }

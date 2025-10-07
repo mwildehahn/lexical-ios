@@ -1,5 +1,6 @@
 import XCTest
 @testable import Lexical
+@testable import LexicalUIKit
 
 final class FenwickTreeTests: XCTestCase {
   func testPrefixAndRangeSums() {

@@ -1,5 +1,6 @@
 import XCTest
 @testable import Lexical
+@testable import LexicalUIKit
 @testable import LexicalAutoLinkPlugin
 @testable import EditorHistoryPlugin
 

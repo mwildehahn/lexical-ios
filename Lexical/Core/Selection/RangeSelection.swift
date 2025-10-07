@@ -6,7 +6,6 @@
  */
 
 import Foundation
-import UIKit
 
 @MainActor
 public class RangeSelection: BaseSelection {
@@ -1067,8 +1066,8 @@ public class RangeSelection: BaseSelection {
     // Optimized: pre-clamp a single grapheme (composed character) deletion when starting
     // from a collapsed caret. This avoids relying on native tokenizer behavior that may
     var didPreClampSingleChar = false
-    if isBackwards && wasCollapsed, let editor = getActiveEditor(),
-       editor.frontend is LexicalView, editor.featureFlags.useOptimizedReconciler {
+#if canImport(UIKit)
+    if isBackwards && wasCollapsed, let editor = getActiveEditor(), !(editor.frontend is ReadOnlyFrontend), editor.featureFlags.useOptimizedReconciler {
       if let start = caretStringLocation, start > 0 {
         let clamp: NSRange
         if let ns = editor.textStorage?.string as NSString?, editor.featureFlags.useOptimizedReconcilerStrictMode {
@@ -1126,6 +1125,7 @@ public class RangeSelection: BaseSelection {
         }
       }
     }
+#endif
     // Capture potential caret remap target for list/item merges when deleting backwards
     var preDeletePreviousTextKey: NodeKey? = nil
     if isBackwards && wasCollapsed && anchor.type == .text && anchor.offset == 0 {
@@ -1157,7 +1157,8 @@ public class RangeSelection: BaseSelection {
     // Read-only fallback: there is no native selection movement. If collapsed,
     // synthesize a one-character selection using rangeCache so removeText() can
     // splice correctly. This mirrors what UIKit selection movement would do.
-    if let editor = getActiveEditor(), editor.frontend is LexicalReadOnlyTextKitContext, isCollapsed() {
+#if canImport(UIKit)
+    if let editor = getActiveEditor(), editor.frontend is ReadOnlyFrontend, isCollapsed() {
       if let anchorLoc = try stringLocationForPoint(anchor, editor: editor) {
         // If at absolute doc start and deleting backwards, this is a no-op.
         if isBackwards && anchorLoc == 0 {
@@ -1170,6 +1171,7 @@ public class RangeSelection: BaseSelection {
         try applySelectionRange(rng, affinity: isBackwards ? .backward : .forward)
       }
     }
+#endif
     if isCollapsed() {
       let anchor = self.anchor
       let focus = self.focus
@@ -1288,7 +1290,7 @@ public class RangeSelection: BaseSelection {
       // on fast backspaces after typing a new word). If selection started collapsed and
       // the native tokenizer expanded to more than one character (e.g., a whole word),
       // force a single-character deletion to mirror legacy behavior.
-      if wasCollapsed, let editor = getActiveEditor(), editor.frontend is LexicalView, editor.featureFlags.useOptimizedReconciler {
+      if wasCollapsed, let editor = getActiveEditor(), !(editor.frontend is ReadOnlyFrontend), editor.featureFlags.useOptimizedReconciler {
         if !isCollapsed(), let start = caretStringLocation,
            let a = try? stringLocationForPoint(anchor, editor: editor),
            let b = try? stringLocationForPoint(focus, editor: editor) {
@@ -1590,7 +1592,7 @@ public class RangeSelection: BaseSelection {
   }
 
   @MainActor
-  internal func applySelectionRange(_ range: NSRange, affinity: UXTextStorageDirection) throws {
+  public func applySelectionRange(_ range: NSRange, affinity: UXTextStorageDirection) throws {
     guard let editor = getActiveEditor() else {
       throw LexicalError.invariantViolation("Calling applyNativeSelection when no active editor")
     }

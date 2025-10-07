@@ -6,14 +6,13 @@
  */
 
 import Foundation
-import UIKit
 
 // This function is analagous to the parts of onBeforeInput() where inputType == 'insertText'.
 // However, on iOS, we are assuming that `shouldPreventDefaultAndInsertText()` has already been checked
 // before calling onInsertTextFromUITextView().
 
 @MainActor
-internal func onInsertTextFromUITextView(
+public func onInsertTextFromUITextView(
   text: String, editor: Editor,
   updateMode: UpdateBehaviourModificationMode = UpdateBehaviourModificationMode()
 ) throws {
@@ -187,7 +186,7 @@ func checkIfTokenOrCanTextBeInserted(node: TextNode) -> Bool {
 
 // triggered by selection change event from the UITextView
 @MainActor
-internal func onSelectionChange(editor: Editor) {
+public func onSelectionChange(editor: Editor) {
   // Note: we have to detect selection changes here even if an update is in progress, otherwise marked text breaks!
   do {
     try editor.updateWithCustomBehaviour(

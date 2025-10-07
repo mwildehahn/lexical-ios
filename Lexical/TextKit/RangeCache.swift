@@ -5,7 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import UIKit
+import Foundation
+import LexicalCore
 
 /* The range cache is used when updating the NSTextStorage following a change to Lexical's
  * data model. In order to do the update with nuance, changing only the bits of the string
@@ -13,21 +14,21 @@ import UIKit
  * is how this information is stored, to save having to regenerate it (an expensive operation).
  */
 
-struct RangeCacheItem {
+public struct RangeCacheItem {
   // Legacy absolute location (TextKit 1)
-  var location: Int = 0
+  public var location: Int = 0
   // Optional index for Fenwick-backed absolute locations (optimized reconciler)
   // 0 indicates unused in this branch.
-  var nodeIndex: Int = 0
+  public var nodeIndex: Int = 0
   // the length of the full preamble, including any special characters
-  var preambleLength: Int = 0
+  public var preambleLength: Int = 0
   // the length of any special characters in the preamble
-  var preambleSpecialCharacterLength: Int = 0
-  var childrenLength: Int = 0
-  var textLength: Int = 0
-  var postambleLength: Int = 0
+  public var preambleSpecialCharacterLength: Int = 0
+  public var childrenLength: Int = 0
+  public var textLength: Int = 0
+  public var postambleLength: Int = 0
 
-  var range: NSRange {
+  public var range: NSRange {
     NSRange(
       location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
@@ -56,7 +57,7 @@ struct RangeCacheItem {
  * first Text node, or at the start of the second Text node.
  */
 @MainActor
-internal func pointAtStringLocation(
+public func pointAtStringLocation(
   _ location: Int, searchDirection: UXTextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> Point? {
   do {

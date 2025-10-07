@@ -5,7 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import UIKit
+import Foundation
+import CoreGraphics
+import LexicalCore
 
 @objc public class NodeKeyMultiplier: NSObject {
   let depthBlockSize: UInt64
@@ -27,12 +29,12 @@ import UIKit
   public let plugins: [Plugin]
   public let editorStateVersion: Int
   public let nodeKeyMultiplier: NodeKeyMultiplier?
-  public let keyCommands: [UIKeyCommand]?
+  public let keyCommands: [UXKeyCommand]?
   public let metricsContainer: EditorMetricsContainer?
 
   public init(
     theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
-    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil,
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UXKeyCommand]? = nil,
     metricsContainer: EditorMetricsContainer? = nil
   ) {
     self.theme = theme
@@ -45,7 +47,7 @@ import UIKit
 
   @objc public convenience init(
     theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
-    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UXKeyCommand]? = nil
   ) {
     self.init(
       theme: theme,
@@ -60,11 +62,11 @@ import UIKit
 
 internal enum DecoratorCacheItem {
   case needsCreation
-  case cachedView(UIView)
-  case unmountedCachedView(UIView)
-  case needsDecorating(UIView)
+  case cachedView(UXView)
+  case unmountedCachedView(UXView)
+  case needsDecorating(UXView)
 
-  var view: UIView? {
+  var view: UXView? {
     switch self {
     case .needsCreation:
       return nil
@@ -91,11 +93,11 @@ public class Editor: NSObject {
   private var pendingEditorState: EditorState?
   private var theme: Theme
 
-  internal var textStorage: TextStorage? {
+  public var textStorage: TextStorage? {
     frontend?.textStorage
   }
 
-  internal weak var frontend: Frontend? {
+  public weak var frontend: Frontend? {
     didSet {
       if pendingEditorState != nil {
         if let textStorage {
@@ -122,7 +124,7 @@ public class Editor: NSObject {
   internal var isRecoveringFromError: Bool = false
 
   // See description in RangeCache.swift.
-  internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
+  public internal(set) var rangeCache: [NodeKey: RangeCacheItem] = [:]
   private var dfsOrderCache: [NodeKey]? = nil
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
@@ -141,7 +143,7 @@ public class Editor: NSObject {
   internal var nextFenwickNodeIndex: Int = 1
 
   // Used to help co-ordinate selection and events
-  internal var compositionKey: NodeKey?
+  public var compositionKey: NodeKey?
   public var dirtyType: DirtyType = .noDirtyNodes  // TODO: I made this public to work around an issue in playground. @amyworrall
   public var featureFlags: FeatureFlags = FeatureFlags()
 
@@ -151,7 +153,7 @@ public class Editor: NSObject {
   // Used for storing and dispatching command listeners
   internal var commands: Commands = [:]
 
-  internal var plugins: [Plugin]
+  public private(set) var plugins: [Plugin]
   internal let metricsContainer: EditorMetricsContainer?
 
   // Used to cache decorators
@@ -210,7 +212,7 @@ public class Editor: NSObject {
     resetEditor()
   }
 
-  convenience init(featureFlags: FeatureFlags, editorConfig: EditorConfig) {
+  public convenience init(featureFlags: FeatureFlags, editorConfig: EditorConfig) {
     self.init(editorConfig: editorConfig)
     self.featureFlags = featureFlags
   }
@@ -542,7 +544,7 @@ public class Editor: NSObject {
 
   // MARK: - Selection
 
-  internal func getNativeSelection() -> NativeSelection {
+  public func getNativeSelection() -> NativeSelection {
     return frontend?.nativeSelection ?? NativeSelection()
   }
 
@@ -1216,19 +1218,19 @@ public class Editor: NSObject {
   }
 }
 
-internal enum NativeSelectionModificationType {
+public enum NativeSelectionModificationType {
   case move
   case extend
 }
 
-internal struct UpdateBehaviourModificationMode {
-  let markedTextOperation: MarkedTextOperation?
-  let skipTransforms: Bool
-  let suppressReconcilingSelection: Bool
-  let suppressSanityCheck: Bool
-  let allowUpdateWithoutTextStorage: Bool
+public struct UpdateBehaviourModificationMode {
+  public let markedTextOperation: MarkedTextOperation?
+  public let skipTransforms: Bool
+  public let suppressReconcilingSelection: Bool
+  public let suppressSanityCheck: Bool
+  public let allowUpdateWithoutTextStorage: Bool
 
-  internal init(
+  public init(
     suppressReconcilingSelection: Bool = false,
     suppressSanityCheck: Bool = false,
     markedTextOperation: MarkedTextOperation? = nil,

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -7,6 +8,7 @@
 
 import Foundation
 import UIKit
+import Lexical
 
 @MainActor
 class ResponderForNodeSelection: UIResponder, UIKeyInput {
@@ -46,3 +48,5 @@ class ResponderForNodeSelection: UIResponder, UIKeyInput {
     textView
   }
 }
+
+#endif

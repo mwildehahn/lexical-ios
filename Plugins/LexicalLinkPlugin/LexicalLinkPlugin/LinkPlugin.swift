@@ -6,7 +6,7 @@
  */
 
 import Foundation
-import Lexical
+import LexicalUIKit
 import UIKit
 
 extension CommandType {

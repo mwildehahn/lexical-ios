@@ -7,6 +7,7 @@
 
 import Foundation
 @testable import Lexical
+@testable import LexicalUIKit
 import XCTest
 
 class UnknownNodeTests: XCTestCase {

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -94,3 +95,5 @@ import UIKit
     textKitContext.editor.dispatchCommand(type: .readOnlyViewTapped, payload: nil)
   }
 }
+
+#endif

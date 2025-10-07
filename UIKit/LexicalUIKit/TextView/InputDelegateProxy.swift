@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -6,6 +7,7 @@
  */
 
 import UIKit
+import Lexical
 
 @MainActor
 internal class InputDelegateProxy: NSObject, UITextInputDelegate {
@@ -51,3 +53,5 @@ internal class InputDelegateProxy: NSObject, UITextInputDelegate {
     }
   #endif
 }
+
+#endif

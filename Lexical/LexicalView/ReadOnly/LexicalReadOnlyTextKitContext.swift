@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -6,61 +7,10 @@
  */
 
 import UIKit
-
-internal class LexicalReadOnlySizeCache {
-
-  internal enum TruncationStringMode {
-    case noTruncation
-    case displayedInLastLine
-    case displayedUnderLastLine
-  }
-
-  var requiredWidth: CGFloat = 0
-  var requiredHeight: CGFloat?  // nil if auto height
-  var measuredTextKitHeight: CGFloat?  // the height of rendered text. Will always be less than the targetHeight
-  var customTruncationString: String?  // set to nil to opt out of custom truncation
-  var customTruncationAttributes: [NSAttributedString.Key: Any] = [:]
-  var truncationStringMode: TruncationStringMode = .noTruncation  // this is the computed truncation mode, not the desired mode
-  var extraHeightForTruncationLine: CGFloat = 0  // iff truncationStringMode is displayedUnderLastLine, this is the height needed to add to the main height.
-  var cachedTextContainerInsets: UIEdgeInsets = .zero
-  var glyphRangeForLastLineFragmentBeforeTruncation: NSRange?
-  var glyphRangeForLastLineFragmentAfterTruncation: NSRange?
-  var characterRangeForLastLineFragmentBeforeTruncation: NSRange?
-  var glyphIndexAtTruncationIndicatorCutPoint: Int?  // assuming the truncation indicator is inline, this is where it would be cut.
-  var textContainerDidShrinkLastLine: Bool?
-  var sizeForTruncationString: CGSize?
-  var originForTruncationStringInTextKitCoordinates: CGPoint?  // need adding the insets left/top to get it in view coordinates
-  var gapBeforeTruncationString: CGFloat = 6.0
-
-  var completeHeightToRender: CGFloat {
-    guard let measuredTextKitHeight else { return 0 }
-    var height = measuredTextKitHeight
-
-    // add insets if necessary
-    height += cachedTextContainerInsets.top
-    height += cachedTextContainerInsets.bottom
-
-    if truncationStringMode == .displayedUnderLastLine {
-      height += extraHeightForTruncationLine
-    }
-
-    return height
-  }
-
-  var completeSizeToRender: CGSize {
-    return CGSize(width: requiredWidth, height: completeHeightToRender)
-  }
-
-  var customTruncationRect: CGRect? {
-    guard let origin = originForTruncationStringInTextKitCoordinates,
-      let size = sizeForTruncationString
-    else { return nil }
-    return CGRect(origin: origin, size: size)
-  }
-}
+import LexicalCore
 
 @MainActor
-@objc public class LexicalReadOnlyTextKitContext: NSObject, Frontend {
+@objc public class LexicalReadOnlyTextKitContext: NSObject, ReadOnlyFrontend {
   @objc public let layoutManager: LayoutManager
   public let textStorage: TextStorage
   public let textContainer: TextContainer
@@ -248,7 +198,7 @@ internal class LexicalReadOnlySizeCache {
     return sizeCache.completeSizeToRender
   }
 
-  var textLayoutWidth: CGFloat {
+  public var textLayoutWidth: CGFloat {
     return textContainer.size.width - 2 * textContainer.lineFragmentPadding
   }
 
@@ -266,58 +216,58 @@ internal class LexicalReadOnlySizeCache {
   @objc public var textContainerInsets: UXEdgeInsets = UXEdgeInsets(
     top: 5, left: 5, bottom: 5, right: 5)
 
-  var nativeSelection: NativeSelection {
+  public var nativeSelection: NativeSelection {
     NativeSelection()
   }
 
-  var viewForDecoratorSubviews: UXView? {
+  public var viewForDecoratorSubviews: UXView? {
     return self.attachedView
   }
 
-  var isEmpty: Bool {
+  public var isEmpty: Bool {
     return textStorage.length == 0
   }
 
-  var isUpdatingNativeSelection: Bool = false
+  public var isUpdatingNativeSelection: Bool = false
 
-  var interceptNextSelectionChangeAndReplaceWithRange: NSRange?
+  public var interceptNextSelectionChangeAndReplaceWithRange: NSRange?
 
-  func moveNativeSelection(
+  public func moveNativeSelection(
     type: NativeSelectionModificationType, direction: UXTextStorageDirection,
     granularity: UXTextGranularity
   ) {
     // no-op
   }
 
-  func unmarkTextWithoutUpdate() {
+  public func unmarkTextWithoutUpdate() {
     // no-op
   }
 
-  func presentDeveloperFacingError(message: String) {
+  public func presentDeveloperFacingError(message: String) {
     // no-op
   }
 
-  func updateNativeSelection(from selection: BaseSelection) throws {
+  public func updateNativeSelection(from selection: BaseSelection) throws {
     // no-op
   }
 
-  func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
+  public func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
     // no-op
   }
 
-  func resetSelectedRange() {
+  public func resetSelectedRange() {
     // no-op
   }
 
-  func resetTypingAttributes(for selectedNode: Node) {
+  public func resetTypingAttributes(for selectedNode: Node) {
     // no-op
   }
 
-  func showPlaceholderText() {
+  public func showPlaceholderText() {
     // no-op
   }
 
-  var isFirstResponder: Bool {
+  public var isFirstResponder: Bool {
     false
   }
 
@@ -337,3 +287,5 @@ internal class LexicalReadOnlySizeCache {
     context.restoreGState()
   }
 }
+
+#endif

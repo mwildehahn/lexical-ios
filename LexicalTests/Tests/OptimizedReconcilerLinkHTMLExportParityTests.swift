@@ -1,5 +1,6 @@
 import XCTest
 @testable import Lexical
+@testable import LexicalUIKit
 @testable import LexicalHTML
 @testable import LexicalLinkPlugin
 @testable import LexicalLinkHTMLSupport

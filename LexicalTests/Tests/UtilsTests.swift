@@ -6,6 +6,7 @@
  */
 
 @testable import Lexical
+@testable import LexicalUIKit
 import XCTest
 
 class UtilsTests: XCTestCase {

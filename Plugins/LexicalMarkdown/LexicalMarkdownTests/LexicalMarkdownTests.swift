@@ -7,6 +7,7 @@
 
 import Foundation
 @testable import Lexical
+@testable import LexicalUIKit
 @testable import LexicalListPlugin
 @testable import LexicalMarkdown
 import XCTest

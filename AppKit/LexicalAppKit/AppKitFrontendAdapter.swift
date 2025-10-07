@@ -70,58 +70,58 @@ public final class AppKitFrontendAdapter {
 // MARK: - Frontend conformance
 
 extension AppKitFrontendAdapter: Frontend {
-  var textStorage: TextStorage {
+  public var textStorage: TextStorage {
     textView.lexicalTextStorage
   }
 
-  var layoutManager: LayoutManager {
+  public var layoutManager: LayoutManager {
     textView.lexicalLayoutManager
   }
 
-  var textContainerInsets: UXEdgeInsets {
+  public var textContainerInsets: UXEdgeInsets {
     textView.lexicalTextContainerInsets
   }
 
-  var nativeSelection: NativeSelection {
+  public var nativeSelection: NativeSelection {
     let selectionRange = textView.selectedRange
     let markedRange = textView.markedTextRange
     let optionalRange = selectionRange.location == NSNotFound ? nil : selectionRange
     return NativeSelection(
       range: optionalRange,
       opaqueRange: nil,
-      affinity: textView.selectionAffinity,
+      affinity: textView.lexicalSelectionAffinity,
       markedRange: markedRange,
       markedOpaqueRange: nil,
       selectionIsNodeOrObject: false)
   }
 
-  var isFirstResponder: Bool {
+  public var isFirstResponder: Bool {
     textView.isFrontmostFirstResponder
   }
 
-  var viewForDecoratorSubviews: UXView? {
+  public var viewForDecoratorSubviews: UXView? {
     textView
   }
 
-  var isEmpty: Bool {
+  public var isEmpty: Bool {
     textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
-  var isUpdatingNativeSelection: Bool {
+  public var isUpdatingNativeSelection: Bool {
     get { textView.isUpdatingNativeSelection }
     set { textView.isUpdatingNativeSelection = newValue }
   }
 
-  var interceptNextSelectionChangeAndReplaceWithRange: NSRange? {
+  public var interceptNextSelectionChangeAndReplaceWithRange: NSRange? {
     get { textView.interceptNextSelectionChangeAndReplaceWithRange }
     set { textView.interceptNextSelectionChangeAndReplaceWithRange = newValue }
   }
 
-  var textLayoutWidth: CGFloat {
+  public var textLayoutWidth: CGFloat {
     textView.textLayoutWidth
   }
 
-  func moveNativeSelection(
+  public func moveNativeSelection(
     type: NativeSelectionModificationType,
     direction: UXTextStorageDirection,
     granularity: UXTextGranularity
@@ -131,45 +131,45 @@ extension AppKitFrontendAdapter: Frontend {
     }
 
     textView.isUpdatingNativeSelection = true
-    textView.selectionAffinity = direction
+    textView.lexicalSelectionAffinity = direction
     textView.doCommand(by: selector)
     textView.isUpdatingNativeSelection = false
     refreshOverlayTargets()
   }
 
-  func unmarkTextWithoutUpdate() {
+  public func unmarkTextWithoutUpdate() {
     textView.unmarkTextWithoutUpdate()
   }
 
-  func presentDeveloperFacingError(message: String) {
+  public func presentDeveloperFacingError(message: String) {
     textView.presentDeveloperFacingError(message: message)
   }
 
-  func updateNativeSelection(from selection: BaseSelection) throws {
+  public func updateNativeSelection(from selection: BaseSelection) throws {
     guard let rangeSelection = selection as? RangeSelection else { return }
     try textView.updateNativeSelection(from: rangeSelection)
     refreshOverlayTargets()
   }
 
-  func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
+  public func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
     textView.setMarkedTextFromReconciler(markedText, selectedRange: selectedRange)
     refreshOverlayTargets()
   }
 
-  func resetSelectedRange() {
+  public func resetSelectedRange() {
     textView.resetSelectedRange()
     refreshOverlayTargets()
   }
 
-  func showPlaceholderText() {
+  public func showPlaceholderText() {
     textView.showPlaceholderText()
   }
 
-  func resetTypingAttributes(for selectedNode: Node) {
+  public func resetTypingAttributes(for selectedNode: Node) {
     // TODO: AppKit parity – map selected node styling to AppKit typing attributes.
   }
 
-  func updateOverlayTargets(_ rects: [CGRect]) {
+  public func updateOverlayTargets(_ rects: [CGRect]) {
     let nsRects = rects.map { NSRect(origin: NSPoint(x: $0.origin.x, y: $0.origin.y), size: NSSize(width: $0.size.width, height: $0.size.height)) }
     overlayView.updateTappableRects(nsRects)
   }

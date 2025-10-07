@@ -6,7 +6,7 @@
  */
 
 import Foundation
-import UIKit
+import Foundation
 
 /// A base class that combines DecoratorBlockNode's custom view rendering
 /// with ElementNode's child management capabilities
