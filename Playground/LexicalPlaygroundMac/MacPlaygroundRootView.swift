@@ -36,7 +36,7 @@ struct MacPlaygroundRootView: View {
     }
   }
 
-  private enum SidebarItem: Hashable {
+  enum SidebarItem: Hashable {
     case flags
     case hierarchy
     case performance
@@ -45,12 +45,13 @@ struct MacPlaygroundRootView: View {
 }
 
 @MainActor
-private final class MacPlaygroundSession: ObservableObject {
+final class MacPlaygroundSession: ObservableObject {
   @Published var controller: MacPlaygroundViewController?
   @Published var activeProfile: FeatureFlags.OptimizedProfile = .aggressiveEditor
   @Published fileprivate var flagBuilder = FeatureFlagsBuilder(flags: FeatureFlags.optimizedProfile(.aggressiveEditor))
   @Published var hierarchyText: String = "-"
   @Published var consoleText: String = ""
+  @Published var placeholderVisible: Bool = true
   private var logEntries: [String] = []
 
   private var updateListener: Editor.RemovalHandler?
@@ -68,6 +69,10 @@ private final class MacPlaygroundSession: ObservableObject {
   func toggleFormat(_ format: TextFormatType) {
     dispatch(.formatText, payload: format)
     logEvent("Toggle format: \(format)")
+  }
+
+  func toggleStrikethrough() {
+    toggleFormat(.strikethrough)
   }
 
   func indent() {
@@ -110,6 +115,32 @@ private final class MacPlaygroundSession: ObservableObject {
       controller.insertList(type: .checklist)
     }
     logEvent("Apply block style -> \(option.title)")
+  }
+
+  func insertSampleDecorator() {
+    guard let controller else { return }
+    controller.insertSampleDecorator()
+    logEvent("Inserted sample decorator node")
+  }
+
+  func insertLoremIpsum() {
+    guard let controller else { return }
+    controller.insertLoremIpsumParagraph()
+    logEvent("Inserted lorem ipsum paragraph")
+  }
+
+  func resetDocument() {
+    guard let controller else { return }
+    controller.resetDocument()
+    placeholderVisible = controller.isPlaceholderVisible
+    logEvent("Reset document to welcome copy")
+  }
+
+  func togglePlaceholder() {
+    guard let controller else { return }
+    placeholderVisible.toggle()
+    controller.togglePlaceholder(visible: placeholderVisible)
+    logEvent(placeholderVisible ? "Placeholder enabled" : "Placeholder hidden")
   }
 
   enum BlockOption: CaseIterable {
@@ -199,11 +230,13 @@ private final class MacPlaygroundSession: ObservableObject {
       Task { @MainActor in
         self.flagBuilder = FeatureFlagsBuilder(flags: controller.activeFeatureFlags)
         self.hierarchyText = (try? getNodeHierarchy(editorState: activeState)) ?? "-"
+        self.placeholderVisible = controller.isPlaceholderVisible
       }
     }
     Task { @MainActor in
       self.flagBuilder = FeatureFlagsBuilder(flags: controller.activeFeatureFlags)
       self.hierarchyText = (try? getNodeHierarchy(editorState: editor.getEditorState())) ?? "-"
+      self.placeholderVisible = controller.isPlaceholderVisible
     }
     logEvent("Editor session bound")
   }
@@ -225,7 +258,9 @@ private final class MacPlaygroundSession: ObservableObject {
     var text = ""
     do {
       try editor.read {
-        text = getTextContent()
+        if let root = getRoot() {
+          text = (try? root.getTextContent()) ?? ""
+        }
       }
     } catch {
       text = "Error generating text: \(error)"
@@ -278,6 +313,10 @@ private struct MacPlaygroundToolbar: View {
       blockStyleMenu
       profileMenu
 
+      Divider()
+
+      scriptMenu
+
       Spacer()
     }
     .padding(.horizontal, 12)
@@ -316,6 +355,15 @@ private struct MacPlaygroundToolbar: View {
         Label("Inline Code", systemImage: "curlybraces")
           .labelStyle(.iconOnly)
       }
+      .keyboardShortcut("`", modifiers: .command)
+
+      Button {
+        session.toggleStrikethrough()
+      } label: {
+        Label("Strikethrough", systemImage: "strikethrough")
+          .labelStyle(.iconOnly)
+      }
+      .keyboardShortcut("x", modifiers: [.command, .shift])
 
       Button {
         session.indent()
@@ -323,6 +371,7 @@ private struct MacPlaygroundToolbar: View {
         Label("Increase Indent", systemImage: "increase.indent")
           .labelStyle(.iconOnly)
       }
+      .keyboardShortcut("]", modifiers: .command)
 
       Button {
         session.outdent()
@@ -330,6 +379,7 @@ private struct MacPlaygroundToolbar: View {
         Label("Decrease Indent", systemImage: "decrease.indent")
           .labelStyle(.iconOnly)
       }
+      .keyboardShortcut("[", modifiers: .command)
     }
   }
 
@@ -364,6 +414,37 @@ private struct MacPlaygroundToolbar: View {
       }
     } label: {
       Label("Profile", systemImage: "switch.2")
+    }
+  }
+
+  private var scriptMenu: some View {
+    Menu {
+      Button {
+        session.resetDocument()
+      } label: {
+        Label("Reset Document", systemImage: "arrow.counterclockwise")
+      }
+
+      Button {
+        session.togglePlaceholder()
+      } label: {
+        Label(session.placeholderVisible ? "Hide Placeholder" : "Show Placeholder",
+              systemImage: session.placeholderVisible ? "eye.slash" : "eye")
+      }
+
+      Button {
+        session.insertSampleDecorator()
+      } label: {
+        Label("Insert Sample Decorator", systemImage: "rectangle.fill")
+      }
+
+      Button {
+        session.insertLoremIpsum()
+      } label: {
+        Label("Insert Lorem Ipsum", systemImage: "text.append")
+      }
+    } label: {
+      Label("Scripts", systemImage: "wand.and.stars")
     }
   }
 
@@ -414,6 +495,7 @@ private struct MacPlaygroundEditorContainer: NSViewControllerRepresentable {
       controller = newController
       session.controller = newController
       session.activeProfile = newController.activeProfile
+      session.placeholderVisible = newController.isPlaceholderVisible
       session.observeEditor(newController)
     }
   }
@@ -430,7 +512,7 @@ private struct InspectorContainer: View {
     case .hierarchy:
       HierarchyInspectorView(session: session)
     case .performance:
-      PerformanceInspectorPlaceholder()
+      MacPerformancePanel(session: session)
     case .console:
       ConsoleInspectorView(session: session)
     }
@@ -450,7 +532,6 @@ private struct FlagsInspectorView: View {
         }
       }
     }
-    .listStyle(.insetGrouped)
     .frame(minWidth: 260)
   }
 }
@@ -468,20 +549,6 @@ private struct HierarchyInspectorView: View {
     }
     .background(Color(NSColor.textBackgroundColor))
     .frame(minWidth: 260)
-  }
-}
-
-private struct PerformanceInspectorPlaceholder: View {
-  var body: some View {
-    VStack(spacing: 12) {
-      Text("Performance tools coming soon")
-        .font(.headline)
-      Text("The mac playground will surface the same PerfRunEngine scenarios as iOS once the panels are ported.")
-        .multilineTextAlignment(.center)
-        .foregroundStyle(.secondary)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding()
   }
 }
 
@@ -521,7 +588,7 @@ private struct ConsoleInspectorView: View {
   }
 }
 
-private struct FeatureFlagsBuilder {
+struct FeatureFlagsBuilder {
   var reconcilerSanityCheck: Bool
   var proxyTextViewInputDelegate: Bool
   var useOptimizedReconciler: Bool

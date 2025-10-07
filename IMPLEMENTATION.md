@@ -9,7 +9,7 @@ _Last updated: 2025-10-07 • Owner: Core iOS Editor_
 | --- | --- |
 | Baseline Commit | `a42a942` (origin/main) |
 | Current Phase | Phase 6 — macOS Enablement & Packaging |
-| Next Task | 6.3c.v Wire performance panels |
+| Next Task | 6.3d Ensure keyboard shortcut/tools parity |
 | Test Discipline | Full Lexical-Package suite after every change (non-negotiable) |
 | Selection Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test` |
 | Full Suite Command | `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test` |
@@ -180,8 +180,12 @@ Tasks:
         6.3c.iii [x] Add side panels for flags + node hierarchy (shared data models + SwiftUI List/Table views).
         6.3c.iv [x] Provide export/log console surfaces (copy helpers for plain text/JSON; rolling log view).
             - Added Export & Console inspector with clipboard buttons for plain text / JSON output and a live log stream wired to `MacPlaygroundSession`.
-        6.3c.v [ ] Wire performance runners (PerfRunEngine / PerformanceView) into mac UI or flag for deferred parity.
-    6.3d [ ] Ensure keyboard shortcut testing, placeholder/decorator tools, and scripted scenarios behave the same as iOS.
+        6.3c.v [x] Wire performance runners (PerfRunEngine / PerformanceView) into mac UI or flag for deferred parity.
+            - Added `MacPerformancePanel` placeholder with roadmap notes; session logs command activity pending future PerfRunEngine port.
+    6.3d [x] Ensure keyboard shortcut testing, placeholder/decorator tools, and scripted scenarios behave the same as iOS.
+        - [x] Added AppKit sample decorator node + insertion helpers and exposed scripted actions (reset document, lorem insertion) via a new SwiftUI “Scripts” menu.
+        - [x] Mirrored formatting keyboard shortcuts (⌘B/⌘I/⌘U/⌘⇧X/⌘`) and indent/outdent shortcuts, updating toolbar buttons to dispatch through the session for logging.
+        - [x] Hooked placeholder visibility toggles to the session/controller so QA can enable/disable the placeholder and log the state; parity gaps (link/image plugins) captured for later PAL work.
     6.3e [ ] Document build/run commands (`xcodebuild -scheme LexicalPlayground-macOS …`) and update README/DocC with mac playground usage notes.
     6.3f [ ] Run full suite + playground build on both platforms before marking complete.
 6.4 [ ] Publish migration notes + API docs for AppKit consumers.
@@ -320,6 +324,7 @@ Tasks:
 | 2025-10-07 | Phase 5 | Discipline | Selection suite PASS (11:29 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (11:30 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 5 | Task 5.8d | Added AppKit placeholder regression tests and guarded placeholder color application to avoid TextStorage recursion loops. |
+| 2025-10-07 | Phase 6 | Task 6.3d | Mac playground toolbar parity: added strikethrough/indent shortcuts, script menu (reset doc, placeholder toggle, sample decorator, lorem). Full suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`, 14:45 UTC); Mac suite PASS (`xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`, 14:46 UTC). |
 | 2025-10-07 | Phase 5 | Discipline | Selection suite PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |

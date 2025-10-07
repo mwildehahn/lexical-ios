@@ -35,6 +35,7 @@
 		06E5D1B02B3C6F0E007A7FAD /* lexical-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 06F7CF952A545C7C0024CD5A /* lexical-logo.png */; };
 		06E5D1B22B3C6F0E007A7FAD /* LexicalAppKit in Frameworks */ = {isa = PBXBuildFile; productRef = 06E5D1B12B3C6F0E007A7FAD /* LexicalAppKit */; };
 		06E5D1B42B3C734B007A7FAD /* MacPlaygroundViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E5D1B32B3C734B007A7FAD /* MacPlaygroundViewController.swift */; };
+		06E5D1B62B3C7765007A7FAD /* MacPerformancePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E5D1B52B3C7765007A7FAD /* MacPerformancePanel.swift */; };
 		3C48FEE42B04F2C5009BBFA2 /* LexicalMarkdown in Frameworks */ = {isa = PBXBuildFile; productRef = 3C48FEE32B04F2C5009BBFA2 /* LexicalMarkdown */; };
 /* End PBXBuildFile section */
 
@@ -61,6 +62,7 @@
 		06E5D1A22B3C6F0E007A7FAD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		06E5D1A32B3C6F0E007A7FAD /* LexicalPlayground-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LexicalPlayground-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		06E5D1B32B3C734B007A7FAD /* MacPlaygroundViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlaygroundViewController.swift; sourceTree = "<group>"; };
+		06E5D1B52B3C7765007A7FAD /* MacPerformancePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPerformancePanel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +141,7 @@
 				06E5D1A02B3C6F0E007A7FAD /* LexicalPlaygroundMacApp.swift */,
 				06E5D1A12B3C6F0E007A7FAD /* MacPlaygroundRootView.swift */,
 				06E5D1B32B3C734B007A7FAD /* MacPlaygroundViewController.swift */,
+				06E5D1B52B3C7765007A7FAD /* MacPerformancePanel.swift */,
 				06E5D1A22B3C6F0E007A7FAD /* Info.plist */,
 			);
 			path = LexicalPlaygroundMac;
@@ -295,6 +298,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				06E5D1B62B3C7765007A7FAD /* MacPerformancePanel.swift in Sources */,
 				06E5D1B42B3C734B007A7FAD /* MacPlaygroundViewController.swift in Sources */,
 				06E5D1AE2B3C6F0E007A7FAD /* MacPlaygroundRootView.swift in Sources */,
 				06E5D1AD2B3C6F0E007A7FAD /* LexicalPlaygroundMacApp.swift in Sources */,
