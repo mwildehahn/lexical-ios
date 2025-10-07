@@ -57,6 +57,9 @@ let package = Package(
     .library(
       name: "LexicalAppKit",
       targets: ["LexicalAppKit"]),
+    .executable(
+      name: "LexicalMacHarnessApp",
+      targets: ["LexicalMacHarnessApp"]),
   ],
   dependencies: [
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
@@ -172,6 +175,12 @@ let package = Package(
       name: "LexicalAppKit",
       dependencies: ["Lexical"],
       path: "./AppKit/LexicalAppKit"),
+    .executableTarget(
+      name: "LexicalMacHarnessApp",
+      dependencies: ["LexicalAppKit"],
+      path: "Examples/AppKitHarness",
+      exclude: ["README.md"],
+      sources: ["LexicalMacHarness.swift", "LexicalMacHarnessAppMain.swift"]),
     .testTarget(
       name: "LexicalMacTests",
       dependencies: ["Lexical", "LexicalUIKitAppKit", "LexicalAppKit"],

@@ -159,13 +159,13 @@ Tasks:
 6.1 [ ] Expose `LexicalAppKit` product + macOS platform in SPM.
     6.1a [x] Audit current targets/products for platform assumptions (Lexical, LexicalUIKit, plugins, tests).
     6.1b [x] Update `Package.swift` (add `.macOS(.v14)` platform, conditional dependencies, public `LexicalAppKit` product, ensure mac-only targets don’t drag UIKit).
-    6.1c [ ] Verify SPM graph (`swift package describe`) and run required suites (`Lexical-Package` + `LexicalMacTests`) to confirm iOS + mac builds remain green.
+    6.1c [x] Verify SPM graph (`swift package describe`) and run required suites (`Lexical-Package` + `LexicalMacTests`) to confirm iOS + mac builds remain green.
     6.1d [ ] Capture packaging changes in `IMPLEMENTATION.md` progress log (commands, timestamps) and note any targets still iOS-only.
 6.2 [ ] Build macOS sample app / playground target.
-    6.2a [ ] Evaluate existing `Examples/AppKitHarness` and decide whether to promote it or create a new Xcode target/SwiftPM demo.
-    6.2b [ ] Implement the chosen sample (project settings, bundle identifiers, minimal UI wiring) and ensure it links against the SPM `LexicalAppKit` product.
-    6.2c [ ] Add build/run instructions plus troubleshooting notes to docs (likely `Examples/AppKitHarness/README.md` or new doc section).
-    6.2d [ ] Run mac build of the sample (`xcodebuild -scheme <sample> -destination 'platform=macOS,arch=arm64' build`) and log results.
+    6.2a [x] Evaluate existing `Examples/AppKitHarness` and decide whether to promote it or create a new Xcode target/SwiftPM demo.
+    6.2b [x] Implement the chosen sample (project settings, bundle identifiers, minimal UI wiring) and ensure it links against the SPM `LexicalAppKit` product.
+    6.2c [x] Add build/run instructions plus troubleshooting notes to docs (likely `Examples/AppKitHarness/README.md` or new doc section).
+    6.2d [x] Run mac build of the sample (`swift build --product LexicalMacHarnessApp`) and log results.
 6.3 [ ] Publish migration notes + API docs for AppKit consumers.
     6.3a [ ] Update README / DocC with instructions for selecting iOS vs. macOS products (including SwiftUI integration expectations).
     6.3b [ ] Document known gaps (e.g., plugins still UIKit-only) and recommended minimum OS versions.
@@ -182,6 +182,11 @@ Tasks:
   - `LexicalAppKit` and `LexicalUIKitAppKit` compile on mac today; `LexicalMacTests` exercises these targets while `LexicalTests` stays iOS-only.
   - `LexicalSwiftUI` currently depends on `LexicalUIKit` and remains an iOS/macCatalyst-only surface pending Phase 7 work.
   - Package.swift now targets Swift tools 5.9 to access `.macOS(.v14)`; confirm CI/toolchain baseline (Xcode 15+) before landing.
+- **6.2 sample app notes:**
+  - Reused the existing harness source by introducing a SwiftPM executable target (`LexicalMacHarnessApp`) that depends on `LexicalAppKit` and lives alongside the harness source files.
+  - Added a SwiftUI `@main` entry point (macOS 14+) that embeds `LexicalMacHarnessViewController` via `NSViewControllerRepresentable` and enforces a sensible default window size.
+  - `swift run LexicalMacHarnessApp` now produces a runnable macOS harness; README documents both integration and sample usage paths.
+  - Build verification uses `swift build --product LexicalMacHarnessApp` because there is no Xcode scheme (keeps sample pure SwiftPM).
 
 ### Phase 7 — Cross-Platform SwiftUI Surface
 Goal: Provide a unified SwiftUI layer that selects the appropriate platform implementation.
@@ -298,6 +303,14 @@ Tasks:
 | 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (12:52 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
 | 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (12:53 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (12:53 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
+| 2025-10-07 | Phase 6 | Task 6.1c | Ran `swift package describe` to verify new macOS product/platform entries (Tools 5.9); repeated Selection + full iOS suites and LexicalMacTests (13:10 UTC) — all PASS. |
+| 2025-10-07 | Phase 6 | Task 6.2a | Reviewed existing harness (`Examples/AppKitHarness`); decided to promote it via SwiftPM executable instead of adding a new Xcode project. |
+| 2025-10-07 | Phase 6 | Task 6.2b | Added `LexicalMacHarnessApp` executable target (SwiftUI window embedding `LexicalMacHarnessViewController`). |
+| 2025-10-07 | Phase 6 | Task 6.2c | Updated harness README with `swift run LexicalMacHarnessApp` instructions and notes. |
+| 2025-10-07 | Phase 6 | Task 6.2d | `swift build --product LexicalMacHarnessApp` (11:11 UTC) — build succeeded (warnings about SwiftSoup plist files only). |
+| 2025-10-07 | Phase 6 | Discipline | Selection suite PASS (13:10 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
+| 2025-10-07 | Phase 6 | Discipline | Full Lexical-Package suite PASS (13:10 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 6 | Discipline | LexicalMacTests PASS (13:10 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
 
 
 ## Appendix — Deferred / Optional Items
