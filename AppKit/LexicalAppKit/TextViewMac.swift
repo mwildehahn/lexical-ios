@@ -12,6 +12,8 @@ public class TextViewMac: NSTextView {
   public let lexicalLayoutManager: LayoutManager
   public let lexicalTextContainer: TextContainer
   public private(set) var lexicalTextContainerInsets: UXEdgeInsets
+  internal private(set) var defaultTextColor: NSColor = NSColor.textColor
+  private var isApplyingPlaceholderColor = false
 
   /// Mirrors the UIKit implementation so that the frontend can suppress recursive updates while
   /// native selection is being synchronised.
@@ -38,6 +40,8 @@ public class TextViewMac: NSTextView {
     isEditable = true
     isRichText = true
     drawsBackground = true
+    defaultTextColor = (textColor ?? defaultTextColor)
+    textColor = defaultTextColor
     if #available(macOS 10.15, *) {
       font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
     } else if let fixed = NSFont.userFixedPitchFont(ofSize: 14) {
@@ -60,6 +64,9 @@ public class TextViewMac: NSTextView {
 
   public func updatePlaceholder(_ placeholder: String?) {
     placeholderString = placeholder
+    if placeholder == nil {
+      applyTextColor(defaultTextColor)
+    }
   }
 
   public func setTextContainerInsets(_ insets: UXEdgeInsets) {
@@ -92,16 +99,20 @@ public class TextViewMac: NSTextView {
   }
 
   internal func showPlaceholderText() {
-    guard let placeholderString,
-      string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    else {
+    if isApplyingPlaceholderColor {
       return
     }
 
-    // Draw placeholder by setting attributed text attributes temporarily. This mirrors the simple
-    // UIKit placeholder behaviour we use today. The placeholder will disappear automatically when the
-    // user types.
-    textColor = NSColor.placeholderTextColor
+    guard let placeholderString else {
+      applyTextColor(defaultTextColor)
+      return
+    }
+
+    if string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      applyTextColor(NSColor.placeholderTextColor)
+    } else {
+      applyTextColor(defaultTextColor)
+    }
   }
 
   public override func copy(_ sender: Any?) {
@@ -290,6 +301,13 @@ public class TextViewMac: NSTextView {
     defer { lexicalTextStorage.mode = .none }
     action()
     showPlaceholderText()
+  }
+
+  private func applyTextColor(_ color: NSColor) {
+    guard textColor != color else { return }
+    isApplyingPlaceholderColor = true
+    textColor = color
+    isApplyingPlaceholderColor = false
   }
 
   private func setMarkedTextInternal(_ markedText: String, selectedRange: NSRange, replacementRange: NSRange) {

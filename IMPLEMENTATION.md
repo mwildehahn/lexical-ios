@@ -134,8 +134,12 @@ Tasks:
 5.8 [ ] Expand unit/integration test suite for AppKit.
     5.8a [x] Add selection/IME regression tests (mac target).
     5.8b [x] Cover pasteboard/command cases.
-    5.8c [ ] Cover decorator mount/hit-test flows.
-    5.8d [ ] Ensure snapshot/placeholder tests for placeholder rendering.
+    5.8c [x] Cover decorator mount/hit-test flows.
+        - [x] Added multi-decorator regression (`testOverlayRectsRespectInsetsForMultipleDecorators`) validating frame transforms with non-zero text container insets.
+        - [x] Added cache cleanup regression (`testOverlayTargetsClearedAfterDecoratorRemoval`) asserting overlay rect removal and decoratorPositionCache pruning.
+    5.8d [x] Ensure snapshot/placeholder tests for placeholder rendering.
+        - [x] Added placeholder color regression verifying placeholder tint appears only when the buffer is empty.
+        - [x] Added placeholder removal regression ensuring removing placeholder restores default text color.
 5.9 [ ] Iterate until macOS build + tests pass locally.
 
 **Phase 5.7 Notes (2025-10-07)**
@@ -146,7 +150,8 @@ Tasks:
 **Phase 5.8 Running Notes**
 - 5.8a (IME regression) is now covered by `testMarkedTextInsertionBridgesThroughEditor`, which exercises `setMarkedText` + `unmarkText` and confirms the editor clears any marked range after commit.
 - Copy/cut/paste command dispatch tests (5.8b) run interception-only listeners so platform handlers still execute; no regressions seen.
-- Upcoming focus (5.8c) is to add richer decorator mount/hit-test assertions (multiple decorators, frame transforms) followed by placeholder rendering checks (5.8d).
+- 5.8c introduces multi-decorator assertions (`testOverlayRectsRespectInsetsForMultipleDecorators`) and cache cleanup verification (`testOverlayTargetsClearedAfterDecoratorRemoval`), ensuring overlay transforms honor text container insets and stale rects disappear after removal.
+- 5.8d verifies placeholder rendering: `testPlaceholderAppliesPlaceholderColorWhenEmpty` confirms placeholder tint only appears when the buffer is empty, and `testPlaceholderClearsAfterPlaceholderRemoval` regresses default color restoration. Guarded `TextViewMac.showPlaceholderText()` against recursive placeholder updates to avoid TextStorage re-entry loops.
 
 ### Phase 6 — macOS Enablement & Packaging
 Goal: Turn on macOS products in `Package.swift`, add CI coverage.
@@ -257,6 +262,14 @@ Tasks:
 | 2025-10-07 | Phase 5 | Task 5.8a | Added marked-text regression coverage (AppKit) ensuring set/unmark flows propagate to the editor. |
 | 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (10:43 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
 | 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (11:06 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 16 tests run (1 skipped). |
+| 2025-10-07 | Phase 5 | Task 5.8c | Expanded decorator coverage: added multi-decorator inset regression and cache cleanup test to ensure overlay rect transforms and position cache lifecycle behave on AppKit. |
+| 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (11:29 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 18 tests run (1 skipped). |
+| 2025-10-07 | Phase 5 | Discipline | Selection suite PASS (11:29 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
+| 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (11:30 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 5 | Task 5.8d | Added AppKit placeholder regression tests and guarded placeholder color application to avoid TextStorage recursion loops. |
+| 2025-10-07 | Phase 5 | Discipline | Selection suite PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData -only-testing:LexicalTests/SelectionTests test`. |
+| 2025-10-07 | Phase 5 | Discipline | Full Lexical-Package suite PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme Lexical-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath .build/DerivedData test`. |
+| 2025-10-07 | Phase 5 | Discipline | LexicalMacTests PASS (12:07 UTC) — `xcodebuild -workspace Playground/LexicalPlayground.xcodeproj/project.xcworkspace -scheme LexicalMacTests -destination 'platform=macOS,arch=arm64' -derivedDataPath .build/DerivedData test`; 20 tests run (1 skipped). |
 
 
 ## Appendix — Deferred / Optional Items
