@@ -24,7 +24,7 @@ public struct NativeSelectionAppKit: NativeSelectionProtocol {
   public let range: NSRange?
 
   /// The selection affinity (upstream or downstream).
-  public let affinity: NSSelectionAffinity
+  public let nsAffinity: NSSelectionAffinity
 
   /// The marked text range (for IME composition).
   public let markedRange: NSRange?
@@ -40,12 +40,24 @@ public struct NativeSelectionAppKit: NativeSelectionProtocol {
     return markedRange.location != NSNotFound
   }
 
+  /// The selection affinity as LexicalTextStorageDirection for cross-platform compatibility.
+  public var affinity: LexicalTextStorageDirection {
+    switch nsAffinity {
+    case .upstream:
+      return .backward
+    case .downstream:
+      return .forward
+    @unknown default:
+      return .forward
+    }
+  }
+
   // MARK: - Initialization
 
   /// Creates a native selection from an NSTextView.
   public init(textView: NSTextView) {
     self.range = textView.selectedRange()
-    self.affinity = textView.selectionAffinity
+    self.nsAffinity = textView.selectionAffinity
 
     let marked = textView.markedRange()
     self.markedRange = marked.location != NSNotFound ? marked : nil
@@ -61,9 +73,30 @@ public struct NativeSelectionAppKit: NativeSelectionProtocol {
     selectionIsNodeOrObject: Bool = false
   ) {
     self.range = range
-    self.affinity = affinity
+    self.nsAffinity = affinity
     self.markedRange = markedRange
     self.selectionIsNodeOrObject = selectionIsNodeOrObject
+  }
+
+  /// Creates a native selection with LexicalTextStorageDirection affinity.
+  public init(
+    range: NSRange?,
+    lexicalAffinity: LexicalTextStorageDirection,
+    markedRange: NSRange? = nil,
+    selectionIsNodeOrObject: Bool = false
+  ) {
+    self.range = range
+    self.nsAffinity = lexicalAffinity == .backward ? .upstream : .downstream
+    self.markedRange = markedRange
+    self.selectionIsNodeOrObject = selectionIsNodeOrObject
+  }
+
+  /// Creates an empty selection.
+  public init() {
+    self.range = nil
+    self.nsAffinity = .downstream
+    self.markedRange = nil
+    self.selectionIsNodeOrObject = false
   }
 
   // MARK: - Convenience
@@ -107,6 +140,12 @@ extension TextViewAppKit {
     defer { isUpdatingNativeSelection = false }
 
     setSelectedRange(range, affinity: affinity, stillSelecting: false)
+  }
+
+  /// Apply a selection from NativeSelectionAppKit.
+  public func applySelection(_ selection: NativeSelectionAppKit) {
+    guard let range = selection.range else { return }
+    applySelection(range: range, affinity: selection.nsAffinity)
   }
 
   /// Apply a Lexical selection to the native text view.

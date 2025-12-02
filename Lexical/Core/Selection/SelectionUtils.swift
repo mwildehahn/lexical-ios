@@ -197,7 +197,6 @@ func editorStateHasDirtySelection(pendingEditorState: EditorState, editor: Edito
   return false
 }
 
-#if canImport(UIKit)
 @MainActor
 func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   let rangeCache = editor.rangeCache
@@ -230,6 +229,8 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
     throw LexicalError.invariantViolation("Need grid selection")
   }
 }
+
+#if canImport(UIKit)
 @MainActor
 public func createNativeSelection(from selection: RangeSelection, editor: Editor) throws
   -> NativeSelection
