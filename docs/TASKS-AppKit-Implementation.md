@@ -893,7 +893,7 @@ Many selection operations depend on RangeCache and native NSTextView selection A
 - [x] Port `stringLocationForPoint()` to cross-platform - removed UIKit guard (only uses rangeCache)
 - [ ] Port `createSelection()` to AppKit (`SelectionUtils.swift:266`) - Requires Editor.getNativeSelection() on AppKit
 - [ ] Port `validatePosition()` to AppKit (`SelectionUtils.swift:722`) - Uses UITextView-specific APIs
-- [ ] Port `createNativeSelection()` to AppKit - Currently UIKit-only, uses platform-specific types
+- [x] Port `createNativeSelection()` to AppKit - Implemented as `createNativeSelectionAppKit()` in LexicalAppKit
 - [x] `getSelection()` already returns nil on AppKit when no existing selection (correct behavior for now)
 - [x] Verify build and test
 
@@ -919,9 +919,13 @@ Many selection operations depend on RangeCache and native NSTextView selection A
 - [ ] Verify selection sync between Lexical and NSTextView
 
 **Files Modified:**
-- `Lexical/Core/Selection/SelectionUtils.swift` - Made `stringLocationForPoint()` cross-platform
+- `Lexical/Core/Selection/SelectionUtils.swift` - Made `stringLocationForPoint()` cross-platform and public
 - `Lexical/Core/Selection/RangeSelection.swift` - Made `applySelectionRange()` cross-platform
-- `Sources/LexicalAppKit/NativeSelection.swift` - Enhanced with affinity support and convenience methods
+- `Lexical/Core/Selection/Point.swift` - Made `isBefore(point:)` public
+- `Sources/LexicalAppKit/NativeSelection.swift` - Enhanced with:
+  - Affinity support (`affinity` property returning `LexicalTextStorageDirection`)
+  - `createNativeSelectionAppKit(from:editor:)` function
+  - `applyLexicalSelection(_:editor:)` in TextViewAppKit
 
 **Files to Reference:**
 - `Lexical/Core/Selection/SelectionUtils.swift` - Utility functions
