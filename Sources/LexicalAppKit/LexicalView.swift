@@ -21,6 +21,9 @@ public protocol LexicalViewDelegate: NSObjectProtocol {
   func textViewShouldChangeText(
     _ textView: LexicalView, range: NSRange, replacementText text: String
   ) -> Bool
+  func textView(
+    _ textView: LexicalView, shouldInteractWith URL: URL, in selection: RangeSelection?
+  ) -> Bool
 }
 
 extension LexicalViewDelegate {
@@ -28,6 +31,11 @@ extension LexicalViewDelegate {
   public func textViewDidEndEditing(textView: LexicalView) {}
   public func textViewShouldChangeText(
     _ textView: LexicalView, range: NSRange, replacementText text: String
+  ) -> Bool {
+    return true
+  }
+  public func textView(
+    _ textView: LexicalView, shouldInteractWith URL: URL, in selection: RangeSelection?
   ) -> Bool {
     return true
   }
