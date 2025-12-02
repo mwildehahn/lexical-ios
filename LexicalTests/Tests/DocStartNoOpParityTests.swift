@@ -1,8 +1,16 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 @testable import Lexical
 import XCTest
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class DocStartNoOpParityTests: XCTestCase {
@@ -32,6 +40,3 @@ final class DocStartNoOpParityTests: XCTestCase {
     XCTAssertEqual(try run(opt), try run(leg))
   }
 }
-
-
-#endif

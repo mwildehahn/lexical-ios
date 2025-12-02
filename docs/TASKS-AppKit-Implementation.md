@@ -20,14 +20,15 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (161 tests)
+- `swift test` passes on macOS (185 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
 - `deleteCharacter`, `deleteWord`, `deleteLine` implemented for AppKit
 - SelectionTests enabled for AppKit (19 additional tests)
 - `LexicalReadOnlyTextKitContextAppKit` ported for parity testing
-- 24+ parity test files enabled via cross-platform test utilities
+- Cross-platform parity tests enabled via shared test utilities
+- `LexicalView` parity tests enabled (Emoji, WordDelete, LineBreak, etc.)
 
 **Remaining Work:**
 - macOS example app (optional)
@@ -41,10 +42,11 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
    - `SelectableDecoratorNode` - requires UIKit views
    - `LexicalInlineImagePlugin` - requires UIKit image views
    - `LexicalTablePlugin` - requires UIKit table views
-3. **Tests still UIKit-only** (~70 test files):
-   - Some parity tests use `LexicalView` which requires a full text view (UIKit-only)
-   - Tests exposing AppKit paragraph behavior differences are skipped
-   - Core functionality and reconciler parity tests enabled (161 tests pass)
+3. **Tests still UIKit-only** (~60 test files):
+   - Decorator-related tests (require AppKit decorator support)
+   - Composition/IME tests (may need NSTextInputClient differences)
+   - Tests using `editor.frontend` (UIKit-specific Frontend protocol)
+   - Core functionality and LexicalView parity tests enabled (185 tests pass)
 
 ---
 
