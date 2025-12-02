@@ -20,7 +20,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (183 tests)
+- `swift test` passes on macOS (193 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -1270,6 +1270,15 @@ After completing 10.4:
 - [ ] `OptimizedReconcilerLegacyParityReorderTextMixTests.swift` - Uses UIKit-specific APIs
 - [x] `OptimizedReconcilerLinkHTMLExportParityTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerListBoundaryParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerBackspaceJoinCaretParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerCodeLineJoinSplitParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerDoubleNewlinePasteParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerFormattedPasteParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerQuoteBoundaryParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerElementSelectionDeleteParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerPasteParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerCrossParentFallbackTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerMultiNodeReplaceTests.swift` - Converted to cross-platform
 
 **Step 10.8.3: Enable Selection Tests**
 After completing 10.2:
