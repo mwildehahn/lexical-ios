@@ -20,15 +20,29 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (13 tests)
+- `swift test` passes on macOS (16 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
+- `deleteCharacter`, `deleteWord`, `deleteLine` implemented for AppKit
 
 **Remaining Work:**
 - macOS example app (optional)
 - Full integration testing with runtime verification
-- Enable more tests as AppKit features are implemented (e.g., deleteCharacter)
+
+**Known Gaps (AppKit vs UIKit feature parity):**
+1. **Decorator nodes** - `DecoratorNode.getAttributedStringAttributes` returns empty on AppKit
+   - Affects: inline images, tables, custom embedded views
+   - Location: `Lexical/Core/Nodes/DecoratorNode.swift:156`
+2. **UIKit-only plugins** (wrapped in conditional compilation, no AppKit equivalent):
+   - `SelectableDecoratorNode` - requires UIKit views
+   - `LexicalInlineImagePlugin` - requires UIKit image views
+   - `LexicalTablePlugin` - requires UIKit table views
+3. **Tests still UIKit-only** (~20 test files):
+   - OptimizedReconciler tests (depend on UIKit reconciler internals)
+   - Decorator position/parity tests
+   - Selection clamp/range tests
+   - These require either AppKit equivalents or abstraction work
 
 ---
 
@@ -286,7 +300,7 @@ Instead of fully migrating to LexicalCore, wrapped UIKit-specific code with `#if
 - [x] Wrap Editor.swift `rangeCache` initialization and access in UIKit guards
 - [x] Wrap Editor.swift frontend-related methods in UIKit guards
 - [x] Wrap RangeSelection.swift `modify`, `applyNativeSelection`, `applySelectionRange`, `init(nativeSelection:)` in UIKit guards
-- [x] Add AppKit stubs for `deleteCharacter`, `deleteWord`, `deleteLine` in RangeSelection.swift
+- [x] Implement `deleteCharacter`, `deleteWord`, `deleteLine` for AppKit in RangeSelection.swift
 - [x] Wrap SelectionUtils.swift `createNativeSelection`, `validatePosition`, `stringLocationForPoint`, `createSelection` in UIKit guards
 - [x] Update `getSelection()` to return nil on AppKit when no existing selection
 - [x] Wrap Utils.swift `decoratorView`, `destroyCachedDecoratorView`, `getAttributedStringFromFrontend` in UIKit guards
@@ -708,7 +722,7 @@ Full AppKit plugin implementations would require additional work (e.g., AppKit v
 - UIKit-specific tests (using `LexicalReadOnlyTextKitContext`, `UITextView`, etc.) are skipped on macOS
 
 ### 7.3 Current Test Coverage on macOS
-Tests passing on macOS (13 total):
+Tests passing on macOS (16 total):
 - FenwickTreeTests (3 tests)
 - HistoryTests (2 tests)
 - KeyedDiffTests (2 tests)
@@ -716,17 +730,17 @@ Tests passing on macOS (13 total):
 - LexicalHTMLTests (1 test)
 - LexicalMarkdownTests (1 test)
 - LinkNodeTests (1 test)
-- ListItemNodeTests (1 test)
+- ListItemNodeTests (4 tests) - includes deleteCharacter tests
 
 ### 7.4 Future Test Expansion
-As more AppKit features are implemented (e.g., `deleteCharacter`, full text editing):
-- [ ] Enable more tests by removing conditional compilation guards
+- [x] `deleteCharacter` implemented - enabled 3 additional ListItemNodeTests
 - [ ] Add AppKit-specific tests for NSTextInputClient, keyboard, mouse handling
 - [ ] Add IME/marked text input tests
+- [ ] Enable more tests as remaining features are implemented (decorators, etc.)
 
 ### 7.5 Verify Phase 7 Complete
 - [x] `swift build --build-tests` succeeds on macOS
-- [x] `swift test` passes on macOS (13 tests)
+- [x] `swift test` passes on macOS (16 tests)
 - [x] Test infrastructure supports both platforms
 
 ---
