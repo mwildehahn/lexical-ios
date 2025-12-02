@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 @testable import LexicalAutoLinkPlugin
@@ -95,3 +98,5 @@ final class PluginsSmokeParityTests: XCTestCase {
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
 }
+
+#endif

@@ -1,3 +1,7 @@
+// This test uses UIKit-specific types (LexicalReadOnlyTextKitContext, ImageNode)
+// and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 @testable import LexicalInlineImagePlugin
@@ -130,3 +134,5 @@ final class InlineImagePersistenceTests: XCTestCase {
 
   // Multi-image delete sequences are exercised in LexicalView-based tests and parity tests.
 }
+
+#endif

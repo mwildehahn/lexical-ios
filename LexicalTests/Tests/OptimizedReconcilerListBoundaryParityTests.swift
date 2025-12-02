@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 @testable import LexicalListPlugin
@@ -44,3 +47,5 @@ final class OptimizedReconcilerListBoundaryParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 }
+
+#endif

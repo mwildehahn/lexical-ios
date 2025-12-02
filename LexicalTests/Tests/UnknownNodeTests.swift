@@ -5,6 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+// This test uses UIKit-specific types (TextView) and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import Foundation
 @testable import Lexical
 import XCTest
@@ -49,3 +52,5 @@ class UnknownNodeTests: XCTestCase {
     XCTAssertEqual(node, newNode, "Node failed equality check from node constructors")
   }
 }
+
+#endif

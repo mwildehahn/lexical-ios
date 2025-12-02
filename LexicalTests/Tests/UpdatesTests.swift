@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -234,3 +237,5 @@ class UpdatesTests: XCTestCase {
     editor.dispatchCommand(type: CommandType.click, payload: nil)
   }
 }
+
+#endif

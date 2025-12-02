@@ -121,7 +121,19 @@ let package = Package(
 
     .testTarget(
       name: "LexicalTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin", "LexicalInlineImagePlugin"],
+      dependencies: [
+        "Lexical",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+        "LexicalLinkPlugin",
+        "LexicalListPlugin",
+        "LexicalMarkdown",
+        "LexicalHTML",
+        "LexicalListHTMLSupport",
+        "LexicalLinkHTMLSupport",
+        "LexicalAutoLinkPlugin",
+        "EditorHistoryPlugin",
+        "LexicalInlineImagePlugin",
+      ],
       path: "./LexicalTests"),
 
     .target(
@@ -130,7 +142,11 @@ let package = Package(
       path: "./Plugins/LexicalListPlugin/LexicalListPlugin"),
     .testTarget(
       name: "LexicalListPluginTests",
-      dependencies: ["Lexical", "LexicalListPlugin"],
+      dependencies: [
+        "Lexical",
+        "LexicalListPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalListPlugin/LexicalListPluginTests"),
     .target(
       name: "LexicalListHTMLSupport",
@@ -143,7 +159,12 @@ let package = Package(
       path: "./Plugins/LexicalHTML/LexicalHTML"),
     .testTarget(
       name: "LexicalHTMLTests",
-      dependencies: ["Lexical", "LexicalHTML", "SwiftSoup"],
+      dependencies: [
+        "Lexical",
+        "LexicalHTML",
+        "SwiftSoup",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalHTML/LexicalHTMLTests"),
 
     .target(
@@ -157,7 +178,11 @@ let package = Package(
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPlugin"),
     .testTarget(
       name: "LexicalLinkPluginTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin"],
+      dependencies: [
+        "Lexical",
+        "LexicalLinkPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPluginTests"),
     .target(
       name: "LexicalLinkHTMLSupport",
@@ -170,7 +195,11 @@ let package = Package(
       path: "./Plugins/LexicalInlineImagePlugin/LexicalInlineImagePlugin"),
     .testTarget(
       name: "LexicalInlineImagePluginTests",
-      dependencies: ["Lexical", "LexicalInlineImagePlugin"],
+      dependencies: [
+        "Lexical",
+        "LexicalInlineImagePlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalInlineImagePlugin/LexicalInlineImagePluginTests"),
 
     .target(
@@ -184,7 +213,11 @@ let package = Package(
       path: "./Plugins/EditorHistoryPlugin/EditorHistoryPlugin"),
     .testTarget(
       name: "EditorHistoryPluginTests",
-      dependencies: ["Lexical", "EditorHistoryPlugin"],
+      dependencies: [
+        "Lexical",
+        "EditorHistoryPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/EditorHistoryPlugin/EditorHistoryPluginTests"),
 
     .target(
@@ -202,6 +235,7 @@ let package = Package(
         "Lexical",
         "LexicalMarkdown",
         .product(name: "Markdown", package: "swift-markdown"),
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
       ],
       path: "./Plugins/LexicalMarkdown/LexicalMarkdownTests"),
   ]

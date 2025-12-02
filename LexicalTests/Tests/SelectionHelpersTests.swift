@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -84,3 +87,5 @@ class SelectionHelpersTests: XCTestCase {
     }
   }
 }
+
+#endif

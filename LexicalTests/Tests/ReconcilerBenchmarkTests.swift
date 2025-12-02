@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 
@@ -224,3 +227,5 @@ private extension Array {
     stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
   }
 }
+
+#endif

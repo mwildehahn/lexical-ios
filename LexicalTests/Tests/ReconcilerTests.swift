@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -287,3 +290,5 @@ class ReconcilerTests: XCTestCase {
     XCTAssertEqual(paraStyle, paraStyle2, "Expected two equal paragraph styles when editing previous Code node")
   }
 }
+
+#endif

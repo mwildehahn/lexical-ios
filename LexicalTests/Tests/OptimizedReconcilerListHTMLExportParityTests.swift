@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 @testable import LexicalHTML
@@ -56,3 +59,5 @@ final class OptimizedReconcilerListHTMLExportParityTests: XCTestCase {
     XCTAssertEqual(htmlOpt2, htmlLeg2)
   }
 }
+
+#endif

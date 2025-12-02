@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -39,3 +42,5 @@ class PluginTests: XCTestCase {
     XCTAssertEqual(plugin.listenerCount, listenerCountBaseValue + 2, "Listener count should be 2 more after update")
   }
 }
+
+#endif

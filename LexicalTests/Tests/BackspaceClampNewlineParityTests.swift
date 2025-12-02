@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 @testable import Lexical
 import XCTest
 
@@ -99,3 +102,5 @@ final class BackspaceClampNewlineParityTests: XCTestCase {
     XCTAssertEqual(optOut, legOut)
   }
 }
+
+#endif

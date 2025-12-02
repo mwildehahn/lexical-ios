@@ -9,11 +9,17 @@
 @testable import LexicalLinkPlugin
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 class LinkNodeTests: XCTestCase {
 
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // UIKit-specific test that uses textStorage and .link attribute
   func testLinkAttributeLengthForAccessibility() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
     let editor = view.editor
 
     try editor.update {
@@ -41,9 +47,14 @@ class LinkNodeTests: XCTestCase {
     XCTAssertEqual(url, "http://www.example.com", "Link address should match")
     XCTAssertEqual(range.length, 11, "link should span eleven characters")
   }
+  #endif
 
   func testLinkNodeTypeAndProperties() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    let view = LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #else
+    let view = Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #endif
 
     try view.editor.update {
       let linkNode = LinkNode()

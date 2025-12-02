@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -2214,3 +2217,5 @@ class NodeTests: XCTestCase {
     XCTAssertEqual(view.textStorage.string, "T\nest\u{1f609}")
   }
 }
+
+#endif

@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -202,3 +205,5 @@ class TransformTests: XCTestCase {
     XCTAssert(updateLog.contains(where: { $0.contains(TransformTests.combinedTransformKey) }), "Did not execute dependent transform")
   }
 }
+
+#endif

@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Parity tests between legacy and optimized reconcilers for backspace behavior
  * around punctuation, newlines, and while typing a new word. Legacy is ground truth.
@@ -171,3 +174,5 @@ final class TypingBackspaceParityTests: XCTestCase {
     XCTAssertEqual(try run(opt), try run(leg))
   }
 }
+
+#endif
