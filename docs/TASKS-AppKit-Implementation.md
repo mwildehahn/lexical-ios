@@ -901,11 +901,11 @@ Many selection operations depend on RangeCache and native NSTextView selection A
 - [ ] Port `modify()` function to AppKit (`RangeSelection.swift:1830`)
   - Uses `UITextGranularity` - need AppKit equivalent using NSTextView selection methods
   - Consider NSTextView's `selectionRange(forProposedRange:granularity:)` or manual implementation
-- [ ] Port `applyNativeSelection()` to AppKit
-- [ ] Port `applySelectionRange()` to AppKit
-- [ ] Port `init(nativeSelection:)` to AppKit
-- [ ] Port `getPlaintext()` to AppKit (`RangeSelection.swift:861`)
-- [ ] Verify build and test
+- [ ] Port `applyNativeSelection()` to AppKit - Requires platform-specific NativeSelection type
+- [x] Port `applySelectionRange()` to cross-platform - Now uses `LexicalTextStorageDirection`
+- [ ] Port `init(nativeSelection:)` to AppKit - Requires platform-specific NativeSelection type
+- [ ] Port `getPlaintext()` to AppKit (`RangeSelection.swift:861`) - Needs node traversal approach
+- [x] Verify build and test
 
 **Step 10.2.3: Update NativeSelectionAppKit** ✅ COMPLETE
 - [x] `NativeSelectionAppKit` implements `NativeSelectionProtocol`
@@ -920,6 +920,7 @@ Many selection operations depend on RangeCache and native NSTextView selection A
 
 **Files Modified:**
 - `Lexical/Core/Selection/SelectionUtils.swift` - Made `stringLocationForPoint()` cross-platform
+- `Lexical/Core/Selection/RangeSelection.swift` - Made `applySelectionRange()` cross-platform
 - `Sources/LexicalAppKit/NativeSelection.swift` - Enhanced with affinity support and convenience methods
 
 **Files to Reference:**
