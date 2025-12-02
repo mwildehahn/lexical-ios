@@ -41,7 +41,10 @@ public class TextViewAppKit: NSTextView {
   let lexicalTextStorage: TextStorageAppKit
 
   /// The custom layout manager.
-  let lexicalLayoutManager: NSLayoutManager
+  let lexicalLayoutManager: LayoutManagerAppKit
+
+  /// The layout manager delegate.
+  private let layoutManagerDelegate: LayoutManagerDelegateAppKit
 
   /// Flag indicating if we're programmatically updating selection.
   internal var isUpdatingNativeSelection = false
@@ -71,8 +74,10 @@ public class TextViewAppKit: NSTextView {
     // Create custom text storage
     self.lexicalTextStorage = TextStorageAppKit()
 
-    // Create layout manager
-    self.lexicalLayoutManager = NSLayoutManager()
+    // Create custom layout manager with delegate
+    self.lexicalLayoutManager = LayoutManagerAppKit()
+    self.layoutManagerDelegate = LayoutManagerDelegateAppKit()
+    lexicalLayoutManager.delegate = layoutManagerDelegate
     lexicalTextStorage.addLayoutManager(lexicalLayoutManager)
 
     // Create text container
@@ -263,34 +268,178 @@ extension TextViewAppKit: NSTextViewDelegate {
 /// This class bridges the Lexical editor with the AppKit text system.
 public class TextStorageAppKit: NSTextStorage {
 
+  /// Character location typealias for decorator position cache.
+  internal typealias CharacterLocation = Int
+
+  /// Cache of decorator node positions for the layout manager.
+  @objc internal var decoratorPositionCache: [NodeKey: CharacterLocation] = [:]
+
   /// The backing store for the attributed string.
-  private let storage = NSMutableAttributedString()
+  private var backingAttributedString: NSMutableAttributedString
+
+  /// Current editing mode.
+  var mode: TextStorageEditingMode
 
   /// Reference to the Lexical editor.
   weak var editor: Editor?
 
+  // MARK: - Initialization
+
+  public override init() {
+    backingAttributedString = NSMutableAttributedString()
+    mode = .none
+    super.init()
+  }
+
+  convenience init(editor: Editor) {
+    self.init()
+    self.editor = editor
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("\(#function) has not been implemented")
+  }
+
+  // Required initializer for NSPasteboardReading conformance (inherited from NSTextStorage)
+  required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
+    backingAttributedString = NSMutableAttributedString()
+    mode = .none
+    super.init(pasteboardPropertyList: propertyList, ofType: type)
+  }
+
   // MARK: - NSTextStorage Required Overrides
 
   public override var string: String {
-    storage.string
+    backingAttributedString.string
   }
 
   public override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key: Any] {
-    storage.attributes(at: location, effectiveRange: range)
+    if backingAttributedString.length <= location {
+      // Index out of range
+      return [:]
+    }
+    return backingAttributedString.attributes(at: location, effectiveRange: range)
+  }
+
+  public override func replaceCharacters(in range: NSRange, with attrString: NSAttributedString) {
+    if mode == .none {
+      // Clamp range for safe access
+      let length = backingAttributedString.length
+      let safeLocation = max(0, min(range.location, length))
+      let safeLength = min(range.length, length - safeLocation)
+      let safeRange = NSRange(location: safeLocation, length: safeLength)
+
+      let newString = attrString.string
+      let currentString = safeLength > 0
+        ? backingAttributedString.attributedSubstring(from: safeRange).string
+        : ""
+      if currentString != newString {
+        // If mode is none, an update hasn't gone through Lexical yet.
+        performControllerModeUpdate(attrString.string, range: range)
+      }
+      return
+    }
+
+    // Since we're in either controller or non-controlled mode, call super
+    // Clamp to storage bounds
+    let length = backingAttributedString.length
+    let start = max(0, min(range.location, length))
+    let end = max(start, min(range.location + range.length, length))
+    let safe = NSRange(location: start, length: end - start)
+    super.replaceCharacters(in: safe, with: attrString)
   }
 
   public override func replaceCharacters(in range: NSRange, with str: String) {
+    if mode == .none {
+      // Clamp range before accessing substring
+      let length = backingAttributedString.length
+      let safeLocation = max(0, min(range.location, length))
+      let safeLength = min(range.length, length - safeLocation)
+      let safeRange = NSRange(location: safeLocation, length: safeLength)
+
+      let currentString = safeLength > 0
+        ? backingAttributedString.attributedSubstring(from: safeRange).string
+        : ""
+      if currentString != str {
+        performControllerModeUpdate(str, range: range)
+      }
+      return
+    }
+
+    // Mode is not none, so this change has already passed through Lexical
+    // Clamp range to storage bounds
+    let length = backingAttributedString.length
+    let start = max(0, min(range.location, length))
+    let end = max(start, min(range.location + range.length, length))
+    let safe = NSRange(location: start, length: end - start)
+
     beginEditing()
-    storage.replaceCharacters(in: range, with: str)
-    edited(.editedCharacters, range: range, changeInLength: str.count - range.length)
+    backingAttributedString.replaceCharacters(in: safe, with: str)
+    edited(.editedCharacters, range: safe, changeInLength: (str as NSString).length - safe.length)
+    endEditing()
+  }
+
+  private func performControllerModeUpdate(_ str: String, range: NSRange) {
+    mode = .controllerMode
+    defer {
+      mode = .none
+    }
+
+    // Controller mode handling for AppKit
+    // For now, perform the edit directly
+    // Full Lexical integration will add selection handling
+    let length = backingAttributedString.length
+    let start = max(0, min(range.location, length))
+    let end = max(start, min(range.location + range.length, length))
+    let safe = NSRange(location: start, length: end - start)
+
+    beginEditing()
+    backingAttributedString.replaceCharacters(in: safe, with: str)
+    edited(.editedCharacters, range: safe, changeInLength: (str as NSString).length - safe.length)
     endEditing()
   }
 
   public override func setAttributes(_ attrs: [NSAttributedString.Key: Any]?, range: NSRange) {
+    if mode != .controllerMode {
+      return
+    }
+
+    // Clamp attributes range to safe bounds
+    let length = backingAttributedString.length
+    let start = max(0, min(range.location, length))
+    let end = max(start, min(range.location + range.length, length))
+    let safe = NSRange(location: start, length: end - start)
+
     beginEditing()
-    storage.setAttributes(attrs, range: range)
-    edited(.editedAttributes, range: range, changeInLength: 0)
+    if safe.length > 0 {
+      backingAttributedString.setAttributes(attrs, range: safe)
+      edited(.editedAttributes, range: safe, changeInLength: 0)
+    }
     endEditing()
+  }
+
+  /// Extra line fragment attributes for trailing empty lines.
+  public var extraLineFragmentAttributes: [NSAttributedString.Key: Any]? {
+    didSet {
+      beginEditing()
+      if backingAttributedString.length > 0 {
+        edited(
+          .editedAttributes,
+          range: NSRange(location: backingAttributedString.length - 1, length: 1),
+          changeInLength: 0
+        )
+      }
+      endEditing()
+    }
+  }
+}
+
+// MARK: - TextStorageAppKit Debug
+
+extension TextStorageAppKit {
+  @MainActor public override var debugDescription: String {
+    return "TextStorageAppKit[\(backingAttributedString.string.utf16.enumerated().map { "(\($0)=U+\(String(format:"%04X",$1)))" }.joined())]"
   }
 }
 

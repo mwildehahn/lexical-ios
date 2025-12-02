@@ -589,25 +589,48 @@ NSTextView provides built-in undo when `allowsUndo = true`. Extension adds:
 ## Phase 5: TextKit Layer
 
 ### 5.1 Create AppKit LayoutManager
-- [ ] Create `LexicalAppKit/LayoutManager.swift`
-- [ ] Handle `NSFont` instead of `UIFont` in delegate methods
-- [ ] Override `showCGGlyphs` if needed
+- [x] Create `LexicalAppKit/LayoutManager.swift`
+- [x] Handle `NSFont` instead of `UIFont` in delegate methods
+- [x] Override `showCGGlyphs` for link color fixes
+- [x] Create `LayoutManagerDelegateAppKit` for text transform (uppercase/lowercase)
 
 **STTextView Reference:**
 - `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/STTextView+NSTextLayoutManagerDelegate.swift`
 
+**Implementation Notes:**
+Created `Sources/LexicalAppKit/LayoutManager.swift` with:
+- `LayoutManagerAppKit` class with custom drawing and decorator positioning
+- `LayoutManagerDelegateAppKit` for glyph generation with text transforms
+- Updated `TextViewAppKit` to use custom layout manager and delegate
+- Updated `TextStorageAppKit` with decorator position cache and editing mode support
+
 ### 5.2 Create AppKit TextAttachment Support
-- [ ] Create `LexicalAppKit/TextAttachment.swift` if needed
-- [ ] Handle `NSImage` instead of `UIImage`
+- [x] Create `LexicalAppKit/TextAttachment.swift`
+- [x] Handle `NSImage` instead of `UIImage`
+
+**Implementation Notes:**
+Created `Sources/LexicalAppKit/TextAttachment.swift` with:
+- `TextAttachmentAppKit` class for decorator node attachments
+- Stub for bounds calculation (full implementation pending decorator view support)
+- Empty image override to prevent AppKit placeholder drawing
 
 ### 5.3 Create AppKit AttributesUtils
-- [ ] Create `LexicalAppKit/AttributesUtils.swift`
-- [ ] Use `NSFont`, `NSColor` instead of UIKit equivalents
-- [ ] Maintain same public API as UIKit version
+- [x] Create `LexicalAppKit/AttributesUtils.swift`
+- [x] Use `NSFont`, `NSColor` instead of UIKit equivalents
+- [x] Maintain same public API as UIKit version (except block-level attributes which depend on UIKit-only types)
+
+**Implementation Notes:**
+Created `Sources/LexicalAppKit/AttributesUtils.swift` with:
+- `AttributeUtilsAppKit` enum with attribute styling functions
+- `LexicalConstantsAppKit` for default font and color
+- Paragraph style generation from attributes
+- NSAttributedString.Key extensions (matching UIKit)
+- Note: `applyBlockLevelAttributes` not ported (requires UIKit-only `RangeCacheItem`)
 
 ### 5.4 Verify Phase 5 Complete
-- [ ] Rich text rendering works on macOS
-- [ ] Font and color attributes applied correctly
+- [x] `swift build` succeeds for all targets
+- [ ] Rich text rendering works on macOS (requires test app)
+- [ ] Font and color attributes applied correctly (requires test app)
 
 ---
 
