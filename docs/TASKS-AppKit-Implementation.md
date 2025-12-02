@@ -515,58 +515,69 @@ Keyboard handling uses NSTextView's built-in responder chain. The extension adds
 - `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/Extensions/NSEvent+Helpers.swift` - Key helpers
 
 ### 4.5 Implement Selection Management
-- [ ] Create `LexicalAppKit/NativeSelection.swift`
-- [ ] Implement selection using `NSRange` (simpler than UIKit's UITextRange)
-- [ ] Connect to Lexical's selection system
-- [ ] Handle selection change notifications
+- [x] Create `LexicalAppKit/NativeSelection.swift`
+- [x] Implement selection using `NSRange`
+- [x] Create `NativeSelectionAppKit` conforming to `NativeSelectionProtocol`
+- [ ] Connect to Lexical's selection system (partial - hooks in place)
 
-**STTextView Reference:**
-- `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/STTextView+Select.swift` - Selection handling
+**Implementation Notes:**
+Created `NativeSelection.swift` with:
+- `NativeSelectionAppKit` struct capturing NSTextView selection state
+- Selection change handling hooks (`handleSelectionChange`)
+- `applySelection` for programmatic selection updates
 
 ### 4.6 Implement Copy/Paste
-- [ ] Create `LexicalAppKit/CopyPasteHelpers.swift`
-- [ ] Use `NSPasteboard` instead of `UIPasteboard`
-- [ ] Implement `copy:`, `cut:`, `paste:` actions
-- [ ] Handle rich text and plain text pasteboard types
+- [x] Create `LexicalAppKit/CopyPasteHelpers.swift`
+- [x] Use `NSPasteboard` instead of `UIPasteboard`
+- [x] Implement `copy:`, `cut:`, `paste:` actions
+- [x] Handle rich text (RTF) and plain text pasteboard types
+- [x] Define custom `.lexicalNodes` pasteboard type
 
-**STTextView Reference:**
-- `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/STTextView+CopyPaste.swift` - Pasteboard handling
+**Implementation Notes:**
+Created `CopyPasteHelpers.swift` with:
+- Multi-format copy (Lexical nodes, RTF, plain text)
+- Paste with format preference (Lexical > RTF > plain text)
+- Drag-and-drop type declarations
 
 ### 4.7 Implement First Responder
-- [ ] Override `acceptsFirstResponder` -> `Bool` (return true)
-- [ ] Override `becomeFirstResponder()` -> `Bool`
-- [ ] Override `resignFirstResponder()` -> `Bool`
-- [ ] Handle `window?.makeFirstResponder(self)` pattern
+- [x] First responder handled in `TextView.swift` via NSTextView
+- [x] `becomeFirstResponder()` and `resignFirstResponder()` override
+- [x] Delegate notifications for editing begin/end
 
-**STTextView Reference:**
-- `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/STTextView.swift` - Search for "firstResponder"
+**Note:** NSTextView provides first responder handling. Overrides added in TextView.swift.
 
 ### 4.8 Implement Mouse Handling
-- [ ] Override `mouseDown(with:)`
-- [ ] Override `mouseDragged(with:)`
-- [ ] Override `mouseUp(with:)`
-- [ ] Convert mouse coordinates to text positions
-- [ ] Update selection on mouse events
+- [x] Create `LexicalAppKit/TextView+Mouse.swift`
+- [x] Override `mouseDown(with:)` - with link click handling
+- [x] Override `mouseDragged(with:)`
+- [x] Override `mouseUp(with:)`
+- [x] Override `rightMouseDown(with:)` for context menu
+- [x] Cursor rect management
 
-**STTextView Reference:**
-- `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/STTextView+Mouse.swift` - Mouse event handling
+**Implementation Notes:**
+NSTextView handles most mouse selection. Extension adds:
+- Link click detection and handling
+- Selection change notifications
+- Context menu positioning
 
 ### 4.9 Implement Undo/Redo
-- [ ] Create `LexicalAppKit/TextView+Undo.swift`
-- [ ] Connect to `undoManager`
-- [ ] Register undo actions for text changes
+- [x] Create `LexicalAppKit/TextView+Undo.swift`
+- [x] Access `undoManager` property
+- [x] Undo grouping helpers
+- [x] `withoutUndoRegistration` utility
 
-**STTextView Reference:**
-- `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/STTextView+Undo.swift` - Undo management
-- `/Users/mh/labs/STTextView/Sources/STTextViewCommon/CoalescingUndoManager.swift` - Coalescing pattern
+**Implementation Notes:**
+NSTextView provides built-in undo when `allowsUndo = true`. Extension adds:
+- Menu item validation
+- Undo grouping helpers for batch operations
+- Utility to perform changes without undo registration
 
 ### 4.10 Implement Scrolling
-- [ ] Handle scroll view integration
-- [ ] Implement `scrollRangeToVisible(_:)`
-- [ ] Handle viewport updates
+- [x] Scroll view integration in `LexicalView.swift`
+- [x] `scrollRangeToVisible(_:)` provided by NSTextView
+- [x] `scrollSelectionToVisible()` in LexicalView
 
-**STTextView Reference:**
-- `/Users/mh/labs/STTextView/Sources/STTextViewAppKit/STTextView+Scrolling.swift` - Scroll handling
+**Note:** NSScrollView integration done in LexicalView. NSTextView provides scrollRangeToVisible.
 
 ### 4.11 Verify Phase 4 Complete
 - [x] `swift build --target LexicalAppKit` succeeds

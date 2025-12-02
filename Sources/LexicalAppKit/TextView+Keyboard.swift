@@ -113,25 +113,7 @@ extension TextViewAppKit {
     updatePlaceholderVisibility()
   }
 
-  // MARK: - Cut/Paste Operations
-
-  /// Cut operation.
-  public override func cut(_ sender: Any?) {
-    super.cut(sender)
-    updatePlaceholderVisibility()
-  }
-
-  /// Paste operation.
-  public override func paste(_ sender: Any?) {
-    super.paste(sender)
-    updatePlaceholderVisibility()
-  }
-
-  /// Paste as plain text.
-  public override func pasteAsPlainText(_ sender: Any?) {
-    super.pasteAsPlainText(sender)
-    updatePlaceholderVisibility()
-  }
+  // Cut/paste operations are in CopyPasteHelpers.swift
 }
 
 #endif // os(macOS) && !targetEnvironment(macCatalyst)
