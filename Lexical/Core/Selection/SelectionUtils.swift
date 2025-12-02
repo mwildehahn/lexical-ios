@@ -67,9 +67,20 @@ public func getSelection(allowInvalidPositions: Bool = false) throws -> BaseSele
 
   // Could not get active editor. This is unexpected, but we can't log since logging requires editor!
   throw LexicalError.invariantViolation("called getSelection() without an active editor")
-  #else
-  // On AppKit, if there's no existing selection we cannot derive from native UI yet
-  return nil
+  #elseif os(macOS) && !targetEnvironment(macCatalyst)
+  if let editor = getActiveEditor() {
+    do {
+      let selection = try createSelectionAppKit(editor: editor)
+      editorState?.selection = selection
+      return selection
+    } catch {
+      editor.log(.other, .warning, "Exception while creating range selection on AppKit")
+      return nil
+    }
+  }
+
+  // Could not get active editor. This is unexpected, but we can't log since logging requires editor!
+  throw LexicalError.invariantViolation("called getSelection() without an active editor")
   #endif
 }
 
@@ -264,13 +275,13 @@ func createEmptyRangeSelection() -> RangeSelection {
   return RangeSelection(anchor: anchor, focus: focus, format: TextFormat())
 }
 
-#if canImport(UIKit)
 /// When we create a selection, we try to use the previous selection where possible, unless an actual user selection change has occurred.
 /// When we do need to create a new selection, we validate we can have text nodes for both anchor and focus nodes.
 /// If that holds true, we then return that selection as a mutable object that we use for the editor state for this update cycle.
 /// If a selection gets changed, and requires a update to native iOS selection, it gets marked as "dirty".
 /// If the selection changes, but matches with the existing native selection, then we only need to sync it.
 /// Otherwise, we generally bail out of doing an update to selection during reconciliation unless there are dirty nodes that need reconciling.
+#if canImport(UIKit)
 @MainActor
 func createSelection(editor: Editor) throws -> BaseSelection? {
   let currentEditorState = editor.getEditorState()
@@ -290,6 +301,48 @@ func createSelection(editor: Editor) throws -> BaseSelection? {
       range.location, searchDirection: nativeSelection.affinity, rangeCache: editor.rangeCache),
       let focus = try pointAtStringLocation(
         range.location + range.length, searchDirection: nativeSelection.affinity,
+        rangeCache: editor.rangeCache)
+    {
+      return RangeSelection(anchor: anchor, focus: focus, format: TextFormat())
+    }
+
+    return nil
+  }
+
+  // we have a last selection. Clone it!
+  return lastSelection.clone()
+}
+#elseif os(macOS) && !targetEnvironment(macCatalyst)
+@MainActor
+func createSelectionAppKit(editor: Editor) throws -> BaseSelection? {
+  let currentEditorState = editor.getEditorState()
+  let lastSelection = currentEditorState.selection
+
+  guard let lastSelection else {
+    // Get native selection from AppKit frontend
+    guard let frontend = editor.frontendAppKit else {
+      return nil
+    }
+
+    let range = frontend.nativeSelectionRange
+    let affinity: LexicalTextStorageDirection = frontend.nativeSelectionAffinity == .downstream ? .forward : .backward
+
+    // If rangeCache is empty, we can't convert native selection to Lexical selection yet
+    // This happens during initialization - return a default selection at root
+    if editor.rangeCache.isEmpty {
+      // Return selection at start of first paragraph if it exists
+      if let root = editor.getEditorState().getRootNode(),
+         let firstChild = root.getFirstChild() {
+        let point = Point(key: firstChild.key, offset: 0, type: .element)
+        return RangeSelection(anchor: point, focus: point, format: TextFormat())
+      }
+      return nil
+    }
+
+    if let anchor = try pointAtStringLocation(
+      range.location, searchDirection: affinity, rangeCache: editor.rangeCache),
+      let focus = try pointAtStringLocation(
+        range.location + range.length, searchDirection: affinity,
         rangeCache: editor.rangeCache)
     {
       return RangeSelection(anchor: anchor, focus: focus, format: TextFormat())

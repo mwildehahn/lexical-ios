@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -11,9 +8,17 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 class SerializationTests: XCTestCase {
 
-  var view: LexicalView?
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  var view: LexicalAppKit.LexicalView?
+  #else
+  var view: Lexical.LexicalView?
+  #endif
   var editor: Editor {
     get {
       guard let editor = view?.editor else {
@@ -25,7 +30,11 @@ class SerializationTests: XCTestCase {
   }
 
   override func setUp() {
-    view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    view = LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #else
+    view = Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #endif
   }
 
   override func tearDown() {
@@ -43,6 +52,8 @@ class SerializationTests: XCTestCase {
     XCTAssertNotNil(mapping[NodeType.heading], "Heading Node should not be nil")
   }
 
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // This test uses generateArrayFromSelectedNodes which is UIKit-only (in CopyPasteHelpers.swift)
   func testSimpleSerialization() throws {
     try editor.update {
       guard let editorState = getActiveEditorState(),
@@ -83,9 +94,12 @@ class SerializationTests: XCTestCase {
       XCTAssertEqual(textNode.getTextContent(), "Hello")
     }
   }
+  #endif
 
   let jsonString = "{\"root\":{\"children\":[{\"children\":[{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\"This is \",\"type\":\"text\",\"version\":1},{\"detail\":0,\"format\":1,\"mode\":\"normal\",\"style\":\"\",\"text\":\"bold\",\"type\":\"text\",\"version\":1},{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\" \",\"type\":\"text\",\"version\":1},{\"detail\":0,\"format\":2,\"mode\":\"normal\",\"style\":\"\",\"text\":\"italic\",\"type\":\"text\",\"version\":1},{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\" \",\"type\":\"text\",\"version\":1},{\"detail\":0,\"format\":8,\"mode\":\"normal\",\"style\":\"\",\"text\":\"underline\",\"type\":\"text\",\"version\":1},{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\" text in the first paragraph.\",\"type\":\"text\",\"version\":1}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1},{\"children\":[{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\"This is another paragraph.\",\"type\":\"text\",\"version\":1}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1},{\"children\":[{\"detail\":0,\"format\":16,\"mode\":\"normal\",\"style\":\"\",\"text\":\"This is a code line.\",\"type\":\"text\",\"version\":1}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1},{\"children\":[{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\"This is \",\"type\":\"text\",\"version\":1},{\"detail\":0,\"format\":4,\"mode\":\"normal\",\"style\":\"\",\"text\":\"strikethrough\",\"type\":\"text\",\"version\":1}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"root\",\"version\":1}}"
 
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // These tests use insertGeneratedNodes which is UIKit-only (in CopyPasteHelpers.swift)
   func testWebFormatJSONImporting() throws {
     try editor.update {
       let decoder = JSONDecoder()
@@ -167,6 +181,7 @@ class SerializationTests: XCTestCase {
 
     XCTAssertEqual(text, "This is bold italic underline text in the first paragraph.\nThis is another paragraph.\nThis is a code line.\nThis is strikethrough")
   }
+  #endif
 
   func testFromToJSONMethods() throws {
     let headlessEditor = Editor.createHeadless(editorConfig: EditorConfig(theme: Theme(), plugins: []))
@@ -204,5 +219,3 @@ class SerializationTests: XCTestCase {
     XCTAssertEqual(comparisonJSON, outputJSON, "Equality of json")
   }
 }
-
-#endif

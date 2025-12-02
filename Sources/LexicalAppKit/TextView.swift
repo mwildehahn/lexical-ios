@@ -266,19 +266,19 @@ extension TextViewAppKit: NSTextViewDelegate {
 /// Custom NSTextStorage for Lexical on macOS.
 ///
 /// This class bridges the Lexical editor with the AppKit text system.
-public class TextStorageAppKit: NSTextStorage {
+public class TextStorageAppKit: NSTextStorage, ReconcilerTextStorageAppKit {
 
   /// Character location typealias for decorator position cache.
   internal typealias CharacterLocation = Int
 
   /// Cache of decorator node positions for the layout manager.
-  @objc internal var decoratorPositionCache: [NodeKey: CharacterLocation] = [:]
+  @objc public var decoratorPositionCache: [NodeKey: Int] = [:]
 
   /// The backing store for the attributed string.
   private var backingAttributedString: NSMutableAttributedString
 
   /// Current editing mode.
-  var mode: TextStorageEditingMode
+  public var mode: TextStorageEditingMode
 
   /// Reference to the Lexical editor.
   weak var editor: Editor?

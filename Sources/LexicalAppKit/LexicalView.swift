@@ -140,6 +140,9 @@ public class LexicalView: NSView {
     // Set the delegate
     textView.lexicalDelegate = self
 
+    // Connect this view to the editor as the frontend
+    textView.editor.frontendAppKit = self
+
     // Register rich text command handlers
     registerRichTextAppKit(editor: textView.editor)
   }
@@ -357,6 +360,213 @@ extension LexicalView: TextViewAppKitDelegate {
     replacementText text: String
   ) -> Bool {
     delegate?.textViewShouldChangeText(self, range: range, replacementText: text) ?? true
+  }
+}
+
+// MARK: - FrontendAppKit Conformance
+
+extension LexicalView: FrontendAppKit {
+
+  public var textStorage: NSTextStorage {
+    textView.lexicalTextStorage
+  }
+
+  public var layoutManager: NSLayoutManager {
+    textView.lexicalLayoutManager
+  }
+
+  public var textContainerInsets: NSEdgeInsets {
+    let inset = textView.textContainerInset
+    return NSEdgeInsets(top: inset.height, left: inset.width, bottom: inset.height, right: inset.width)
+  }
+
+  public var nativeSelectionRange: NSRange {
+    textView.selectedRange()
+  }
+
+  public var nativeSelectionAffinity: NSSelectionAffinity {
+    textView.selectionAffinity
+  }
+
+  public var isFirstResponder: Bool {
+    textViewIsFirstResponder
+  }
+
+  public var viewForDecoratorSubviews: NSView? {
+    textView
+  }
+
+  public var isEmpty: Bool {
+    isTextViewEmpty
+  }
+
+  public var isUpdatingNativeSelection: Bool {
+    get { textView.isUpdatingNativeSelection }
+    set { textView.isUpdatingNativeSelection = newValue }
+  }
+
+  public var interceptNextSelectionChangeAndReplaceWithRange: NSRange? {
+    get { textView.interceptNextSelectionChangeAndReplaceWithRange }
+    set { textView.interceptNextSelectionChangeAndReplaceWithRange = newValue }
+  }
+
+  public var textLayoutWidth: CGFloat {
+    textView.textContainer?.containerSize.width ?? 0
+  }
+
+  public func moveNativeSelection(
+    type: NativeSelectionModificationType,
+    direction: LexicalTextStorageDirection,
+    granularity: LexicalTextGranularity
+  ) {
+    // Convert to NSTextView selection operations
+    let currentRange = textView.selectedRange()
+    guard let textContainer = textView.textContainer,
+          let layoutManager = textView.layoutManager else { return }
+
+    // Calculate new selection based on direction and granularity
+    var newRange = currentRange
+
+    switch granularity {
+    case .character:
+      if direction == .forward {
+        if currentRange.location + currentRange.length < (textView.string as NSString).length {
+          if type == .move {
+            newRange = NSRange(location: currentRange.location + 1, length: 0)
+          } else {
+            newRange = NSRange(location: currentRange.location, length: currentRange.length + 1)
+          }
+        }
+      } else {
+        if currentRange.location > 0 {
+          if type == .move {
+            newRange = NSRange(location: currentRange.location - 1, length: 0)
+          } else {
+            newRange = NSRange(location: currentRange.location - 1, length: currentRange.length + 1)
+          }
+        }
+      }
+    case .word:
+      // Find word boundary
+      let string = textView.string as NSString
+      let wordRange = string.rangeOfCharacter(
+        from: .whitespacesAndNewlines,
+        options: direction == .forward ? [] : .backwards,
+        range: NSRange(
+          location: direction == .forward ? currentRange.location + currentRange.length : 0,
+          length: direction == .forward
+            ? string.length - (currentRange.location + currentRange.length)
+            : currentRange.location
+        )
+      )
+      if wordRange.location != NSNotFound {
+        if type == .move {
+          newRange = NSRange(location: wordRange.location, length: 0)
+        } else {
+          // Extend selection
+          let newLocation = min(currentRange.location, wordRange.location)
+          let newEnd = max(currentRange.location + currentRange.length, wordRange.location + wordRange.length)
+          newRange = NSRange(location: newLocation, length: newEnd - newLocation)
+        }
+      }
+    case .line:
+      // Find line boundaries using layout manager
+      var lineStart: Int = 0
+      var lineEnd: Int = 0
+      layoutManager.lineFragmentRect(forGlyphAt: currentRange.location, effectiveRange: nil)
+      let glyphRange = layoutManager.glyphRange(for: textContainer)
+      if direction == .forward {
+        lineEnd = NSMaxRange(glyphRange)
+        newRange = type == .move
+          ? NSRange(location: lineEnd, length: 0)
+          : NSRange(location: currentRange.location, length: lineEnd - currentRange.location)
+      } else {
+        lineStart = glyphRange.location
+        newRange = type == .move
+          ? NSRange(location: lineStart, length: 0)
+          : NSRange(location: lineStart, length: currentRange.location + currentRange.length - lineStart)
+      }
+    case .paragraph, .sentence:
+      // Treat similar to line for now
+      break
+    case .document:
+      let length = (textView.string as NSString).length
+      if direction == .forward {
+        newRange = type == .move
+          ? NSRange(location: length, length: 0)
+          : NSRange(location: currentRange.location, length: length - currentRange.location)
+      } else {
+        newRange = type == .move
+          ? NSRange(location: 0, length: 0)
+          : NSRange(location: 0, length: currentRange.location + currentRange.length)
+      }
+    }
+
+    textView.setSelectedRange(newRange)
+  }
+
+  public func unmarkTextWithoutUpdate() {
+    // Clear any marked text from IME composition
+    if textView.hasMarkedText() {
+      textView.unmarkText()
+    }
+  }
+
+  public func presentDeveloperFacingError(message: String) {
+    // Show an alert for developer-facing errors during debugging
+    #if DEBUG
+    let alert = NSAlert()
+    alert.messageText = "Lexical Error"
+    alert.informativeText = message
+    alert.alertStyle = .warning
+    alert.addButton(withTitle: "OK")
+    alert.runModal()
+    #endif
+  }
+
+  public func updateNativeSelection(from selection: BaseSelection) throws {
+    guard let rangeSelection = selection as? RangeSelection else {
+      // Handle other selection types (NodeSelection, etc.)
+      return
+    }
+
+    textView.applyLexicalSelection(rangeSelection, editor: editor)
+  }
+
+  public func setMarkedTextFromReconciler(_ markedText: NSAttributedString, selectedRange: NSRange) {
+    // Set marked text for IME composition from the reconciler
+    textView.setMarkedText(
+      markedText,
+      selectedRange: selectedRange,
+      replacementRange: textView.selectedRange()
+    )
+  }
+
+  public func resetSelectedRange() {
+    // Reset selection to the end of the text
+    let length = (textView.string as NSString).length
+    textView.setSelectedRange(NSRange(location: length, length: 0))
+  }
+
+  public func resetTypingAttributes(for selectedNode: Node) {
+    // Reset typing attributes based on the selected node's attributes
+    // This ensures new text typed at this position uses the correct formatting
+    let theme = editor.getTheme()
+    var attrs: [NSAttributedString.Key: Any] = [:]
+
+    // Start with default font and color
+    attrs[.font] = LexicalConstantsAppKit.defaultFont
+    attrs[.foregroundColor] = LexicalConstantsAppKit.defaultColor
+
+    // Apply node-specific attributes
+    if let textNode = selectedNode as? TextNode {
+      let nodeAttrs = textNode.getAttributedStringAttributes(theme: theme)
+      for (key, value) in nodeAttrs {
+        attrs[key] = value
+      }
+    }
+
+    textView.typingAttributes = attrs
   }
 }
 

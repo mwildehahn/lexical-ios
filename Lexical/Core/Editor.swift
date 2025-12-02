@@ -131,6 +131,26 @@ public class Editor: NSObject {
       }
     }
   }
+  #elseif os(macOS) && !targetEnvironment(macCatalyst)
+  internal var textStorage: NSTextStorage? {
+    frontendAppKit?.textStorage
+  }
+
+  public weak var frontendAppKit: FrontendAppKit? {
+    didSet {
+      if pendingEditorState != nil {
+        if let textStorage = frontendAppKit?.textStorage {
+          // We need to clear the text storage, but mode property is on the subclass
+          // For now, just do direct replacement
+          let range = NSRange(location: 0, length: textStorage.string.lengthAsNSString())
+          textStorage.beginEditing()
+          textStorage.replaceCharacters(in: range, with: "")
+          textStorage.endEditing()
+        }
+        try? beginUpdate({}, mode: UpdateBehaviourModificationMode(), reason: .initialization)
+      }
+    }
+  }
   #endif
 
   internal var infiniteUpdateLoopCount = 0
@@ -921,6 +941,11 @@ public class Editor: NSObject {
           self.isUpdating = previouslyUpdating
           return
         }
+        #elseif os(macOS) && !targetEnvironment(macCatalyst)
+        if mode.allowUpdateWithoutTextStorage && textStorage == nil {
+          self.isUpdating = previouslyUpdating
+          return
+        }
         #endif
 
         #if canImport(UIKit)
@@ -956,6 +981,29 @@ public class Editor: NSObject {
           if featureFlags.verboseLogging {
             let tsLenAfter = textStorage?.length ?? -1
             print("🔥 RECONCILE: end dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLenAfter)")
+          }
+        }
+        #elseif os(macOS) && !targetEnvironment(macCatalyst)
+        // AppKit reconciliation path - use legacy Reconciler only (no optimized path yet)
+        if !headless {
+          // Prevent selection feedback during reconciliation
+          frontendAppKit?.isUpdatingNativeSelection = true
+          defer { frontendAppKit?.isUpdatingNativeSelection = false }
+
+          if featureFlags.verboseLogging {
+            let tsLen = textStorage?.length ?? -1
+            print("🔥 RECONCILE: begin (AppKit) dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLen)")
+          }
+          try Reconciler.updateEditorState(
+            currentEditorState: editorState,
+            pendingEditorState: pendingEditorState,
+            editor: self,
+            shouldReconcileSelection: !mode.suppressReconcilingSelection,
+            markedTextOperation: nil  // AppKit uses different IME handling
+          )
+          if featureFlags.verboseLogging {
+            let tsLenAfter = textStorage?.length ?? -1
+            print("🔥 RECONCILE: end (AppKit) dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLenAfter)")
           }
         }
         #endif

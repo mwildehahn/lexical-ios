@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -11,8 +8,16 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 class ElementNodeTests: XCTestCase {
-  var view: LexicalView?
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  var view: LexicalAppKit.LexicalView?
+  #else
+  var view: Lexical.LexicalView?
+  #endif
   var editor: Editor {
     get {
       guard let editor = view?.editor else {
@@ -24,7 +29,11 @@ class ElementNodeTests: XCTestCase {
   }
 
   override func setUp() {
-    view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    view = LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #else
+    view = Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #endif
   }
 
   override func tearDown() {
@@ -83,7 +92,11 @@ class ElementNodeTests: XCTestCase {
     try editor.update {
       createExampleNodeTree()
 
+      #if os(macOS) && !targetEnvironment(macCatalyst)
+      view?.textView.setSelectedRange(NSRange(location: 2, length: 4))
+      #else
       view?.textView.selectedRange = NSRange(location: 2, length: 4)
+      #endif
       if let elementNode = getNodeByKey(key: "4") as? ElementNode {
         let selection = try elementNode.select(anchorOffset: 20, focusOffset: 10)
         XCTAssertEqual(selection.anchor.key, "4")
@@ -121,5 +134,3 @@ class ElementNodeTests: XCTestCase {
     }
   }
 }
-
-#endif

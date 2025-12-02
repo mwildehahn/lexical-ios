@@ -1622,12 +1622,35 @@ public class RangeSelection: BaseSelection {
             // Look in previous sibling element (e.g., previous list item)
             if let prevElement = parent.getPreviousSibling() as? ElementNode {
               if let lastText = findLastTextNodeInElement(prevElement) {
-                let prevLength = lastText.getTextContentSize()
-                // Create selection spanning from end of previous text to start of current text
-                // This creates a boundary-spanning selection that will merge the elements
-                // anchor stays at current position (start of current text)
-                // focus moves to end of previous text
-                focus.updatePoint(key: lastText.getKey(), offset: prevLength, type: .text)
+                // Merge current element's content into the previous element
+                let cursorOffset = lastText.getTextContentSize()
+                let children = parent.getChildren()
+
+                // For text nodes, merge the text content directly
+                if let firstChild = children.first as? TextNode {
+                  // Concatenate text content
+                  let mergedText = lastText.getTextPart() + firstChild.getTextPart()
+                  try lastText.setText(mergedText)
+
+                  // Move any additional children (beyond the first text node) to prevElement
+                  for (index, child) in children.enumerated() {
+                    if index > 0 {
+                      try prevElement.append([child])
+                    }
+                  }
+                } else {
+                  // Non-text first child: just move all children
+                  for child in children {
+                    try prevElement.append([child])
+                  }
+                }
+
+                // Remove the now-empty current parent element
+                try parent.remove()
+
+                // Position cursor at the join point
+                try lastText.select(anchorOffset: cursorOffset, focusOffset: cursorOffset)
+                return
               } else {
                 // Previous element has no text, try to collapse
                 if try parent.collapseAtStart(selection: self) {
@@ -1947,6 +1970,49 @@ public class RangeSelection: BaseSelection {
     self.dirty = false
     self.format = TextFormat()
     self.style = ""
+  }
+  #elseif os(macOS) && !targetEnvironment(macCatalyst)
+  @MainActor
+  internal func modify(
+    alter: NativeSelectionModificationType, isBackward: Bool, granularity: LexicalTextGranularity
+  ) throws {
+    let collapse = alter == .move
+
+    guard let editor = getActiveEditor() else {
+      throw LexicalError.invariantViolation("Cannot be called outside update loop")
+    }
+
+    guard let frontendAppKit = editor.frontendAppKit else {
+      throw LexicalError.invariantViolation("No AppKit frontend attached")
+    }
+
+    if editor.featureFlags.verboseLogging {
+      let rng = NSStringFromRange(frontendAppKit.nativeSelectionRange)
+      print("🔥 MODIFY: request alter=\(alter) dir=\(isBackward ? "backward" : "forward") gran=\(granularity) native.before=\(rng)")
+    }
+
+    frontendAppKit.moveNativeSelection(
+      type: alter,
+      direction: isBackward ? .backward : .forward,
+      granularity: granularity)
+
+    let nativeRange = frontendAppKit.nativeSelectionRange
+    let nativeAffinity: LexicalTextStorageDirection = frontendAppKit.nativeSelectionAffinity == .downstream ? .forward : .backward
+
+    if editor.featureFlags.verboseLogging {
+      print("🔥 MODIFY: native.after=\(NSStringFromRange(nativeRange))")
+    }
+
+    try applySelectionRange(nativeRange, affinity: nativeAffinity)
+
+    // Because a range works on start and end, we might need to flip
+    // to match the range specifically.
+    let anchorLocation = isBackward ? nativeRange.location + nativeRange.length : nativeRange.location
+    let focusLocation = isBackward ? nativeRange.location : nativeRange.location + nativeRange.length
+
+    if !collapse && anchorLocation != anchor.offset || focusLocation != focus.offset {
+      swapPoints()
+    }
   }
   #endif
 

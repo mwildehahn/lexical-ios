@@ -7,6 +7,9 @@
 
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 import Foundation
 import LexicalCore
 
@@ -57,6 +60,7 @@ enum AttributeUtils {
     // hence, they are applied last
     var combinedAttributes = lexicalAttributes.reduce([:]) { $0.merging($1) { $1 } }
 
+    #if canImport(UIKit)
     var font = combinedAttributes[.font] as? UIFont ?? LexicalConstants.defaultFont
     var fontDescriptor = font.fontDescriptor
     var symbolicTraits = fontDescriptor.symbolicTraits
@@ -103,6 +107,54 @@ enum AttributeUtils {
     if combinedAttributes[.foregroundColor] == nil {
       combinedAttributes[.foregroundColor] = LexicalConstants.defaultColor
     }
+    #elseif canImport(AppKit)
+    var font = combinedAttributes[.font] as? NSFont ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
+    var fontDescriptor = font.fontDescriptor
+    var symbolicTraits = fontDescriptor.symbolicTraits
+
+    // update symbolicTraits for AppKit
+    if let bold = combinedAttributes[.bold] as? Bool {
+      if bold {
+        symbolicTraits.insert(.bold)
+      } else {
+        symbolicTraits.remove(.bold)
+      }
+    }
+
+    if let italic = combinedAttributes[.italic] as? Bool {
+      if italic {
+        symbolicTraits.insert(.italic)
+      } else {
+        symbolicTraits.remove(.italic)
+      }
+    }
+
+    // update font face, family and size
+    if let family = combinedAttributes[.fontFamily] as? String {
+      fontDescriptor = fontDescriptor.withFamily(family)
+    }
+
+    if let size = coerceCGFloat(combinedAttributes[.fontSize]) {
+      fontDescriptor = fontDescriptor.addingAttributes([.size: size])
+    }
+
+    fontDescriptor = fontDescriptor.withSymbolicTraits(symbolicTraits)
+    font = NSFont(descriptor: fontDescriptor, size: 0) ?? font
+
+    combinedAttributes[.font] = font
+
+    if let paragraphStyle = getParagraphStyle(
+      attributes: combinedAttributes, indentSize: CGFloat(theme.indentSize))
+    {
+      combinedAttributes[.paragraphStyle] = paragraphStyle
+      combinedAttributes[.paragraphSpacingBefore_internal] = paragraphStyle.paragraphSpacingBefore
+      combinedAttributes[.paragraphSpacing_internal] = paragraphStyle.paragraphSpacing
+    }
+
+    if combinedAttributes[.foregroundColor] == nil {
+      combinedAttributes[.foregroundColor] = NSColor.textColor
+    }
+    #endif
 
     return combinedAttributes
   }
@@ -189,6 +241,7 @@ enum AttributeUtils {
     return nil
   }
 
+  #if canImport(UIKit)
   private static func extraLineFragmentIsPresent(_ textStorage: TextStorage) -> Bool {
     let textAsNSString: NSString = textStorage.string as NSString
     guard textAsNSString.length > 0 else { return true }
@@ -321,6 +374,7 @@ enum AttributeUtils {
         .appliedBlockLevelStyles_internal, value: attributes, range: enclosing)
     }
   }
+  #endif  // canImport(UIKit) - UIKit-specific block level attribute functions
 }
 
 extension NSAttributedString.Key {
@@ -339,4 +393,3 @@ extension NSAttributedString.Key {
   internal static let appliedBlockLevelStyles_internal: NSAttributedString.Key = .init(
     rawValue: "appliedBlockLevelStyles_internal")
 }
-#endif  // canImport(UIKit)
