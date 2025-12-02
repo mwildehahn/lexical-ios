@@ -159,24 +159,66 @@ Files with actual UIKit dependencies (need abstraction or stay in UIKit):
 ### 2.5 Move Node System to Core
 
 **Step 2.5.1: Move Node.swift (base class)**
-- [ ] Copy `Core/Nodes/Node.swift` to `Sources/LexicalCore/Nodes/Node.swift`
-- [ ] Change `import UIKit` to `import Foundation`
-- [ ] Add any missing imports from LexicalCore types
-- [ ] Identify and list missing dependencies (will show as build errors)
-- [ ] Verify build (expect errors - document what's missing)
+- [x] Copy `Core/Nodes/Node.swift` to `Sources/LexicalCore/Nodes/Node.swift`
+- [x] Change `import UIKit` to `import Foundation`
+- [x] Identify and list missing dependencies (documented below)
+- [ ] Resolve dependencies and verify build
+
+**Node.swift Dependencies Discovered:**
+
+*Types needed (must be moved to LexicalCore):*
+- `Editor` - main editor class (complex, many UIKit deps)
+- `EditorState` - editor state class
+- `ElementNode` - base class for element nodes
+- `TextNode`, `RootNode`, `ParagraphNode`, `HeadingNode`, `QuoteNode`
+- `CodeNode`, `CodeHighlightNode`, `LineBreakNode`, `PlaceholderNode`
+- `DecoratorNode`, `DecoratorBlockNode`, `DecoratorContainerNode`
+- `RangeSelection`, `BaseSelection` - selection types
+
+*Utility functions needed:*
+- `getActiveEditor()`, `getActiveEditorState()` - from Updates.swift
+- `errorOnReadOnly()`, `isReadOnlyMode()` - from Updates.swift
+- `generateKey()`, `getNodeByKey()` - from Utils.swift
+- `internallyMarkNodeAsDirty()`, `internallyMarkSiblingsAsDirty()` - from Utils.swift
+- `isElementNode()`, `isRootNode()`, `isTextNode()` - from Utils.swift
+- `getSelection()`, `removeFromParent()` - from Utils.swift
+- `maybeMoveChildrenSelectionToParent()` - from Utils.swift
+- `moveSelectionPointToSibling()`, `moveSelectionPointToEnd()` - from SelectionHelpers.swift
+- `updateElementSelectionOnCreateDeleteNode()` - from SelectionHelpers.swift
+
+*Constants needed:*
+- `LexicalConstants.uninitializedNodeKey` - from Constants.swift
+- `kRootNodeKey` - from EditorState.swift
 
 **Step 2.5.2: Move required utilities for Node**
-Dependencies Node.swift needs from Utils.swift:
-- [ ] Move `getNodeByKey()` function
-- [ ] Move `generateKey()` function
-- [ ] Move `getActiveEditor()` function
-- [ ] Move `getActiveEditorState()` function
-- [ ] Move `internallyMarkNodeAsDirty()` function
-- [ ] Move `internallyMarkSiblingsAsDirty()` function
-- [ ] Move `errorOnReadOnly()` function
-- [ ] Move `isReadOnlyMode()` function
-- [ ] Create `Sources/LexicalCore/Utils.swift` with these functions
-- [ ] Verify build
+Given the extensive dependencies, we need to move most of the core system together.
+
+*Phase A: Move constants and simple types*
+- [x] Move `kRootNodeKey` to LexicalCore/CoreTypes.swift
+- [x] Add `LexicalCoreConstants.uninitializedNodeKey` to LexicalCore/CoreTypes.swift
+- [x] Add `StringExtensions.swift` with `lengthAsNSString()` method
+
+**Key Finding: Deep Coupling**
+Attempted to move Node.swift and related types but discovered deep coupling:
+- Node.swift depends on ~15 utility functions from Utils.swift, SelectionHelpers.swift
+- Utility functions depend on Editor and EditorState
+- Editor has heavy UIKit dependencies (decorators, text storage, etc.)
+- Selection types depend on Node types (circular dependency)
+
+**Revised Approach Needed:**
+Instead of moving Node to Core, consider:
+1. **Protocol Extraction**: Create protocols in LexicalCore that Editor/EditorState conform to
+2. **Dependency Injection**: Pass editor/state access via protocols rather than global functions
+3. **Gradual Migration**: Move types one at a time with protocol-based dependencies
+
+*Phase B-D: Deferred*
+The remaining phases require architectural changes to break circular dependencies.
+See "Revised Approach" above for next steps.
+
+- [ ] Create `EditorStateProtocol` in LexicalCore
+- [ ] Create `EditorAccessProtocol` in LexicalCore
+- [ ] Refactor Node.swift to use protocols instead of concrete types
+- [ ] Move Node.swift to LexicalCore with protocol-based dependencies
 
 **Step 2.5.3: Move ElementNode.swift**
 - [ ] Copy `Core/Nodes/ElementNode.swift` to `Sources/LexicalCore/Nodes/`
