@@ -825,16 +825,16 @@ This phase outlines all remaining work needed to achieve feature parity between 
 
 ### Overview of Gaps
 
-| Category | Impact | Complexity | Dependencies |
-|----------|--------|------------|--------------|
-| RangeCache System | High | High | None |
-| Selection System | High | Medium | RangeCache |
-| Events/Input System | High | Medium | Selection |
-| Reconciler | High | High | RangeCache, Selection |
-| Decorator Nodes | Medium | Medium | TextAttachment |
-| Custom Drawing | Low | Medium | LayoutManager |
-| Plugin Parity | Medium | Varies | Decorators |
-| Test Parity | Low | Low | All above |
+| Category | Status | Impact | Complexity | Dependencies |
+|----------|--------|--------|------------|--------------|
+| RangeCache System | ✅ Complete | High | High | None |
+| Selection System | ✅ Complete | High | Medium | RangeCache |
+| Events/Input System | ✅ Complete | High | Medium | Selection |
+| Reconciler | ⏳ Pending | High | High | RangeCache, Selection |
+| Decorator Nodes | ⏳ Pending | Medium | Medium | TextAttachment |
+| Custom Drawing | ⏳ Pending | Low | Medium | LayoutManager |
+| Plugin Parity | ⏳ Pending | Medium | Varies | Decorators |
+| Test Parity | ⏳ Pending | Low | Low | All above |
 
 ---
 
@@ -941,11 +941,11 @@ Many selection operations depend on RangeCache and native NSTextView selection A
 
 ---
 
-### 10.3 Events and Input System for AppKit ✅ MAJOR PROGRESS
+### 10.3 Events and Input System for AppKit ✅ COMPLETE
 
 These functions handle text input and selection change events from the native view.
 
-**Current State:** AppKit event handlers implemented in `Events.swift`
+**Current State:** AppKit event handlers fully integrated with TextViewAppKit
 
 **Step 10.3.1: Port Input Event Handlers** ✅ COMPLETE
 - [x] Port `onInsertTextFromUITextView()` to AppKit - Created `onInsertTextFromTextView()`
@@ -965,33 +965,37 @@ These functions handle text input and selection change events from the native vi
   - `onPasteFromTextView()` - Paste from NSPasteboard
   - `setPasteboardAppKit()` - Helper function
   - `insertDataTransferForRichTextAppKit()` - Paste content handling
-- [ ] Port selection change handling to AppKit (partially done in Phase 10.2)
-- [ ] Connect to `TextViewAppKit` input handling
-- [ ] Verify text input works with IME
+- [x] Selection change handling connected via `handleSelectionChange()`
+- [x] `TextViewAppKit` keyboard methods dispatch Lexical commands
+- [ ] Verify text input works with IME (requires runtime testing)
 
 **Step 10.3.2: Port Rich Text Registration** ✅ COMPLETE
 - [x] Port `registerRichText()` to AppKit - Created `registerRichTextAppKit()`
   - All command listeners registered
   - Text formatting commands set up
   - Indent/outdent commands working
-- [ ] Connect to LexicalView initialization
-- [ ] Verify formatting commands work (bold, italic, etc.)
+- [x] Connect to LexicalView initialization - `registerRichTextAppKit()` called in init
+- [ ] Verify formatting commands work (bold, italic, etc.) - requires runtime testing
 
-**Step 10.3.3: Integrate with NSTextViewDelegate**
-- [ ] Update `TextViewAppKit` delegate methods to use ported event handlers
-- [ ] Ensure `textDidChange` triggers proper Lexical updates
-- [ ] Ensure `textViewDidChangeSelection` triggers selection sync
-- [ ] Verify undo/redo integration
+**Step 10.3.3: Integrate with NSTextViewDelegate** ✅ COMPLETE
+- [x] Update `TextViewAppKit` delegate methods to use ported event handlers
+  - `deleteBackward`, `deleteForward`, `deleteWordBackward`, etc. dispatch commands
+  - `insertNewline`, `insertTab`, `insertBacktab` dispatch commands
+  - `insertText` dispatches `.insertText` command
+  - `copy`, `cut`, `paste` dispatch corresponding commands with NSPasteboard
+- [x] `textViewDidChangeSelection` calls `handleSelectionChange()` for selection sync
+- [ ] Verify undo/redo integration (requires runtime testing)
 
 **Cross-Platform Changes:**
 - `handleIndentAndOutdent()` moved outside UIKit guard for cross-platform use
 
 **Files Modified:**
 - `Lexical/Core/Events.swift` - Added AppKit event handlers section
-
-**Files to Reference:**
-- `Lexical/Core/Events.swift` - Event handlers
-- `Sources/LexicalAppKit/TextView.swift` - Current AppKit text view
+- `Sources/LexicalAppKit/TextView.swift` - Connected selection change handling
+- `Sources/LexicalAppKit/TextView+Keyboard.swift` - Keyboard methods dispatch Lexical commands
+- `Sources/LexicalAppKit/TextView+NSTextInputClient.swift` - insertText dispatches command
+- `Sources/LexicalAppKit/CopyPasteHelpers.swift` - Copy/cut/paste dispatch commands
+- `Sources/LexicalAppKit/LexicalView.swift` - Calls `registerRichTextAppKit()` in init
 
 ---
 
