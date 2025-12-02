@@ -819,6 +819,380 @@ Updated `README.md` with:
 
 ---
 
+## Phase 10: Full UIKit/AppKit Parity (Future Work)
+
+This phase outlines all remaining work needed to achieve feature parity between UIKit and AppKit implementations. These tasks are organized by priority and dependency order.
+
+### Overview of Gaps
+
+| Category | Impact | Complexity | Dependencies |
+|----------|--------|------------|--------------|
+| RangeCache System | High | High | None |
+| Selection System | High | Medium | RangeCache |
+| Events/Input System | High | Medium | Selection |
+| Reconciler | High | High | RangeCache, Selection |
+| Decorator Nodes | Medium | Medium | TextAttachment |
+| Custom Drawing | Low | Medium | LayoutManager |
+| Plugin Parity | Medium | Varies | Decorators |
+| Test Parity | Low | Low | All above |
+
+---
+
+### 10.1 RangeCache System for AppKit
+
+The RangeCache is critical infrastructure that maps Lexical node keys to NSTextStorage locations. Without it, many features don't work.
+
+**Current State:** Entirely UIKit-only (`Lexical/TextKit/RangeCache.swift`)
+
+**Step 10.1.1: Create RangeCacheAppKit**
+- [ ] Create `Sources/LexicalAppKit/RangeCache.swift`
+- [ ] Port `RangeCacheItem` struct (location, lengths, range computation)
+- [ ] Port `searchForNodeByLocation()` function
+- [ ] Port `searchForElementByLocation()` function
+- [ ] Port `createPoint()` function
+- [ ] Port `createNativeSelection()` function
+- [ ] Verify build
+
+**Step 10.1.2: Integrate RangeCache with Editor**
+- [ ] Add `rangeCache` property to Editor for AppKit (currently UIKit-only)
+- [ ] Update Editor initialization to create RangeCache on AppKit
+- [ ] Update Editor state reset to clear RangeCache on AppKit
+- [ ] Verify build
+
+**Step 10.1.3: Port RangeCache Helper Files**
+- [ ] Port `RangeCacheFenwick.swift` to AppKit (Fenwick tree integration)
+- [ ] Port `RangeCacheIncremental.swift` to AppKit (incremental updates)
+- [ ] Port `RangeCacheIndexing.swift` to AppKit (node indexing)
+- [ ] Verify build
+
+**Files to Reference:**
+- `Lexical/TextKit/RangeCache.swift` - Main implementation
+- `Lexical/Helper/RangeCacheFenwick.swift` - Fenwick tree helpers
+- `Lexical/Helper/RangeCacheIncremental.swift` - Incremental update helpers
+- `Lexical/Helper/RangeCacheIndexing.swift` - Indexing helpers
+
+---
+
+### 10.2 Selection System for AppKit
+
+Many selection operations depend on RangeCache and native NSTextView selection APIs.
+
+**Current State:** Core selection types work, but many utility functions are UIKit-only.
+
+**Step 10.2.1: Port Selection Utility Functions**
+- [ ] Port `stringLocationForPoint()` to AppKit (`SelectionUtils.swift:200`)
+- [ ] Port `createSelection()` to AppKit (`SelectionUtils.swift:266`)
+- [ ] Port `validatePosition()` to AppKit (`SelectionUtils.swift:722`)
+- [ ] Port `createNativeSelection()` to AppKit
+- [ ] Update `getSelection()` to use new functions on AppKit
+- [ ] Verify build and test
+
+**Step 10.2.2: Port RangeSelection Methods**
+- [ ] Port `modify()` function to AppKit (`RangeSelection.swift:1830`)
+  - Uses `UITextGranularity` - need AppKit equivalent using NSTextView selection methods
+  - Consider NSTextView's `selectionRange(forProposedRange:granularity:)` or manual implementation
+- [ ] Port `applyNativeSelection()` to AppKit
+- [ ] Port `applySelectionRange()` to AppKit
+- [ ] Port `init(nativeSelection:)` to AppKit
+- [ ] Port `getPlaintext()` to AppKit (`RangeSelection.swift:861`)
+- [ ] Verify build and test
+
+**Step 10.2.3: Update NativeSelectionAppKit**
+- [ ] Enhance `NativeSelectionAppKit` to fully implement `NativeSelectionProtocol`
+- [ ] Add marked text range tracking
+- [ ] Add selection affinity support
+- [ ] Connect to Editor's selection system
+- [ ] Verify selection sync between Lexical and NSTextView
+
+**Files to Reference:**
+- `Lexical/Core/Selection/SelectionUtils.swift` - Utility functions
+- `Lexical/Core/Selection/RangeSelection.swift` - Selection methods
+- `Sources/LexicalAppKit/NativeSelection.swift` - Current AppKit implementation
+
+---
+
+### 10.3 Events and Input System for AppKit
+
+These functions handle text input and selection change events from the native view.
+
+**Current State:** UIKit-only in `Events.swift`
+
+**Step 10.3.1: Port Input Event Handlers**
+- [ ] Port `onInsertTextFromUITextView()` to AppKit (`Events.swift:22`)
+  - Rename to `onInsertTextFromTextView()` or create AppKit-specific version
+  - Handle marked text operations (IME)
+  - Handle paragraph/line break insertion
+- [ ] Port selection change handling to AppKit
+- [ ] Connect to `TextViewAppKit` input handling
+- [ ] Verify text input works with IME
+
+**Step 10.3.2: Port Rich Text Registration**
+- [ ] Port `registerRichText()` to AppKit (`Events.swift`)
+  - Register command listeners
+  - Set up text formatting commands
+- [ ] Connect to LexicalView initialization
+- [ ] Verify formatting commands work (bold, italic, etc.)
+
+**Step 10.3.3: Integrate with NSTextViewDelegate**
+- [ ] Update `TextViewAppKit` delegate methods to use ported event handlers
+- [ ] Ensure `textDidChange` triggers proper Lexical updates
+- [ ] Ensure `textViewDidChangeSelection` triggers selection sync
+- [ ] Verify undo/redo integration
+
+**Files to Reference:**
+- `Lexical/Core/Events.swift` - Event handlers
+- `Sources/LexicalAppKit/TextView.swift` - Current AppKit text view
+
+---
+
+### 10.4 Reconciler for AppKit
+
+The Reconciler syncs Lexical's node tree with NSTextStorage. This is the most complex component.
+
+**Current State:** Entirely UIKit-only (`Reconciler.swift`, `OptimizedReconciler.swift`)
+
+**Step 10.4.1: Port Basic Reconciler**
+- [ ] Create `Sources/LexicalAppKit/Reconciler.swift`
+- [ ] Port `reconcile()` function
+- [ ] Port `reconcileNode()` function
+- [ ] Port text node reconciliation logic
+- [ ] Port element node reconciliation logic
+- [ ] Handle decorator node placeholders
+- [ ] Verify basic text editing works
+
+**Step 10.4.2: Port Optimized Reconciler (Optional)**
+- [ ] Evaluate if optimized reconciler is needed for AppKit
+- [ ] If yes, port `OptimizedReconciler.swift`
+- [ ] Port incremental update logic
+- [ ] Port Fenwick tree integration
+- [ ] Benchmark performance vs basic reconciler
+
+**Step 10.4.3: Port Supporting Infrastructure**
+- [ ] Port `Mutations.swift` to AppKit
+- [ ] Port `GarbageCollection.swift` to AppKit
+- [ ] Port `ReconcilerShadowCompare.swift` to AppKit (if using optimized reconciler)
+- [ ] Verify node creation/deletion works
+
+**Step 10.4.4: Integrate with Editor**
+- [ ] Update Editor to use AppKit reconciler
+- [ ] Wire up reconciler calls in `update()` block
+- [ ] Wire up reconciler calls in `read()` block
+- [ ] Verify full edit cycle works
+
+**Files to Reference:**
+- `Lexical/Core/Reconciler.swift` - Basic reconciler
+- `Lexical/Core/OptimizedReconciler.swift` - Optimized reconciler
+- `Lexical/Core/Mutations.swift` - Mutation tracking
+- `Lexical/Core/GarbageCollection.swift` - Node cleanup
+
+---
+
+### 10.5 Decorator Node Support for AppKit
+
+Decorators allow embedding custom views (images, tables, etc.) in the text.
+
+**Current State:** `DecoratorNode.getAttributedStringAttributes` returns empty on AppKit
+
+**Step 10.5.1: Implement TextAttachmentAppKit**
+- [ ] Update `Sources/LexicalAppKit/TextAttachment.swift`
+- [ ] Implement `attachmentBounds(for:textContainer:proposedLineFragment:glyphPosition:characterIndex:)`
+- [ ] Implement custom view attachment cell
+- [ ] Store reference to decorator view
+- [ ] Verify attachment sizing works
+
+**Step 10.5.2: Implement Decorator View Caching**
+- [ ] Create decorator view cache in LexicalViewAppKit
+- [ ] Port `decoratorView(forKey:createIfNecessary:)` to AppKit
+- [ ] Port `destroyCachedDecoratorView()` to AppKit
+- [ ] Implement view lifecycle management
+
+**Step 10.5.3: Update DecoratorNode for AppKit**
+- [ ] Update `DecoratorNode.getAttributedStringAttributes()` for AppKit
+- [ ] Return proper `TextAttachmentAppKit` in attributes
+- [ ] Verify decorator nodes render placeholder
+
+**Step 10.5.4: Implement Decorator View Positioning**
+- [ ] Port decorator positioning logic from `LayoutManager.swift`
+- [ ] Update `LayoutManagerAppKit` to position decorator views
+- [ ] Handle scroll and resize events
+- [ ] Verify decorator views display correctly
+
+**Files to Reference:**
+- `Lexical/Core/Nodes/DecoratorNode.swift` - Decorator base class
+- `Lexical/TextKit/TextAttachment.swift` - UIKit attachment
+- `Lexical/TextKit/LayoutManager.swift` - View positioning
+- `Sources/LexicalAppKit/TextAttachment.swift` - Current AppKit stub
+
+---
+
+### 10.6 Custom Drawing for AppKit
+
+Custom drawing allows rendering custom backgrounds, underlines, etc.
+
+**Current State:** `CustomDrawingHandler` type and `registerCustomDrawing` are UIKit-only
+
+**Step 10.6.1: Define AppKit Custom Drawing Types**
+- [ ] Create AppKit version of `CustomDrawingHandler` typealias
+- [ ] Use AppKit graphics context types (NSGraphicsContext, NSBezierPath)
+- [ ] Define in `Sources/LexicalAppKit/CustomDrawing.swift` or similar
+
+**Step 10.6.2: Port Custom Drawing Registration**
+- [ ] Port `registerCustomDrawing()` to Editor for AppKit
+- [ ] Store handlers in Editor
+- [ ] Verify registration works
+
+**Step 10.6.3: Implement Custom Drawing in LayoutManager**
+- [ ] Update `LayoutManagerAppKit` to invoke custom drawing handlers
+- [ ] Override `drawBackground(forGlyphRange:at:)` or similar
+- [ ] Override `drawGlyphs(forGlyphRange:at:)` for foreground drawing
+- [ ] Pass appropriate context and rect info to handlers
+- [ ] Verify code block backgrounds render correctly
+
+**Files to Reference:**
+- `Lexical/Core/Constants.swift:72` - CustomDrawingHandler typedef
+- `Lexical/Core/Editor.swift:440` - CustomDrawingHandlerInfo
+- `Lexical/TextKit/LayoutManager.swift` - UIKit drawing implementation
+
+---
+
+### 10.7 Plugin Parity for AppKit
+
+Several plugins are entirely UIKit-only and need AppKit equivalents.
+
+**Step 10.7.1: SelectableDecoratorNode for AppKit**
+- [ ] Create `Plugins/SelectableDecoratorNode/SelectableDecoratorNodeAppKit/`
+- [ ] Port `SelectableDecoratorNode.swift` using NSView
+- [ ] Port `SelectableDecoratorView.swift` using NSView
+- [ ] Implement selection handles for AppKit
+- [ ] Add to Package.swift with platform condition
+
+**Step 10.7.2: LexicalInlineImagePlugin for AppKit**
+- [ ] Create AppKit version of `ImageNode.swift` using NSImageView
+- [ ] Create AppKit version of `SelectableImageNode.swift`
+- [ ] Create AppKit version of `InlineImagePlugin.swift`
+- [ ] Add to Package.swift with platform condition
+- [ ] Verify image insertion and display works
+
+**Step 10.7.3: LexicalTablePlugin for AppKit**
+- [ ] Create AppKit version of `TableNode.swift`
+- [ ] Create AppKit version of `TableNodeView.swift` using NSTableView or NSGridView
+- [ ] Create AppKit version of `TableNodeScrollableWrapperView.swift`
+- [ ] Add to Package.swift with platform condition
+- [ ] Verify table editing works
+
+**Step 10.7.4: Update Existing Plugins**
+- [ ] Update `ListPlugin.swift` - remove UIKit guards where possible
+- [ ] Update `LinkPlugin.swift` - remove UIKit guards where possible
+- [ ] Verify all plugins build on AppKit
+
+**Files to Reference:**
+- `Plugins/SelectableDecoratorNode/` - UIKit implementation
+- `Plugins/LexicalInlineImagePlugin/` - UIKit implementation
+- `Plugins/LexicalTablePlugin/` - UIKit implementation
+
+---
+
+### 10.8 Test Parity for AppKit
+
+Enable tests that are currently UIKit-only once the above features are implemented.
+
+**Step 10.8.1: Enable Core Tests**
+After completing 10.1-10.4, enable these tests:
+- [ ] `SelectionTests.swift`
+- [ ] `TransformsTests.swift`
+- [ ] `ElementNodeTests.swift`
+- [ ] `NodeTests.swift` (if UIKit-only)
+- [ ] `SerializationTests.swift` (if UIKit-only)
+
+**Step 10.8.2: Enable Reconciler Tests**
+After completing 10.4:
+- [ ] `OptimizedReconcilerTests.swift`
+- [ ] `OptimizedReconcilerMarkdownParityTests.swift`
+- [ ] `OptimizedReconcilerListHTMLExportParityTests.swift`
+- [ ] `OptimizedReconcilerIndentParityTests.swift`
+- [ ] `OptimizedReconcilerPlainPasteParityTests.swift`
+- [ ] `OptimizedReconcilerHistoryTypingParityTests.swift`
+- [ ] `OptimizedReconcilerInlineFormatToggleSelectionParityTests.swift`
+- [ ] `OptimizedReconcilerRangeDeleteMultiParagraphParityTests.swift`
+- [ ] `OptimizedReconcilerLinkPluginParityTests.swift`
+- [ ] `OptimizedReconcilerLegacyParityReorderTextMixTests.swift`
+
+**Step 10.8.3: Enable Selection Tests**
+After completing 10.2:
+- [ ] `SelectionClampParityTests.swift`
+- [ ] `RangeCachePointMappingAfterEditsParityTests.swift`
+- [ ] `BackspaceMergeAtParagraphStartParityTests.swift`
+- [ ] `MergeDeleteParityTests.swift`
+- [ ] `EmojiParityTests.swift`
+
+**Step 10.8.4: Enable Decorator Tests**
+After completing 10.5:
+- [ ] `DecoratorPositionCacheTests.swift`
+- [ ] `DecoratorNodeTests.swift`
+- [ ] `OptimizedReconcilerDecoratorParityTests.swift`
+- [ ] `OptimizedReconcilerTypingAroundDecoratorParityTests.swift`
+
+**Step 10.8.5: Enable Plugin Tests**
+After completing 10.7:
+- [ ] `InlineImageTests.swift`
+- [ ] `InlineImagePersistenceTests.swift`
+- [ ] `OptimizedReconcilerInlineImageParityTests.swift`
+
+**Step 10.8.6: Create AppKit-Specific Tests**
+- [ ] Create `LexicalAppKitTests/` test target
+- [ ] Add NSTextInputClient conformance tests
+- [ ] Add keyboard handling tests
+- [ ] Add mouse handling tests
+- [ ] Add IME/marked text tests
+- [ ] Add undo/redo tests
+- [ ] Add accessibility tests
+
+---
+
+### 10.9 Verification and Documentation
+
+**Step 10.9.1: Create macOS Example App**
+- [ ] Create `Examples/LexicalMacOSExample/` Xcode project
+- [ ] Demonstrate basic text editing
+- [ ] Demonstrate formatting (bold, italic, etc.)
+- [ ] Demonstrate lists
+- [ ] Demonstrate links
+- [ ] Demonstrate images (after 10.7.2)
+- [ ] Demonstrate tables (after 10.7.3)
+
+**Step 10.9.2: Update Documentation**
+- [ ] Update README with full feature matrix
+- [ ] Document any platform-specific behaviors
+- [ ] Document any known limitations
+- [ ] Add migration guide for UIKit users adding AppKit support
+
+**Step 10.9.3: Final Verification**
+- [ ] All tests pass on both iOS and macOS
+- [ ] Example apps work correctly
+- [ ] No regressions in UIKit functionality
+- [ ] Performance is acceptable on both platforms
+
+---
+
+### Implementation Priority Recommendation
+
+For practical implementation, this is the recommended order:
+
+1. **Phase 10.1** (RangeCache) - Foundation for everything else
+2. **Phase 10.2** (Selection) - Core editing functionality
+3. **Phase 10.3** (Events) - Input handling
+4. **Phase 10.4** (Reconciler) - Complete editing cycle
+5. **Phase 10.8.1-10.8.3** (Enable tests) - Validate implementation
+6. **Phase 10.5** (Decorators) - Rich content support
+7. **Phase 10.6** (Custom Drawing) - Visual polish
+8. **Phase 10.7** (Plugins) - Feature completeness
+9. **Phase 10.8.4-10.8.6** (Remaining tests) - Full test coverage
+10. **Phase 10.9** (Docs/Examples) - Ship it!
+
+**Estimated Effort:** This is significant work, likely 2-4 weeks of focused development for a developer familiar with the codebase.
+
+---
+
 ## Quick Reference: Key STTextView Files
 
 | Feature | STTextView File |
