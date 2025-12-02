@@ -187,7 +187,7 @@ Both platforms share TextKit 1 foundations:
 
 ## Proposed Implementation Strategy
 
-### Option A: Conditional Compilation (Recommended)
+### Option A: Conditional Compilation
 
 Use `#if canImport(AppKit)` throughout the codebase to handle platform differences inline.
 
@@ -199,172 +199,249 @@ Use `#if canImport(AppKit)` throughout the codebase to handle platform differenc
 **Cons:**
 - Conditional blocks can become complex
 - Both platforms must compile together
+- Platform-specific code mixed with shared code
 
-### Option B: Separate Targets
+### Option B: Separate Targets (Recommended)
 
-Split into `LexicalCore`, `LexicalUIKit`, and `LexicalAppKit` targets.
+Split into separate targets with umbrella re-exports, following the pattern used by [STTextView](https://github.com/nicklockwood/STTextView):
+
+```
+LexicalCore          - Platform-agnostic: nodes, selection, reconciler, editor state
+LexicalUIKit         - UIKit implementation: LexicalView, TextView, UITextInput
+LexicalAppKit        - AppKit implementation: LexicalView, TextView, NSTextInputClient
+Lexical              - Umbrella target that re-exports the correct implementation
+```
 
 **Pros:**
 - Clean separation of concerns
-- Platform-specific code is isolated
-- Can ship platform-specific packages
+- Platform-specific code is fully isolated
+- No `#if` blocks cluttering shared code
+- Each target compiles independently
+- Easier to test platform-specific code
+- Proven pattern (STTextView uses this successfully)
 
 **Cons:**
-- More complex build configuration
-- Harder to share code that needs minor platform tweaks
-- More files to maintain
+- More complex initial Package.swift setup
+- Some code duplication in platform targets
 
 ### Recommendation
 
-**Use Option A (Conditional Compilation)** with strategic abstractions:
+**Use Option B (Separate Targets)** with umbrella re-exports:
 
-1. Create platform type aliases (`PlatformView`, `PlatformFont`, etc.)
-2. Create protocol abstractions where behavior differs significantly
-3. Use `#if` blocks for implementation differences
-4. Keep the single-target structure initially
+1. Create `LexicalCore` target with platform-agnostic code
+2. Create `LexicalUIKit` and `LexicalAppKit` targets for platform-specific implementations
+3. Create umbrella `Lexical` target that conditionally re-exports the correct implementation
+4. Use a shared `LexicalViewProtocol` with associated types for platform-specific types
+5. Maintain parallel file structure between UIKit and AppKit implementations
+
+This approach is proven by STTextView, which successfully supports macOS, iOS, and Mac Catalyst with this architecture.
 
 ---
 
 ## Detailed Work Breakdown
 
-### Phase 1: Platform Abstraction Layer
+### Phase 1: Target Structure & Package Setup
 
-**Estimated effort: 2-3 days**
+#### 1.1 Update `Package.swift`
 
-#### 1.1 Create `PlatformTypes.swift`
+Restructure into separate targets with platform-conditional dependencies:
 
 ```swift
-#if canImport(AppKit) && !targetEnvironment(macCatalyst)
-import AppKit
-public typealias PlatformView = NSView
-public typealias PlatformFont = NSFont
-public typealias PlatformColor = NSColor
-public typealias PlatformImage = NSImage
+let package = Package(
+    name: "Lexical",
+    platforms: [.iOS(.v16), .macOS(.v13), .macCatalyst(.v16)],
+    products: [
+        .library(name: "Lexical", targets: ["Lexical"]),
+    ],
+    targets: [
+        // Umbrella target - re-exports platform-specific implementation
+        .target(
+            name: "Lexical",
+            dependencies: [
+                .target(name: "LexicalUIKit",
+                        condition: .when(platforms: [.iOS, .macCatalyst])),
+                .target(name: "LexicalAppKit",
+                        condition: .when(platforms: [.macOS])),
+            ]
+        ),
+        // Platform-agnostic core
+        .target(
+            name: "LexicalCore",
+            dependencies: []
+        ),
+        // UIKit implementation
+        .target(
+            name: "LexicalUIKit",
+            dependencies: ["LexicalCore"]
+        ),
+        // AppKit implementation
+        .target(
+            name: "LexicalAppKit",
+            dependencies: ["LexicalCore"]
+        ),
+    ]
+)
+```
+
+#### 1.2 Create Umbrella Module (`Sources/Lexical/module.swift`)
+
+```swift
+import Foundation
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@_exported import LexicalAppKit
 #else
-import UIKit
-public typealias PlatformView = UIView
-public typealias PlatformFont = UIFont
-public typealias PlatformColor = UIColor
-public typealias PlatformImage = UIImage
+@_exported import LexicalUIKit
 #endif
+
+@_exported import LexicalCore
 ```
 
-#### 1.2 Create `SelectionTypes.swift`
+This allows consumers to simply `import Lexical` and get the correct implementation.
 
-Abstract `UITextStorageDirection` and `UITextGranularity`:
+#### 1.3 Create `LexicalViewProtocol` with Associated Types
 
-```swift
-public enum SelectionAffinity: Int {
-  case forward
-  case backward
-}
-
-public enum SelectionGranularity: Int {
-  case character, word, sentence, paragraph, line, document
-}
-```
-
-#### 1.3 Create `PasteboardProtocol.swift`
+Instead of typealiases, use associated types for flexibility (following STTextView's pattern):
 
 ```swift
+// In LexicalCore
 @MainActor
-public protocol PasteboardProtocol: AnyObject {
-  var string: String? { get set }
-  func setData(_ data: Data, forType typeIdentifier: String)
-  func data(forType typeIdentifier: String) -> Data?
-  // ...
+public protocol LexicalViewProtocol {
+    associatedtype ViewType
+    associatedtype ColorType
+    associatedtype FontType
+    associatedtype EdgeInsetsType
+
+    var textStorage: TextStorage { get }
+    var layoutManager: LayoutManager { get }
+    var textContainerInsets: EdgeInsetsType { get }
+    var editor: Editor { get }
+    var isFirstResponder: Bool { get }
+    var viewForDecoratorSubviews: ViewType? { get }
+    // ...
 }
 ```
 
-#### 1.4 Update Files
+#### 1.4 Organize Source Directories
 
-| File | Changes |
-|------|---------|
-| `Package.swift` | Add `.macOS(.v13)` platform |
-| `Constants.swift` | Use platform typealiases |
-| `NativeSelection.swift` | Abstract `UITextRange` |
-| `FrontendProtocol.swift` | Use `PlatformEdgeInsets`, `PlatformView` |
+```
+Sources/
+├── Lexical/                    # Umbrella (just module.swift)
+├── LexicalCore/                # Platform-agnostic
+│   ├── Nodes/
+│   ├── Selection/
+│   ├── Editor.swift
+│   ├── EditorState.swift
+│   ├── Reconciler.swift
+│   ├── Theme.swift
+│   └── LexicalViewProtocol.swift
+├── LexicalUIKit/               # iOS/Catalyst
+│   ├── LexicalView.swift
+│   ├── TextView.swift
+│   ├── InputDelegateProxy.swift
+│   ├── NativeSelection.swift
+│   └── Extensions/
+└── LexicalAppKit/              # macOS
+    ├── LexicalView.swift       # Parallel structure
+    ├── TextView.swift
+    ├── TextInputClient.swift
+    ├── NativeSelection.swift
+    └── Extensions/
+```
 
-### Phase 2: Update Core Files
+### Phase 2: Extract Platform-Agnostic Core
 
-**Estimated effort: 3-5 days**
+Move truly platform-agnostic code into `LexicalCore`:
 
-Add `#if canImport(AppKit)` conditionals to:
+| Component | Move to LexicalCore | Notes |
+|-----------|---------------------|-------|
+| `Nodes/` | Yes (entire directory) | No UIKit dependencies |
+| `EditorState.swift` | Yes | Pure state management |
+| `Editor.swift` | Partial | Extract command dispatch, keep keyboard in UIKit |
+| `Reconciler.swift` | Yes | Core diffing logic |
+| `Theme.swift` | Yes | Uses Foundation types |
+| `Selection/` | Partial | Core algorithms move, UI types stay |
 
-| File | Changes Required |
-|------|------------------|
-| `Events.swift` | Abstract pasteboard, rename to platform-neutral |
-| `CopyPasteHelpers.swift` | Use `PasteboardProtocol` |
-| `AttributesUtils.swift` | Handle `NSFont`/`UIFont` differences |
-| `Utils.swift` | Minor platform conditionals |
-| `TextNode.swift` | `UIColor` → `PlatformColor` |
-| `RangeSelection.swift` | `UITextStorageDirection` → `SelectionAffinity` |
+Files that stay in `LexicalUIKit` (with parallel versions in `LexicalAppKit`):
 
-### Phase 3: Update TextKit Layer
+| File | Reason |
+|------|--------|
+| `Events.swift` | Uses `UIPasteboard` |
+| `CopyPasteHelpers.swift` | Platform pasteboard |
+| `NativeSelection.swift` | `UITextRange`/`NSRange` differences |
+| `AttributesUtils.swift` | Font/color handling |
 
-**Estimated effort: 1-2 days**
+### Phase 3: TextKit Layer
 
-TextKit classes are mostly cross-platform. Changes needed:
+TextKit 1 classes (`NSTextStorage`, `NSLayoutManager`, `NSTextContainer`) are shared between UIKit and AppKit with nearly identical APIs.
 
-| File | Changes |
-|------|---------|
-| `TextStorage.swift` | Add import conditional only |
-| `LayoutManager.swift` | `showCGGlyphs` needs platform-specific font type |
-| `TextContainer.swift` | Add import conditional only |
-| `TextAttachment.swift` | `image(forBounds:)` return type differs |
-| `LayoutManagerDelegate.swift` | Font type in delegate method |
+| File | Target | Notes |
+|------|--------|-------|
+| `TextStorage.swift` | `LexicalCore` | Identical on both platforms |
+| `LayoutManager.swift` | Platform targets | `showCGGlyphs` uses different font types |
+| `TextContainer.swift` | `LexicalCore` | Identical on both platforms |
+| `TextAttachment.swift` | Platform targets | Image type differs |
+| `LayoutManagerDelegate.swift` | Platform targets | Font type in delegate |
+
+**Note:** STTextView uses TextKit 2 (`NSTextLayoutManager`) which has better cross-platform parity. Consider whether Lexical should migrate to TextKit 2 for simpler cross-platform support (see Open Questions).
 
 ### Phase 4: Create AppKit Frontend
 
-**Estimated effort: 2-3 weeks**
+This is the largest piece of work - creating the AppKit implementation in `LexicalAppKit/` with a parallel structure to `LexicalUIKit/`.
 
-This is the largest piece of work - creating the AppKit equivalent of `LexicalView` and `TextView`.
+#### 4.1 File Structure (Parallel to UIKit)
 
-#### 4.1 `LexicalViewAppKit.swift`
+Following STTextView's pattern, maintain identical file organization:
 
-```swift
-#if canImport(AppKit) && !targetEnvironment(macCatalyst)
-@MainActor
-public class LexicalViewAppKit: NSView, Frontend {
-  public let textView: TextViewAppKit
-  // Implement Frontend protocol
-  // Handle decorator subviews
-  // Manage overlay views
-}
-#endif
+```
+LexicalUIKit/                    LexicalAppKit/
+├── LexicalView.swift            ├── LexicalView.swift
+├── TextView.swift               ├── TextView.swift
+├── TextView+UITextInput.swift   ├── TextView+NSTextInputClient.swift
+├── TextView+Keyboard.swift      ├── TextView+Keyboard.swift
+├── NativeSelection.swift        ├── NativeSelection.swift
+├── CopyPasteHelpers.swift       ├── CopyPasteHelpers.swift
+└── Delegate.swift               └── Delegate.swift
 ```
 
-**Key responsibilities:**
-- Initialize TextKit stack
-- Create and configure `TextViewAppKit`
-- Implement `Frontend` protocol
-- Handle decorator view positioning
-- Manage placeholder text
-
-#### 4.2 `TextViewAppKit.swift`
+#### 4.2 `LexicalView.swift` (in LexicalAppKit)
 
 ```swift
-#if canImport(AppKit) && !targetEnvironment(macCatalyst)
-@MainActor
-public class TextViewAppKit: NSTextView, NSTextInputClient {
-  weak var editor: Editor?
+import AppKit
+import LexicalCore
 
-  // NSTextInputClient implementation
-  // Keyboard event handling
-  // Selection management
-  // Marked text (IME) support
+@MainActor
+public class LexicalView: NSView, LexicalViewProtocol {
+    public typealias ViewType = NSView
+    public typealias ColorType = NSColor
+    public typealias FontType = NSFont
+    public typealias EdgeInsetsType = NSEdgeInsets
+
+    public let textView: TextView
+    // Implement LexicalViewProtocol
+    // Handle decorator subviews
+    // Manage overlay views
 }
-#endif
 ```
 
-**Key responsibilities:**
-- Implement `NSTextInputClient` for text input
-- Handle `keyDown:` for keyboard events
-- Manage selection via `selectedRange`
-- Support marked text for IME
-- Integrate with Lexical's command system
+#### 4.3 `TextView.swift` (in LexicalAppKit)
 
-#### 4.3 Key Implementation Challenges
+```swift
+import AppKit
+import LexicalCore
+
+@MainActor
+public class TextView: NSTextView, NSTextInputClient {
+    weak var editor: Editor?
+
+    // NSTextInputClient implementation
+    // Keyboard event handling via keyDown:/performKeyEquivalent:
+    // Selection management via selectedRange
+    // Marked text (IME) support
+}
+```
+
+#### 4.4 Key Implementation Challenges
 
 1. **Selection Model Differences**
    - UIKit uses opaque `UITextRange`/`UITextPosition`
@@ -388,8 +465,6 @@ public class TextViewAppKit: NSTextView, NSTextInputClient {
 
 ### Phase 5: Update Plugins
 
-**Estimated effort: 3-5 days**
-
 Most plugins are platform-agnostic. These need attention:
 
 | Plugin | Changes Needed |
@@ -398,9 +473,42 @@ Most plugins are platform-agnostic. These need attention:
 | `SelectableDecoratorNode` | Abstract view handling |
 | `LexicalCodeHighlightPlugin` | Verify font handling |
 
-### Phase 6: Testing
+### Phase 6: SwiftUI Wrappers (Optional)
 
-**Estimated effort: 1-2 weeks**
+Following STTextView's pattern, provide SwiftUI wrappers in separate targets:
+
+```swift
+// Package.swift additions
+.target(
+    name: "LexicalSwiftUI",
+    dependencies: [
+        .target(name: "LexicalSwiftUIUIKit",
+                condition: .when(platforms: [.iOS, .macCatalyst])),
+        .target(name: "LexicalSwiftUIAppKit",
+                condition: .when(platforms: [.macOS])),
+    ]
+),
+.target(name: "LexicalSwiftUIUIKit", dependencies: ["Lexical"]),
+.target(name: "LexicalSwiftUIAppKit", dependencies: ["Lexical"]),
+```
+
+Each platform target provides the same public API:
+
+```swift
+// LexicalSwiftUIUIKit/LexicalEditorView.swift
+public struct LexicalEditorView: UIViewRepresentable {
+    @Binding var text: AttributedString
+    // ...
+}
+
+// LexicalSwiftUIAppKit/LexicalEditorView.swift
+public struct LexicalEditorView: NSViewRepresentable {
+    @Binding var text: AttributedString
+    // ...
+}
+```
+
+### Phase 7: Testing
 
 1. **Unit Tests**
    - Ensure existing tests pass on macOS
@@ -431,21 +539,6 @@ Most plugins are platform-agnostic. These need attention:
 
 ---
 
-## Estimated Timeline
-
-| Phase | Duration | Dependencies |
-|-------|----------|--------------|
-| Phase 1: Platform Abstraction | 2-3 days | None |
-| Phase 2: Core Updates | 3-5 days | Phase 1 |
-| Phase 3: TextKit Updates | 1-2 days | Phase 1 |
-| Phase 4: AppKit Frontend | 2-3 weeks | Phases 1-3 |
-| Phase 5: Plugin Updates | 3-5 days | Phase 4 |
-| Phase 6: Testing | 1-2 weeks | Phase 5 |
-
-**Total estimated effort: 5-8 weeks**
-
----
-
 ## Success Criteria
 
 1. **Compilation**: Package compiles for both iOS and macOS
@@ -460,74 +553,69 @@ Most plugins are platform-agnostic. These need attention:
 
 ## Open Questions
 
-1. **TextKit 2**: Should we support TextKit 2 on macOS 13+? (UIKit version requires iOS 16+)
-2. **SwiftUI**: Should we provide a SwiftUI wrapper for the AppKit view?
-3. **Catalyst Priority**: How important is Catalyst support vs native AppKit?
+1. **TextKit 2 Migration**: STTextView uses TextKit 2 exclusively, which has better cross-platform parity. Should Lexical migrate from TextKit 1 to TextKit 2? This would be a larger undertaking but would simplify the platform abstraction.
+2. **SwiftUI Priority**: Should SwiftUI wrappers be included in the initial release, or added later?
+3. **Catalyst Priority**: How important is Catalyst support vs native AppKit? The umbrella target approach supports both.
 4. **Plugin Scope**: Which plugins must work on day one?
+5. **Naming**: Should the classes be named identically (`LexicalView`) in both targets, or differently (`LexicalViewUIKit`/`LexicalViewAppKit`)? STTextView uses identical names.
 
 ---
 
-## Appendix: File-by-File Analysis
+## Appendix: Target Organization
 
-### Files Requiring Changes
+### Proposed Target Structure
 
 <details>
-<summary>Click to expand full file list</summary>
+<summary>Click to expand full target breakdown</summary>
 
-#### Core (39 files with UIKit imports)
+#### LexicalCore (Platform-Agnostic)
 
-| File | UIKit Usage | Change Type |
-|------|-------------|-------------|
-| `Editor.swift` | `UIKeyCommand` | Conditional |
-| `Events.swift` | `UIPasteboard` | Abstract |
-| `Constants.swift` | `UIFont`, `UIColor` | Typealias |
-| `TextNode.swift` | `UIColor` | Typealias |
-| `Utils.swift` | Minor | Conditional |
-| `RangeSelection.swift` | `UITextStorageDirection` | Abstract |
-| `SelectionUtils.swift` | Selection types | Abstract |
-| `GridSelection.swift` | Selection types | Abstract |
-| `NodeSelection.swift` | Selection types | Abstract |
-| `Reconciler.swift` | Minor | Conditional |
-| `OptimizedReconciler.swift` | Minor | Conditional |
+Files that move to `LexicalCore` with no platform dependencies:
 
-#### LexicalView (6 files)
+| Directory/File | Notes |
+|----------------|-------|
+| `Nodes/` | All node types (TextNode, ElementNode, etc.) |
+| `Selection/` | Core selection algorithms |
+| `EditorState.swift` | State management |
+| `Reconciler.swift` | Core diffing logic |
+| `OptimizedReconciler.swift` | Performance-optimized reconciler |
+| `Theme.swift` | Theme definitions |
+| `TextStorage.swift` | NSTextStorage (shared API) |
+| `TextContainer.swift` | NSTextContainer (shared API) |
+| `LexicalViewProtocol.swift` | New - shared protocol with associated types |
 
-| File | Change Type |
-|------|-------------|
-| `LexicalView.swift` | Wrap in `#if` |
-| `FrontendProtocol.swift` | Abstract types |
-| `LexicalOverlayView.swift` | Wrap in `#if` |
-| `ResponderForNodeSelection.swift` | Wrap in `#if` |
-| `ReadOnly/LexicalReadOnlyView.swift` | Wrap in `#if` |
-| `ReadOnly/LexicalReadOnlyTextKitContext.swift` | Conditional |
+#### LexicalUIKit (iOS/Catalyst)
 
-#### TextView (3 files)
+Files that remain in or are created for `LexicalUIKit`:
 
-| File | Change Type |
-|------|-------------|
-| `TextView.swift` | Wrap in `#if`, create AppKit version |
-| `NativeSelection.swift` | Abstract |
-| `InputDelegateProxy.swift` | Wrap in `#if` |
+| File | Notes |
+|------|-------|
+| `LexicalView.swift` | UIView-based implementation |
+| `TextView.swift` | UITextView subclass |
+| `TextView+UITextInput.swift` | UITextInput protocol |
+| `TextView+Keyboard.swift` | UIKeyCommand handling |
+| `NativeSelection.swift` | UITextRange/UITextPosition |
+| `InputDelegateProxy.swift` | UITextInputDelegate |
+| `CopyPasteHelpers.swift` | UIPasteboard |
+| `AttributesUtils.swift` | UIFont/UIColor handling |
+| `LayoutManager.swift` | UIKit font types |
+| `LexicalOverlayView.swift` | Overlay handling |
 
-#### TextKit (7 files)
+#### LexicalAppKit (macOS)
 
-| File | Change Type |
-|------|-------------|
-| `TextStorage.swift` | Import conditional |
-| `LayoutManager.swift` | Font type conditional |
-| `TextContainer.swift` | Import conditional |
-| `TextAttachment.swift` | Image type conditional |
-| `LayoutManagerDelegate.swift` | Font type conditional |
-| `RangeCache.swift` | Selection type abstract |
-| `TextKitUtils.swift` | None (pure Foundation) |
+New files created in `LexicalAppKit` (parallel to UIKit):
 
-#### Helper (3 files)
-
-| File | Change Type |
-|------|-------------|
-| `CopyPasteHelpers.swift` | Abstract pasteboard |
-| `AttributesUtils.swift` | Font/color conditionals |
-| `ReconcilerShadowCompare.swift` | None |
+| File | Notes |
+|------|-------|
+| `LexicalView.swift` | NSView-based implementation |
+| `TextView.swift` | NSTextView subclass |
+| `TextView+NSTextInputClient.swift` | NSTextInputClient protocol |
+| `TextView+Keyboard.swift` | keyDown:/performKeyEquivalent: |
+| `NativeSelection.swift` | NSRange-based |
+| `CopyPasteHelpers.swift` | NSPasteboard |
+| `AttributesUtils.swift` | NSFont/NSColor handling |
+| `LayoutManager.swift` | AppKit font types |
+| `LexicalOverlayView.swift` | Overlay handling |
 
 </details>
 
@@ -535,6 +623,7 @@ Most plugins are platform-agnostic. These need attention:
 
 ## References
 
+- [STTextView](https://github.com/nicklockwood/STTextView) - Reference implementation for cross-platform text view architecture
 - [Apple TextKit Documentation](https://developer.apple.com/documentation/appkit/textkit)
 - [NSTextInputClient Protocol](https://developer.apple.com/documentation/appkit/nstextinputclient)
 - [Lexical Web Documentation](https://lexical.dev/)
