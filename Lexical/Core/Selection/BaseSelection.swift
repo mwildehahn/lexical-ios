@@ -13,7 +13,6 @@ import LexicalCore
 public protocol BaseSelection: AnyObject, CustomDebugStringConvertible {
   /// True if the selection has had any changes made that need reconciling.
   var dirty: Bool { get set }
-
   /// Makes an identical copy of this selection.
   func clone() -> BaseSelection
 

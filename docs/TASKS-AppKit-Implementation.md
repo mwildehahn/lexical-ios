@@ -227,11 +227,22 @@ Created foundation protocols in LexicalCore to enable future Node migration:
 - [x] Move `TextFormat` to `LexicalCore/TextFormat.swift`
   - Removed duplicate from `Lexical/Core/Nodes/TextNode.swift`
 
-*Phase C-D: Deferred*
-The remaining phases require the Lexical target to implement the protocols:
-- [ ] Create concrete `NodeContext` implementation in Lexical target
-- [ ] Wire up `NodeContextProvider` in EditorContext
-- [ ] Refactor Node.swift to use protocols instead of concrete types
+*Phase C: NodeContext Implementation (Completed)*
+Created the bridge between LexicalCore protocols and Lexical concrete types:
+
+- [x] Create `NodeContextImpl` in `Lexical/Core/NodeContextImpl.swift`
+  - Implements `NodeContext` protocol from LexicalCore
+  - Bridges protocol method calls to existing global functions (generateKey, internallyMarkNodeAsDirty, etc.)
+  - Selection-related methods return nil for now (full implementation deferred until Node migration)
+- [x] Wire up `NodeContextProvider` in `EditorContext.withContext()`
+  - NodeContextProvider.current is set when entering update/read blocks
+  - Enables LexicalCore types to access editor context via protocol
+
+*Phase D: Node Migration (Deferred)*
+The remaining phases require refactoring Node.swift to use the protocol-based dependencies:
+- [ ] Refactor Node.swift to use `NodeContextProvider.current` instead of global functions
+- [ ] Make Node, ElementNode, TextNode conform to their respective protocols
+- [ ] Make Point, RangeSelection, BaseSelection conform to their respective protocols
 - [ ] Move Node.swift to LexicalCore with protocol-based dependencies
 
 **Step 2.5.3: Move ElementNode.swift**

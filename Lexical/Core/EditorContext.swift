@@ -56,7 +56,12 @@ final class EditorContext {
     )
 
     defer { current = previous }
-    return try operation()
+
+    // Wire up NodeContextProvider so that LexicalCore types can access
+    // the editor context via the protocol-based dependency injection
+    return try NodeContextProvider.withContext(getSharedNodeContext()) {
+      try operation()
+    }
   }
 
   static func getActiveEditor() -> Editor? {
