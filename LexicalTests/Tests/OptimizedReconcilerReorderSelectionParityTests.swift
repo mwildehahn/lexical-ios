@@ -1,23 +1,28 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 import XCTest
 @testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class OptimizedReconcilerReorderSelectionParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags())
-    return ((opt.editor, opt), (leg.editor, leg))
+  private func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
+    return makeParityTestEditors()
   }
 
   func testParity_ReorderKeepsCaretInsideMovedTextNode() throws {
     let (opt, leg) = makeEditors()
 
-    func scenario(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> (String, (NodeKey, Int)) {
+    func scenario(on pair: (Editor, any ReadOnlyTextKitContextProtocol)) throws -> (String, (NodeKey, Int)) {
       let editor = pair.0
       var movedKey: NodeKey = ""; var caretOffset = -1
       try editor.update {
@@ -52,6 +57,3 @@ final class OptimizedReconcilerReorderSelectionParityTests: XCTestCase {
     if aSel.1 >= 0 && bSel.1 >= 0 { XCTAssertEqual(aSel.1, bSel.1) }
   }
 }
-
-
-#endif

@@ -1,8 +1,16 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class OptimizedReconcilerAttributeOnlyParityTests: XCTestCase {
@@ -16,11 +24,11 @@ final class OptimizedReconcilerAttributeOnlyParityTests: XCTestCase {
     }
     let metrics = Metrics()
 
-    // Editors
+    // Editors - use cross-platform factory with custom config for metrics
     let cfgOpt = EditorConfig(theme: Theme(), plugins: [], metricsContainer: metrics)
     let cfgLeg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfgOpt, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfgLeg, featureFlags: FeatureFlags())
+    let opt = makeReadOnlyContext(editorConfig: cfgOpt, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = makeReadOnlyContext(editorConfig: cfgLeg, featureFlags: FeatureFlags())
 
     // Seed same content in both
     func seed(on editor: Editor, count: Int) throws {
@@ -65,6 +73,3 @@ final class OptimizedReconcilerAttributeOnlyParityTests: XCTestCase {
     }
   }
 }
-
-
-#endif
