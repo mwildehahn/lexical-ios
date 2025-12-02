@@ -53,37 +53,43 @@ extension TextViewAppKit {
 
   /// Delete backward (Backspace key).
   public override func deleteBackward(_ sender: Any?) {
-    super.deleteBackward(sender)
+    // Dispatch Lexical command
+    editor.dispatchCommand(type: .deleteCharacter, payload: true)
     updatePlaceholderVisibility()
   }
 
   /// Delete forward (Delete key).
   public override func deleteForward(_ sender: Any?) {
-    super.deleteForward(sender)
+    // Dispatch Lexical command (isBackwards: false)
+    editor.dispatchCommand(type: .deleteCharacter, payload: false)
     updatePlaceholderVisibility()
   }
 
   /// Delete word backward (Option+Backspace).
   public override func deleteWordBackward(_ sender: Any?) {
-    super.deleteWordBackward(sender)
+    // Dispatch Lexical command
+    editor.dispatchCommand(type: .deleteWord, payload: true)
     updatePlaceholderVisibility()
   }
 
   /// Delete word forward (Option+Delete).
   public override func deleteWordForward(_ sender: Any?) {
-    super.deleteWordForward(sender)
+    // Dispatch Lexical command (isBackwards: false)
+    editor.dispatchCommand(type: .deleteWord, payload: false)
     updatePlaceholderVisibility()
   }
 
   /// Delete to beginning of line (Cmd+Backspace).
   public override func deleteToBeginningOfLine(_ sender: Any?) {
-    super.deleteToBeginningOfLine(sender)
+    // Dispatch Lexical command
+    editor.dispatchCommand(type: .deleteLine, payload: true)
     updatePlaceholderVisibility()
   }
 
   /// Delete to end of line (Cmd+Delete / Ctrl+K).
   public override func deleteToEndOfLine(_ sender: Any?) {
-    super.deleteToEndOfLine(sender)
+    // Dispatch Lexical command (isBackwards: false)
+    editor.dispatchCommand(type: .deleteLine, payload: false)
     updatePlaceholderVisibility()
   }
 
@@ -91,29 +97,34 @@ extension TextViewAppKit {
 
   /// Insert newline (Return/Enter key).
   public override func insertNewline(_ sender: Any?) {
-    super.insertNewline(sender)
+    // Dispatch Lexical command for paragraph insertion
+    editor.dispatchCommand(type: .insertParagraph, payload: nil)
     updatePlaceholderVisibility()
   }
 
   /// Insert newline ignoring field editor (Option+Return).
   public override func insertNewlineIgnoringFieldEditor(_ sender: Any?) {
-    super.insertNewlineIgnoringFieldEditor(sender)
+    // Dispatch Lexical command for line break insertion
+    editor.dispatchCommand(type: .insertLineBreak, payload: nil)
     updatePlaceholderVisibility()
   }
 
   /// Insert tab.
   public override func insertTab(_ sender: Any?) {
-    super.insertTab(sender)
+    // Dispatch indent command or insert tab character
+    editor.dispatchCommand(type: .keyTab, payload: nil)
     updatePlaceholderVisibility()
   }
 
   /// Insert back tab (Shift+Tab).
   public override func insertBacktab(_ sender: Any?) {
-    super.insertBacktab(sender)
+    // Dispatch outdent command
+    editor.dispatchCommand(type: .keyTab, payload: true) // payload=true for shift+tab
     updatePlaceholderVisibility()
   }
 
   // Cut/paste operations are in CopyPasteHelpers.swift
+  // Text insertion is in TextView+NSTextInputClient.swift
 }
 
 #endif // os(macOS) && !targetEnvironment(macCatalyst)

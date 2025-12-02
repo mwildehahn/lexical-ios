@@ -36,41 +36,18 @@ extension TextViewAppKit {
       return
     }
 
+    // Dispatch Lexical copy command with pasteboard
     let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-
-    // Write multiple representations
-    var types: [NSPasteboard.PasteboardType] = []
-
-    // 1. Lexical nodes (for rich paste within Lexical)
-    if let lexicalData = serializeLexicalSelection() {
-      pasteboard.setData(lexicalData, forType: .lexicalNodes)
-      types.append(.lexicalNodes)
-    }
-
-    // 2. RTF (for rich text apps)
-    if let rtfData = attributedSubstring(forProposedRange: selection, actualRange: nil)?
-        .rtf(from: NSRange(location: 0, length: selection.length)) {
-      pasteboard.setData(rtfData, forType: .rtf)
-      types.append(.rtf)
-    }
-
-    // 3. Plain text (universal fallback)
-    if let textStorage = textStorage {
-      let text = textStorage.attributedSubstring(from: selection).string
-      pasteboard.setString(text, forType: .string)
-      types.append(.string)
-    }
-
-    pasteboard.declareTypes(types, owner: nil)
+    editor.dispatchCommand(type: .copy, payload: pasteboard)
   }
 
   // MARK: - Cut
 
   /// Cut the current selection to the pasteboard.
   public override func cut(_ sender: Any?) {
-    copy(sender)
-    deleteBackward(sender)
+    // Dispatch Lexical cut command with pasteboard
+    let pasteboard = NSPasteboard.general
+    editor.dispatchCommand(type: .cut, payload: pasteboard)
     updatePlaceholderVisibility()
   }
 
@@ -78,37 +55,19 @@ extension TextViewAppKit {
 
   /// Paste from the pasteboard.
   public override func paste(_ sender: Any?) {
+    // Dispatch Lexical paste command with pasteboard
     let pasteboard = NSPasteboard.general
-
-    // Try Lexical nodes first (preserves structure)
-    if let lexicalData = pasteboard.data(forType: .lexicalNodes),
-       deserializeLexicalNodes(lexicalData) {
-      updatePlaceholderVisibility()
-      return
-    }
-
-    // Try RTF next (preserves formatting)
-    if let rtfData = pasteboard.data(forType: .rtf),
-       let attributedString = NSAttributedString(rtf: rtfData, documentAttributes: nil) {
-      insertText(attributedString, replacementRange: selectedRange())
-      updatePlaceholderVisibility()
-      return
-    }
-
-    // Fall back to plain text
-    if let string = pasteboard.string(forType: .string) {
-      insertText(string, replacementRange: selectedRange())
-      updatePlaceholderVisibility()
-      return
-    }
+    editor.dispatchCommand(type: .paste, payload: pasteboard)
+    updatePlaceholderVisibility()
   }
 
   /// Paste as plain text, stripping formatting.
   public override func pasteAsPlainText(_ sender: Any?) {
     let pasteboard = NSPasteboard.general
 
+    // For plain text paste, just insert the text directly
     if let string = pasteboard.string(forType: .string) {
-      insertText(string, replacementRange: selectedRange())
+      editor.dispatchCommand(type: .insertText, payload: string)
       updatePlaceholderVisibility()
     }
   }

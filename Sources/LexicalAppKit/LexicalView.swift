@@ -139,6 +139,9 @@ public class LexicalView: NSView {
 
     // Set the delegate
     textView.lexicalDelegate = self
+
+    // Register rich text command handlers
+    registerRichTextAppKit(editor: textView.editor)
   }
 
   /// Convenience initializer using default feature flags.

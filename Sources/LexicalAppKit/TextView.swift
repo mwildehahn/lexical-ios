@@ -256,8 +256,8 @@ extension TextViewAppKit: NSTextViewDelegate {
   }
 
   public func textViewDidChangeSelection(_ notification: Notification) {
-    // Selection change notifications for Lexical integration
-    // This will be expanded when we integrate with Editor
+    // Sync native selection changes to Lexical
+    handleSelectionChange()
   }
 }
 

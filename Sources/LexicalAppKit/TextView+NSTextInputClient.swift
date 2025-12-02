@@ -43,8 +43,8 @@ extension TextViewAppKit {
       return
     }
 
-    // Let NSTextView handle the actual insertion
-    super.insertText(string, replacementRange: replacementRange)
+    // Dispatch Lexical command for text insertion
+    editor.dispatchCommand(type: .insertText, payload: text)
 
     // Update placeholder visibility
     updatePlaceholderVisibility()
