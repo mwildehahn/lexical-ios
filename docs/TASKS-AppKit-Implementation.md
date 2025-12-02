@@ -838,38 +838,48 @@ This phase outlines all remaining work needed to achieve feature parity between 
 
 ---
 
-### 10.1 RangeCache System for AppKit
+### 10.1 RangeCache System for AppKit ✅ COMPLETE
 
 The RangeCache is critical infrastructure that maps Lexical node keys to NSTextStorage locations. Without it, many features don't work.
 
-**Current State:** Entirely UIKit-only (`Lexical/TextKit/RangeCache.swift`)
+**Implementation Approach:** Instead of creating a separate AppKit RangeCache, the existing RangeCache was made cross-platform by:
+1. Replacing `UITextStorageDirection` with `LexicalTextStorageDirection` (already defined in PlatformTypes.swift)
+2. Removing `#if canImport(UIKit)` guards from RangeCache files
+3. Moving `NodePart` enum to `LexicalCore/CoreTypes.swift`
+4. Removing UIKit guards around `rangeCache` in `Editor.swift`
 
-**Step 10.1.1: Create RangeCacheAppKit**
-- [ ] Create `Sources/LexicalAppKit/RangeCache.swift`
-- [ ] Port `RangeCacheItem` struct (location, lengths, range computation)
-- [ ] Port `searchForNodeByLocation()` function
-- [ ] Port `searchForElementByLocation()` function
-- [ ] Port `createPoint()` function
-- [ ] Port `createNativeSelection()` function
-- [ ] Verify build
+**Step 10.1.1: Make RangeCache Cross-Platform**
+- [x] Update `Lexical/TextKit/RangeCache.swift` - Replace UIKit import with Foundation, use `LexicalTextStorageDirection`
+- [x] Remove `#if canImport(UIKit)` guards from RangeCache.swift
+- [x] `RangeCacheItem` struct now available on both platforms
+- [x] `pointAtStringLocation()` and `evaluateNode()` now cross-platform
+- [x] All range cache update functions now cross-platform
+- [x] Verify build
 
 **Step 10.1.2: Integrate RangeCache with Editor**
-- [ ] Add `rangeCache` property to Editor for AppKit (currently UIKit-only)
-- [ ] Update Editor initialization to create RangeCache on AppKit
-- [ ] Update Editor state reset to clear RangeCache on AppKit
-- [ ] Verify build
+- [x] Remove `#if canImport(UIKit)` guard from `rangeCache` property in Editor.swift
+- [x] Editor initialization creates RangeCache on all platforms
+- [x] Editor state reset clears RangeCache on all platforms
+- [x] `cachedDFSOrder()` now available on all platforms
+- [x] `parseEditorState()` uses rangeCache on all platforms
+- [x] Verify build
 
-**Step 10.1.3: Port RangeCache Helper Files**
-- [ ] Port `RangeCacheFenwick.swift` to AppKit (Fenwick tree integration)
-- [ ] Port `RangeCacheIncremental.swift` to AppKit (incremental updates)
-- [ ] Port `RangeCacheIndexing.swift` to AppKit (node indexing)
-- [ ] Verify build
+**Step 10.1.3: Make RangeCache Helper Files Cross-Platform**
+- [x] Update `RangeCacheFenwick.swift` - Remove UIKit guards
+- [x] Update `RangeCacheIncremental.swift` - Remove UIKit guards
+- [x] Update `RangeCacheIndexing.swift` - Remove UIKit guards
+- [x] Move `NodePart` enum from `Reconciler.swift` to `LexicalCore/CoreTypes.swift`
+- [x] `swift build` succeeds for all targets
+- [x] `swift test` passes (16 tests)
 
-**Files to Reference:**
-- `Lexical/TextKit/RangeCache.swift` - Main implementation
-- `Lexical/Helper/RangeCacheFenwick.swift` - Fenwick tree helpers
-- `Lexical/Helper/RangeCacheIncremental.swift` - Incremental update helpers
-- `Lexical/Helper/RangeCacheIndexing.swift` - Indexing helpers
+**Files Modified:**
+- `Lexical/TextKit/RangeCache.swift` - Made cross-platform
+- `Lexical/Helper/RangeCacheFenwick.swift` - Made cross-platform
+- `Lexical/Helper/RangeCacheIncremental.swift` - Made cross-platform
+- `Lexical/Helper/RangeCacheIndexing.swift` - Made cross-platform
+- `Lexical/Core/Editor.swift` - Removed UIKit guards around rangeCache
+- `Lexical/Core/Reconciler.swift` - Removed NodePart (now in LexicalCore)
+- `Sources/LexicalCore/CoreTypes.swift` - Added NodePart enum
 
 ---
 

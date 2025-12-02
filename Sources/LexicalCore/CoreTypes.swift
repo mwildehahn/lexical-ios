@@ -237,3 +237,13 @@ public enum CustomDrawingGranularity {
 // MARK: - DirtyNodeMap
 
 public typealias DirtyNodeMap = [NodeKey: DirtyStatusCause]
+
+// MARK: - NodePart
+
+/// Represents which part of a node's string representation is being referenced.
+/// Used by the RangeCache system to track positions in the text storage.
+public enum NodePart {
+  case preamble
+  case text
+  case postamble
+}

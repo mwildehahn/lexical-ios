@@ -146,9 +146,7 @@ public class Editor: NSObject {
   internal var isRecoveringFromError: Bool = false
 
   // See description in RangeCache.swift.
-  #if canImport(UIKit)
   internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
-  #endif
   private var dfsOrderCache: [NodeKey]? = nil
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
@@ -214,9 +212,7 @@ public class Editor: NSObject {
     guard let rootNodeKey = editorState.getRootNode()?.key else {
       fatalError("Expected root node key when creating new editor state")
     }
-    #if canImport(UIKit)
     rangeCache[rootNodeKey] = RangeCacheItem()
-    #endif
     dfsOrderCache = nil
     dfsOrderCache = nil
     theme = editorConfig.theme
@@ -493,10 +489,8 @@ public class Editor: NSObject {
     compositionKey = nil
     editorState = EditorState(version: editorStateVersion)
 
-    #if canImport(UIKit)
     rangeCache = [:]
     rangeCache[kRootNodeKey] = RangeCacheItem()
-    #endif
     dfsOrderCache = nil
     dfsOrderCache = nil
 
@@ -848,14 +842,12 @@ public class Editor: NSObject {
     dfsOrderCache = nil
   }
 
-  #if canImport(UIKit)
   internal func cachedDFSOrder() -> [NodeKey] {
     if let cached = dfsOrderCache { return cached }
     let ordered = sortedNodeKeysByLocation(rangeCache: rangeCache)
     dfsOrderCache = ordered
     return ordered
   }
-  #endif
 
   private func beginUpdate(
     _ closure: () throws -> Void, mode: UpdateBehaviourModificationMode,
@@ -1235,9 +1227,7 @@ public class Editor: NSObject {
     let previousPendingEditorState = self.pendingEditorState
     let previousDirtyNodes = self.dirtyNodes
     let previousDirtyType = self.dirtyType
-    #if canImport(UIKit)
     let previousRangeCache = self.rangeCache
-    #endif
     let previousCloneNotNeeded = self.cloneNotNeeded
     let previousNormalizedNodes = self.normalizedNodes
     let previousHeadless = self.headless
@@ -1248,9 +1238,7 @@ public class Editor: NSObject {
     self.dirtyNodes = [:]
     self.dirtyType = .noDirtyNodes
     self.cloneNotNeeded = Set()
-    #if canImport(UIKit)
     self.rangeCache = [kRootNodeKey: RangeCacheItem()]
-    #endif
     self.dfsOrderCache = nil
     self.normalizedNodes = Set()
     self.editorState = editorState
@@ -1261,9 +1249,7 @@ public class Editor: NSObject {
       self.dirtyNodes = previousDirtyNodes
       self.dirtyType = previousDirtyType
       self.cloneNotNeeded = previousCloneNotNeeded
-      #if canImport(UIKit)
       self.rangeCache = previousRangeCache
-      #endif
       self.dfsOrderCache = nil
       self.normalizedNodes = previousNormalizedNodes
       self.editorState = previousActiveEditorState

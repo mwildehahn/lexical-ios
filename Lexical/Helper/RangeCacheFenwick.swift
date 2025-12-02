@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if canImport(UIKit)
-
 import Foundation
 import LexicalCore
 
@@ -145,4 +143,3 @@ internal func rebuildLocationsWithRangeDiffs(
   }
   return next
 }
-#endif  // canImport(UIKit)

@@ -5,8 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if canImport(UIKit)
-
 import Foundation
 import LexicalCore
 @MainActor
@@ -111,4 +109,3 @@ internal func applyLengthDeltasBatch(
   }
   return startShift
 }
-#endif  // canImport(UIKit)

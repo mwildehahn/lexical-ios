@@ -10,12 +10,6 @@ import UIKit
 import Foundation
 import LexicalCore
 
-public enum NodePart {
-  case preamble
-  case text
-  case postamble
-}
-
 private struct ReconcilerInsertion {
   var location: Int
   var nodeKey: NodeKey
