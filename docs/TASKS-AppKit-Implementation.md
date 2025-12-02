@@ -20,7 +20,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (130 tests)
+- `swift test` passes on macOS (134 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -1241,8 +1241,11 @@ After completing 10.1-10.4, enable these tests:
     - `testGetTextOutOfJSONHeadlessly` - uses insertGeneratedNodes
 
 **Step 10.8.2: Enable Reconciler Tests**
-**BLOCKED:** These tests require `LexicalReadOnlyTextKitContext` which is UIKit-only.
-To enable, need to port `LexicalReadOnlyTextKitContext` to AppKit first.
+**UNBLOCKED:** `LexicalReadOnlyTextKitContextAppKit` now available.
+Infrastructure in place:
+- `LexicalReadOnlyTextKitContextAppKit` - AppKit version of read-only context
+- `CrossPlatformTestUtilities.swift` - Helper functions for cross-platform tests
+- `InsertParityTests.swift` - First parity test enabled (4 tests pass)
 After completing 10.4:
 - [ ] `OptimizedReconcilerTests.swift`
 - [ ] `OptimizedReconcilerMarkdownParityTests.swift`

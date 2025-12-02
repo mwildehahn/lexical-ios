@@ -1,4 +1,12 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+// This test exposes AppKit parity difference - extra newline in output
+// TODO: Investigate AppKit paragraph merge behavior
 #if !os(macOS) || targetEnvironment(macCatalyst)
 
 @testable import Lexical
@@ -47,6 +55,5 @@ final class BackspaceMergeAtParagraphStartParityTests: XCTestCase {
     XCTAssertEqual(a, "HelloWorld")
   }
 }
-
 
 #endif
