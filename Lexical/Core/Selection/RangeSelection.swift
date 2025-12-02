@@ -1543,20 +1543,282 @@ public class RangeSelection: BaseSelection {
     try removeText()
   }
   #else
-  // AppKit stubs - text editing operations not yet implemented
+  // MARK: - AppKit text editing operations
+
+  /// Delete a single character (AppKit implementation).
+  ///
+  /// This implementation handles:
+  /// - Collapsed selections: extends by one character using Lexical node tree
+  /// - Non-collapsed selections: removes selected content
+  /// - Decorator nodes: selects and removes them
+  /// - Empty elements: removes and collapses at start
   @MainActor
   public func deleteCharacter(isBackwards: Bool) throws {
-    fatalError("deleteCharacter not implemented on AppKit")
+    guard let editor = getActiveEditor() else {
+      throw LexicalError.invariantViolation("Cannot be called outside update loop")
+    }
+
+    // If selection is not collapsed, just remove the selected text
+    if !isCollapsed() {
+      try removeText()
+      return
+    }
+
+    let anchor = self.anchor
+    let focus = self.focus
+    let anchorNode: Node? = try anchor.getNode()
+
+    // Handle deletion around decorators
+    let adjacentNode = try getAdjacentNode(focus: focus, isBackward: isBackwards)
+    if let adjacentNode = adjacentNode as? DecoratorNode {
+      if adjacentNode.isInline() {
+        if let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
+          try anchorNode.remove()
+          let nodeSelection = NodeSelection(nodes: Set([adjacentNode.key]))
+          try setSelection(nodeSelection)
+        } else {
+          try adjacentNode.selectStart()
+          try adjacentNode.remove()
+          editor.dispatchCommand(type: .selectionChange)
+        }
+      } else {
+        if let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
+          try anchorNode.remove()
+          try adjacentNode.selectEnd()
+        } else {
+          if try adjacentNode.collapseAtStart(selection: self) {
+            return
+          } else {
+            try adjacentNode.selectPrevious(anchorOffset: nil, focusOffset: nil)
+            try adjacentNode.remove()
+          }
+        }
+      }
+      return
+    }
+
+    // Extend selection by one character using Lexical node tree
+    if anchor.type == .text, let textNode = anchorNode as? TextNode {
+      let textContent = textNode.getTextPart()
+      let nsString = textContent as NSString
+
+      if isBackwards {
+        if anchor.offset > 0 {
+          // Get grapheme cluster at previous position
+          let idx = anchor.offset - 1
+          let graphemeRange = nsString.rangeOfComposedCharacterSequence(at: idx)
+          let newOffset = graphemeRange.location
+          focus.updatePoint(key: anchor.key, offset: newOffset, type: .text)
+        } else {
+          // At start of text node - look for previous text content across node boundaries
+          if let prevSibling = textNode.getPreviousSibling() as? TextNode {
+            // Previous sibling in same parent element
+            let prevLength = prevSibling.getTextContentSize()
+            let nsStr = prevSibling.getTextPart() as NSString
+            let graphemeRange = nsStr.rangeOfComposedCharacterSequence(at: max(0, prevLength - 1))
+            anchor.updatePoint(key: prevSibling.getKey(), offset: prevLength, type: .text)
+            focus.updatePoint(key: prevSibling.getKey(), offset: graphemeRange.location, type: .text)
+          } else if let parent = textNode.getParent() as? ElementNode {
+            // Look in previous sibling element (e.g., previous list item)
+            if let prevElement = parent.getPreviousSibling() as? ElementNode {
+              if let lastText = findLastTextNodeInElement(prevElement) {
+                let prevLength = lastText.getTextContentSize()
+                // Create selection spanning from end of previous text to start of current text
+                // This creates a boundary-spanning selection that will merge the elements
+                // anchor stays at current position (start of current text)
+                // focus moves to end of previous text
+                focus.updatePoint(key: lastText.getKey(), offset: prevLength, type: .text)
+              } else {
+                // Previous element has no text, try to collapse
+                if try parent.collapseAtStart(selection: self) {
+                  return
+                }
+              }
+            } else {
+              // No previous element - try collapseAtStart as fallback for empty elements
+              if try parent.collapseAtStart(selection: self) {
+                return
+              }
+              return // At absolute start, nothing to delete
+            }
+          } else {
+            return // No parent, at absolute start
+          }
+        }
+      } else {
+        if anchor.offset < textNode.getTextContentSize() {
+          // Get grapheme cluster at current position
+          let graphemeRange = nsString.rangeOfComposedCharacterSequence(at: anchor.offset)
+          let newOffset = graphemeRange.location + graphemeRange.length
+          focus.updatePoint(key: anchor.key, offset: newOffset, type: .text)
+        } else {
+          // At end of text node - look for next text content
+          if let nextSibling = textNode.getNextSibling() as? TextNode {
+            let nextContent = nextSibling.getTextPart() as NSString
+            if nextContent.length > 0 {
+              let graphemeRange = nextContent.rangeOfComposedCharacterSequence(at: 0)
+              focus.updatePoint(key: nextSibling.getKey(), offset: graphemeRange.location + graphemeRange.length, type: .text)
+            } else {
+              focus.updatePoint(key: nextSibling.getKey(), offset: 0, type: .text)
+            }
+          } else if let parent = textNode.getParent() as? ElementNode {
+            // Look in next sibling element
+            if let nextElement = parent.getNextSibling() as? ElementNode {
+              if let firstText = findFirstTextNodeInElement(nextElement) {
+                let nextContent = firstText.getTextPart() as NSString
+                if nextContent.length > 0 {
+                  let graphemeRange = nextContent.rangeOfComposedCharacterSequence(at: 0)
+                  focus.updatePoint(key: firstText.getKey(), offset: graphemeRange.location + graphemeRange.length, type: .text)
+                } else {
+                  focus.updatePoint(key: firstText.getKey(), offset: 0, type: .text)
+                }
+              }
+            }
+          } else {
+            return // At absolute end
+          }
+        }
+      }
+    } else if anchor.type == .element {
+      // Selection is on an element node (empty element)
+      if let element = anchorNode as? ElementNode {
+        if isBackwards {
+          if try element.collapseAtStart(selection: self) {
+            return
+          }
+        }
+      }
+    }
+
+    try removeText()
   }
 
+  /// Find the last text node within an element, searching recursively.
+  private func findLastTextNodeInElement(_ element: ElementNode) -> TextNode? {
+    let children = element.getChildren()
+    for child in children.reversed() {
+      if let textNode = child as? TextNode {
+        return textNode
+      }
+      if let childElement = child as? ElementNode {
+        if let found = findLastTextNodeInElement(childElement) {
+          return found
+        }
+      }
+    }
+    return nil
+  }
+
+  /// Find the first text node within an element, searching recursively.
+  private func findFirstTextNodeInElement(_ element: ElementNode) -> TextNode? {
+    for child in element.getChildren() {
+      if let textNode = child as? TextNode {
+        return textNode
+      }
+      if let childElement = child as? ElementNode {
+        if let found = findFirstTextNodeInElement(childElement) {
+          return found
+        }
+      }
+    }
+    return nil
+  }
+
+  /// Delete a word (AppKit implementation).
   @MainActor
   public func deleteWord(isBackwards: Bool) throws {
-    fatalError("deleteWord not implemented on AppKit")
+    guard getActiveEditor() != nil else {
+      throw LexicalError.invariantViolation("Cannot be called outside update loop")
+    }
+
+    // If selection is not collapsed, just remove the selected text
+    if !isCollapsed() {
+      try removeText()
+      return
+    }
+
+    // Extend selection by word using Lexical node tree
+    if anchor.type == .text, let textNode = try anchor.getNode() as? TextNode {
+      let textContent = textNode.getTextPart()
+      let nsString = textContent as NSString
+
+      if isBackwards {
+        if anchor.offset > 0 {
+          var wordStart = anchor.offset
+          // Skip whitespace
+          while wordStart > 0 {
+            let ch = nsString.character(at: wordStart - 1)
+            if let scalar = Unicode.Scalar(ch), !CharacterSet.whitespaces.contains(scalar) {
+              break
+            }
+            wordStart -= 1
+          }
+          // Skip word characters
+          while wordStart > 0 {
+            let ch = nsString.character(at: wordStart - 1)
+            if let scalar = Unicode.Scalar(ch), CharacterSet.whitespaces.contains(scalar) || CharacterSet.punctuationCharacters.contains(scalar) {
+              break
+            }
+            wordStart -= 1
+          }
+          focus.updatePoint(key: anchor.key, offset: wordStart, type: .text)
+        }
+      } else {
+        let length = nsString.length
+        if anchor.offset < length {
+          var wordEnd = anchor.offset
+          // Skip word characters
+          while wordEnd < length {
+            let ch = nsString.character(at: wordEnd)
+            if let scalar = Unicode.Scalar(ch), CharacterSet.whitespaces.contains(scalar) || CharacterSet.punctuationCharacters.contains(scalar) {
+              break
+            }
+            wordEnd += 1
+          }
+          // Skip whitespace
+          while wordEnd < length {
+            let ch = nsString.character(at: wordEnd)
+            if let scalar = Unicode.Scalar(ch), !CharacterSet.whitespaces.contains(scalar) {
+              break
+            }
+            wordEnd += 1
+          }
+          focus.updatePoint(key: anchor.key, offset: wordEnd, type: .text)
+        }
+      }
+    }
+
+    try removeText()
   }
 
+  /// Delete to line boundary (AppKit implementation).
+  ///
+  /// Note: In Lexical's paragraph-based model, "line" maps to paragraph.
   @MainActor
   public func deleteLine(isBackwards: Bool) throws {
-    fatalError("deleteLine not implemented on AppKit")
+    guard getActiveEditor() != nil else {
+      throw LexicalError.invariantViolation("Cannot be called outside update loop")
+    }
+
+    // If selection is not collapsed, just remove the selected text
+    if !isCollapsed() {
+      try removeText()
+      return
+    }
+
+    // Extend selection to paragraph boundary
+    if anchor.type == .text, let textNode = try anchor.getNode() as? TextNode {
+      if isBackwards {
+        // Select from start of text node to current position
+        focus.updatePoint(key: anchor.key, offset: 0, type: .text)
+      } else {
+        // Select from current position to end of text node
+        let length = textNode.getTextContentSize()
+        focus.updatePoint(key: anchor.key, offset: length, type: .text)
+      }
+    }
+
+    try removeText()
   }
   #endif
 

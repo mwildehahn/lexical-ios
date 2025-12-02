@@ -119,8 +119,7 @@ class ListItemNodeTests: XCTestCase {
     }
   }
 
-  #if !os(macOS) || targetEnvironment(macCatalyst)
-  // Tests that use deleteCharacter - not yet implemented on AppKit
+  // Tests that use deleteCharacter - now implemented on both AppKit and UIKit
   func testRemoveEmptyListItemNodes() throws {
     guard let editor else {
       XCTFail("Editor unexpectedly nil")
@@ -405,7 +404,6 @@ class ListItemNodeTests: XCTestCase {
       XCTAssertEqual(item1.getChildren().count, 1)
     }
   }
-  #endif
 
   #if !os(macOS) || targetEnvironment(macCatalyst)
   // UIKit-specific tests that use UITextView APIs
