@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 /*
  * This file, Mutations, contains the logic for Lexical's `non-controlled` mode. In this mode,

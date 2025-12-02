@@ -7,6 +7,7 @@
 
 import MobileCoreServices
 import UIKit
+import LexicalCore
 import UniformTypeIdentifiers
 
 @MainActor

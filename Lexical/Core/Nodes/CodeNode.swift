@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 // This is an ObjC class because it needs to conform to NSObject's equality, otherwise the Layout Manager
 // can't iterate through attributes properly.

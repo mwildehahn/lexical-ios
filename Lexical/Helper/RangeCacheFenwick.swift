@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 /// Rebuilds rangeCache locations using a Fenwick tree of per-node entireRange deltas.
 /// - Parameters:

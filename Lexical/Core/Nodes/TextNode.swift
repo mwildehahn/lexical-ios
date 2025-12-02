@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 public enum TextNodeThemeSubtype {
   public static let code = "code"

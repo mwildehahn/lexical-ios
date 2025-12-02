@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 @MainActor
 public func updateTextFormat(type: TextFormatType, editor: Editor) throws {

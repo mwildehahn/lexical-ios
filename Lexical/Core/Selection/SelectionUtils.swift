@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import LexicalCore
 
 func createPoint(key: NodeKey, offset: Int, type: SelectionType) -> Point {
   Point(key: key, offset: offset, type: type)

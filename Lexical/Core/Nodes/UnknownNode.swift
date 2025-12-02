@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 // NB: This class is meant to represent unknown nodes serialized *with JSON*. This is a very
 //     important distinction as the class has no means of representing mappings with keys as

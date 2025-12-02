@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 @objc public class NodeKeyMultiplier: NSObject {
   let depthBlockSize: UInt64

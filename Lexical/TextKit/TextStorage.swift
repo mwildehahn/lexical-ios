@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 @MainActor
 public class TextStorage: NSTextStorage {

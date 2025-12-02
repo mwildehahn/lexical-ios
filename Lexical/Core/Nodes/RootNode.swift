@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 public class RootNode: ElementNode {
 

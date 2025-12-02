@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 // TODO for see more:
 // 1. correctly decode the 'bold' attribute using Lexical rules

@@ -6,8 +6,9 @@
  */
 
 import UIKit
+import LexicalCore
 
-public typealias NodeKey = String
+// NodeKey is now defined in LexicalCore
 
 /// The base class for all Lexical nodes to inherit from.
 ///

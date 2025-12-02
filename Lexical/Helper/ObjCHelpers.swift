@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 @objc public extension Editor {
   func registerCommandObjC(_ commandName: String, priority: CommandPriority, block: @escaping ((_ payload: Any?) -> Bool)) -> () -> Void {

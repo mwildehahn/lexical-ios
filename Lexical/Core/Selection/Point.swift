@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 public enum SelectionType: String {
   case text = "text"

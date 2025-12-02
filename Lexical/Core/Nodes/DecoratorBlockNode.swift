@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import LexicalCore
 
 open class DecoratorBlockNode: DecoratorNode {
 

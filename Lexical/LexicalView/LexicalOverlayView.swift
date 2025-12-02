@@ -5,6 +5,7 @@
 //  Created by Michael Hahn on 7/30/24.
 //
 import UIKit
+import LexicalCore
 
 final class LexicalOverlayView: UIView {
 

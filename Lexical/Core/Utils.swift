@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import LexicalCore
 
 @MainActor
 public func getNodeByKey<N: Node>(key: NodeKey) -> N? {

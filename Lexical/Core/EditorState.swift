@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 internal let kRootNodeKey = "root"
 

@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import LexicalCore
 import QuartzCore
 
 // Optimized reconciler entry point. Initially a thin wrapper so we can land

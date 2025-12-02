@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import LexicalCore
 
 // This function is analagous to the parts of onBeforeInput() where inputType == 'insertText'.
 // However, on iOS, we are assuming that `shouldPreventDefaultAndInsertText()` has already been checked

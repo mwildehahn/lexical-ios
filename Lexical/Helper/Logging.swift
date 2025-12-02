@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 public extension CommandType {
   static let log = CommandType(rawValue: "log")

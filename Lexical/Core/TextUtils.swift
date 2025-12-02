@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 @MainActor
 internal func isRootTextContentEmpty(isEditorComposing: Bool, trim: Bool = true) -> Bool {

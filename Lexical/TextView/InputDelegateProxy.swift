@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 @MainActor
 internal class InputDelegateProxy: NSObject, UITextInputDelegate {

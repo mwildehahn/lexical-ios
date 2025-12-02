@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import LexicalCore
 
 /// A Lexical Frontend is an object that contains the TextKit stack used by Lexical, along with handling
 /// user interactions, incoming events, etc. The Frontend protocol provides a hard boundary for what are

@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 /// This protocol represents things common to all types of selection.
 @MainActor

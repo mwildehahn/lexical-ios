@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 /* The range cache is used when updating the NSTextStorage following a change to Lexical's
  * data model. In order to do the update with nuance, changing only the bits of the string

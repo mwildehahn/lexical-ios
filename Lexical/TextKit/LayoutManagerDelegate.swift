@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 @MainActor
 class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {

@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 /**
  A node that renders an arbitrary `UIView` inline in the text.

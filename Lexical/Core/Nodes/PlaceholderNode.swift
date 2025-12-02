@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import LexicalCore
 
 public class PlaceholderNode: TextNode {
   private static let placeholderCharacter = "\u{200B}"

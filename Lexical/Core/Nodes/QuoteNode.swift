@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 public class QuoteNode: ElementNode {
   override public init() {

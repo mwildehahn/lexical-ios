@@ -6,6 +6,7 @@
  */
 
 import UIKit
+import LexicalCore
 
 open class ParagraphNode: ElementNode {
   override public init() {

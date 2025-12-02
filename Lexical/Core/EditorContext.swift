@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 /// MainActor-isolated context manager for managing editor state during updates
 /// Replaces the thread dictionary pattern for Swift 6 compatibility
