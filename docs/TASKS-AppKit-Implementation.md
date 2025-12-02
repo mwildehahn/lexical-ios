@@ -211,12 +211,26 @@ Instead of moving Node to Core, consider:
 2. **Dependency Injection**: Pass editor/state access via protocols rather than global functions
 3. **Gradual Migration**: Move types one at a time with protocol-based dependencies
 
-*Phase B-D: Deferred*
-The remaining phases require architectural changes to break circular dependencies.
-See "Revised Approach" above for next steps.
+*Phase B: Protocol Extraction (Started)*
+Created foundation protocols in LexicalCore to enable future Node migration:
 
-- [ ] Create `EditorStateProtocol` in LexicalCore
-- [ ] Create `EditorAccessProtocol` in LexicalCore
+- [x] Create `NodeContext` protocol in `LexicalCore/Protocols/NodeContext.swift`
+  - Defines operations Node needs: node map access, dirty tracking, key generation, selection ops
+- [x] Create `NodeProtocol`, `ElementNodeProtocol`, `TextNodeProtocol`, `DecoratorNodeProtocol`
+  - Abstract interfaces for node types
+- [x] Create `BaseSelectionProtocol`, `RangeSelectionProtocol`, `PointProtocol`
+  - Abstract interfaces for selection types
+- [x] Create `NodeContextProvider` for dependency injection
+  - Will be used when Node.swift is moved to LexicalCore
+- [x] Move `SelectionType` to `LexicalCore/CoreTypes.swift`
+  - Removed duplicate from `Lexical/Core/Selection/Point.swift`
+- [x] Move `TextFormat` to `LexicalCore/TextFormat.swift`
+  - Removed duplicate from `Lexical/Core/Nodes/TextNode.swift`
+
+*Phase C-D: Deferred*
+The remaining phases require the Lexical target to implement the protocols:
+- [ ] Create concrete `NodeContext` implementation in Lexical target
+- [ ] Wire up `NodeContextProvider` in EditorContext
 - [ ] Refactor Node.swift to use protocols instead of concrete types
 - [ ] Move Node.swift to LexicalCore with protocol-based dependencies
 

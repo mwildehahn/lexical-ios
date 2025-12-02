@@ -8,13 +8,7 @@
 import Foundation
 import LexicalCore
 
-public enum SelectionType: String {
-  case text = "text"
-  case element = "element"
-  case range = "range"
-  case node = "node"
-  case grid = "grid"
-}
+// SelectionType is now defined in LexicalCore/CoreTypes.swift
 
 public class Point {
   public var key: NodeKey

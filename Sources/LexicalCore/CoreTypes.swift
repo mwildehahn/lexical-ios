@@ -22,6 +22,17 @@ public enum LexicalCoreConstants {
   public static let uninitializedNodeKey: NodeKey = ""
 }
 
+// MARK: - SelectionType
+
+/// The type of a selection point
+public enum SelectionType: String, Equatable, Sendable {
+  case text = "text"
+  case element = "element"
+  case range = "range"
+  case node = "node"
+  case grid = "grid"
+}
+
 // MARK: - NodeType
 
 public struct NodeType: Hashable, RawRepresentable, Sendable {
