@@ -36,19 +36,19 @@ The RFC contains:
 ## Phase 1: Package Structure & Umbrella Module
 
 ### 1.1 Update Package.swift
-- [ ] Add `.macOS(.v13)` to platforms array
-- [ ] Create `LexicalCore` target with no dependencies
-- [ ] Create `LexicalUIKit` target depending on `LexicalCore`
-- [ ] Create `LexicalAppKit` target depending on `LexicalCore` with `.when(platforms: [.macOS])`
-- [ ] Update main `Lexical` target to use platform-conditional dependencies
-- [ ] Verify package resolves: `swift package resolve`
+- [x] Add `.macOS(.v13)` to platforms array
+- [x] Create `LexicalCore` target with no dependencies
+- [x] Create `LexicalUIKit` target depending on `LexicalCore`
+- [x] Create `LexicalAppKit` target depending on `LexicalCore` with `.when(platforms: [.macOS])`
+- [x] Update main `Lexical` target to use platform-conditional dependencies
+- [x] Verify package resolves: `swift package resolve`
 
 **STTextView Reference:**
 - `/Users/mh/labs/STTextView/Package.swift` - Full example of platform-conditional targets
 
 ### 1.2 Create Umbrella Module
-- [ ] Create `Sources/Lexical/` directory (if restructuring)
-- [ ] Create `Sources/Lexical/module.swift` with conditional re-exports:
+- [x] Create `Sources/Lexical/` directory (if restructuring)
+- [x] Create `Sources/Lexical/module.swift` with conditional re-exports:
   ```swift
   #if os(macOS) && !targetEnvironment(macCatalyst)
   @_exported import LexicalAppKit
@@ -62,59 +62,187 @@ The RFC contains:
 - `/Users/mh/labs/STTextView/Sources/STTextView/module.swift` - Umbrella re-export pattern
 
 ### 1.3 Create Directory Structure
-- [ ] Create `Sources/LexicalCore/`
-- [ ] Create `Sources/LexicalUIKit/`
-- [ ] Create `Sources/LexicalAppKit/`
-- [ ] Verify build succeeds with empty targets: `swift build`
+- [x] Create `Sources/LexicalCore/`
+- [x] Create `Sources/LexicalUIKit/`
+- [x] Create `Sources/LexicalAppKit/`
+- [x] Verify build succeeds with empty targets: `swift build`
 
 ---
 
 ## Phase 2: Extract LexicalCore
 
 ### 2.1 Identify Platform-Agnostic Files
-- [ ] Audit each file in current `Lexical/` for UIKit imports
-- [ ] Create list of files with NO UIKit dependencies (candidates for Core)
-- [ ] Create list of files with UIKit dependencies (stay in UIKit target)
+- [x] Audit each file in current `Lexical/` for UIKit imports
+- [x] Create list of files with NO UIKit dependencies (candidates for Core)
+- [x] Create list of files with UIKit dependencies (stay in UIKit target)
 
-### 2.2 Move Node System to Core
-- [ ] Move `Nodes/Node.swift` to `LexicalCore/`
-- [ ] Move `Nodes/TextNode.swift` to `LexicalCore/`
-- [ ] Move `Nodes/ElementNode.swift` to `LexicalCore/`
-- [ ] Move `Nodes/RootNode.swift` to `LexicalCore/`
-- [ ] Move `Nodes/ParagraphNode.swift` to `LexicalCore/`
-- [ ] Move `Nodes/LineBreakNode.swift` to `LexicalCore/`
-- [ ] Move `Nodes/DecoratorNode.swift` to `LexicalCore/`
-- [ ] Move all remaining node files to `LexicalCore/`
-- [ ] Fix any import issues (remove UIKit, use Foundation)
-- [ ] Verify Core target builds: `swift build --target LexicalCore`
+**Audit Results:**
+Files WITHOUT UIKit imports (32 files) - candidates for Core:
+- Core: EditorContext, EditorState, Errors, FeatureFlags, LexicalRuntime, Mutations, StyleEvents, TextUtils, Updates
+- Nodes: ElementNode, HeadingNode, LineBreakNode, PlaceholderNode, UnknownNode
+- Selection: BaseSelection, Point
+- Helper: FenwickTree, KeyedDiff, Logging, NSAttributedStringKey+Extensions, ObjCHelpers, PlanDiff, RangeCacheFenwick, RangeCacheIncremental, RangeCacheIndexing, RangeHelpers, SelectionHelpers, Theme
+- Plugin: Plugin.swift
+- TextKit: TextKitUtils
 
-**STTextView Reference:**
-- `/Users/mh/labs/STTextView/Sources/STTextViewCommon/` - Example of shared platform-agnostic code
+Files that have `import UIKit` but don't use UIKit types (can change import to Foundation):
+- Node.swift, RootNode.swift, ParagraphNode.swift, CodeHighlightNode.swift
 
-### 2.3 Move Editor State to Core
-- [ ] Move `EditorState.swift` to `LexicalCore/`
-- [ ] Move `EditorHistory.swift` to `LexicalCore/` (if exists)
-- [ ] Extract platform-agnostic parts of `Editor.swift` to `LexicalCore/EditorCore.swift`
-- [ ] Keep UIKit-specific Editor code in `LexicalUIKit/`
+Files with actual UIKit dependencies (need abstraction or stay in UIKit):
+- TextNode.swift (UIColor, UIRectFill)
+- CodeNode.swift (UIColor, UIGraphicsGetCurrentContext)
+- QuoteNode.swift (UIColor, UIEdgeInsets, UIBezierPath)
+- DecoratorNode.swift, DecoratorContainerNode.swift, DecoratorBlockNode.swift (UIView)
+- LexicalView.swift, TextView.swift, etc. (UIKit views)
 
-### 2.4 Move Selection Logic to Core
-- [ ] Move `Selection/BaseSelection.swift` to `LexicalCore/`
-- [ ] Move `Selection/RangeSelection.swift` to `LexicalCore/` (extract UI types)
-- [ ] Move `Selection/NodeSelection.swift` to `LexicalCore/`
-- [ ] Move `Selection/GridSelection.swift` to `LexicalCore/`
-- [ ] Create `SelectionTypes.swift` in Core for platform-neutral selection enums
-- [ ] Verify Core target builds
+**Initial Core files added:**
+- [x] `PlatformTypes.swift` - Cross-platform type aliases (LexicalColor, LexicalFont, etc.)
+- [x] `FeatureFlags.swift` - Feature flag configuration
+- [x] `LexicalRuntime.swift` - Runtime configuration
+- [x] `Errors.swift` - LexicalError enum
 
-### 2.5 Move Reconciler to Core
-- [ ] Move `Reconciler.swift` to `LexicalCore/`
-- [ ] Move `OptimizedReconciler.swift` to `LexicalCore/`
-- [ ] Abstract any UIKit dependencies (if any)
-- [ ] Verify Core target builds
+### 2.2 Split and Move Constants (Foundation for everything else)
 
-### 2.6 Move Theme System to Core
-- [ ] Move `Theme.swift` to `LexicalCore/`
-- [ ] Abstract color/font types if needed
-- [ ] Verify Core target builds
+**Analysis:** `Constants.swift` contains many types. Some are pure Foundation, others have UIKit dependencies or depend on Node/EditorState types. We must split this file first.
+
+**Step 2.2.1: Create CoreTypes.swift with pure Foundation types**
+- [x] Create `Sources/LexicalCore/CoreTypes.swift`
+- [x] Move `NodeType` struct (no deps)
+- [x] Move `Mode` enum (no deps)
+- [x] Move `Direction` enum (no deps)
+- [x] Move `Destination` enum (no deps)
+- [x] Move `CommandType` struct (no deps)
+- [x] Move `CommandPriority` enum (no deps)
+- [x] Move `TextFormatType` enum (no deps)
+- [x] Move `DirtyStatusCause` enum (no deps)
+- [x] Move `DirtyType` enum (no deps)
+- [x] Move `EditorUpdateReason` enum (no deps)
+- [x] Move `TextStorageEditingMode` enum (no deps)
+- [x] Move `TextTransform` enum (no deps)
+- [x] Move `CustomDrawingLayer` enum (no deps)
+- [x] Move `CustomDrawingGranularity` enum (no deps)
+- [x] Move `BlockLevelAttributes` class (uses CGFloat only)
+- [x] Move `DirtyNodeMap` typealias
+- [x] Verify build: `swift build --target LexicalCore`
+
+**Step 2.2.2: Create NodeKey typealias**
+- [x] Add `public typealias NodeKey = String` to CoreTypes.swift
+- [x] Verify build
+
+**Step 2.2.3: Keep platform-specific constants in original location**
+- [x] `LexicalConstants.defaultFont` uses UIFont - stays in Lexical/UIKit
+- [x] `LexicalConstants.defaultColor` uses UIColor - stays in Lexical/UIKit
+- [x] Add imports in original Constants.swift to use CoreTypes from LexicalCore
+- [x] Verify Lexical target still builds
+
+### 2.3 Move Theme System to Core
+- [x] Copy `Theme.swift` to `Sources/LexicalCore/Theme.swift`
+- [x] Remove UIKit import (uses Foundation only)
+- [x] Update to import CoreTypes if needed
+- [x] Verify build: `swift build --target LexicalCore`
+
+### 2.4 Move Helper Utilities to Core
+
+**Step 2.4.1: Move standalone helpers (no Node dependencies)**
+- [x] Move `Helper/FenwickTree.swift` to `Sources/LexicalCore/Helper/`
+- [x] Move `Helper/KeyedDiff.swift` to `Sources/LexicalCore/Helper/`
+- [ ] Move `Helper/PlanDiff.swift` to `Sources/LexicalCore/Helper/` - **BLOCKED: depends on Editor, EditorState, RangeCacheItem**
+- [ ] Move `Helper/ObjCHelpers.swift` to `Sources/LexicalCore/Helper/` - **BLOCKED: depends on Editor**
+- [x] Move `Helper/NSAttributedStringKey+Extensions.swift` to `Sources/LexicalCore/Helper/`
+- [x] Verify build after each move
+
+**Step 2.4.2: Move Serialization.swift**
+- [ ] Move `Core/Serialization.swift` to `Sources/LexicalCore/` - **BLOCKED: depends on Node types (RootNode, TextNode, etc.)**
+- [ ] Fix any import issues
+- [ ] Verify build
+
+### 2.5 Move Node System to Core
+
+**Step 2.5.1: Move Node.swift (base class)**
+- [ ] Copy `Core/Nodes/Node.swift` to `Sources/LexicalCore/Nodes/Node.swift`
+- [ ] Change `import UIKit` to `import Foundation`
+- [ ] Add any missing imports from LexicalCore types
+- [ ] Identify and list missing dependencies (will show as build errors)
+- [ ] Verify build (expect errors - document what's missing)
+
+**Step 2.5.2: Move required utilities for Node**
+Dependencies Node.swift needs from Utils.swift:
+- [ ] Move `getNodeByKey()` function
+- [ ] Move `generateKey()` function
+- [ ] Move `getActiveEditor()` function
+- [ ] Move `getActiveEditorState()` function
+- [ ] Move `internallyMarkNodeAsDirty()` function
+- [ ] Move `internallyMarkSiblingsAsDirty()` function
+- [ ] Move `errorOnReadOnly()` function
+- [ ] Move `isReadOnlyMode()` function
+- [ ] Create `Sources/LexicalCore/Utils.swift` with these functions
+- [ ] Verify build
+
+**Step 2.5.3: Move ElementNode.swift**
+- [ ] Copy `Core/Nodes/ElementNode.swift` to `Sources/LexicalCore/Nodes/`
+- [ ] Fix imports (uses Foundation only)
+- [ ] Verify build
+
+**Step 2.5.4: Move simple node types (no UIKit usage)**
+- [ ] Move `LineBreakNode.swift` to LexicalCore/Nodes/
+- [ ] Move `HeadingNode.swift` to LexicalCore/Nodes/
+- [ ] Move `PlaceholderNode.swift` to LexicalCore/Nodes/
+- [ ] Move `UnknownNode.swift` to LexicalCore/Nodes/
+- [ ] Verify build after each move
+
+**Step 2.5.5: Move nodes with UIKit imports but no actual usage**
+- [ ] Move `RootNode.swift` - change `import UIKit` to `import Foundation`
+- [ ] Move `ParagraphNode.swift` - change `import UIKit` to `import Foundation`
+- [ ] Move `CodeHighlightNode.swift` - change `import UIKit` to `import Foundation`
+- [ ] Verify build after each move
+
+**Step 2.5.6: Move nodes that need platform abstraction**
+- [ ] Move `TextNode.swift` - replace UIColor with LexicalColor, UIRectFill with lexicalRectFill
+- [ ] Move `CodeNode.swift` - replace UIColor/UIGraphicsGetCurrentContext with platform abstractions
+- [ ] Move `QuoteNode.swift` - replace UIColor/UIEdgeInsets/UIBezierPath with platform abstractions
+- [ ] Verify build after each move
+
+**Step 2.5.7: Decorator nodes - may need to stay in UIKit**
+DecoratorNode and children use UIView directly. Options:
+- [ ] Option A: Keep DecoratorNode.swift in LexicalUIKit, create protocol in Core
+- [ ] Option B: Create DecoratorNodeProtocol in Core, implementations in UIKit/AppKit
+- [ ] Document decision and implement chosen approach
+- [ ] Verify build
+
+### 2.6 Move Selection Logic to Core
+
+**Step 2.6.1: Move selection base types**
+- [ ] Move `Selection/Point.swift` to `Sources/LexicalCore/Selection/`
+- [ ] Move `Selection/BaseSelection.swift` to `Sources/LexicalCore/Selection/`
+- [ ] Verify build
+
+**Step 2.6.2: Move selection implementations**
+- [ ] Move `Selection/RangeSelection.swift` to LexicalCore (has UIKit imports - audit actual usage)
+- [ ] Move `Selection/NodeSelection.swift` to LexicalCore (has UIKit imports - audit actual usage)
+- [ ] Move `Selection/GridSelection.swift` to LexicalCore (has UIKit imports - audit actual usage)
+- [ ] For any UIKit-specific selection code, extract to LexicalUIKit
+- [ ] Verify build
+
+### 2.7 Move EditorState to Core
+- [ ] Move `EditorState.swift` to `Sources/LexicalCore/`
+- [ ] Audit for any UIKit dependencies
+- [ ] Verify build
+
+### 2.8 Move Reconciler to Core (Complex - many dependencies)
+- [ ] Audit `Reconciler.swift` for all dependencies
+- [ ] Audit `OptimizedReconciler.swift` for all dependencies
+- [ ] Move helper files needed by reconciler first
+- [ ] Move `Reconciler.swift` to LexicalCore
+- [ ] Move `OptimizedReconciler.swift` to LexicalCore
+- [ ] Replace any UIKit types with platform abstractions
+- [ ] Verify build
+
+### 2.9 Verify Phase 2 Complete
+- [ ] `swift build --target LexicalCore` succeeds
+- [ ] `swift build --target LexicalUIKit` succeeds
+- [ ] `swift build --target Lexical` succeeds (iOS)
+- [ ] Run existing tests to verify no regressions
+- [ ] Commit Phase 2 changes
 
 ### 2.7 Create LexicalViewProtocol
 - [ ] Create `LexicalCore/LexicalViewProtocol.swift`
