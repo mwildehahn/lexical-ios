@@ -39,11 +39,10 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
    - `SelectableDecoratorNode` - requires UIKit views
    - `LexicalInlineImagePlugin` - requires UIKit image views
    - `LexicalTablePlugin` - requires UIKit table views
-3. **Tests still UIKit-only** (~20 test files):
-   - OptimizedReconciler tests (depend on UIKit reconciler internals)
-   - Decorator position/parity tests
-   - Selection clamp/range tests
-   - These require either AppKit equivalents or abstraction work
+3. **Tests still UIKit-only** (~118 test files):
+   - Most parity tests require `LexicalReadOnlyTextKitContext` (UIKit-only)
+   - Enabling these requires porting `LexicalReadOnlyTextKitContext` to AppKit
+   - Core functionality tests have been enabled (130 tests pass)
 
 ---
 
@@ -1222,7 +1221,7 @@ Several plugins are entirely UIKit-only and need AppKit equivalents.
 
 Enable tests that are currently UIKit-only once the above features are implemented.
 
-**Step 10.8.1: Enable Core Tests**
+**Step 10.8.1: Enable Core Tests** ✅ COMPLETE
 After completing 10.1-10.4, enable these tests:
 - [x] `SelectionTests.swift` - Enabled for AppKit (19/24 tests pass)
   - 5 tests wrapped as UIKit-only due to platform API differences:
@@ -1242,6 +1241,8 @@ After completing 10.1-10.4, enable these tests:
     - `testGetTextOutOfJSONHeadlessly` - uses insertGeneratedNodes
 
 **Step 10.8.2: Enable Reconciler Tests**
+**BLOCKED:** These tests require `LexicalReadOnlyTextKitContext` which is UIKit-only.
+To enable, need to port `LexicalReadOnlyTextKitContext` to AppKit first.
 After completing 10.4:
 - [ ] `OptimizedReconcilerTests.swift`
 - [ ] `OptimizedReconcilerMarkdownParityTests.swift`
