@@ -5,8 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+import Foundation
 import LexicalCore
 
 @MainActor
@@ -338,3 +339,4 @@ extension NSAttributedString.Key {
   internal static let appliedBlockLevelStyles_internal: NSAttributedString.Key = .init(
     rawValue: "appliedBlockLevelStyles_internal")
 }
+#endif  // canImport(UIKit)

@@ -5,7 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
 import LexicalCore
 
 /**
@@ -66,24 +71,24 @@ open class DecoratorNode: Node {
     Self(key)
   }
 
-  /// Create your `UIView` here.
+  /// Create your view here.
   ///
   /// Do not add it to the view hierarchy or size it; Lexical will do that later.
-  open func createView() -> UIView {
+  open func createView() -> LexicalView {
     fatalError("createView: base method not extended")
   }
 
   /// Called by Lexical when reconciling a dirty decorator node. This is where you update your view to match
   /// the state encapsulated in the decorator node.
-  open func decorate(view: UIView) {
+  open func decorate(view: LexicalView) {
     fatalError("decorate: base method not extended")
   }
 
-  open func decoratorWillAppear(view: UIView) {
+  open func decoratorWillAppear(view: LexicalView) {
     // no-op unless overridden
   }
 
-  open func decoratorDidDisappear(view: UIView) {
+  open func decoratorDidDisappear(view: LexicalView) {
     // no-op unless overridden
   }
 
@@ -138,6 +143,7 @@ open class DecoratorNode: Node {
   }
 
   override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
+    #if canImport(UIKit)
     let textAttachment = TextAttachment()
 
     guard let editor = getActiveEditor() else { return [:] }
@@ -146,6 +152,10 @@ open class DecoratorNode: Node {
     textAttachment.key = key
 
     return [.attachment: textAttachment]
+    #else
+    // AppKit decorator support not yet implemented
+    return [:]
+    #endif
   }
 
   @discardableResult

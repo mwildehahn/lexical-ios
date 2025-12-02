@@ -5,8 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+import Foundation
 import LexicalCore
 
 @MainActor
@@ -98,3 +99,4 @@ internal func shadowCompareOptimizedVsLegacy(
   verifyRangeCacheInvariants(editor: activeEditor, label: "optimized")
   verifyRangeCacheInvariants(editor: legacyEditor, label: "legacy")
 }
+#endif

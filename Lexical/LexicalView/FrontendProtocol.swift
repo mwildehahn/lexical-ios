@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
 import UIKit
 import LexicalCore
@@ -42,3 +44,4 @@ internal protocol Frontend: AnyObject {
   func showPlaceholderText()
   func resetTypingAttributes(for selectedNode: Node)
 }
+#endif  // canImport(UIKit)

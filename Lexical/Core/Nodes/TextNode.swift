@@ -5,7 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
 import LexicalCore
 
 public enum TextNodeThemeSubtype {
@@ -260,7 +265,7 @@ open class TextNode: Node {
         attributeDictionary.merge(themeDict) { (_, new) in new }
       } else {
         attributeDictionary[NSAttributedString.Key.fontFamily] = "Courier"
-        attributeDictionary[NSAttributedString.Key.backgroundColor] = UIColor.lightGray
+        attributeDictionary[NSAttributedString.Key.backgroundColor] = LexicalColor.lightGray
       }
     }
 
@@ -696,14 +701,16 @@ public extension NSAttributedString.Key {
   static let inlineCodeBackgroundColor: NSAttributedString.Key = .init(rawValue: "inlineCodeBackgroundColor")
 }
 
+#if canImport(UIKit)
 extension TextNode {
   internal static var inlineCodeBackgroundDrawing: CustomDrawingHandler {
     get {
       return { attributeKey, attributeValue, layoutManager, attributeRunCharacterRange, granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
-        guard let attributeValue = attributeValue as? UIColor else { return }
+        guard let attributeValue = attributeValue as? LexicalColor else { return }
         attributeValue.setFill()
-        UIRectFill(rect)
+        lexicalRectFill(rect)
       }
     }
   }
 }
+#endif

@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
 import LexicalCore
 
@@ -70,3 +72,4 @@ public class TextContainer: NSTextContainer {
     return lineFragmentRect
   }
 }
+#endif  // canImport(UIKit)

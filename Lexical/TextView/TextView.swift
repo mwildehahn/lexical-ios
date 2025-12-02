@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import MobileCoreServices
 import UIKit
 import LexicalCore
@@ -718,3 +720,4 @@ private class CustomSelectionRect: UITextSelectionRect {
     return baseRect.isVertical
   }
 }
+#endif  // canImport(UIKit)

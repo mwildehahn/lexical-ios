@@ -5,8 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
 import LexicalCore
 
 @MainActor
@@ -448,6 +452,7 @@ public func sliceSelectedTextNodeContent(selection: BaseSelection, textNode: Tex
   return textNode
 }
 
+#if canImport(UIKit)
 @MainActor
 public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> UIView? {
   guard let editor = getActiveEditor() else {
@@ -490,6 +495,7 @@ internal func destroyCachedDecoratorView(forKey key: NodeKey) {
   }
   editor.decoratorCache.removeValue(forKey: key)
 }
+#endif
 
 public typealias FindFunction = (
   _ node: Node
@@ -599,6 +605,7 @@ public func maybeMoveChildrenSelectionToParent(
   return selection
 }
 
+#if canImport(UIKit)
 @MainActor
 public func getAttributedStringFromFrontend() throws -> NSAttributedString {
   // @alexmattice - replace this with a version driven off a depth first search
@@ -612,6 +619,7 @@ public func getAttributedStringFromFrontend() throws -> NSAttributedString {
     return NSAttributedString(string: "")
   }
 }
+#endif
 
 @MainActor
 public func removeFromParent(node: Node) throws {

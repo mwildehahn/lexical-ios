@@ -173,6 +173,38 @@ public protocol DecoratorNodeProtocol: NodeProtocol {
   func selectEnd() throws -> any RangeSelectionProtocol
 }
 
+// MARK: - Root Node Protocol
+
+/// Protocol for the root node
+@MainActor
+public protocol RootNodeProtocol: ElementNodeProtocol {}
+
+// MARK: - Type Checking Helpers
+
+/// Check if a node is an element node using protocol conformance
+@MainActor
+public func isElementNode(_ node: (any NodeProtocol)?) -> Bool {
+  node is (any ElementNodeProtocol)
+}
+
+/// Check if a node is a text node using protocol conformance
+@MainActor
+public func isTextNode(_ node: (any NodeProtocol)?) -> Bool {
+  node is (any TextNodeProtocol)
+}
+
+/// Check if a node is the root node using protocol conformance
+@MainActor
+public func isRootNode(_ node: (any NodeProtocol)?) -> Bool {
+  node is (any RootNodeProtocol)
+}
+
+/// Check if a node is a decorator node using protocol conformance
+@MainActor
+public func isDecoratorNode(_ node: (any NodeProtocol)?) -> Bool {
+  node is (any DecoratorNodeProtocol)
+}
+
 // MARK: - Selection Protocols
 
 /// Protocol for base selection

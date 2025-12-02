@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
 import LexicalCore
 
@@ -33,3 +35,4 @@ import LexicalCore
     return textStorage?.string
   }
 }
+#endif  // canImport(UIKit)

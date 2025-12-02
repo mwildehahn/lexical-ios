@@ -5,8 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+import Foundation
 import LexicalCore
 
 public enum NodePart {
@@ -809,3 +810,4 @@ private func buildAttributedSubtree(
   output.append(post)
   return output
 }
+#endif  // canImport(UIKit)

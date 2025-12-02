@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
 import LexicalCore
 
@@ -199,3 +201,4 @@ extension TextStorage {
       "TextStorage[\(backingAttributedString.string.utf16.enumerated().map { "(\($0)=U+\(String(format:"%04X",$1)))" }.joined())]"
   }
 }
+#endif  // canImport(UIKit)

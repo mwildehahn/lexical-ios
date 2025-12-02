@@ -29,7 +29,11 @@ The RFC contains:
 4. **Mark tasks `[x]`** when complete (edit this file)
 5. **Reference STTextView** files listed for implementation patterns
 6. **Build frequently** - Run `swift build` after changes to catch issues early
-7. **Commit after each phase** completion
+7. **Commit frequently** - Create logical commits as you complete related tasks. Don't wait until an entire phase is complete. Good commit boundaries include:
+   - Completing a numbered task or sub-task
+   - Getting the build working after a set of related changes
+   - Adding a new file or moving files
+   - Fixing a category of errors (e.g., "wrap all UIKit imports in conditional compilation")
 
 ---
 
@@ -244,6 +248,28 @@ The remaining phases require refactoring Node.swift to use the protocol-based de
 - [ ] Make Node, ElementNode, TextNode conform to their respective protocols
 - [ ] Make Point, RangeSelection, BaseSelection conform to their respective protocols
 - [ ] Move Node.swift to LexicalCore with protocol-based dependencies
+
+*Phase E: Conditional Compilation Approach (Completed)*
+Instead of fully migrating to LexicalCore, wrapped UIKit-specific code with `#if canImport(UIKit)` guards to enable macOS builds:
+
+- [x] Wrap DecoratorNode.swift `getAttributedStringAttributes` in UIKit guards
+- [x] Wrap Editor.swift `CustomDrawingHandlerInfo`, `registerCustomDrawing` in UIKit guards
+- [x] Make `UpdateBehaviourModificationMode` cross-platform with platform-specific initializers
+- [x] Wrap Editor.swift `rangeCache` initialization and access in UIKit guards
+- [x] Wrap Editor.swift frontend-related methods in UIKit guards
+- [x] Wrap RangeSelection.swift `modify`, `applyNativeSelection`, `applySelectionRange`, `init(nativeSelection:)` in UIKit guards
+- [x] Add AppKit stubs for `deleteCharacter`, `deleteWord`, `deleteLine` in RangeSelection.swift
+- [x] Wrap SelectionUtils.swift `createNativeSelection`, `validatePosition`, `stringLocationForPoint`, `createSelection` in UIKit guards
+- [x] Update `getSelection()` to return nil on AppKit when no existing selection
+- [x] Wrap Utils.swift `decoratorView`, `destroyCachedDecoratorView`, `getAttributedStringFromFrontend` in UIKit guards
+- [x] Wrap RootNode.swift `LexicalReadOnlyTextKitContext` check in UIKit guards
+- [x] Wrap Events.swift `onSelectionChange`, `registerRichText` and related functions in UIKit guards
+- [x] Wrap ReconcilerShadowCompare.swift entire file in UIKit guards
+- [x] Add NSEdgeInsets Equatable conformance to PlatformTypes.swift for macOS
+- [x] **BUILD SUCCESS: `swift build --target Lexical` now succeeds on macOS**
+
+*Technical Debt Note:*
+This approach creates conditional compilation throughout Core files rather than clean separation. This is pragmatic for initial macOS support but should be revisited in favor of proper LexicalCore extraction when time permits.
 
 **Step 2.5.3: Move ElementNode.swift**
 - [ ] Copy `Core/Nodes/ElementNode.swift` to `Sources/LexicalCore/Nodes/`

@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
 import LexicalCore
 
@@ -22,4 +24,4 @@ internal func sortedNodeKeysByLocation(rangeCache: [NodeKey: RangeCacheItem]) ->
     }
     .map { $0.key }
 }
-
+#endif  // canImport(UIKit)

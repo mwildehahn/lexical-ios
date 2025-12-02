@@ -5,8 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
 import LexicalCore
 
 // Re-export all LexicalCore types for backwards compatibility
@@ -19,8 +23,8 @@ enum LexicalConstants {
   // key overrides any face or family key that we set. Hence we provide a default font of
   // Helvetica instead. Note that we need a fallback to something non-optional, hence
   // we do use system font if Helvetica cannot be found. This should never happen.
+  #if canImport(UIKit)
   static let defaultFont = UIFont(name: "Helvetica", size: 15.0) ?? UIFont.systemFont(ofSize: 15.0)
-
   static let defaultColor: UIColor = {
     if #available(iOS 13.0, *) {
       return UIColor.label
@@ -28,6 +32,10 @@ enum LexicalConstants {
       return UIColor.black
     }
   }()
+  #elseif canImport(AppKit)
+  static let defaultFont = NSFont(name: "Helvetica", size: 15.0) ?? NSFont.systemFont(ofSize: 15.0)
+  static let defaultColor: NSColor = .labelColor
+  #endif
 
   // Sigil value used during node initialization
   static let uninitializedNodeKey = "uninitializedNodeKey"
@@ -61,6 +69,7 @@ public struct CommandListenerWithMetadata {
 }
 public typealias Commands = [CommandType: [CommandPriority: [UUID: CommandListenerWithMetadata]]]
 
+#if canImport(UIKit)
 /// See <doc:CustomDrawing> for description of the parameters
 public typealias CustomDrawingHandler = (
   _ attributeKey: NSAttributedString.Key,
@@ -72,3 +81,4 @@ public typealias CustomDrawingHandler = (
   _ rect: CGRect,
   _ firstLineFragment: CGRect
 ) -> Void
+#endif

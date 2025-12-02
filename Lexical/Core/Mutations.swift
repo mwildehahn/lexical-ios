@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
 import LexicalCore
 
@@ -86,3 +87,4 @@ internal func handleTextMutation(textStorage: TextStorage, rangeOfChange: NSRang
 public func getIsProcessingMutations() -> Bool {
   return isProcessingMutations
 }
+#endif  // canImport(UIKit)

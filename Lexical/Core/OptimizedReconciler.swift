@@ -5,8 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+import Foundation
 import LexicalCore
 import QuartzCore
 
@@ -2571,3 +2572,4 @@ internal enum OptimizedReconciler {
     }
   }
 }
+#endif  // canImport(UIKit)

@@ -5,8 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if os(iOS) || os(tvOS) || os(visionOS) || targetEnvironment(macCatalyst)
 import UIKit
 import LexicalCore
 
 // Placeholder for LexicalUIKit
 // UIKit-specific components will be moved here in Phase 3
+
+#endif

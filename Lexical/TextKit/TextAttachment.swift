@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
 import LexicalCore
 
@@ -46,3 +48,4 @@ public class TextAttachment: NSTextAttachment {
     return UIImage()
   }
 }
+#endif  // canImport(UIKit)

@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
 import LexicalCore
 
@@ -228,3 +230,4 @@ public func cloneContents(selection: RangeSelection) throws -> (
 
   return (nodeMap, range)
 }
+#endif  // canImport(UIKit)

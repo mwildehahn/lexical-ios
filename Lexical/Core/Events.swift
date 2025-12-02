@@ -5,10 +5,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
 import LexicalCore
 
+#if canImport(UIKit)
 // This function is analagous to the parts of onBeforeInput() where inputType == 'insertText'.
 // However, on iOS, we are assuming that `shouldPreventDefaultAndInsertText()` has already been checked
 // before calling onInsertTextFromUITextView().
@@ -149,6 +154,7 @@ internal func onPasteFromUITextView(editor: Editor, pasteboard: UIPasteboard) th
 
   editor.frontend?.showPlaceholderText()
 }
+#endif
 
 @MainActor
 public func shouldInsertTextAfterOrBeforeTextNode(selection: RangeSelection, node: TextNode) -> Bool
@@ -186,6 +192,7 @@ func checkIfTokenOrCanTextBeInserted(node: TextNode) -> Bool {
   return !node.canInsertTextBefore() || isToken
 }
 
+#if canImport(UIKit)
 // triggered by selection change event from the UITextView
 @MainActor
 internal func onSelectionChange(editor: Editor) {
@@ -470,3 +477,4 @@ public func registerRichText(editor: Editor) {
     return true
   }
 }
+#endif

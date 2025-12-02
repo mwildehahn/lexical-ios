@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
 import LexicalCore
 
@@ -322,3 +324,4 @@ private func updateNodeLocationFor(
     }
   }
 }
+#endif  // canImport(UIKit)

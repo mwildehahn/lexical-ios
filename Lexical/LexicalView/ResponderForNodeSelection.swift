@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
 import UIKit
 import LexicalCore
@@ -47,3 +49,4 @@ class ResponderForNodeSelection: UIResponder, UIKeyInput {
     textView
   }
 }
+#endif  // canImport(UIKit)

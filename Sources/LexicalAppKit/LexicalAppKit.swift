@@ -5,8 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
 import AppKit
 import LexicalCore
 
 // Placeholder for LexicalAppKit
 // AppKit-specific components will be created here in Phase 4
+
+#endif

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
 import MobileCoreServices
 import UIKit
@@ -375,3 +376,4 @@ extension NSAttributedString {
     return result
   }
 }
+#endif  // canImport(UIKit)

@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
 import LexicalCore
 
@@ -95,3 +97,4 @@ import LexicalCore
     textKitContext.editor.dispatchCommand(type: .readOnlyViewTapped, payload: nil)
   }
 }
+#endif  // canImport(UIKit)

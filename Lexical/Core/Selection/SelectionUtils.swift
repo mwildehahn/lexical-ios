@@ -5,8 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
 import LexicalCore
 
 func createPoint(key: NodeKey, offset: Int, type: SelectionType) -> Point {
@@ -49,6 +53,7 @@ public func getSelection(allowInvalidPositions: Bool = false) throws -> BaseSele
     getActiveEditor()?.log(.other, .warning, "Selection failed sanity check")
   }
 
+  #if canImport(UIKit)
   if let editor = getActiveEditor() {
     do {
       let selection = try createSelection(editor: editor)
@@ -62,6 +67,10 @@ public func getSelection(allowInvalidPositions: Bool = false) throws -> BaseSele
 
   // Could not get active editor. This is unexpected, but we can't log since logging requires editor!
   throw LexicalError.invariantViolation("called getSelection() without an active editor")
+  #else
+  // On AppKit, if there's no existing selection we cannot derive from native UI yet
+  return nil
+  #endif
 }
 
 @MainActor
@@ -188,6 +197,7 @@ func editorStateHasDirtySelection(pendingEditorState: EditorState, editor: Edito
   return false
 }
 
+#if canImport(UIKit)
 @MainActor
 func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   let rangeCache = editor.rangeCache
@@ -220,7 +230,6 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
     throw LexicalError.invariantViolation("Need grid selection")
   }
 }
-
 @MainActor
 public func createNativeSelection(from selection: RangeSelection, editor: Editor) throws
   -> NativeSelection
@@ -244,6 +253,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
     range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
     affinity: affinity)
 }
+#endif
 
 @MainActor
 func createEmptyRangeSelection() -> RangeSelection {
@@ -253,6 +263,7 @@ func createEmptyRangeSelection() -> RangeSelection {
   return RangeSelection(anchor: anchor, focus: focus, format: TextFormat())
 }
 
+#if canImport(UIKit)
 /// When we create a selection, we try to use the previous selection where possible, unless an actual user selection change has occurred.
 /// When we do need to create a new selection, we validate we can have text nodes for both anchor and focus nodes.
 /// If that holds true, we then return that selection as a mutable object that we use for the editor state for this update cycle.
@@ -289,6 +300,7 @@ func createSelection(editor: Editor) throws -> BaseSelection? {
   // we have a last selection. Clone it!
   return lastSelection.clone()
 }
+#endif
 
 /// This is used to make a selection when the existing selection is null or should be replaced,
 /// i.e. forcing selection on the editor when it current exists outside the editor.
@@ -707,6 +719,7 @@ internal func normalizeSelectionPointsForBoundaries(
   }
 }
 
+#if canImport(UIKit)
 @MainActor
 func validatePosition(
   textView: UITextView, position: UITextPosition, direction: UITextStorageDirection
@@ -742,3 +755,4 @@ func validatePosition(
 
   return currentPosition
 }
+#endif

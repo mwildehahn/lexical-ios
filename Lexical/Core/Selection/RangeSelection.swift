@@ -5,8 +5,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
 import LexicalCore
 
 @MainActor
@@ -854,6 +858,7 @@ public class RangeSelection: BaseSelection {
     return try insertNodeIntoTarget(node: node, target: try target.getParentOrThrow())
   }
 
+  #if canImport(UIKit)
   @MainActor
   public func getPlaintext() throws -> String {
     // @alexmattice - replace this with a version driven off a depth first search
@@ -869,6 +874,7 @@ public class RangeSelection: BaseSelection {
       return ""
     }
   }
+  #endif
 
   // MARK: - Internal
 
@@ -1035,6 +1041,7 @@ public class RangeSelection: BaseSelection {
     }
   }
 
+  #if canImport(UIKit)
   @MainActor
   public func deleteCharacter(isBackwards: Bool) throws {
     if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
@@ -1535,12 +1542,30 @@ public class RangeSelection: BaseSelection {
     }
     try removeText()
   }
+  #else
+  // AppKit stubs - text editing operations not yet implemented
+  @MainActor
+  public func deleteCharacter(isBackwards: Bool) throws {
+    fatalError("deleteCharacter not implemented on AppKit")
+  }
+
+  @MainActor
+  public func deleteWord(isBackwards: Bool) throws {
+    fatalError("deleteWord not implemented on AppKit")
+  }
+
+  @MainActor
+  public func deleteLine(isBackwards: Bool) throws {
+    fatalError("deleteLine not implemented on AppKit")
+  }
+  #endif
 
   @MainActor
   internal func removeText() throws {
     try insertText("")
   }
 
+  #if canImport(UIKit)
   @MainActor
   internal func modify(
     alter: NativeSelectionModificationType, isBackward: Bool, granularity: UITextGranularity
@@ -1659,6 +1684,7 @@ public class RangeSelection: BaseSelection {
     self.format = TextFormat()
     self.style = ""
   }
+  #endif
 
   @MainActor
   internal func formatText(formatType: TextFormatType) throws {
