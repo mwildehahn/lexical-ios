@@ -74,21 +74,21 @@ open class DecoratorNode: Node {
   /// Create your view here.
   ///
   /// Do not add it to the view hierarchy or size it; Lexical will do that later.
-  open func createView() -> LexicalView {
+  open func createView() -> LexicalNativeView {
     fatalError("createView: base method not extended")
   }
 
   /// Called by Lexical when reconciling a dirty decorator node. This is where you update your view to match
   /// the state encapsulated in the decorator node.
-  open func decorate(view: LexicalView) {
+  open func decorate(view: LexicalNativeView) {
     fatalError("decorate: base method not extended")
   }
 
-  open func decoratorWillAppear(view: LexicalView) {
+  open func decoratorWillAppear(view: LexicalNativeView) {
     // no-op unless overridden
   }
 
-  open func decoratorDidDisappear(view: LexicalView) {
+  open func decoratorDidDisappear(view: LexicalNativeView) {
     // no-op unless overridden
   }
 

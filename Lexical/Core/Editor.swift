@@ -82,11 +82,11 @@ import LexicalCore
 
 internal enum DecoratorCacheItem {
   case needsCreation
-  case cachedView(LexicalView)
-  case unmountedCachedView(LexicalView)
-  case needsDecorating(LexicalView)
+  case cachedView(LexicalNativeView)
+  case unmountedCachedView(LexicalNativeView)
+  case needsDecorating(LexicalNativeView)
 
-  var view: LexicalView? {
+  var view: LexicalNativeView? {
     switch self {
     case .needsCreation:
       return nil

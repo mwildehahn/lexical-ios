@@ -13,7 +13,7 @@ public typealias LexicalColor = UIColor
 public typealias LexicalFont = UIFont
 public typealias LexicalEdgeInsets = UIEdgeInsets
 public typealias LexicalBezierPath = UIBezierPath
-public typealias LexicalView = UIView
+public typealias LexicalNativeView = UIView
 public typealias LexicalTextStorageDirection = UITextStorageDirection
 public typealias LexicalTextGranularity = UITextGranularity
 
@@ -33,7 +33,7 @@ public typealias LexicalColor = NSColor
 public typealias LexicalFont = NSFont
 public typealias LexicalEdgeInsets = NSEdgeInsets
 public typealias LexicalBezierPath = NSBezierPath
-public typealias LexicalView = NSView
+public typealias LexicalNativeView = NSView
 
 /// Direction for text storage operations (AppKit equivalent)
 public enum LexicalTextStorageDirection: Int {

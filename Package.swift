@@ -54,6 +54,9 @@ let package = Package(
     .library(
       name: "LexicalMarkdown",
       targets: ["LexicalMarkdown"]),
+    .library(
+      name: "LexicalSwiftUI",
+      targets: ["LexicalSwiftUI"]),
   ],
   dependencies: [
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
@@ -92,6 +95,30 @@ let package = Package(
       name: "LexicalAppKit",
       dependencies: ["Lexical"],
       path: "Sources/LexicalAppKit"),
+
+    // MARK: - SwiftUI Targets
+
+    // SwiftUI umbrella module - re-exports platform-specific SwiftUI wrappers
+    .target(
+      name: "LexicalSwiftUI",
+      dependencies: [
+        .target(name: "LexicalSwiftUIUIKit", condition: .when(platforms: [.iOS, .macCatalyst])),
+        .target(name: "LexicalSwiftUIAppKit", condition: .when(platforms: [.macOS])),
+      ],
+      path: "Sources/LexicalSwiftUI"),
+
+    // UIKit SwiftUI wrapper (iOS/Catalyst)
+    .target(
+      name: "LexicalSwiftUIUIKit",
+      dependencies: ["Lexical"],
+      path: "Sources/LexicalSwiftUIUIKit"),
+
+    // AppKit SwiftUI wrapper (macOS)
+    .target(
+      name: "LexicalSwiftUIAppKit",
+      dependencies: ["LexicalAppKit"],
+      path: "Sources/LexicalSwiftUIAppKit"),
+
     .testTarget(
       name: "LexicalTests",
       dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin", "LexicalInlineImagePlugin"],
