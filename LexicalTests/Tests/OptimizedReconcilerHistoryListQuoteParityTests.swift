@@ -1,19 +1,20 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 import XCTest
 @testable import Lexical
 @testable import EditorHistoryPlugin
 @testable import LexicalListPlugin
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class OptimizedReconcilerHistoryListQuoteParityTests: XCTestCase {
 
-  private func makeEditorsWithHistory() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
+  private func makeEditorsWithHistory() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
     let cfgOpt = EditorConfig(theme: Theme(), plugins: [EditorHistoryPlugin()])
     let cfgLeg = EditorConfig(theme: Theme(), plugins: [EditorHistoryPlugin()])
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfgOpt, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfgLeg, featureFlags: FeatureFlags())
+    let opt = makeReadOnlyContext(editorConfig: cfgOpt, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = makeReadOnlyContext(editorConfig: cfgLeg, featureFlags: FeatureFlags())
     return ((opt.editor, opt), (leg.editor, leg))
   }
 
@@ -22,7 +23,7 @@ final class OptimizedReconcilerHistoryListQuoteParityTests: XCTestCase {
     ListPlugin().setUp(editor: opt.0)
     ListPlugin().setUp(editor: leg.0)
 
-    func scenario(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> (String, String) {
+    func scenario(on pair: (Editor, any ReadOnlyTextKitContextProtocol)) throws -> (String, String) {
       let editor = pair.0; let ctx = pair.1
       try editor.update {
         guard let root = getRoot() else { return }
@@ -64,7 +65,7 @@ final class OptimizedReconcilerHistoryListQuoteParityTests: XCTestCase {
   func testParity_UndoRedo_QuoteSplitMerge() throws {
     let (opt, leg) = makeEditorsWithHistory()
 
-    func scenario(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> (String, String) {
+    func scenario(on pair: (Editor, any ReadOnlyTextKitContextProtocol)) throws -> (String, String) {
       let editor = pair.0; let ctx = pair.1
       try editor.update {
         guard let root = getRoot() else { return }
@@ -100,5 +101,3 @@ final class OptimizedReconcilerHistoryListQuoteParityTests: XCTestCase {
     XCTAssertEqual(aRedo, bRedo)
   }
 }
-
-#endif
