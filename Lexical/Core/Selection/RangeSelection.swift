@@ -1827,6 +1827,52 @@ public class RangeSelection: BaseSelection {
     try insertText("")
   }
 
+  /// Apply a selection range from native coordinates to Lexical selection.
+  /// This is cross-platform and can be used on both UIKit and AppKit.
+  @MainActor
+  internal func applySelectionRange(_ range: NSRange, affinity: LexicalTextStorageDirection) throws {
+    guard let editor = getActiveEditor() else {
+      throw LexicalError.invariantViolation("Calling applySelectionRange when no active editor")
+    }
+
+    let anchorOffset = affinity == .forward ? range.location : range.location + range.length
+    let focusOffset = affinity == .forward ? range.location + range.length : range.location
+    if editor.featureFlags.verboseLogging {
+      print("🔥 APPLY-NATIVE: map range=\(NSStringFromRange(range)) → anchorOff=\(anchorOffset) focusOff=\(focusOffset)")
+    }
+
+    if let anchor = try pointAtStringLocation(
+      anchorOffset, searchDirection: affinity, rangeCache: editor.rangeCache),
+      let focus = try pointAtStringLocation(
+        focusOffset, searchDirection: affinity, rangeCache: editor.rangeCache)
+    {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 APPLY-NATIVE: mapped anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
+      }
+      // Guard against mismapped wide ranges (observed at line breaks) when the original
+      // native range length is 1. If the mapped points land on the same TextNode and span
+      // its full content, clamp to 1 char at the intended string offsets.
+      if range.length == 1,
+         anchor.type == .text, focus.type == .text, anchor.key == focus.key,
+         let tn = (try? anchor.getNode()) as? TextNode,
+         abs(anchor.offset - focus.offset) > 1,
+         abs(anchor.offset - focus.offset) >= tn.getTextContentSize() {
+        if editor.featureFlags.verboseLogging {
+          print("🔥 APPLY-NATIVE: clamp mapped len=\(abs(anchor.offset - focus.offset)) → 1 (node=\(anchor.key))")
+        }
+        if let aPt = try? pointAtStringLocation(anchorOffset, searchDirection: .backward, rangeCache: editor.rangeCache),
+           let fPt = try? pointAtStringLocation(focusOffset, searchDirection: .forward, rangeCache: editor.rangeCache) {
+          self.anchor = aPt; self.focus = fPt
+        } else {
+          self.anchor = anchor; self.focus = focus
+        }
+      } else {
+        self.anchor = anchor
+        self.focus = focus
+      }
+    }
+  }
+
   #if canImport(UIKit)
   @MainActor
   internal func modify(
@@ -1875,50 +1921,6 @@ public class RangeSelection: BaseSelection {
     }
     try applySelectionRange(
       range, affinity: range.length == 0 ? .backward : nativeSelection.affinity)
-  }
-
-  @MainActor
-  internal func applySelectionRange(_ range: NSRange, affinity: UITextStorageDirection) throws {
-    guard let editor = getActiveEditor() else {
-      throw LexicalError.invariantViolation("Calling applyNativeSelection when no active editor")
-    }
-
-    let anchorOffset = affinity == .forward ? range.location : range.location + range.length
-    let focusOffset = affinity == .forward ? range.location + range.length : range.location
-    if editor.featureFlags.verboseLogging {
-      print("🔥 APPLY-NATIVE: map range=\(NSStringFromRange(range)) → anchorOff=\(anchorOffset) focusOff=\(focusOffset)")
-    }
-
-    if let anchor = try pointAtStringLocation(
-      anchorOffset, searchDirection: affinity, rangeCache: editor.rangeCache),
-      let focus = try pointAtStringLocation(
-        focusOffset, searchDirection: affinity, rangeCache: editor.rangeCache)
-    {
-      if editor.featureFlags.verboseLogging {
-        print("🔥 APPLY-NATIVE: mapped anchor=\(anchor.key):\(anchor.offset) focus=\(focus.key):\(focus.offset)")
-      }
-      // Guard against mismapped wide ranges (observed at line breaks) when the original
-      // native range length is 1. If the mapped points land on the same TextNode and span
-      // its full content, clamp to 1 char at the intended string offsets.
-      if range.length == 1,
-         anchor.type == .text, focus.type == .text, anchor.key == focus.key,
-         let tn = (try? anchor.getNode()) as? TextNode,
-         abs(anchor.offset - focus.offset) > 1,
-         abs(anchor.offset - focus.offset) >= tn.getTextContentSize() {
-        if editor.featureFlags.verboseLogging {
-          print("🔥 APPLY-NATIVE: clamp mapped len=\(abs(anchor.offset - focus.offset)) → 1 (node=\(anchor.key))")
-        }
-        if let aPt = try? pointAtStringLocation(anchorOffset, searchDirection: .backward, rangeCache: editor.rangeCache),
-           let fPt = try? pointAtStringLocation(focusOffset, searchDirection: .forward, rangeCache: editor.rangeCache) {
-          self.anchor = aPt; self.focus = fPt
-        } else {
-          self.anchor = anchor; self.focus = focus
-        }
-      } else {
-        self.anchor = anchor
-        self.focus = focus
-      }
-    }
   }
 
   @MainActor
