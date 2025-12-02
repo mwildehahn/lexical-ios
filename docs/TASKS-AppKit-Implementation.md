@@ -915,17 +915,24 @@ Many selection operations depend on RangeCache and native NSTextView selection A
   - `affinity` computed property returns `LexicalTextStorageDirection` for cross-platform use
   - New `init(range:lexicalAffinity:...)` for creating with `LexicalTextStorageDirection`
   - Empty `init()` for default selection state
-- [ ] Connect to Editor's selection system (requires more Frontend work)
-- [ ] Verify selection sync between Lexical and NSTextView
+- [x] Connect to Editor's selection system:
+  - `handleSelectionChange()` detects NSTextView selection changes
+  - `notifyLexicalOfSelectionChange()` updates Lexical's RangeSelection
+- [x] Bidirectional selection sync implemented:
+  - Native → Lexical: via `pointAtStringLocation()` and `editor.update()`
+  - Lexical → Native: via `createNativeSelectionAppKit()` and `applyLexicalSelection()`
 
 **Files Modified:**
 - `Lexical/Core/Selection/SelectionUtils.swift` - Made `stringLocationForPoint()` cross-platform and public
 - `Lexical/Core/Selection/RangeSelection.swift` - Made `applySelectionRange()` cross-platform
 - `Lexical/Core/Selection/Point.swift` - Made `isBefore(point:)` public
+- `Lexical/Core/Editor.swift` - Made `rangeCache` public (read)
+- `Lexical/TextKit/RangeCache.swift` - Made `RangeCacheItem` and `pointAtStringLocation()` public
 - `Sources/LexicalAppKit/NativeSelection.swift` - Enhanced with:
   - Affinity support (`affinity` property returning `LexicalTextStorageDirection`)
   - `createNativeSelectionAppKit(from:editor:)` function
   - `applyLexicalSelection(_:editor:)` in TextViewAppKit
+  - `notifyLexicalOfSelectionChange()` for native → Lexical sync
 
 **Files to Reference:**
 - `Lexical/Core/Selection/SelectionUtils.swift` - Utility functions
