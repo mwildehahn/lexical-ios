@@ -4,6 +4,31 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 ---
 
+## Progress Summary
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 | ✅ Complete | Package Structure & Umbrella Module |
+| Phase 2 | ✅ Complete | Extract LexicalCore (via conditional compilation) |
+| Phase 3 | ✅ Complete | Organize LexicalUIKit (conditional compilation) |
+| Phase 4 | ✅ Complete | Create LexicalAppKit |
+| Phase 5 | ✅ Complete | TextKit Layer |
+| Phase 6 | ✅ Complete | Delegate & Plugin System |
+| Phase 7 | ⏸️ Deferred | Testing & Validation |
+| Phase 8 | ⏸️ Optional | SwiftUI Wrappers |
+| Phase 9 | ⏸️ Pending | Documentation & Cleanup |
+
+**Current Status:** Core AppKit implementation complete. `swift build` succeeds on macOS.
+LexicalAppKit provides basic text editing with the Lexical editor on macOS.
+
+**Remaining Work:**
+- Testing infrastructure (Phase 7)
+- SwiftUI wrappers (Phase 8)
+- Documentation and example apps (Phase 9)
+- Full integration testing with a test app
+
+---
+
 ## Before You Begin
 
 **READ THE RFC FIRST:** Before starting any tasks, read the full RFC for context:
@@ -662,6 +687,8 @@ Full AppKit plugin implementations would require additional work (e.g., AppKit v
 
 ## Phase 7: Testing & Validation
 
+**Status: Deferred** - Requires test infrastructure work. Existing tests are iOS-specific.
+
 ### 7.1 Create macOS Test Target
 - [ ] Add macOS test target to Package.swift
 - [ ] Configure test target for macOS platform
@@ -670,6 +697,9 @@ Full AppKit plugin implementations would require additional work (e.g., AppKit v
 - [ ] Identify platform-agnostic tests
 - [ ] Move/copy tests to run on both platforms
 - [ ] Create platform-specific test helpers
+
+**Note:** Most existing tests use UIKit-specific types (LexicalView, LexicalReadOnlyTextKitContext).
+Porting requires creating AppKit test helpers or abstracting test infrastructure.
 
 ### 7.3 Add AppKit-Specific Tests
 - [ ] Test NSTextInputClient implementation
