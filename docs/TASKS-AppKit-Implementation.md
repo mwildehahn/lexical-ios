@@ -1005,37 +1005,75 @@ The Reconciler syncs Lexical's node tree with NSTextStorage. This is the most co
 
 **Current State:** Entirely UIKit-only (`Reconciler.swift`, `OptimizedReconciler.swift`)
 
-**Step 10.4.1: Port Basic Reconciler**
-- [ ] Create `Sources/LexicalAppKit/Reconciler.swift`
-- [ ] Port `reconcile()` function
-- [ ] Port `reconcileNode()` function
-- [ ] Port text node reconciliation logic
-- [ ] Port element node reconciliation logic
-- [ ] Handle decorator node placeholders
+**Analysis Findings:**
+The Reconciler has deep dependencies on the UIKit `Frontend` protocol and internal Editor state:
+
+1. **Frontend Protocol** (`Lexical/LexicalView/FrontendProtocol.swift`):
+   - UIKit-only, provides `textStorage`, `layoutManager`, `viewForDecoratorSubviews`
+   - `LexicalView: UIView, Frontend` conforms and is assigned to `editor.frontend`
+   - Editor accesses text storage via `frontend?.textStorage`
+
+2. **Internal Dependencies** (not accessible from LexicalAppKit):
+   - `editor.dirtyNodes` - internal property
+   - `editor.editorState` / `editor.pendingEditorState` - private properties
+   - `EditorState.nodeMap` - internal property
+   - `editor.rangeCache` setter - internal (set)
+
+3. **Key Challenges:**
+   - Creating an external AppKit reconciler is blocked by access control
+   - Need to either: (a) make internal APIs public, or (b) add reconciler code inside Lexical module
+
+**Recommended Approach:**
+The most practical approach is to make the existing Reconciler cross-platform:
+1. Create AppKit version of `Frontend` protocol inside Lexical module
+2. Add `editor.frontendAppKit` property alongside `editor.frontend`
+3. Update Reconciler to use conditional compilation for platform-specific parts
+4. Keep decorator handling UIKit-only initially (stub out on AppKit)
+
+**Alternative Approach (Simpler):**
+For basic functionality without full reconciler:
+1. Text input already works via command dispatch → selection.insertText()
+2. Changes to EditorState don't update NSTextStorage yet
+3. A minimal "sync on demand" could be added to LexicalViewAppKit
+
+**Step 10.4.1: Create AppKit Frontend Protocol**
+- [ ] Add AppKit version of `Frontend` protocol inside `Lexical/LexicalView/`
+- [ ] Define `FrontendAppKit` protocol with `textStorage: TextStorageAppKit`
+- [ ] Add `editor.frontendAppKit` property
+- [ ] Make `LexicalViewAppKit` conform to `FrontendAppKit` (via internal extension)
+
+**Step 10.4.2: Port Basic Reconciler**
+- [ ] Remove `#if canImport(UIKit)` guard from Reconciler.swift
+- [ ] Add conditional compilation for UIKit vs AppKit paths
+- [ ] Port `updateEditorState()` to use `frontendAppKit` on macOS
+- [ ] Port `reconcileNode()` with cross-platform range cache
+- [ ] Stub decorator handling on AppKit (add later in Phase 10.5)
 - [ ] Verify basic text editing works
 
-**Step 10.4.2: Port Optimized Reconciler (Optional)**
+**Step 10.4.3: Port Optimized Reconciler (Optional)**
 - [ ] Evaluate if optimized reconciler is needed for AppKit
 - [ ] If yes, port `OptimizedReconciler.swift`
 - [ ] Port incremental update logic
 - [ ] Port Fenwick tree integration
 - [ ] Benchmark performance vs basic reconciler
 
-**Step 10.4.3: Port Supporting Infrastructure**
+**Step 10.4.4: Port Supporting Infrastructure**
 - [ ] Port `Mutations.swift` to AppKit
 - [ ] Port `GarbageCollection.swift` to AppKit
 - [ ] Port `ReconcilerShadowCompare.swift` to AppKit (if using optimized reconciler)
 - [ ] Verify node creation/deletion works
 
-**Step 10.4.4: Integrate with Editor**
-- [ ] Update Editor to use AppKit reconciler
-- [ ] Wire up reconciler calls in `update()` block
-- [ ] Wire up reconciler calls in `read()` block
-- [ ] Verify full edit cycle works
+**Step 10.4.5: Verify Full Edit Cycle**
+- [ ] Verify text insertion updates NSTextStorage
+- [ ] Verify text deletion updates NSTextStorage
+- [ ] Verify paragraph insertion works
+- [ ] Verify selection reconciliation works
+- [ ] Run full test suite
 
 **Files to Reference:**
 - `Lexical/Core/Reconciler.swift` - Basic reconciler
 - `Lexical/Core/OptimizedReconciler.swift` - Optimized reconciler
+- `Lexical/LexicalView/FrontendProtocol.swift` - UIKit Frontend protocol
 - `Lexical/Core/Mutations.swift` - Mutation tracking
 - `Lexical/Core/GarbageCollection.swift` - Node cleanup
 
