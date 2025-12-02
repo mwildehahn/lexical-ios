@@ -7,7 +7,6 @@
 
 import Foundation
 import Lexical
-import UIKit
 
 @MainActor
 open class EditorHistoryPlugin: Plugin {

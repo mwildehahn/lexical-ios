@@ -7,7 +7,6 @@
 
 import Foundation
 import Lexical
-import UIKit
 
 public extension CommandType {
   static let undo = CommandType(rawValue: "undo")

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import AVFoundation
 import Foundation
 import Lexical
@@ -119,3 +120,4 @@ public class SelectableImageNode: SelectableDecoratorNode {
     return AVMakeRect(aspectRatio: size, insideRect: CGRect(x: 0, y: 0, width: textViewWidth, height: maxImageHeight)).size
   }
 }
+#endif

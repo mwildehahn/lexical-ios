@@ -7,7 +7,6 @@
 
 import Foundation
 import Lexical
-import UIKit
 
 extension NodeType {
   // don't make this `listItem` keep it all lowercased

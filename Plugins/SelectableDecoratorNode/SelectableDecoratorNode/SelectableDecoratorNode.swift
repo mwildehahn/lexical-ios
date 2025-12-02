@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Lexical
 import UIKit
 
@@ -40,3 +41,4 @@ open class SelectableDecoratorNode: DecoratorNode {
     fatalError("decorateContentView: base method not extended")
   }
 }
+#endif

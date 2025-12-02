@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
 import Lexical
 
@@ -33,3 +34,4 @@ open class InlineImagePlugin: Plugin {
     node is ImageNode
   }
 }
+#endif

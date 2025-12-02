@@ -7,7 +7,6 @@
 
 import Foundation
 import Lexical
-import UIKit
 
 open class CodeHighlightPlugin: Plugin {
   weak var editor: Editor?

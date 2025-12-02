@@ -271,6 +271,43 @@ Instead of fully migrating to LexicalCore, wrapped UIKit-specific code with `#if
 *Technical Debt Note:*
 This approach creates conditional compilation throughout Core files rather than clean separation. This is pragmatic for initial macOS support but should be revisited in favor of proper LexicalCore extraction when time permits.
 
+*Phase F: Plugin Conditional Compilation (Completed)*
+Added conditional compilation to all plugins to enable `swift build` to succeed on macOS:
+
+- [x] Add `Exports.swift` to Lexical target with `@_exported import LexicalCore`
+  - Enables plugins to access LexicalCore types through Lexical module
+- [x] **EditorHistoryPlugin**: Remove unnecessary UIKit import (no actual UIKit usage)
+  - `History.swift`, `HistoryConstants.swift`, `EditorHistoryPlugin.swift`
+- [x] **LexicalListPlugin**: Wrap UIKit-specific code in conditional compilation
+  - `ListPlugin.swift`: Wrap `registerCustomDrawing` block and `UIImpactFeedbackGenerator` usage
+  - `ListItemNode.swift`: Remove unnecessary UIKit import
+  - `ListStyleEvents.swift`: Wrap `resetTypingAttributes` call
+- [x] **LexicalLinkPlugin**: Wrap UIKit-specific code in conditional compilation
+  - `LinkNode.swift`: Remove unnecessary UIKit import
+  - `LinkPlugin.swift`: Wrap `LexicalView` property and usage
+- [x] **LexicalAutoLinkPlugin**: Remove unnecessary UIKit imports
+  - `AutoLinkPlugin.swift`, `AutoLinkNode.swift`
+- [x] **LexicalCodeHighlightPlugin**: Remove unnecessary UIKit import
+  - `CodeHighlightPlugin.swift`
+- [x] **LexicalHTML**: Remove unnecessary UIKit import
+  - `HTMLPlugin.swift`
+- [x] **SelectableDecoratorNode**: Wrap entire file contents in UIKit guards (fully UIKit-dependent)
+  - `SelectableDecoratorNode.swift`, `SelectableDecoratorView.swift`
+- [x] **LexicalInlineImagePlugin**: Wrap UIKit-dependent code
+  - `InlineImagePlugin.swift`: Wrap entire file (depends on ImageNode)
+  - `ImageNode.swift`: Wrap entire file (uses UIImageView, UIImage)
+  - `SelectableImageNode.swift`: Wrap entire file (uses UIKit views)
+- [x] **LexicalTablePlugin**: Wrap entire files in UIKit guards (fully UIKit-dependent)
+  - `TableNode.swift`, `TableNodeView.swift`, `TableNodeScrollableWrapperView.swift`
+- [x] **LexicalMentionsPlugin**: Add cross-platform color support
+  - `MentionNode.swift`: Conditional UIColor/NSColor usage
+- [x] Remove unnecessary UIKit guard from `SelectionHelpers.swift`
+  - Functions use only Foundation/LexicalCore types, no UIKit needed
+- [x] **BUILD SUCCESS: `swift build` now succeeds for all targets on macOS**
+
+*Test Note:*
+Tests are iOS-specific (use UIKit types like `LexicalView`, `LexicalReadOnlyTextKitContext`) and should be run on iOS simulators. macOS test support would require AppKit test infrastructure.
+
 **Step 2.5.3: Move ElementNode.swift**
 - [ ] Copy `Core/Nodes/ElementNode.swift` to `Sources/LexicalCore/Nodes/`
 - [ ] Fix imports (uses Foundation only)

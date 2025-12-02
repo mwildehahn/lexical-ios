@@ -8,7 +8,6 @@
 import Foundation
 import Lexical
 import LexicalLinkPlugin
-import UIKit
 
 struct LinkMatcherResult {
   let index: Int

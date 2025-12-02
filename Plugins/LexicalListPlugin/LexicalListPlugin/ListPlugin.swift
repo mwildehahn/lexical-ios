@@ -7,7 +7,9 @@
 
 import Foundation
 import Lexical
+#if canImport(UIKit)
 import UIKit
+#endif
 
 extension CommandType {
   public static let insertUnorderedList = CommandType(rawValue: "insertUnorderedList")
@@ -58,6 +60,7 @@ open class ListPlugin: Plugin {
           return true
         })
 
+#if canImport(UIKit)
       try editor.registerCustomDrawing(
         customAttribute: .listItem, layer: .text, granularity: .contiguousParagraphs
       ) {
@@ -136,6 +139,7 @@ open class ListPlugin: Plugin {
         }
 
       }
+#endif
     } catch {
       print("\(error)")
     }
@@ -178,10 +182,12 @@ open class ListPlugin: Plugin {
         let isChecked = node.getIsChecked()
         try node.setIsChecked(!isChecked)
 
+#if canImport(UIKit)
         // TODO: make this configurable
         let impact = UIImpactFeedbackGenerator(style: .rigid)
         impact.prepare()
         impact.impactOccurred()
+#endif
         handled = true
       }
     } catch {

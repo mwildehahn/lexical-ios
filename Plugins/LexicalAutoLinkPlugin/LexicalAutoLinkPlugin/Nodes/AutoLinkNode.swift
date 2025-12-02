@@ -5,9 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import Foundation
 import Lexical
 import LexicalLinkPlugin
-import UIKit
 
 extension NodeType {
   public static let autoLink = NodeType(rawValue: "autoLink")

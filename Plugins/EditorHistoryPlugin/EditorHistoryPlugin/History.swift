@@ -7,7 +7,6 @@
 
 import Foundation
 import Lexical
-import UIKit
 
 enum MergeAction {
   case historyMerge

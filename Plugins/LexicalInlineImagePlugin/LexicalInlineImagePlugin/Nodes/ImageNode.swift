@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import AVFoundation
 import Foundation
 import Lexical
@@ -187,3 +188,4 @@ public class ImageNode: DecoratorNode {
     }
   }
 }
+#endif
