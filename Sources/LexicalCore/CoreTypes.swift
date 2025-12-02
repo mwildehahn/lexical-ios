@@ -11,6 +11,17 @@ import Foundation
 
 public typealias NodeKey = String
 
+/// The key used for the root node in EditorState's nodeMap
+public let kRootNodeKey: NodeKey = "root"
+
+// MARK: - LexicalConstants
+
+/// Platform-agnostic constants for Lexical
+public enum LexicalCoreConstants {
+  /// Sentinel value for nodes that haven't been assigned a key yet
+  public static let uninitializedNodeKey: NodeKey = ""
+}
+
 // MARK: - NodeType
 
 public struct NodeType: Hashable, RawRepresentable, Sendable {
