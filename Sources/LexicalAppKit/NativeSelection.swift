@@ -152,11 +152,46 @@ extension TextViewAppKit {
   ///
   /// This method converts a Lexical RangeSelection to native selection coordinates
   /// and updates the text view's selection.
-  public func applyLexicalSelection(_ selection: RangeSelection) {
-    // TODO: Convert Lexical selection coordinates to NSRange
-    // This requires access to the reconciled text storage to map
-    // node keys and offsets to character positions
+  public func applyLexicalSelection(_ selection: RangeSelection, editor: Editor) {
+    guard !isUpdatingNativeSelection else { return }
+
+    do {
+      let nativeSelection = try createNativeSelectionAppKit(from: selection, editor: editor)
+      applySelection(nativeSelection)
+    } catch {
+      // Selection conversion failed - this can happen if nodes aren't in range cache yet
+    }
   }
+}
+
+// MARK: - Native Selection Creation
+
+/// Create a NativeSelectionAppKit from a Lexical RangeSelection.
+///
+/// This function converts Lexical selection points (node key + offset) to native
+/// NSRange coordinates using the Editor's range cache.
+@MainActor
+public func createNativeSelectionAppKit(from selection: RangeSelection, editor: Editor) throws
+  -> NativeSelectionAppKit
+{
+  let isBefore = try selection.anchor.isBefore(point: selection.focus)
+  var affinity: LexicalTextStorageDirection = isBefore ? .forward : .backward
+
+  if selection.anchor == selection.focus {
+    affinity = .forward
+  }
+
+  guard let anchorLocation = try stringLocationForPoint(selection.anchor, editor: editor),
+    let focusLocation = try stringLocationForPoint(selection.focus, editor: editor)
+  else {
+    return NativeSelectionAppKit()
+  }
+
+  let location = isBefore ? anchorLocation : focusLocation
+
+  return NativeSelectionAppKit(
+    range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
+    lexicalAffinity: affinity)
 }
 
 // MARK: - Selection Change Handling

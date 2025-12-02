@@ -24,7 +24,7 @@ public class Point {
   }
 
   @MainActor
-  func isBefore(point b: Point) throws -> Bool {
+  public func isBefore(point b: Point) throws -> Bool {
     var aNode = try getNode()
     var bNode = try b.getNode()
     let aOffset = offset

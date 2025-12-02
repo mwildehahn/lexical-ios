@@ -198,7 +198,7 @@ func editorStateHasDirtySelection(pendingEditorState: EditorState, editor: Edito
 }
 
 @MainActor
-func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
+public func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   let rangeCache = editor.rangeCache
 
   guard let rangeCacheItem = rangeCache[point.key] else { return nil }
