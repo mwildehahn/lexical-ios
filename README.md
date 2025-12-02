@@ -10,6 +10,16 @@ Lexical iOS is in pre-release with no guarantee of support.
 
 For changes between versions, see the [Lexical iOS Changelog](https://github.com/facebook/lexical-ios/blob/main/Lexical/Documentation.docc/Changelog.md).
 
+## Platform Support
+
+Lexical supports multiple Apple platforms:
+
+| Platform | Minimum Version | Target |
+|----------|-----------------|--------|
+| iOS | 16.0+ | `Lexical`, `LexicalSwiftUI` |
+| macOS | 13.0+ | `LexicalAppKit`, `LexicalSwiftUI` |
+| Mac Catalyst | 16.0+ | `Lexical`, `LexicalSwiftUI` |
+
 ## Playground
 
 We have a sample playground app demonstrating some of Lexical's features:
@@ -21,17 +31,105 @@ The playground app contains the code for a rich text toolbar. While this is not 
 This playground app is very new, and many more features will come in time!
 
 ## Requirements
-Lexical iOS is written in Swift, and targets iOS 13 and above. (Note that the Playground app requires at least iOS 14, due to use of UIKit features such as UIMenu.)
+Lexical is written in Swift 5.7+ and requires:
+- iOS 16.0+ / macOS 13.0+ / Mac Catalyst 16.0+
+- Xcode 14.0+
 
-## Building Lexical
-We provide a Swift package file that is sufficient to build Lexical core. Add this as a dependency of your app to use Lexical.
+Note: The Playground app requires at least iOS 14 due to use of UIKit features such as UIMenu.
+
+## Installation
+
+### Swift Package Manager
+
+Add Lexical to your `Package.swift`:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/facebook/lexical-ios.git", from: "0.1.0")
+]
+```
+
+Then add the appropriate target to your dependencies:
+
+```swift
+// For iOS apps (UIKit)
+.target(name: "YourApp", dependencies: ["Lexical"]),
+
+// For macOS apps (AppKit)
+.target(name: "YourApp", dependencies: ["LexicalAppKit"]),
+
+// For SwiftUI apps (any platform)
+.target(name: "YourApp", dependencies: ["LexicalSwiftUI"]),
+```
+
+### Available Targets
+
+| Target | Platform | Description |
+|--------|----------|-------------|
+| `Lexical` | iOS, Catalyst | Main UIKit-based editor |
+| `LexicalAppKit` | macOS | AppKit-based editor |
+| `LexicalSwiftUI` | All | SwiftUI wrappers |
+| `LexicalCore` | All | Core types (nodes, selection, etc.) |
+| `LexicalListPlugin` | iOS | List formatting support |
+| `LexicalLinkPlugin` | iOS | Link support |
+| `LexicalHTML` | iOS | HTML import/export |
+| `LexicalMarkdown` | iOS | Markdown support |
+| `EditorHistoryPlugin` | iOS | Undo/redo support |
 
 Some plugins included in this repository do not yet have package files. (This is because we use a different build system internally at Meta. Adding these would be an easy PR if you want to start contributing to Lexical!)
 
 ## Using Lexical in your app
-For editable text with Lexical, instantiate a `LexicalView`. To configure it with plugins and a theme, you can create an `EditorConfig` to pass in to the `LexicalView`'s initialiser.
 
-To programatically work with the data within your `LexicalView`, you need access to the `Editor`. You can then call `editor.update {}`, and inside that closure you can use the Lexical API.
+### UIKit (iOS)
+
+For editable text with Lexical on iOS, instantiate a `LexicalView`:
+
+```swift
+import Lexical
+
+let config = EditorConfig(theme: Theme(), plugins: [])
+let lexicalView = LexicalView(editorConfig: config, featureFlags: FeatureFlags())
+
+// Access the editor for programmatic updates
+lexicalView.editor.update {
+    // Use the Lexical API here
+}
+```
+
+### AppKit (macOS)
+
+For macOS apps, use `LexicalAppKit`:
+
+```swift
+import LexicalAppKit
+
+let config = EditorConfig(theme: Theme(), plugins: [])
+let lexicalView = LexicalView(editorConfig: config, featureFlags: FeatureFlags())
+
+// Access the editor
+lexicalView.editor.update {
+    // Use the Lexical API here
+}
+```
+
+### SwiftUI (iOS & macOS)
+
+For SwiftUI apps on any platform, use `LexicalSwiftUI`:
+
+```swift
+import LexicalSwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        LexicalEditorView(
+            config: EditorConfig(theme: Theme(), plugins: []),
+            onEditorReady: { editor in
+                // Configure editor
+            }
+        )
+    }
+}
+```
 
 For more information, see the documentation.
 
