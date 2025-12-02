@@ -20,7 +20,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (185 tests)
+- `swift test` passes on macOS (183 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -29,6 +29,13 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 - `LexicalReadOnlyTextKitContextAppKit` ported for parity testing
 - Cross-platform parity tests enabled via shared test utilities
 - `LexicalView` parity tests enabled (Emoji, WordDelete, LineBreak, etc.)
+- Additional parity tests converted to cross-platform:
+  - `OptimizedReconcilerListHTMLExportParityTests`
+  - `OptimizedReconcilerMarkdownParityTests`
+  - `OptimizedReconcilerPlainPasteParityTests`
+  - `OptimizedReconcilerLinkPluginParityTests`
+  - `OptimizedReconcilerLinkHTMLExportParityTests`
+  - `OptimizedReconcilerListBoundaryParityTests`
 
 **Remaining Work:**
 - macOS example app (optional)
@@ -1251,24 +1258,26 @@ Infrastructure in place:
 - `CrossPlatformTestUtilities.swift` - Helper functions for cross-platform tests
 - `InsertParityTests.swift` - First parity test enabled (4 tests pass)
 After completing 10.4:
-- [ ] `OptimizedReconcilerTests.swift`
-- [ ] `OptimizedReconcilerMarkdownParityTests.swift`
-- [ ] `OptimizedReconcilerListHTMLExportParityTests.swift`
-- [ ] `OptimizedReconcilerIndentParityTests.swift`
-- [ ] `OptimizedReconcilerPlainPasteParityTests.swift`
-- [ ] `OptimizedReconcilerHistoryTypingParityTests.swift`
-- [ ] `OptimizedReconcilerInlineFormatToggleSelectionParityTests.swift`
-- [ ] `OptimizedReconcilerRangeDeleteMultiParagraphParityTests.swift`
-- [ ] `OptimizedReconcilerLinkPluginParityTests.swift`
-- [ ] `OptimizedReconcilerLegacyParityReorderTextMixTests.swift`
+- [ ] `OptimizedReconcilerTests.swift` - Uses UIKit-specific APIs
+- [x] `OptimizedReconcilerMarkdownParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerListHTMLExportParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerIndentParityTests.swift` - Already cross-platform
+- [x] `OptimizedReconcilerPlainPasteParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerHistoryTypingParityTests.swift` - Already cross-platform
+- [x] `OptimizedReconcilerInlineFormatToggleSelectionParityTests.swift` - Already cross-platform
+- [ ] `OptimizedReconcilerRangeDeleteMultiParagraphParityTests.swift` - Platform behavior difference (kept UIKit-only)
+- [x] `OptimizedReconcilerLinkPluginParityTests.swift` - Converted to cross-platform
+- [ ] `OptimizedReconcilerLegacyParityReorderTextMixTests.swift` - Uses UIKit-specific APIs
+- [x] `OptimizedReconcilerLinkHTMLExportParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerListBoundaryParityTests.swift` - Converted to cross-platform
 
 **Step 10.8.3: Enable Selection Tests**
 After completing 10.2:
-- [ ] `SelectionClampParityTests.swift`
-- [ ] `RangeCachePointMappingAfterEditsParityTests.swift`
-- [ ] `BackspaceMergeAtParagraphStartParityTests.swift`
-- [ ] `MergeDeleteParityTests.swift`
-- [ ] `EmojiParityTests.swift`
+- [ ] `SelectionClampParityTests.swift` - Uses UIKit-specific APIs
+- [ ] `RangeCachePointMappingAfterEditsParityTests.swift` - Uses UIKit-specific APIs
+- [x] `BackspaceMergeAtParagraphStartParityTests.swift` - Already cross-platform
+- [x] `MergeDeleteParityTests.swift` - Already cross-platform
+- [x] `EmojiParityTests.swift` - Already cross-platform
 
 **Step 10.8.4: Enable Decorator Tests**
 After completing 10.5:
