@@ -86,10 +86,11 @@ let package = Package(
       path: "Sources/LexicalUIKit"),
 
     // AppKit implementation (macOS)
-    // New AppKit implementation will be created here in Phase 4
+    // Depends on Lexical (which includes Editor, EditorConfig) rather than just LexicalCore
+    // The Lexical target builds on macOS via conditional compilation
     .target(
       name: "LexicalAppKit",
-      dependencies: ["LexicalCore"],
+      dependencies: ["Lexical"],
       path: "Sources/LexicalAppKit"),
     .testTarget(
       name: "LexicalTests",

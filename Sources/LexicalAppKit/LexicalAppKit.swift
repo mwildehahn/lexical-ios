@@ -7,9 +7,13 @@
 
 #if os(macOS) && !targetEnvironment(macCatalyst)
 import AppKit
-import LexicalCore
+@_exported import Lexical
 
-// Placeholder for LexicalAppKit
-// AppKit-specific components will be created here in Phase 4
+// LexicalAppKit provides AppKit-specific components for Lexical on macOS.
+//
+// Main types:
+// - LexicalView: The main view for embedding Lexical in an AppKit app
+// - TextViewAppKit: The underlying NSTextView subclass
+// - TextStorageAppKit: Custom NSTextStorage for Lexical integration
 
 #endif
