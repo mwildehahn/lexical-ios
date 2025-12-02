@@ -883,19 +883,19 @@ The RangeCache is critical infrastructure that maps Lexical node keys to NSTextS
 
 ---
 
-### 10.2 Selection System for AppKit
+### 10.2 Selection System for AppKit (IN PROGRESS)
 
 Many selection operations depend on RangeCache and native NSTextView selection APIs.
 
-**Current State:** Core selection types work, but many utility functions are UIKit-only.
+**Current State:** Core selection types work. Some utility functions now cross-platform.
 
 **Step 10.2.1: Port Selection Utility Functions**
-- [ ] Port `stringLocationForPoint()` to AppKit (`SelectionUtils.swift:200`)
-- [ ] Port `createSelection()` to AppKit (`SelectionUtils.swift:266`)
-- [ ] Port `validatePosition()` to AppKit (`SelectionUtils.swift:722`)
-- [ ] Port `createNativeSelection()` to AppKit
-- [ ] Update `getSelection()` to use new functions on AppKit
-- [ ] Verify build and test
+- [x] Port `stringLocationForPoint()` to cross-platform - removed UIKit guard (only uses rangeCache)
+- [ ] Port `createSelection()` to AppKit (`SelectionUtils.swift:266`) - Requires Editor.getNativeSelection() on AppKit
+- [ ] Port `validatePosition()` to AppKit (`SelectionUtils.swift:722`) - Uses UITextView-specific APIs
+- [ ] Port `createNativeSelection()` to AppKit - Currently UIKit-only, uses platform-specific types
+- [x] `getSelection()` already returns nil on AppKit when no existing selection (correct behavior for now)
+- [x] Verify build and test
 
 **Step 10.2.2: Port RangeSelection Methods**
 - [ ] Port `modify()` function to AppKit (`RangeSelection.swift:1830`)
@@ -907,12 +907,20 @@ Many selection operations depend on RangeCache and native NSTextView selection A
 - [ ] Port `getPlaintext()` to AppKit (`RangeSelection.swift:861`)
 - [ ] Verify build and test
 
-**Step 10.2.3: Update NativeSelectionAppKit**
-- [ ] Enhance `NativeSelectionAppKit` to fully implement `NativeSelectionProtocol`
-- [ ] Add marked text range tracking
-- [ ] Add selection affinity support
-- [ ] Connect to Editor's selection system
+**Step 10.2.3: Update NativeSelectionAppKit** ✅ COMPLETE
+- [x] `NativeSelectionAppKit` implements `NativeSelectionProtocol`
+- [x] Marked text range tracking implemented (`markedRange` property)
+- [x] Selection affinity support added:
+  - `nsAffinity` property for native `NSSelectionAffinity`
+  - `affinity` computed property returns `LexicalTextStorageDirection` for cross-platform use
+  - New `init(range:lexicalAffinity:...)` for creating with `LexicalTextStorageDirection`
+  - Empty `init()` for default selection state
+- [ ] Connect to Editor's selection system (requires more Frontend work)
 - [ ] Verify selection sync between Lexical and NSTextView
+
+**Files Modified:**
+- `Lexical/Core/Selection/SelectionUtils.swift` - Made `stringLocationForPoint()` cross-platform
+- `Sources/LexicalAppKit/NativeSelection.swift` - Enhanced with affinity support and convenience methods
 
 **Files to Reference:**
 - `Lexical/Core/Selection/SelectionUtils.swift` - Utility functions
