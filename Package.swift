@@ -10,11 +10,20 @@ import PackageDescription
 
 let package = Package(
   name: "Lexical",
-  platforms: [.iOS(.v16)],
+  platforms: [.iOS(.v16), .macOS(.v13), .macCatalyst(.v16)],
   products: [
     .library(
       name: "Lexical",
       targets: ["Lexical"]),
+    .library(
+      name: "LexicalCore",
+      targets: ["LexicalCore"]),
+    .library(
+      name: "LexicalUIKit",
+      targets: ["LexicalUIKit"]),
+    .library(
+      name: "LexicalAppKit",
+      targets: ["LexicalAppKit"]),
     .library(
       name: "LexicalListPlugin",
       targets: ["LexicalListPlugin"]),
@@ -51,10 +60,37 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-markdown.git", branch: "main"),
   ],
   targets: [
+    // MARK: - Core Lexical Targets
+
+    // Main Lexical target - currently contains all UIKit code at ./Lexical
+    // During migration, code will move to LexicalCore/LexicalUIKit, and this
+    // will become a thin umbrella that re-exports platform-specific targets.
+    // For now, it remains iOS/Catalyst only.
     .target(
       name: "Lexical",
-      dependencies: [],
+      dependencies: ["LexicalCore"],
       path: "./Lexical"),
+
+    // Platform-agnostic core (nodes, selection, reconciler, editor state)
+    // Files will be migrated here in Phase 2
+    .target(
+      name: "LexicalCore",
+      dependencies: [],
+      path: "Sources/LexicalCore"),
+
+    // UIKit implementation (iOS/Catalyst)
+    // Files will be migrated here in Phase 3
+    .target(
+      name: "LexicalUIKit",
+      dependencies: ["LexicalCore"],
+      path: "Sources/LexicalUIKit"),
+
+    // AppKit implementation (macOS)
+    // New AppKit implementation will be created here in Phase 4
+    .target(
+      name: "LexicalAppKit",
+      dependencies: ["LexicalCore"],
+      path: "Sources/LexicalAppKit"),
     .testTarget(
       name: "LexicalTests",
       dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin", "LexicalInlineImagePlugin"],
