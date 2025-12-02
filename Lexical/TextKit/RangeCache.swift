@@ -14,30 +14,32 @@ import LexicalCore
  * is how this information is stored, to save having to regenerate it (an expensive operation).
  */
 
-struct RangeCacheItem {
+public struct RangeCacheItem {
   // Legacy absolute location (TextKit 1)
-  var location: Int = 0
+  public var location: Int = 0
   // Optional index for Fenwick-backed absolute locations (optimized reconciler)
   // 0 indicates unused in this branch.
-  var nodeIndex: Int = 0
+  public var nodeIndex: Int = 0
   // the length of the full preamble, including any special characters
-  var preambleLength: Int = 0
+  public var preambleLength: Int = 0
   // the length of any special characters in the preamble
-  var preambleSpecialCharacterLength: Int = 0
-  var childrenLength: Int = 0
-  var textLength: Int = 0
-  var postambleLength: Int = 0
+  public var preambleSpecialCharacterLength: Int = 0
+  public var childrenLength: Int = 0
+  public var textLength: Int = 0
+  public var postambleLength: Int = 0
 
-  var range: NSRange {
+  public init() {}
+
+  public var range: NSRange {
     NSRange(
       location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 
   // Optimized (Fenwick) helpers — compatibility layer
   @MainActor
-  func locationFromFenwick(using fenwickTree: FenwickTree? = nil) -> Int { location }
+  public func locationFromFenwick(using fenwickTree: FenwickTree? = nil) -> Int { location }
   @MainActor
-  func rangeFromFenwick(using fenwickTree: FenwickTree? = nil) -> NSRange {
+  public func rangeFromFenwick(using fenwickTree: FenwickTree? = nil) -> NSRange {
     NSRange(location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 }
@@ -57,7 +59,7 @@ struct RangeCacheItem {
  * first Text node, or at the start of the second Text node.
  */
 @MainActor
-internal func pointAtStringLocation(
+public func pointAtStringLocation(
   _ location: Int, searchDirection: LexicalTextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> Point? {
   do {
@@ -198,17 +200,17 @@ extension NSRange {
 }
 
 extension RangeCacheItem {
-  func entireRange() -> NSRange {
+  public func entireRange() -> NSRange {
     return NSRange(
       location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
-  func textRange() -> NSRange {
+  public func textRange() -> NSRange {
     return NSRange(location: location + preambleLength + childrenLength, length: textLength)
   }
-  func childrenRange() -> NSRange {
+  public func childrenRange() -> NSRange {
     return NSRange(location: location + preambleLength, length: childrenLength)
   }
-  func selectableRange() -> NSRange {
+  public func selectableRange() -> NSRange {
     return NSRange(
       location: location,
       length: preambleLength + childrenLength + textLength + postambleLength

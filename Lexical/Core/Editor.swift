@@ -146,7 +146,7 @@ public class Editor: NSObject {
   internal var isRecoveringFromError: Bool = false
 
   // See description in RangeCache.swift.
-  internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
+  public internal(set) var rangeCache: [NodeKey: RangeCacheItem] = [:]
   private var dfsOrderCache: [NodeKey]? = nil
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()

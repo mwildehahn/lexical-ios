@@ -214,11 +214,38 @@ extension TextViewAppKit {
 
   /// Notify Lexical that the native selection has changed.
   private func notifyLexicalOfSelectionChange(_ selection: NativeSelectionAppKit) {
-    // TODO: Update Lexical's selection state
-    // This requires:
-    // 1. Converting NSRange to node key + offset
-    // 2. Creating/updating a RangeSelection
-    // 3. Calling editor.update to apply the selection change
+    guard let range = selection.range else { return }
+
+    // Convert native range to Lexical selection points before the update
+    let affinity = selection.affinity
+    let rangeCache = editor.rangeCache
+
+    guard let anchor = try? pointAtStringLocation(
+      range.location, searchDirection: affinity, rangeCache: rangeCache),
+      let focus = try? pointAtStringLocation(
+        range.location + range.length, searchDirection: affinity, rangeCache: rangeCache)
+    else {
+      return
+    }
+
+    // Apply the selection change
+    try? editor.update {
+      // Get or create the selection
+      if let existingSelection = try? getSelection() as? RangeSelection {
+        // Update existing selection
+        existingSelection.anchor.key = anchor.key
+        existingSelection.anchor.offset = anchor.offset
+        existingSelection.anchor.type = anchor.type
+        existingSelection.focus.key = focus.key
+        existingSelection.focus.offset = focus.offset
+        existingSelection.focus.type = focus.type
+        existingSelection.dirty = true
+      } else {
+        // Create new selection
+        let newSelection = RangeSelection(anchor: anchor, focus: focus, format: TextFormat())
+        try? setSelection(newSelection)
+      }
+    }
   }
 }
 
