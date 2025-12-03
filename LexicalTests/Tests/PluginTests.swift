@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -10,6 +7,10 @@
 
 @testable import Lexical
 import XCTest
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 class TestPlugin: Lexical.Plugin {
   internal var listenerCount: Int = 0
@@ -27,20 +28,18 @@ class TestPlugin: Lexical.Plugin {
 class PluginTests: XCTestCase {
 
   func testPluginListener() throws {
-
     let plugin = TestPlugin()
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [plugin]), featureFlags: FeatureFlags())
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: [plugin]), featureFlags: FeatureFlags())
+    let editor = ctx.editor
 
     // Note that Lexical may internally run some updates when setting itself up, so we fetch the baseline number here and compare later.
     let listenerCountBaseValue = plugin.listenerCount
 
-    try view.editor.update {
+    try editor.update {
     }
-    try view.editor.update {
+    try editor.update {
     }
 
     XCTAssertEqual(plugin.listenerCount, listenerCountBaseValue + 2, "Listener count should be 2 more after update")
   }
 }
-
-#endif

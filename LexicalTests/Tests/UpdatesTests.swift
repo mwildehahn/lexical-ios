@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -11,11 +8,19 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 class UpdatesTests: XCTestCase {
 
+  private func makeEditor() -> (Editor, any ReadOnlyTextKitContextProtocol) {
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    return (ctx.editor, ctx)
+  }
+
   func testUpdateNodeMap() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx // Keep context alive
     var node: Node?
 
     try editor.update {
@@ -47,8 +52,7 @@ class UpdatesTests: XCTestCase {
   }
 
   func testEditorStateNotNil() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx
 
     try editor.getEditorState().read {
       let editorState = getActiveEditorState()
@@ -57,8 +61,7 @@ class UpdatesTests: XCTestCase {
   }
 
   func testUpdateListenersIsFired() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx
 
     try editor.update {
       createExampleNodeTree()
@@ -86,8 +89,7 @@ class UpdatesTests: XCTestCase {
   }
 
   func testUpdateListenersCanBeUnsubscribed() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx
 
     try editor.update {
       createExampleNodeTree()
@@ -124,8 +126,7 @@ class UpdatesTests: XCTestCase {
   }
 
   func testTextContentListenersOnlyFireOnTextContentChanges() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx
 
     try editor.update {
       createExampleNodeTree()
@@ -176,8 +177,7 @@ class UpdatesTests: XCTestCase {
   }
 
   func testCommandListenersFireWhenDispatchCommandIsCalled() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx
 
     try editor.update {
       createExampleNodeTree()
@@ -206,8 +206,7 @@ class UpdatesTests: XCTestCase {
   }
 
   func testCommandListenersFiredInPriorityOrder() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx
 
     try editor.update {
       createExampleNodeTree()
@@ -237,5 +236,3 @@ class UpdatesTests: XCTestCase {
     editor.dispatchCommand(type: CommandType.click, payload: nil)
   }
 }
-
-#endif
