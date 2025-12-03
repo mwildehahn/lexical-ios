@@ -56,6 +56,78 @@ class TestEditorView {
     lexicalView
   }
   #endif
+
+  // MARK: - Composition/IME Helpers
+
+  /// The current attributed text string from the text view.
+  var attributedTextString: String {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    return lexicalView.textView.attributedString().string
+    #else
+    return lexicalView.textView.attributedText?.string ?? ""
+    #endif
+  }
+
+  /// The length of the attributed text.
+  var attributedTextLength: Int {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    return lexicalView.textView.attributedString().length
+    #else
+    return lexicalView.textView.attributedText?.length ?? 0
+    #endif
+  }
+
+  /// Set the selected range in the text view.
+  func setSelectedRange(_ range: NSRange) {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    lexicalView.textView.setSelectedRange(range)
+    #else
+    lexicalView.textView.selectedRange = range
+    #endif
+  }
+
+  /// Get the current selected range.
+  var selectedRange: NSRange {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    return lexicalView.textView.selectedRange()
+    #else
+    return lexicalView.textView.selectedRange
+    #endif
+  }
+
+  /// Set marked text (IME composition).
+  /// - Parameters:
+  ///   - text: The marked text string
+  ///   - selectedRange: The selection within the marked text
+  func setMarkedText(_ text: String, selectedRange: NSRange) {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    // AppKit needs replacementRange - use the current selection or marked range
+    let replacement = lexicalView.textView.markedRange().location != NSNotFound
+      ? lexicalView.textView.markedRange()
+      : lexicalView.textView.selectedRange()
+    lexicalView.textView.setMarkedText(text, selectedRange: selectedRange, replacementRange: replacement)
+    #else
+    lexicalView.textView.setMarkedText(text, selectedRange: selectedRange)
+    #endif
+  }
+
+  /// Unmark the currently marked text (end IME composition).
+  func unmarkText() {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    lexicalView.textView.unmarkText()
+    #else
+    lexicalView.textView.unmarkText()
+    #endif
+  }
+
+  /// Whether there is currently marked text (active IME composition).
+  var hasMarkedText: Bool {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    return lexicalView.textView.markedRange().location != NSNotFound
+    #else
+    return lexicalView.markedTextRange != nil
+    #endif
+  }
 }
 
 /// Convenience function to create a test editor view with default configuration.

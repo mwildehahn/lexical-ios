@@ -1,34 +1,35 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class OptimizedReconcilerCompositionParityTests: XCTestCase {
 
-  private func makeViews() -> (opt: LexicalView, leg: LexicalView) {
+  private func makeViews() -> (opt: TestEditorView, leg: TestEditorView) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalView(editorConfig: cfg, featureFlags: FeatureFlags())
+    let opt = TestEditorView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = TestEditorView(editorConfig: cfg, featureFlags: FeatureFlags())
     return (opt, leg)
   }
 
   func testParity_CompositionUpdateReplaceAndEnd() throws {
     let (opt, leg) = makeViews()
 
-    func compose(on view: LexicalView) throws -> String {
-      try view.editor.update {
+    func compose(on testView: TestEditorView) throws -> String {
+      try testView.editor.update {
         guard let root = getRoot() else { return }
         let p = createParagraphNode(); let t = createTextNode(text: "Hello")
         try p.append([t]); try root.append([p])
       }
-      let len = view.textView.attributedText?.length ?? 0
-      view.textView.selectedRange = NSRange(location: len, length: 0)
-      view.textView.setMarkedText("漢", selectedRange: NSRange(location: 1, length: 0))
-      view.textView.setMarkedText("漢字", selectedRange: NSRange(location: 2, length: 0))
-      view.textView.unmarkText()
-      return view.textView.attributedText?.string.trimmingCharacters(in: .newlines) ?? ""
+      let len = testView.attributedTextLength
+      testView.setSelectedRange(NSRange(location: len, length: 0))
+      testView.setMarkedText("漢", selectedRange: NSRange(location: 1, length: 0))
+      testView.setMarkedText("漢字", selectedRange: NSRange(location: 2, length: 0))
+      testView.unmarkText()
+      return testView.attributedTextString.trimmingCharacters(in: .newlines)
     }
 
     let a = try compose(on: opt)
@@ -36,6 +37,3 @@ final class OptimizedReconcilerCompositionParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 }
-
-
-#endif

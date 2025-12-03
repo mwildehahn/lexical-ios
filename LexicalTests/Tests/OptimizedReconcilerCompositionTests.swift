@@ -1,13 +1,14 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class OptimizedReconcilerCompositionTests: XCTestCase {
 
-  private func makeStrictOptimizedContext() -> LexicalReadOnlyTextKitContext {
+  private func makeStrictOptimizedContext() -> (editor: Editor, ctx: any ReadOnlyTextKitContextProtocol) {
     let flags = FeatureFlags(
       reconcilerSanityCheck: false,
       proxyTextViewInputDelegate: false,
@@ -17,12 +18,14 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
       useReconcilerBlockRebuild: true,
       useOptimizedReconcilerStrictMode: true
     )
-    return LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    return (ctx.editor, ctx)
   }
 
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // This test uses onInsertTextFromUITextView which is UIKit-specific
   func testCompositionUpdateReplacesMarkedRange() throws {
-    let ctx = makeStrictOptimizedContext()
-    let editor = ctx.editor
+    let (editor, ctx) = makeStrictOptimizedContext(); _ = ctx // retain context
 
     try editor.update {
       guard let root = getRoot() else { return }
@@ -30,7 +33,7 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
       try p.append([t]); try root.append([p])
     }
 
-    let startLoc = ctx.textStorage.length
+    let startLoc = editor.textStorage?.length ?? 0
     // Start: insert "あ"
     let op1 = MarkedTextOperation(
       createMarkedText: true,
@@ -49,9 +52,10 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
     )
     try onInsertTextFromUITextView(text: "あい", editor: editor, updateMode: UpdateBehaviourModificationMode(suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: op2))
 
-    let s = ctx.textStorage.string
+    let s = editor.textStorage?.string ?? ""
     XCTAssertTrue(s.hasSuffix("Helloあい"), "Expected updated marked text at end; got: \(s)")
   }
+  #endif
 
   func testCompositionEndUnmarksAndKeepsText() throws {
     let flags = FeatureFlags(
@@ -63,25 +67,27 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
       useReconcilerBlockRebuild: true,
       useOptimizedReconcilerStrictMode: true
     )
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
-    let editor = view.editor
+    let testView = TestEditorView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
 
-    try editor.update {
+    try testView.editor.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode(); let t = createTextNode(text: "Hello")
       try p.append([t]); try root.append([p])
     }
 
     // Place caret at end and set marked text twice, then unmark
-    let len = view.textView.attributedText?.length ?? 0
-    view.textView.selectedRange = NSRange(location: len, length: 0)
-    view.textView.setMarkedText("漢", selectedRange: NSRange(location: 1, length: 0))
-    view.textView.setMarkedText("漢字", selectedRange: NSRange(location: 2, length: 0))
-    view.textView.unmarkText()
+    let len = testView.attributedTextLength
+    testView.setSelectedRange(NSRange(location: len, length: 0))
+    testView.setMarkedText("漢", selectedRange: NSRange(location: 1, length: 0))
+    testView.setMarkedText("漢字", selectedRange: NSRange(location: 2, length: 0))
+    testView.unmarkText()
 
-    let final = view.textView.attributedText?.string ?? ""
+    let final = testView.attributedTextString
     XCTAssertEqual(final.trimmingCharacters(in: .newlines), "Hello漢字")
-    XCTAssertNil(view.markedTextRange)
+    #if !os(macOS) || targetEnvironment(macCatalyst)
+    // On UIKit, we can verify the marked text is cleared
+    XCTAssertFalse(testView.hasMarkedText)
+    #endif
   }
 
   func testCompositionEmojiGraphemeCluster() throws {
@@ -96,27 +102,26 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
       useReconcilerBlockRebuild: true,
       useOptimizedReconcilerStrictMode: true
     )
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
-    let editor = view.editor
+    let testView = TestEditorView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
 
-    try editor.update {
+    try testView.editor.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode(); let t = createTextNode(text: "Hello")
       try p.append([t]); try root.append([p])
     }
 
     // Place caret at end and compose emoji
-    let len = view.textView.attributedText?.length ?? 0
-    view.textView.selectedRange = NSRange(location: len, length: 0)
+    let len = testView.attributedTextLength
+    testView.setSelectedRange(NSRange(location: len, length: 0))
 
     // Start composition with base emoji 👍
-    view.textView.setMarkedText("👍", selectedRange: NSRange(location: 1, length: 0))
+    testView.setMarkedText("👍", selectedRange: NSRange(location: 1, length: 0))
     // Update composition to 👍🏽 (adds skin tone modifier)
-    view.textView.setMarkedText("👍🏽", selectedRange: NSRange(location: 2, length: 0))
+    testView.setMarkedText("👍🏽", selectedRange: NSRange(location: 2, length: 0))
     // End composition
-    view.textView.unmarkText()
+    testView.unmarkText()
 
-    let final = view.textView.attributedText?.string ?? ""
+    let final = testView.attributedTextString
     XCTAssertEqual(final.trimmingCharacters(in: .newlines), "Hello👍🏽")
   }
 
@@ -131,10 +136,9 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
       useReconcilerBlockRebuild: true,
       useOptimizedReconcilerStrictMode: true
     )
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
-    let editor = view.editor
+    let testView = TestEditorView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
 
-    try editor.update {
+    try testView.editor.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode(); let t = createTextNode(text: "Hello")
       try p.append([t]); try root.append([p])
@@ -144,16 +148,14 @@ final class OptimizedReconcilerCompositionTests: XCTestCase {
     let family = "👨‍👩‍👧‍👦"            // man ZWJ woman ZWJ girl ZWJ boy
 
     // Place caret at end and compose family emoji via marked text updates
-    let len = view.textView.attributedText?.length ?? 0
-    view.textView.selectedRange = NSRange(location: len, length: 0)
+    let len = testView.attributedTextLength
+    testView.setSelectedRange(NSRange(location: len, length: 0))
 
-    view.textView.setMarkedText(base, selectedRange: NSRange(location: base.lengthAsNSString(), length: 0))
-    view.textView.setMarkedText(family, selectedRange: NSRange(location: family.lengthAsNSString(), length: 0))
-    view.textView.unmarkText()
+    testView.setMarkedText(base, selectedRange: NSRange(location: base.lengthAsNSString(), length: 0))
+    testView.setMarkedText(family, selectedRange: NSRange(location: family.lengthAsNSString(), length: 0))
+    testView.unmarkText()
 
-    let final = view.textView.attributedText?.string ?? ""
+    let final = testView.attributedTextString
     XCTAssertEqual(final.trimmingCharacters(in: .newlines), "Hello\(family)")
   }
 }
-
-#endif
