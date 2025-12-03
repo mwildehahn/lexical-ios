@@ -106,10 +106,14 @@ private struct LexicalEditorViewRepresentable: UIViewRepresentable {
     }
 
     // Set initial editable state
-    lexicalView.isEditable = !options.contains(.readOnly) && isEnabled
+    lexicalView.textView.isEditable = !options.contains(.readOnly) && isEnabled
 
-    // Notify that editor is ready
-    onEditorReady?(lexicalView.editor)
+    // Notify that editor is ready (deferred to allow view setup to complete)
+    if let callback = onEditorReady {
+      DispatchQueue.main.async {
+        callback(lexicalView.editor)
+      }
+    }
 
     return lexicalView
   }
@@ -117,8 +121,8 @@ private struct LexicalEditorViewRepresentable: UIViewRepresentable {
   func updateUIView(_ lexicalView: LexicalView, context: Context) {
     // Update editable state
     let shouldBeEditable = !options.contains(.readOnly) && isEnabled
-    if lexicalView.isEditable != shouldBeEditable {
-      lexicalView.isEditable = shouldBeEditable
+    if lexicalView.textView.isEditable != shouldBeEditable {
+      lexicalView.textView.isEditable = shouldBeEditable
     }
   }
 
