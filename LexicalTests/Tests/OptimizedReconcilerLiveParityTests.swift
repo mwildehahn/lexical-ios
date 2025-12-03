@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -11,18 +8,19 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class OptimizedReconcilerLiveParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let optFlags = FeatureFlags.optimizedProfile(.aggressiveEditor)
-    let legFlags = FeatureFlags()
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: optFlags)
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legFlags)
-    return ((opt.editor, opt), (leg.editor, leg))
+  private func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
+    return makeParityTestEditors()
   }
 
+  // UIKit-only: AppKit has extra newline prefix in empty editor (known parity difference)
+  #if !os(macOS) || targetEnvironment(macCatalyst)
   func testParity_BackspaceSingleChar() throws {
     let (opt, leg) = makeEditors()
 
@@ -104,8 +102,7 @@ final class OptimizedReconcilerLiveParityTests: XCTestCase {
 
   func testReadOnlyBackspaceAndForwardDelete_Fallback() throws {
     // Verify deleteCharacter() behaves correctly in read-only frontend without native selection movement.
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let ro = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags())
+    let ro = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
     let editor = ro.editor
 
     // Backspace at end → remove last character
@@ -128,6 +125,7 @@ final class OptimizedReconcilerLiveParityTests: XCTestCase {
     try editor.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: false) }
     try editor.read { XCTAssertEqual(getRoot()?.getTextContent(), "ey") }
   }
+  #endif
 
   func testParity_BackspaceAtStartMergesParagraphs() throws {
     let (opt, leg) = makeEditors()
@@ -186,6 +184,8 @@ final class OptimizedReconcilerLiveParityTests: XCTestCase {
     if aCaret >= 0 && bCaret >= 0 { XCTAssertEqual(aCaret, bCaret) }
   }
 
+  // UIKit-only: AppKit has extra newline prefix in empty editor (known parity difference)
+  #if !os(macOS) || targetEnvironment(macCatalyst)
   func testParity_SplitParagraphAtMiddle() throws {
     let (opt, leg) = makeEditors()
 
@@ -233,6 +233,7 @@ final class OptimizedReconcilerLiveParityTests: XCTestCase {
     XCTAssertEqual(a, b)
     XCTAssertEqual(a, "HelloWorld")
   }
+  #endif
 
   func testParity_GraphemeClusterBackspace() throws {
     // Family emoji is a multi-scalar ZWJ sequence; backspace should remove it as one character.
@@ -256,5 +257,3 @@ final class OptimizedReconcilerLiveParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 }
-
-#endif

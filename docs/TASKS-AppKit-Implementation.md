@@ -20,13 +20,15 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (195 tests)
+- `swift test` passes on macOS (209 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
 - `deleteCharacter`, `deleteWord`, `deleteLine` implemented for AppKit
 - SelectionTests enabled for AppKit (19 additional tests)
 - `LexicalReadOnlyTextKitContextAppKit` ported for parity testing
+- `OptimizedReconcilerLiveParityTests` converted to cross-platform (3 tests pass)
+- `OptimizedReconcilerListPluginParityTests` converted to cross-platform (2 tests pass)
 - Cross-platform parity tests enabled via shared test utilities
 - `LexicalView` parity tests enabled (Emoji, WordDelete, LineBreak, etc.)
 - Additional parity tests converted to cross-platform:
@@ -1259,6 +1261,8 @@ Infrastructure in place:
 - `InsertParityTests.swift` - First parity test enabled (4 tests pass)
 After completing 10.4:
 - [ ] `OptimizedReconcilerTests.swift` - Uses UIKit-specific APIs
+- [x] `OptimizedReconcilerLiveParityTests.swift` - Converted to cross-platform (3 tests pass, 6 tests UIKit-only due to newline parity)
+- [x] `OptimizedReconcilerListPluginParityTests.swift` - Converted to cross-platform (2 tests pass)
 - [x] `OptimizedReconcilerMarkdownParityTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerListHTMLExportParityTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerIndentParityTests.swift` - Already cross-platform
