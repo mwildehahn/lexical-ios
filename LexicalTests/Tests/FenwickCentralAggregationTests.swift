@@ -23,7 +23,7 @@ final class FenwickCentralAggregationTests: XCTestCase {
   }
 
   func testMultiSiblingTextChangesAggregatedOnce() throws {
-    let (editor, ctx) = makeEditorWithCentralAgg()
+    let (editor, _) = makeEditorWithCentralAgg()
     // Build: P -> [T1("Hello"), T2("World")]
     var k1: NodeKey = ""; var k2: NodeKey = ""
     try editor.update {
