@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -12,12 +9,25 @@ import XCTest
 
 @testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 class EditorStateTests: XCTestCase {
 
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  private func makeView() -> LexicalAppKit.LexicalView {
+    LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+  }
+  #else
+  private func makeView() -> Lexical.LexicalView {
+    Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+  }
+  #endif
+
   func testReadReturnsCorrectState() throws {
-    let view = LexicalView(
-      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = makeView()
     let editor = view.editor
 
     try editor.update {
@@ -45,8 +55,7 @@ class EditorStateTests: XCTestCase {
   }
 
   func testNodeKeyMultiplier() throws {
-    let view = LexicalView(
-      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = makeView()
     let editor = view.editor
 
     try editor.update {
@@ -99,8 +108,7 @@ class EditorStateTests: XCTestCase {
   }
 
   func testMigrations() throws {
-    let view = LexicalView(
-      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = makeView()
     let editor = view.editor
 
     try editor.update {
@@ -141,20 +149,26 @@ class EditorStateTests: XCTestCase {
   }
 
   func testEditorStateVersionDefault() throws {
-    let view = LexicalView(
-      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = makeView()
     let editor = view.editor
 
     XCTAssertEqual(editor.getEditorState().version, 1)
   }
 
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  private func makeViewWithVersion(_ version: Int) -> LexicalAppKit.LexicalView {
+    LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [], editorStateVersion: version), featureFlags: FeatureFlags())
+  }
+  #else
+  private func makeViewWithVersion(_ version: Int) -> Lexical.LexicalView {
+    Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [], editorStateVersion: version), featureFlags: FeatureFlags())
+  }
+  #endif
+
   func testEditorStateVersion() throws {
-    let view = LexicalView(
-      editorConfig: EditorConfig(theme: Theme(), plugins: [], editorStateVersion: 2), featureFlags: FeatureFlags())
+    let view = makeViewWithVersion(2)
     let editor = view.editor
 
     XCTAssertEqual(editor.getEditorState().version, 2)
   }
 }
-
-#endif
