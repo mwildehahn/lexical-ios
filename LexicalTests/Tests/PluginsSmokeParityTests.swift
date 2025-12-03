@@ -1,15 +1,23 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 import XCTest
 @testable import Lexical
 @testable import LexicalAutoLinkPlugin
 @testable import EditorHistoryPlugin
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class PluginsSmokeParityTests: XCTestCase {
 
-  private func makeEditorsWithPlugins(_ plugins: [Plugin]) -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
+  private func makeEditorsWithPlugins(_ plugins: [Plugin]) -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
     let cfgOpt = EditorConfig(theme: Theme(), plugins: plugins)
     let flagsOpt = FeatureFlags(
       reconcilerSanityCheck: false,
@@ -23,8 +31,8 @@ final class PluginsSmokeParityTests: XCTestCase {
     )
     let cfgLeg = EditorConfig(theme: Theme(), plugins: plugins)
     let flagsLeg = FeatureFlags(reconcilerSanityCheck: false, proxyTextViewInputDelegate: false, useOptimizedReconciler: false)
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfgOpt, featureFlags: flagsOpt)
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfgLeg, featureFlags: flagsLeg)
+    let optCtx = makeReadOnlyContext(editorConfig: cfgOpt, featureFlags: flagsOpt)
+    let legCtx = makeReadOnlyContext(editorConfig: cfgLeg, featureFlags: flagsLeg)
     return ((optCtx.editor, optCtx), (legCtx.editor, legCtx))
   }
 
@@ -64,8 +72,8 @@ final class PluginsSmokeParityTests: XCTestCase {
       useOptimizedReconcilerStrictMode: true
     )
     let legFlags = FeatureFlags(reconcilerSanityCheck: false, proxyTextViewInputDelegate: false, useOptimizedReconciler: false)
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfgOpt, featureFlags: optFlags)
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfgLeg, featureFlags: legFlags)
+    let optCtx = makeReadOnlyContext(editorConfig: cfgOpt, featureFlags: optFlags)
+    let legCtx = makeReadOnlyContext(editorConfig: cfgLeg, featureFlags: legFlags)
     let opt = (optCtx.editor, optCtx)
     let leg = (legCtx.editor, legCtx)
 
@@ -98,5 +106,3 @@ final class PluginsSmokeParityTests: XCTestCase {
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
 }
-
-#endif
