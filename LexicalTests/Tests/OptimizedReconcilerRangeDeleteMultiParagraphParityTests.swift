@@ -1,4 +1,5 @@
-// This test has platform-specific behavior differences and is only available on iOS/Catalyst
+// This test exposes AppKit parity difference - extra newline prefix
+// TODO: Investigate AppKit range delete behavior
 #if !os(macOS) || targetEnvironment(macCatalyst)
 
 import XCTest
@@ -42,6 +43,5 @@ final class OptimizedReconcilerRangeDeleteMultiParagraphParityTests: XCTestCase 
     XCTAssertEqual(a, "AACC")
   }
 }
-
 
 #endif

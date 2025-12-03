@@ -1,4 +1,5 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
+// This test exposes AppKit parity difference - extra newline prefix
+// TODO: Investigate AppKit paragraph behavior
 #if !os(macOS) || targetEnvironment(macCatalyst)
 
 /*
