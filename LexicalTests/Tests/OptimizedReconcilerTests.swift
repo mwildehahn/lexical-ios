@@ -1,14 +1,19 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
+// Cross-platform optimized reconciler tests
 
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+import AppKit
+#else
 import UIKit
+#endif
 
 @MainActor
 final class OptimizedReconcilerTests: XCTestCase {
 
-  func makeEditorWithFrontend() -> (Editor, LexicalReadOnlyTextKitContext) {
+  func makeEditorWithFrontend() -> (Editor, any ReadOnlyTextKitContextProtocol) {
     let flags = FeatureFlags(
       reconcilerSanityCheck: false,
       proxyTextViewInputDelegate: false,
@@ -17,8 +22,13 @@ final class OptimizedReconcilerTests: XCTestCase {
       useReconcilerKeyedDiff: false,
       useReconcilerBlockRebuild: false
     )
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    let ctx = LexicalReadOnlyTextKitContextAppKit(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    #else
     let ctx = LexicalReadOnlyTextKitContext(
       editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    #endif
     return (ctx.editor, ctx)
   }
 
@@ -118,8 +128,22 @@ final class OptimizedReconcilerTests: XCTestCase {
       XCTFail("Expected Hello and World in string")
     }
   }
+
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // This test uses UIFont which is UIKit-specific
   func testAttributeOnlyFastPathBold() throws {
-    let (editor, frontend) = makeEditorWithFrontend()
+    let flags = FeatureFlags(
+      reconcilerSanityCheck: false,
+      proxyTextViewInputDelegate: false,
+      useOptimizedReconciler: true,
+      useReconcilerFenwickDelta: true,
+      useReconcilerKeyedDiff: false,
+      useReconcilerBlockRebuild: false
+    )
+    let ctx = LexicalReadOnlyTextKitContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let editor = ctx.editor
+    let frontend = ctx
 
     try editor.update {
       guard let root = getRoot() else { return }
@@ -159,6 +183,7 @@ final class OptimizedReconcilerTests: XCTestCase {
     }
   }
 
+  // This test uses onInsertTextFromUITextView which is UIKit-specific
   func testCompositionStartInsertsMarkedText() throws {
     // Strict mode to avoid legacy fallback
     let flags = FeatureFlags(
@@ -195,6 +220,5 @@ final class OptimizedReconcilerTests: XCTestCase {
     XCTAssertTrue(frontend.textStorage.string.contains("Hello"))
     XCTAssertTrue(frontend.textStorage.string.contains("あ"))
   }
+  #endif
 }
-
-#endif
