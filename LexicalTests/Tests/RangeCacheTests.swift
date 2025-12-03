@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -11,10 +8,24 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 class RangeCacheTests: XCTestCase {
 
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  private func makeView() -> LexicalAppKit.LexicalView {
+    LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+  }
+  #else
+  private func makeView() -> Lexical.LexicalView {
+    Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+  }
+  #endif
+
   func testSearchRangeCacheForPoints() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = makeView()
     let editor = view.editor
 
     try editor.update {
@@ -67,7 +78,7 @@ class RangeCacheTests: XCTestCase {
   }
 
   func testSearchRangeCacheForLastParagraphWithNoChildren() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = makeView()
     let editor = view.editor
 
     try editor.update {
@@ -111,5 +122,3 @@ class RangeCacheTests: XCTestCase {
     }
   }
 }
-
-#endif
