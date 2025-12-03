@@ -1,13 +1,16 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
+// Cross-platform shadow compare scenario tests
 
 import XCTest
 @testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class ShadowCompareScenarioTests: XCTestCase {
 
-  func makeShadowEditors() -> (Editor, LexicalReadOnlyTextKitContext) {
+  func makeShadowEditors() -> (Editor, any ReadOnlyTextKitContextProtocol) {
     let flags = FeatureFlags(
       reconcilerSanityCheck: false,
       proxyTextViewInputDelegate: false,
@@ -18,7 +21,11 @@ final class ShadowCompareScenarioTests: XCTestCase {
       useOptimizedReconcilerStrictMode: true,
       useReconcilerShadowCompare: true
     )
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    let ctx = LexicalReadOnlyTextKitContextAppKit(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    #else
     let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    #endif
     return (ctx.editor, ctx)
   }
 
@@ -39,11 +46,11 @@ final class ShadowCompareScenarioTests: XCTestCase {
     }
 
     // Scenario B: reorder with decorator present
-    try editor.registerNode(nodeType: .testNode, class: TestDecoratorNode.self)
+    try registerTestDecoratorNode(on: editor)
     try editor.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode()
-      try p.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
+      try p.append([ createTextNode(text: "A"), TestDecoratorNodeCrossplatform(), createTextNode(text: "B") ])
       try root.append([p])
     }
     try editor.update {
@@ -124,5 +131,3 @@ final class ShadowCompareScenarioTests: XCTestCase {
     XCTAssertFalse(frontend.textStorage.string.isEmpty)
   }
 }
-
-#endif
