@@ -1,12 +1,13 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
+
+// UIKit-only: This test relies on UIKit-specific text input behavior
+// (select all + insert replaces text) that works differently on AppKit
+#if !os(macOS) || targetEnvironment(macCatalyst)
 
 @testable import Lexical
 import XCTest

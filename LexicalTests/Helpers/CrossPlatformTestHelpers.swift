@@ -128,6 +128,58 @@ class TestEditorView {
     return lexicalView.markedTextRange != nil
     #endif
   }
+
+  /// Insert text at the current selection, replacing any selected text.
+  func insertText(_ text: String) {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    // On AppKit, use insertText with the current selection as replacement range
+    // This properly goes through Lexical's text input handling
+    lexicalView.textView.insertText(text, replacementRange: lexicalView.textView.selectedRange())
+    #else
+    lexicalView.textView.insertText(text)
+    #endif
+  }
+
+  /// The plain text content of the text view.
+  var text: String {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    return lexicalView.textView.string
+    #else
+    return lexicalView.textView.text ?? ""
+    #endif
+  }
+
+  /// Delete backward (like pressing backspace).
+  func deleteBackward() {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    lexicalView.textView.deleteBackward(nil)
+    #else
+    lexicalView.textView.deleteBackward()
+    #endif
+  }
+
+  /// Delete forward (like pressing delete key).
+  func deleteForward() {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    lexicalView.textView.deleteForward(nil)
+    #else
+    // UITextView doesn't have deleteForward, simulate with selection
+    let range = lexicalView.textView.selectedRange
+    if range.length == 0 && range.location < (lexicalView.textView.text?.count ?? 0) {
+      lexicalView.textView.selectedRange = NSRange(location: range.location, length: 1)
+      lexicalView.textView.insertText("")
+    }
+    #endif
+  }
+
+  /// The text storage length.
+  var textStorageLength: Int {
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    return lexicalView.textView.textStorage?.length ?? 0
+    #else
+    return lexicalView.textView.textStorage.length
+    #endif
+  }
 }
 
 /// Convenience function to create a test editor view with default configuration.

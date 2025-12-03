@@ -1,4 +1,4 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
+// UIKit-only: Tests decoratorPositionCache which is a UIKit TextStorage property
 #if !os(macOS) || targetEnvironment(macCatalyst)
 
 import XCTest
@@ -58,12 +58,11 @@ final class DecoratorPositionCacheTests: XCTestCase {
     var k1 = ""; var k2 = ""; var k3 = ""
     try editor.update {
       guard let root = getRoot() else { return }
-      let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
+      let p1 = createParagraphNode(); _ = createTextNode(text: "Hello")
       let p2 = createParagraphNode(); let t2 = createTextNode(text: "World")
-      let d1 = TestInlineDecorator(); k1 = d1.getKey()          // start of p1
-      let d2 = TestInlineDecorator(); k2 = d2.getKey()          // middle of p1
-      let d3 = TestInlineDecorator(); k3 = d3.getKey()          // start of p2
-      // Build p1 = [d1, "He", d2, "llo"] directly (no clear/remove)
+      let d1 = TestInlineDecorator(); k1 = d1.getKey()
+      let d2 = TestInlineDecorator(); k2 = d2.getKey()
+      let d3 = TestInlineDecorator(); k3 = d3.getKey()
       let left = createTextNode(text: "He"); let right = createTextNode(text: "llo")
       try p1.append([d1, left, d2, right])
       try p2.append([d3, t2])
