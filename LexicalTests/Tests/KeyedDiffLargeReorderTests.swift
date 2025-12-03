@@ -58,18 +58,20 @@ final class KeyedDiffLargeReorderTests: XCTestCase {
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
 
-  // UIKit-only: Uses TestDecoratorNode which is UIKit-specific
-  #if !os(macOS) || targetEnvironment(macCatalyst)
   func testDecoratorInterleavedReorderParity() throws {
     let (opt, leg) = makeEditors()
 
     func buildMixed(_ editor: Editor) throws {
-      try editor.registerNode(nodeType: .testNode, class: TestDecoratorNode.self)
+      try registerTestDecoratorNode(on: editor)
       try editor.update {
         guard let root = getRoot() else { return }
         let p = createParagraphNode()
         // T, D, T, D, T, D
-        try p.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B"), TestDecoratorNode(), createTextNode(text: "C"), TestDecoratorNode() ])
+        try p.append([
+          createTextNode(text: "A"), TestDecoratorNodeCrossplatform(),
+          createTextNode(text: "B"), TestDecoratorNodeCrossplatform(),
+          createTextNode(text: "C"), TestDecoratorNodeCrossplatform()
+        ])
         try root.append([p])
       }
     }
@@ -91,5 +93,4 @@ final class KeyedDiffLargeReorderTests: XCTestCase {
 
     XCTAssertEqual(opt.1.textStorage.string, leg.1.textStorage.string)
   }
-  #endif
 }
