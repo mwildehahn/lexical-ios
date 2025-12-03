@@ -9,6 +9,9 @@ import Foundation
 import Lexical
 #if canImport(UIKit)
 import UIKit
+#elseif os(macOS)
+import AppKit
+import LexicalAppKit
 #endif
 
 extension CommandType {
@@ -131,6 +134,93 @@ open class ListPlugin: Plugin {
             let height = attributes[.checkRectHeight] as? CGFloat ?? bulletDrawRect.height
             let imageRect = CGRect(
               x: bulletDrawRect.minX, y: bulletDrawRect.minY, width: height, height: height)
+            tintedImage.draw(in: imageRect)
+          }
+        } else {
+          // For bullet and number lists, use the existing drawing method
+          attributeValue.listItemCharacter.draw(in: bulletDrawRect, withAttributes: attributes)
+        }
+
+      }
+#elseif os(macOS)
+      try editor.registerCustomDrawing(
+        customAttribute: .listItem, layer: .text, granularity: .contiguousParagraphs
+      ) {
+        attributeKey, attributeValue, layoutManager, characterRange, expandedCharRange, glyphRange,
+        rect, firstLineFragment in
+
+        guard let attributeValue = attributeValue as? ListItemAttribute,
+          let textStorage = layoutManager.textStorage as? TextStorageAppKit
+        else {
+          return
+        }
+
+        // we only want to do the drawing if we're the first character in a paragraph.
+        if characterRange.location != 0
+          && (textStorage.string as NSString).substring(
+            with: NSRange(location: characterRange.location - 1, length: 1)) != "\n"
+        {
+          return
+        }
+
+        let isFirstLine = (glyphRange.location == 0)
+
+        var attributes = textStorage.attributes(at: characterRange.location, effectiveRange: nil)
+
+        var spacingBefore = 0.0
+        if let paragraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle,
+          let mutableParagraphStyle = paragraphStyle.mutableCopy() as? NSMutableParagraphStyle
+        {
+          mutableParagraphStyle.headIndent = 0
+          mutableParagraphStyle.firstLineHeadIndent = 0
+          mutableParagraphStyle.tailIndent = 0
+          spacingBefore = isFirstLine ? 0 : paragraphStyle.paragraphSpacingBefore
+          mutableParagraphStyle.paragraphSpacingBefore = 0
+          attributes[.paragraphStyle] = mutableParagraphStyle
+        }
+        attributes.removeValue(forKey: .underlineStyle)
+        attributes.removeValue(forKey: .strikethroughStyle)
+        // Manual inset calculation for AppKit (CGRect.inset(by:) doesn't take NSEdgeInsets)
+        let bulletDrawRect = CGRect(
+          x: firstLineFragment.minX + attributeValue.characterIndentationPixels,
+          y: firstLineFragment.minY + spacingBefore,
+          width: firstLineFragment.width - attributeValue.characterIndentationPixels,
+          height: firstLineFragment.height - spacingBefore
+        )
+
+        if attributeValue.listType == .check {
+          let theme = editor.getTheme()
+
+          let attributes: [NSAttributedString.Key: Any] = theme.listItem ?? [:]
+          let checkedAtributes: [NSAttributedString.Key: Any] = theme.checkedListItem ?? [:]
+          let uncheckedSymbolName = attributes[.checkSymbolName] as? String ?? "square"
+          let checkedSymbolName =
+            checkedAtributes[.checkSymbolName] as? String ?? "checkmark.square.fill"
+
+          let symbolName = attributeValue.isChecked ? checkedSymbolName : uncheckedSymbolName
+          if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+
+            let checkForegroundColor =
+              attributes[.checkForegroundColor] as? NSColor ?? NSColor.labelColor
+            let checkedCheckForegroundColor =
+              checkedAtributes[.checkForegroundColor] as? NSColor ?? NSColor.labelColor
+
+            let textColor =
+              attributeValue.isChecked ? checkedCheckForegroundColor : checkForegroundColor
+
+            let height = attributes[.checkRectHeight] as? CGFloat ?? bulletDrawRect.height
+            let imageRect = CGRect(
+              x: bulletDrawRect.minX, y: bulletDrawRect.minY, width: height, height: height)
+
+            // Draw tinted image
+            let tintedImage = image.copy() as! NSImage
+            tintedImage.lockFocus()
+            textColor.set()
+            let imageSize = tintedImage.size
+            NSRect(origin: .zero, size: imageSize).fill(using: .sourceAtop)
+            tintedImage.unlockFocus()
+            tintedImage.isTemplate = false
+
             tintedImage.draw(in: imageRect)
           }
         } else {

@@ -9,6 +9,9 @@ import Foundation
 import Lexical
 #if canImport(UIKit)
 import UIKit
+#elseif os(macOS)
+import AppKit
+import LexicalAppKit
 #endif
 
 extension CommandType {
@@ -31,9 +34,7 @@ open class LinkPlugin: Plugin {
   public init() {}
 
   weak var editor: Editor?
-#if canImport(UIKit)
   public weak var lexicalView: LexicalView?
-#endif
 
   public func setUp(editor: Editor) {
     self.editor = editor
@@ -86,9 +87,7 @@ open class LinkPlugin: Plugin {
         try toggleLink(url: linkPayload?.urlString)
         modifiedSelection = try getSelection()?.clone()
       }
-#if canImport(UIKit)
-      lexicalView?.textViewBecomeFirstResponder()
-#endif
+      _ = lexicalView?.textViewBecomeFirstResponder()
       try editor.update {
         getActiveEditorState()?.selection = modifiedSelection
       }

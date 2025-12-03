@@ -143,17 +143,19 @@ open class DecoratorNode: Node {
   }
 
   override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
-    #if canImport(UIKit)
-    let textAttachment = TextAttachment()
-
     guard let editor = getActiveEditor() else { return [:] }
 
+    #if canImport(UIKit)
+    let textAttachment = TextAttachment()
     textAttachment.editor = editor
     textAttachment.key = key
-
+    return [.attachment: textAttachment]
+    #elseif os(macOS)
+    let textAttachment = TextAttachmentAppKit()
+    textAttachment.editor = editor
+    textAttachment.key = key
     return [.attachment: textAttachment]
     #else
-    // AppKit decorator support not yet implemented
     return [:]
     #endif
   }

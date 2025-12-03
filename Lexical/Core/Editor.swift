@@ -244,7 +244,7 @@ public class Editor: NSObject {
     super.init()
     initializePlugins(plugins)
 
-    #if canImport(UIKit)
+    #if canImport(UIKit) || os(macOS)
     // registering custom drawing for built in nodes
     try? registerCustomDrawing(
       customAttribute: .inlineCodeBackgroundColor, layer: .background, granularity: .characterRuns,
@@ -465,6 +465,33 @@ public class Editor: NSObject {
 
   internal var customDrawingBackground: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
   internal var customDrawingText: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
+
+  public func registerCustomDrawing(
+    customAttribute: NSAttributedString.Key, layer: CustomDrawingLayer,
+    granularity: CustomDrawingGranularity, handler: @escaping CustomDrawingHandler
+  ) throws {
+    switch layer {
+    case .text:
+      customDrawingText[customAttribute] = CustomDrawingHandlerInfo(
+        customDrawingHandler: handler, granularity: granularity)
+    case .background:
+      customDrawingBackground[customAttribute] = CustomDrawingHandlerInfo(
+        customDrawingHandler: handler, granularity: granularity)
+    }
+  }
+  #elseif os(macOS)
+  public struct CustomDrawingHandlerInfo {
+    public let customDrawingHandler: CustomDrawingHandler
+    public let granularity: CustomDrawingGranularity
+
+    public init(customDrawingHandler: @escaping CustomDrawingHandler, granularity: CustomDrawingGranularity) {
+      self.customDrawingHandler = customDrawingHandler
+      self.granularity = granularity
+    }
+  }
+
+  public var customDrawingBackground: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
+  public var customDrawingText: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
 
   public func registerCustomDrawing(
     customAttribute: NSAttributedString.Key, layer: CustomDrawingLayer,
@@ -857,6 +884,151 @@ public class Editor: NSObject {
       }
     }
   }
+  #elseif os(macOS)
+  internal func frontendDidUnattachView() {
+    self.log(.editor, .verbose)
+    unmountDecoratorSubviewsIfNecessary()
+  }
+  internal func frontendDidAttachView() {
+    self.log(.editor, .verbose)
+    mountDecoratorSubviewsIfNecessary()
+  }
+
+  var isMounting = false
+  internal func mountDecoratorSubviewsIfNecessary() {
+    if isMounting {
+      return
+    }
+    isMounting = true
+    defer {
+      isMounting = false
+    }
+
+    guard let superview = frontendAppKit?.viewForDecoratorSubviews else {
+      self.log(.editor, .verbose, "No view for mounting decorator subviews.")
+      return
+    }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: begin cache.count=\(decoratorCache.count) ts.len=\(textStorage?.length ?? -1)")
+    }
+    try? self.read {
+      for (nodeKey, decoratorCacheItem) in decoratorCache {
+        switch decoratorCacheItem {
+        case .needsCreation:
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: create key=\(nodeKey)") }
+          guard let view = decoratorView(forKey: nodeKey, createIfNecessary: true),
+            let node = getNodeByKey(key: nodeKey) as? DecoratorNode
+          else {
+            break
+          }
+          view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
+          superview.addSubview(view)
+          node.decoratorWillAppear(view: view)
+          decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            // Always invalidate layout so TextKit positions and unhides the decorator immediately,
+            // regardless of dynamic sizing. Legacy reconciler relies on this for first-frame render.
+            frontendAppKit?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            // Proactively ensure layout for the affected glyphs so that a draw pass
+            // isn't required before LayoutManager can position the decorator. This
+            // helps the immediate-mount case when inserting a decorator after a newline.
+            let glyphRange = frontendAppKit?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontendAppKit?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
+
+          self.log(
+            .editor, .verbose,
+            "needsCreation -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
+        case .cachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: cached key=\(nodeKey)") }
+          // This shouldn't be needed if our appear/disappear logic is perfect, but it turns out we do currently need this.
+          superview.addSubview(view)
+          self.log(
+            .editor, .verbose,
+            "no-op, already cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
+        case .unmountedCachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: remount key=\(nodeKey)") }
+          view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
+          superview.addSubview(view)
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decoratorWillAppear(view: view)
+          }
+          decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            frontendAppKit?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontendAppKit?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontendAppKit?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: remount invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
+          self.log(
+            .editor, .verbose,
+            "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
+        case .needsDecorating(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: decorate key=\(nodeKey)") }
+          superview.addSubview(view)
+          decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decorate(view: view)
+          }
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            // required so that TextKit does the new size calculation, and correctly hides or unhides the view
+            frontendAppKit?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontendAppKit?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontendAppKit?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: decorate invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
+        }
+      }
+    }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: end cache.count=\(decoratorCache.count)")
+    }
+  }
+
+  internal func unmountDecoratorSubviewsIfNecessary() {
+    try? self.read {
+      for (nodeKey, decoratorCacheItem) in decoratorCache {
+        switch decoratorCacheItem {
+        case .needsCreation:
+          break
+        case .cachedView(let view):
+          view.removeFromSuperview()
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decoratorDidDisappear(view: view)
+            decoratorCache[nodeKey] = DecoratorCacheItem.unmountedCachedView(view)
+          } else {
+            decoratorCache[nodeKey] = nil
+          }
+        case .unmountedCachedView:
+          break
+        case .needsDecorating(let view):
+          view.removeFromSuperview()
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decoratorDidDisappear(view: view)
+            decoratorCache[nodeKey] = DecoratorCacheItem.unmountedCachedView(view)
+          } else {
+            decoratorCache[nodeKey] = nil
+          }
+        }
+      }
+    }
+  }
   #endif
 
   // MARK: - Manipulating the editor state
@@ -1049,7 +1221,7 @@ public class Editor: NSObject {
       dirtyType = .noDirtyNodes
       cloneNotNeeded.removeAll()
 
-      #if canImport(UIKit)
+      #if canImport(UIKit) || os(macOS)
       mountDecoratorSubviewsIfNecessary()
       #endif
     }

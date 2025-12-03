@@ -97,7 +97,7 @@ public extension NSAttributedString.Key {
   static let quoteCustomDrawing: NSAttributedString.Key = .init(rawValue: "quoteCustomDrawing")
 }
 
-#if canImport(UIKit)
+#if canImport(UIKit) || os(macOS)
 extension QuoteNode {
   internal static var quoteBackgroundDrawing: CustomDrawingHandler {
     get {

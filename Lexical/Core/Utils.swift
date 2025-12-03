@@ -495,6 +495,49 @@ internal func destroyCachedDecoratorView(forKey key: NodeKey) {
   }
   editor.decoratorCache.removeValue(forKey: key)
 }
+#elseif os(macOS)
+@MainActor
+public func decoratorView(forKey key: NodeKey, createIfNecessary: Bool) -> NSView? {
+  guard let editor = getActiveEditor() else {
+    return nil
+  }
+
+  guard let cacheItem = editor.decoratorCache[key] else {
+    editor.log(.editor, .warning, "Requested decorator view for a node not in the cache")
+    return nil
+  }
+
+  switch cacheItem {
+  case .needsCreation:
+    guard let node = getNodeByKey(key: key) as? DecoratorNode else {
+      editor.log(
+        .editor, .warning, "Requested decorator view for a node that is not a decorator node")
+      return nil
+    }
+    let newView = node.createView()
+    node.decorate(view: newView)
+    editor.decoratorCache[key] = DecoratorCacheItem.unmountedCachedView(newView)
+    editor.log(.editor, .verbose, "Creating view (and setting to unmounted): key \(key)")
+    return newView
+  case .cachedView(let view):
+    editor.log(.editor, .verbose, "Returning cached view: key \(key)")
+    return view
+  case .unmountedCachedView(let view):
+    editor.log(.editor, .verbose, "Returning unmounted cached view: key \(key)")
+    return view
+  case .needsDecorating(let view):
+    editor.log(.editor, .verbose, "Returning needs decorating cached view: key \(key)")
+    return view
+  }
+}
+
+@MainActor
+internal func destroyCachedDecoratorView(forKey key: NodeKey) {
+  guard let editor = getActiveEditor() else {
+    return
+  }
+  editor.decoratorCache.removeValue(forKey: key)
+}
 #endif
 
 public typealias FindFunction = (

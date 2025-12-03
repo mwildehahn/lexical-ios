@@ -701,7 +701,7 @@ public extension NSAttributedString.Key {
   static let inlineCodeBackgroundColor: NSAttributedString.Key = .init(rawValue: "inlineCodeBackgroundColor")
 }
 
-#if canImport(UIKit)
+#if canImport(UIKit) || os(macOS)
 extension TextNode {
   internal static var inlineCodeBackgroundDrawing: CustomDrawingHandler {
     get {

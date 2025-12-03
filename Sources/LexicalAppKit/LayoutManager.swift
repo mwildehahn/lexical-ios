@@ -32,14 +32,122 @@ public class LayoutManagerAppKit: NSLayoutManager, @unchecked Sendable {
 
   // MARK: - Custom Drawing
 
+  private var customDrawingBackground: [NSAttributedString.Key: Editor.CustomDrawingHandlerInfo] {
+    return editor?.customDrawingBackground ?? [:]
+  }
+
+  private var customDrawingText: [NSAttributedString.Key: Editor.CustomDrawingHandlerInfo] {
+    return editor?.customDrawingText ?? [:]
+  }
+
   public override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
     super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
-    // Custom drawing hooks can be added here when needed
+    draw(forGlyphRange: glyphsToShow, at: origin, handlers: customDrawingBackground)
   }
 
   public override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
     super.drawGlyphs(forGlyphRange: glyphsToShow, at: origin)
+    draw(forGlyphRange: glyphsToShow, at: origin, handlers: customDrawingText)
     positionAllDecorators()
+  }
+
+  private func draw(
+    forGlyphRange drawingGlyphRange: NSRange, at origin: CGPoint,
+    handlers: [NSAttributedString.Key: Editor.CustomDrawingHandlerInfo]
+  ) {
+    let characterRange = characterRange(forGlyphRange: drawingGlyphRange, actualGlyphRange: nil)
+    guard let textStorage = textStorage as? TextStorageAppKit else {
+      return
+    }
+
+    handlers.forEach { attribute, value in
+      let handler = value.customDrawingHandler
+      let granularity = value.granularity
+
+      textStorage.enumerateAttribute(attribute, in: characterRange) { value, attributeRunRange, _ in
+        guard let value else {
+          // we only trigger when there is a non-nil value
+          return
+        }
+        let glyphRangeForAttributeRun = glyphRange(
+          forCharacterRange: attributeRunRange, actualCharacterRange: nil)
+        ensureLayout(forGlyphRange: glyphRangeForAttributeRun)
+
+        switch granularity {
+        case .characterRuns:
+          enumerateLineFragments(forGlyphRange: glyphRangeForAttributeRun) {
+            rect, usedRect, textContainer, glyphRangeForGlyphRun, _ in
+            let intersectionRange = NSIntersectionRange(
+              glyphRangeForAttributeRun, glyphRangeForGlyphRun)
+            let charRangeToDraw = self.characterRange(
+              forGlyphRange: intersectionRange, actualGlyphRange: nil)
+            let glyphBoundingRect = self.boundingRect(
+              forGlyphRange: intersectionRange, in: textContainer)
+            handler(
+              attribute, value, self, attributeRunRange, charRangeToDraw, intersectionRange,
+              glyphBoundingRect.offsetBy(dx: origin.x, dy: origin.y),
+              rect.offsetBy(dx: origin.x, dy: origin.y))
+          }
+        case .singleParagraph:
+          let paraGroupRange = textStorage.mutableString.paragraphRange(for: attributeRunRange)
+          (textStorage.string as NSString).enumerateSubstrings(
+            in: paraGroupRange, options: .byParagraphs
+          ) { substring, substringRange, enclosingRange, _ in
+            guard substringRange.length >= 1 else { return }
+            let glyphRangeForParagraph = self.glyphRange(
+              forCharacterRange: substringRange, actualCharacterRange: nil)
+            let firstCharLineFragment = self.lineFragmentRect(
+              forGlyphAt: glyphRangeForParagraph.location, effectiveRange: nil)
+            let lastCharLineFragment = self.lineFragmentRect(
+              forGlyphAt: glyphRangeForParagraph.upperBound - 1, effectiveRange: nil)
+            let containingRect = firstCharLineFragment.union(lastCharLineFragment)
+            handler(
+              attribute, value, self, attributeRunRange, substringRange, glyphRangeForParagraph,
+              containingRect.offsetBy(dx: origin.x, dy: origin.y),
+              firstCharLineFragment.offsetBy(dx: origin.x, dy: origin.y))
+          }
+        case .contiguousParagraphs:
+          let paraGroupRange = textStorage.mutableString.paragraphRange(for: attributeRunRange)
+          guard paraGroupRange.length >= 1 else { return }
+          let glyphRangeForParagraphs = self.glyphRange(
+            forCharacterRange: paraGroupRange, actualCharacterRange: nil)
+          let firstCharLineFragment = self.lineFragmentRect(
+            forGlyphAt: glyphRangeForParagraphs.location, effectiveRange: nil)
+
+          let lastCharLineFragment =
+            (paraGroupRange.upperBound == textStorage.length
+              && self.extraLineFragmentRect.height > 0)
+            ? self.extraLineFragmentRect
+            : self.lineFragmentRect(
+              forGlyphAt: glyphRangeForParagraphs.upperBound - 1, effectiveRange: nil)
+
+          var containingRect = firstCharLineFragment.union(lastCharLineFragment).offsetBy(
+            dx: origin.x, dy: origin.y)
+
+          // If there are block styles, subtract the margin here.
+          if let blockStyle = textStorage.attribute(
+            .appliedBlockLevelStyles_internal, at: paraGroupRange.location, effectiveRange: nil)
+            as? BlockLevelAttributes
+          {
+            // first check to see if we should apply top margin.
+            if paraGroupRange.location > 0 {
+              containingRect.origin.y += blockStyle.marginTop
+              containingRect.size.height -= blockStyle.marginTop
+            }
+            // next check for bottom margin
+            if paraGroupRange.location + paraGroupRange.length
+              < (textStorage.string as NSString).length
+            {
+              containingRect.size.height -= blockStyle.marginBottom
+            }
+          }
+
+          handler(
+            attribute, value, self, attributeRunRange, paraGroupRange, glyphRangeForParagraphs,
+            containingRect, firstCharLineFragment.offsetBy(dx: origin.x, dy: origin.y))
+        }
+      }
+    }
   }
 
   // MARK: - Decorator Positioning
@@ -68,13 +176,21 @@ public class LayoutManagerAppKit: NSLayoutManager, @unchecked Sendable {
     let glyphIndex = glyphIndexForCharacter(at: clampedCharIndex)
     var glyphIsInTextContainer = NSLocationInRange(glyphIndex, glyphRange(for: textContainer))
 
-    // Force layout if glyph isn't laid out yet
+    // If the glyph isn't laid out yet (e.g., immediately after insertion and
+    // before a draw pass), force layout for this glyph and re-check containment
+    // to avoid transiently hiding the decorator view.
     if !glyphIsInTextContainer {
       ensureLayout(forGlyphRange: NSRange(location: glyphIndex, length: 1))
       glyphIsInTextContainer = NSLocationInRange(glyphIndex, glyphRange(for: textContainer))
     }
 
+    var glyphBoundingRect: CGRect = .zero
     let shouldHideView: Bool = !glyphIsInTextContainer
+
+    if glyphIsInTextContainer {
+      glyphBoundingRect = boundingRect(
+        forGlyphRange: NSRange(location: glyphIndex, length: 1), in: textContainer)
+    }
 
     // Get attachment at character index
     var attribute: TextAttachmentAppKit?
@@ -89,15 +205,44 @@ public class LayoutManagerAppKit: NSLayoutManager, @unchecked Sendable {
       return
     }
 
+    let textContainerInset = attachmentEditor.frontendAppKit?.textContainerInsets ?? NSEdgeInsets()
+
     try? attachmentEditor.read {
       if attachmentEditor.featureFlags.verboseLogging {
         print("🔥 DEC-LM: key=\(attachmentKey) charIndex=\(characterIndex) glyphIndex=\(glyphIndex) inContainer=\(glyphIsInTextContainer) hide=\(shouldHideView) ts.len=\(textStorage.length)")
       }
 
-      // Decorator view handling would go here
-      // For now, this is a stub for when decorator views are implemented
+      guard let decoratorView = decoratorView(forKey: attachmentKey, createIfNecessary: !shouldHideView)
+      else {
+        attachmentEditor.log(.TextView, .warning, "create decorator view failed")
+        return
+      }
+
+      if shouldHideView {
+        if attachmentEditor.featureFlags.verboseLogging {
+          print("🔥 DEC-LM: hide view key=\(attachmentKey)")
+        }
+        decoratorView.isHidden = true
+        return
+      }
+
+      // We have a valid location, make sure view is not hidden
+      decoratorView.isHidden = false
+
+      // Calculate decorator origin: start at top-left of glyph rect, offset by container insets
+      var decoratorOrigin = CGPoint(
+        x: glyphBoundingRect.origin.x + textContainerInset.left,
+        y: glyphBoundingRect.origin.y + textContainerInset.top
+      )
+
+      // Adjust y-position: move from top-left to bottom-left (NSView coordinates)
+      // In AppKit, y increases upward, so we add the difference
+      decoratorOrigin.y += (glyphBoundingRect.height - attr.bounds.height)
+
+      decoratorView.frame = CGRect(origin: decoratorOrigin, size: attr.bounds.size)
+
       if attachmentEditor.featureFlags.verboseLogging {
-        print("🔥 DEC-LM: decorator positioning stub for key=\(attachmentKey)")
+        print("🔥 DEC-LM: positioned key=\(attachmentKey) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
       }
     }
   }

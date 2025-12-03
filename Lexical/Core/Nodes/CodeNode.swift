@@ -159,7 +159,7 @@ public class CodeNode: ElementNode {
   }
 }
 
-#if canImport(UIKit)
+#if canImport(UIKit) || os(macOS)
 extension CodeNode {
   internal static var codeBlockBackgroundDrawing: CustomDrawingHandler {
     return {

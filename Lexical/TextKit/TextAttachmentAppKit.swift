@@ -6,8 +6,8 @@
  */
 
 #if os(macOS) && !targetEnvironment(macCatalyst)
+
 import AppKit
-import Lexical
 import LexicalCore
 
 /// Custom NSTextAttachment for Lexical decorator nodes on macOS.
@@ -21,7 +21,7 @@ public class TextAttachmentAppKit: NSTextAttachment {
   public var key: NodeKey?
 
   /// Reference to the Lexical editor.
-  weak var editor: Editor?
+  public weak var editor: Editor?
 
   // MARK: - Bounds Calculation
 
@@ -35,23 +35,21 @@ public class TextAttachmentAppKit: NSTextAttachment {
       return NSRect.zero
     }
 
-    // Decorator view sizing would go here when DecoratorNode is available on AppKit
-    // For now, return zero bounds since decorator views aren't fully implemented yet
+    let attributes =
+      textContainer?.layoutManager?.textStorage?.attributes(at: charIndex, effectiveRange: nil)
+      ?? [:]
 
-    // When decorator views are implemented:
-    // let attributes = textContainer?.layoutManager?.textStorage?.attributes(at: charIndex, effectiveRange: nil) ?? [:]
-    // try? editor.read {
-    //   guard let decoratorNode = getNodeByKey(key: key) as? DecoratorNode else { return }
-    //   let size = decoratorNode.sizeForDecoratorView(textViewWidth: ..., attributes: attributes)
-    //   bounds = NSRect(x: 0, y: 0, width: size.width, height: size.height)
-    // }
+    var bounds = NSRect.zero
+    try? editor.read {
+      guard let decoratorNode = getNodeByKey(key: key) as? DecoratorNode else {
+        return
+      }
+      let size = decoratorNode.sizeForDecoratorView(
+        textViewWidth: editor.frontendAppKit?.textLayoutWidth ?? CGFloat(0), attributes: attributes)
+      bounds = NSRect(x: 0, y: 0, width: size.width, height: size.height)
+    }
 
-    // Unused for now but needed to silence compiler
-    _ = key
-    _ = editor
-
-    let bounds = NSRect.zero
-    self.bounds = bounds
+    self.bounds = bounds  // cache the value so that our LayoutManager can pull it back out later
     return bounds
   }
 
@@ -67,5 +65,4 @@ public class TextAttachmentAppKit: NSTextAttachment {
     return NSImage(size: NSSize(width: 1, height: 1))
   }
 }
-
-#endif // os(macOS) && !targetEnvironment(macCatalyst)
+#endif  // os(macOS) && !targetEnvironment(macCatalyst)

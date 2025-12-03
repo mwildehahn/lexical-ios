@@ -81,4 +81,16 @@ public typealias CustomDrawingHandler = (
   _ rect: CGRect,
   _ firstLineFragment: CGRect
 ) -> Void
+#elseif os(macOS)
+/// See <doc:CustomDrawing> for description of the parameters
+public typealias CustomDrawingHandler = (
+  _ attributeKey: NSAttributedString.Key,
+  _ attributeValue: Any,
+  _ layoutManager: NSLayoutManager,
+  _ attributeRunCharacterRange: NSRange,
+  _ granularityExpandedCharacterRange: NSRange,
+  _ glyphRange: NSRange,
+  _ rect: CGRect,
+  _ firstLineFragment: CGRect
+) -> Void
 #endif
