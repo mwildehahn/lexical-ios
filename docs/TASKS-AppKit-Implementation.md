@@ -1310,10 +1310,15 @@ After completing 10.4:
 - [x] `BackspaceMergeAtParagraphStartParityTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerLiveEditingTests.swift` - Converted to cross-platform (all 24 tests pass)
 
-**Step 10.8.3: Enable Selection Tests**
+**Step 10.8.3: Enable Selection Tests** ✅ COMPLETE
 After completing 10.2:
-- [ ] `SelectionClampParityTests.swift` - Uses UIKit-specific APIs
-- [ ] `RangeCachePointMappingAfterEditsParityTests.swift` - Uses UIKit-specific APIs
+- [x] `SelectionClampParityTests.swift` - Now cross-platform (1 test passes)
+- [x] `RangeCachePointMappingAfterEditsParityTests.swift` - Now cross-platform (1 test passes)
+- [x] `RangeCachePointMappingParityTests.swift` - Cross-platform (1 test passes)
+- [x] `RangeCachePointMappingGraphemeParityTests.swift` - Cross-platform (1 test passes)
+- [x] `RangeCachePointMappingLargeDocParityTests.swift` - Cross-platform (1 test passes)
+- [x] `BackspaceClampNewlineParityTests.swift` - Cross-platform (2 tests pass)
+- [x] `SelectionMappingParityTests.swift` - Cross-platform (2 tests pass)
 - [x] `BackspaceMergeAtParagraphStartParityTests.swift` - Already cross-platform
 - [x] `MergeDeleteParityTests.swift` - Already cross-platform
 - [x] `EmojiParityTests.swift` - Already cross-platform
