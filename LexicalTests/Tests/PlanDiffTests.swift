@@ -1,4 +1,4 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
+// UIKit-only: Uses computePartDiffs which is in UIKit-only code
 #if !os(macOS) || targetEnvironment(macCatalyst)
 
 import XCTest
