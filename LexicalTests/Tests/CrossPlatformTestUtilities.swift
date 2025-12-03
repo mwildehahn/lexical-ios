@@ -193,6 +193,60 @@ public func registerTestDecoratorNode(on editor: Editor) throws {
   try editor.registerNode(nodeType: NodeType.testDecoratorCrossplatform, class: TestDecoratorNodeCrossplatform.self)
 }
 
+// MARK: - Cross-Platform Decorator Block Node for Tests
+
+public extension NodeType {
+  static let testDecoratorBlockCrossplatform = NodeType(rawValue: "testDecoratorBlockCrossplatform")
+}
+
+/// A cross-platform test decorator block node that works on both UIKit and AppKit.
+/// Uses DecoratorBlockNode base class for block-level decorator testing.
+public class TestDecoratorBlockNodeCrossplatform: DecoratorBlockNode {
+  public required override init() {
+    super.init(nil)
+  }
+
+  public required init(_ key: NodeKey?) {
+    super.init(key)
+  }
+
+  public required init(from decoder: Decoder, depth: Int? = nil, index: Int? = nil, parentIndex: Int? = nil) throws {
+    fatalError("init(from:) has not been implemented")
+  }
+
+  public override func clone() -> Self {
+    Self.init()
+  }
+
+  public override class func getType() -> NodeType {
+    .testDecoratorBlockCrossplatform
+  }
+
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  public override func createView() -> NSImageView {
+    return NSImageView()
+  }
+
+  public override func decorate(view: NSView) {}
+  #else
+  public override func createView() -> UIImageView {
+    return UIImageView()
+  }
+
+  public override func decorate(view: UIView) {}
+  #endif
+
+  public override func sizeForDecoratorView(textViewWidth: CGFloat, attributes: [NSAttributedString.Key: Any]) -> CGSize {
+    return CGSize(width: 100, height: 100)
+  }
+}
+
+/// Registers the cross-platform test decorator block node on the given editor.
+@MainActor
+public func registerTestDecoratorBlockNode(on editor: Editor) throws {
+  try editor.registerNode(nodeType: NodeType.testDecoratorBlockCrossplatform, class: TestDecoratorBlockNodeCrossplatform.self)
+}
+
 /// Creates a pair of editors for parity testing with decorator support.
 /// Returns a tuple of (optimized, legacy) contexts with test decorator node registered.
 @MainActor
