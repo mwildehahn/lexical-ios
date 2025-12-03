@@ -180,6 +180,12 @@ class TestEditorView {
     return lexicalView.textView.textStorage.length
     #endif
   }
+
+  /// Clear the editor to initial state.
+  func defaultClearEditor() throws {
+    editor.resetEditor(pendingEditorState: nil)
+    editor.dispatchCommand(type: .clearEditor)
+  }
 }
 
 /// Convenience function to create a test editor view with default configuration.
