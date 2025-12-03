@@ -20,7 +20,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (264 tests)
+- `swift test` passes on macOS (267 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -1308,7 +1308,7 @@ After completing 10.4:
 - [x] `OptimizedReconcilerRangeDeleteMultiParagraphParityTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerLineBreakParityTests.swift` - Converted to cross-platform
 - [x] `BackspaceMergeAtParagraphStartParityTests.swift` - Converted to cross-platform
-- [x] `OptimizedReconcilerLiveEditingTests.swift` - Converted to cross-platform (21/24 tests, 3 UIKit-only: forward delete across paragraph/line break bugs)
+- [x] `OptimizedReconcilerLiveEditingTests.swift` - Converted to cross-platform (all 24 tests pass)
 
 **Step 10.8.3: Enable Selection Tests**
 After completing 10.2:
@@ -1412,6 +1412,37 @@ For practical implementation, this is the recommended order:
 
 **Files Modified:**
 - `Lexical/Core/Selection/RangeSelection.swift:1624-1653` - Direct merge logic for list items
+
+### Forward Delete Across Paragraph Boundary (Fixed)
+
+**Issue:** When forward-deleting at the end of a paragraph, the AppKit `deleteCharacter` implementation extended the selection to include the first character of the next paragraph, then called `removeText()`. This deleted the first character along with the paragraph boundary.
+
+**Symptom:** `testForwardDeleteAtEndMergesNextParagraph` expected "HelloWorld" but got "Helloorld" (missing "W").
+
+**Fix:** Implemented paragraph merge logic for forward delete that mirrors the backspace behavior:
+1. Finds the next element (paragraph) and its first text node
+2. Merges the next element's text content into the current text node
+3. Moves any additional children to the current parent
+4. Removes the now-empty next element
+5. Positions cursor at the join point
+
+**Files Modified:**
+- `Lexical/Core/Selection/RangeSelection.swift:1704-1747` - Paragraph merge logic for forward delete
+
+### LineBreakNode Deletion (Fixed)
+
+**Issue:** When backspacing before a LineBreakNode or forward-deleting after one, the AppKit `deleteCharacter` implementation only checked for TextNode siblings, not LineBreakNode. The LineBreakNode was skipped and not deleted.
+
+**Symptom:** `testBackspaceAcrossLineBreakMergesLines` and `testForwardDeleteAcrossLineBreakMergesLines` expected "HelloWorld" but got "Hello\nWorld" (LineBreakNode not removed).
+
+**Fix:** Added explicit checks for LineBreakNode siblings:
+1. Before checking for TextNode siblings, check if the adjacent sibling is a LineBreakNode
+2. If so, simply remove the LineBreakNode and return
+3. This handles both backspace (previous sibling) and forward delete (next sibling) cases
+
+**Files Modified:**
+- `Lexical/Core/Selection/RangeSelection.swift:1616-1620` - LineBreakNode check for backspace
+- `Lexical/Core/Selection/RangeSelection.swift:1689-1693` - LineBreakNode check for forward delete
 
 ---
 

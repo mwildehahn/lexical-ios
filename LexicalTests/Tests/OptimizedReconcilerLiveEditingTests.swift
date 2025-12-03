@@ -132,8 +132,6 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
     }
   }
 
-  // MARK: - Forward delete across paragraph boundary (UIKit only - AppKit bug)
-  #if !os(macOS) || targetEnvironment(macCatalyst)
   func testForwardDeleteAtEndMergesNextParagraph() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
     try editor.update {
@@ -154,7 +152,6 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       XCTAssertEqual(sel.anchor.offset, 5)
     }
   }
-  #endif
 
   func testBackspaceAtStartMergesWithPreviousParagraph() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
@@ -502,8 +499,8 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
     }
   }
 
-  // MARK: - LineBreakNode deletion tests (UIKit only - AppKit bug with LineBreakNode removal)
-  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // MARK: - LineBreakNode deletion tests
+
   func testBackspaceAcrossLineBreakMergesLines() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
     try editor.update {
@@ -539,5 +536,4 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       if let sel = try getSelection() as? RangeSelection { XCTAssertEqual(sel.anchor.offset, 5) }
     }
   }
-  #endif
 }

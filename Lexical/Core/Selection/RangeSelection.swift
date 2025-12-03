@@ -1610,14 +1610,22 @@ public class RangeSelection: BaseSelection {
           let newOffset = graphemeRange.location
           focus.updatePoint(key: anchor.key, offset: newOffset, type: .text)
         } else {
-          // At start of text node - look for previous text content across node boundaries
-          if let prevSibling = textNode.getPreviousSibling() as? TextNode {
-            // Previous sibling in same parent element
-            let prevLength = prevSibling.getTextContentSize()
-            let nsStr = prevSibling.getTextPart() as NSString
+          // At start of text node - look for previous content across node boundaries
+          let prevSibling = textNode.getPreviousSibling()
+
+          // Check for LineBreakNode first - just delete it
+          if prevSibling is LineBreakNode {
+            try prevSibling?.remove()
+            return
+          }
+
+          if let prevText = prevSibling as? TextNode {
+            // Previous sibling is a text node in same parent element
+            let prevLength = prevText.getTextContentSize()
+            let nsStr = prevText.getTextPart() as NSString
             let graphemeRange = nsStr.rangeOfComposedCharacterSequence(at: max(0, prevLength - 1))
-            anchor.updatePoint(key: prevSibling.getKey(), offset: prevLength, type: .text)
-            focus.updatePoint(key: prevSibling.getKey(), offset: graphemeRange.location, type: .text)
+            anchor.updatePoint(key: prevText.getKey(), offset: prevLength, type: .text)
+            focus.updatePoint(key: prevText.getKey(), offset: graphemeRange.location, type: .text)
           } else if let parent = textNode.getParent() as? ElementNode {
             // Look in previous sibling element (e.g., previous list item)
             if let prevElement = parent.getPreviousSibling() as? ElementNode {
@@ -1675,27 +1683,64 @@ public class RangeSelection: BaseSelection {
           let newOffset = graphemeRange.location + graphemeRange.length
           focus.updatePoint(key: anchor.key, offset: newOffset, type: .text)
         } else {
-          // At end of text node - look for next text content
-          if let nextSibling = textNode.getNextSibling() as? TextNode {
-            let nextContent = nextSibling.getTextPart() as NSString
+          // At end of text node - look for next content
+          let nextSibling = textNode.getNextSibling()
+
+          // Check for LineBreakNode first - just delete it
+          if nextSibling is LineBreakNode {
+            try nextSibling?.remove()
+            return
+          }
+
+          if let nextText = nextSibling as? TextNode {
+            // Next sibling is a text node in same parent element
+            let nextContent = nextText.getTextPart() as NSString
             if nextContent.length > 0 {
               let graphemeRange = nextContent.rangeOfComposedCharacterSequence(at: 0)
-              focus.updatePoint(key: nextSibling.getKey(), offset: graphemeRange.location + graphemeRange.length, type: .text)
+              focus.updatePoint(key: nextText.getKey(), offset: graphemeRange.location + graphemeRange.length, type: .text)
             } else {
-              focus.updatePoint(key: nextSibling.getKey(), offset: 0, type: .text)
+              focus.updatePoint(key: nextText.getKey(), offset: 0, type: .text)
             }
           } else if let parent = textNode.getParent() as? ElementNode {
-            // Look in next sibling element
+            // Look in next sibling element (e.g., next paragraph)
             if let nextElement = parent.getNextSibling() as? ElementNode {
               if let firstText = findFirstTextNodeInElement(nextElement) {
-                let nextContent = firstText.getTextPart() as NSString
-                if nextContent.length > 0 {
-                  let graphemeRange = nextContent.rangeOfComposedCharacterSequence(at: 0)
-                  focus.updatePoint(key: firstText.getKey(), offset: graphemeRange.location + graphemeRange.length, type: .text)
+                // Merge next element's content into current element (mirror of backspace behavior)
+                let cursorOffset = textNode.getTextContentSize()
+                let nextChildren = nextElement.getChildren()
+
+                // For text nodes, merge the text content directly
+                if let firstChild = nextChildren.first as? TextNode {
+                  // Concatenate text content
+                  let mergedText = textNode.getTextPart() + firstChild.getTextPart()
+                  try textNode.setText(mergedText)
+
+                  // Move any additional children (beyond the first text node) to current parent
+                  for (index, child) in nextChildren.enumerated() {
+                    if index > 0 {
+                      try parent.append([child])
+                    }
+                  }
                 } else {
-                  focus.updatePoint(key: firstText.getKey(), offset: 0, type: .text)
+                  // Non-text first child: just move all children
+                  for child in nextChildren {
+                    try parent.append([child])
+                  }
                 }
+
+                // Remove the now-empty next element
+                try nextElement.remove()
+
+                // Position cursor at the join point
+                try textNode.select(anchorOffset: cursorOffset, focusOffset: cursorOffset)
+                return
+              } else {
+                // Next element has no text - just remove it
+                try nextElement.remove()
+                return
               }
+            } else {
+              return // At absolute end
             }
           } else {
             return // At absolute end
