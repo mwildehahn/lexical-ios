@@ -151,6 +151,10 @@ public class Editor: NSObject {
       }
     }
   }
+
+  /// Flag to indicate if this editor is using a read-only frontend context.
+  /// This is used by RootNode to strip leading newlines for parity with UIKit.
+  public var isReadOnlyFrontend: Bool = false
   #endif
 
   internal var infiniteUpdateLoopCount = 0

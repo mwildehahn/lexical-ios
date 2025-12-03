@@ -114,6 +114,7 @@ public class LexicalReadOnlyTextKitContextAppKit: NSObject, FrontendAppKit {
 
     editor = Editor(editorConfig: editorConfig)
     editor.featureFlags = featureFlags
+    editor.isReadOnlyFrontend = true
 
     super.init()
 

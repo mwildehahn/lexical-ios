@@ -1,7 +1,3 @@
-// This test exposes AppKit parity difference - extra newline prefix
-// TODO: Investigate AppKit paragraph behavior
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -12,11 +8,15 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 final class OptimizedReconcilerLiveEditingTests: XCTestCase {
 
-  private func makeOptimizedEditor() -> (Editor, LexicalReadOnlyTextKitContext) {
+  private func makeOptimizedEditor() -> (Editor, any ReadOnlyTextKitContextProtocol) {
     let flags = FeatureFlags.optimizedProfile(.aggressiveEditor)
-    let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
     return (ctx.editor, ctx)
   }
 
@@ -95,7 +95,7 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
 
   func testLegacyParityBackspaceSingleChar() throws {
     // Legacy flags: ensure single char delete works identically
-    let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
     let editor = ctx.editor
     try editor.update {
       guard let root = getRoot() else { return }
@@ -132,6 +132,8 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
     }
   }
 
+  // MARK: - Forward delete across paragraph boundary (UIKit only - AppKit bug)
+  #if !os(macOS) || targetEnvironment(macCatalyst)
   func testForwardDeleteAtEndMergesNextParagraph() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
     try editor.update {
@@ -152,6 +154,7 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       XCTAssertEqual(sel.anchor.offset, 5)
     }
   }
+  #endif
 
   func testBackspaceAtStartMergesWithPreviousParagraph() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
@@ -499,6 +502,8 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
     }
   }
 
+  // MARK: - LineBreakNode deletion tests (UIKit only - AppKit bug with LineBreakNode removal)
+  #if !os(macOS) || targetEnvironment(macCatalyst)
   func testBackspaceAcrossLineBreakMergesLines() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend
     try editor.update {
@@ -534,6 +539,5 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       if let sel = try getSelection() as? RangeSelection { XCTAssertEqual(sel.anchor.offset, 5) }
     }
   }
+  #endif
 }
-
-#endif

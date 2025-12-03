@@ -59,6 +59,10 @@ public class RootNode: ElementNode {
     if let ed = getActiveEditor(), ed.frontend is LexicalReadOnlyTextKitContext, s.hasPrefix("\n") {
       return String(s.dropFirst(1))
     }
+    #elseif canImport(AppKit)
+    if let ed = getActiveEditor(), ed.isReadOnlyFrontend, s.hasPrefix("\n") {
+      return String(s.dropFirst(1))
+    }
     #endif
     return s
   }

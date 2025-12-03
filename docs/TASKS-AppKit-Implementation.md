@@ -20,7 +20,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (240 tests)
+- `swift test` passes on macOS (264 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -1290,7 +1290,7 @@ After completing 10.4:
 - [x] `OptimizedReconcilerPlainPasteParityTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerHistoryTypingParityTests.swift` - Already cross-platform
 - [x] `OptimizedReconcilerInlineFormatToggleSelectionParityTests.swift` - Already cross-platform
-- [ ] `OptimizedReconcilerRangeDeleteMultiParagraphParityTests.swift` - Platform behavior difference (kept UIKit-only)
+- [x] `OptimizedReconcilerRangeDeleteMultiParagraphParityTests.swift` - Now cross-platform (fixed via isReadOnlyFrontend flag)
 - [x] `OptimizedReconcilerLinkPluginParityTests.swift` - Converted to cross-platform
 - [ ] `OptimizedReconcilerLegacyParityReorderTextMixTests.swift` - Uses UIKit-specific APIs
 - [x] `OptimizedReconcilerLinkHTMLExportParityTests.swift` - Converted to cross-platform
@@ -1305,6 +1305,10 @@ After completing 10.4:
 - [x] `OptimizedReconcilerCrossParentFallbackTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerMultiNodeReplaceTests.swift` - Converted to cross-platform
 - [x] `OptimizedReconcilerHistoryListQuoteParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerRangeDeleteMultiParagraphParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerLineBreakParityTests.swift` - Converted to cross-platform
+- [x] `BackspaceMergeAtParagraphStartParityTests.swift` - Converted to cross-platform
+- [x] `OptimizedReconcilerLiveEditingTests.swift` - Converted to cross-platform (21/24 tests, 3 UIKit-only: forward delete across paragraph/line break bugs)
 
 **Step 10.8.3: Enable Selection Tests**
 After completing 10.2:
