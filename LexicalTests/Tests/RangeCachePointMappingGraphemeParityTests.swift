@@ -1,13 +1,14 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class RangeCachePointMappingGraphemeParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: Editor, leg: Editor, optCtx: LexicalReadOnlyTextKitContext, legCtx: LexicalReadOnlyTextKitContext) {
+  private func makeEditors() -> (opt: Editor, leg: Editor, optCtx: any ReadOnlyTextKitContextProtocol, legCtx: any ReadOnlyTextKitContextProtocol) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
     let optFlags = FeatureFlags(
       reconcilerSanityCheck: false,
@@ -23,8 +24,8 @@ final class RangeCachePointMappingGraphemeParityTests: XCTestCase {
       proxyTextViewInputDelegate: false,
       useOptimizedReconciler: false
     )
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: optFlags)
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legFlags)
+    let optCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: optFlags)
+    let legCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: legFlags)
     return (optCtx.editor, legCtx.editor, optCtx, legCtx)
   }
 
@@ -50,10 +51,10 @@ final class RangeCachePointMappingGraphemeParityTests: XCTestCase {
     try build(on: leg)
 
     // Strings must match
-    XCTAssertEqual(opt.frontend?.textStorage.string, leg.frontend?.textStorage.string)
+    XCTAssertEqual(opt.textStorage?.string, leg.textStorage?.string)
 
     func roundTripAll(_ editor: Editor) throws {
-      let s = editor.frontend?.textStorage.string ?? ""
+      let s = editor.textStorage?.string ?? ""
       let ns = s as NSString
       for loc in 0...ns.length {
         let p = try? pointAtStringLocation(loc, searchDirection: .forward, rangeCache: editor.rangeCache)
@@ -68,5 +69,3 @@ final class RangeCachePointMappingGraphemeParityTests: XCTestCase {
     try roundTripAll(leg)
   }
 }
-
-#endif
