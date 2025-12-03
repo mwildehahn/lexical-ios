@@ -20,7 +20,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (223 tests)
+- `swift test` passes on macOS (231 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -40,6 +40,8 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 - `InsertBenchmarkTests` converted to cross-platform (1 test passes)
 - `OptimizedReconcilerLegacyParityMixedParentsComplexTests` converted to cross-platform (1 test passes)
 - `OptimizedReconcilerLegacyParityMultiEditTests` converted to cross-platform (2 tests pass)
+- `OptimizedReconcilerLegacyParityPrePostOnlyTests` converted to cross-platform (4 tests pass)
+- `OptimizedReconcilerLegacyParityPrePostBlockBoundariesTests` converted to cross-platform (4 tests pass)
 - Cross-platform parity tests enabled via shared test utilities
 - `LexicalView` parity tests enabled (Emoji, WordDelete, LineBreak, etc.)
 - Additional parity tests converted to cross-platform:
