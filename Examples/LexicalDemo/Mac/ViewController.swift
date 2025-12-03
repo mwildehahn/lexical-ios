@@ -16,9 +16,15 @@ final class ViewController: NSViewController {
     private var lexicalView: LexicalAppKit.LexicalView!
     private var toolbar: NSStackView!
 
+    override func loadView() {
+        // Create a basic view - required for programmatic NSViewController
+        self.view = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        self.view.wantsLayer = true
+        self.view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
-
         setupToolbar()
         setupLexicalView()
     }
@@ -108,7 +114,7 @@ final class ViewController: NSViewController {
 
         // Layout constraints
         NSLayoutConstraint.activate([
-            toolbar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            toolbar.topAnchor.constraint(equalTo: view.topAnchor),
             toolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             toolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             toolbar.heightAnchor.constraint(equalToConstant: 44),

@@ -1,0 +1,44 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:lexical-ios}",
+      "name": "Debug LexicalDemoSwiftUI",
+      "target": "LexicalDemoSwiftUI",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug LexicalDemoSwiftUI"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:lexical-ios}",
+      "name": "Release LexicalDemoSwiftUI",
+      "target": "LexicalDemoSwiftUI",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release LexicalDemoSwiftUI"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:lexical-ios}",
+      "name": "Debug LexicalDemoMac",
+      "target": "LexicalDemoMac",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug LexicalDemoMac"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:lexical-ios}",
+      "name": "Release LexicalDemoMac",
+      "target": "LexicalDemoMac",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release LexicalDemoMac"
+    }
+  ]
+}
