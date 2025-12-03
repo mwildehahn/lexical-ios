@@ -8,6 +8,7 @@
 import AVFoundation
 import Foundation
 import Lexical
+import SelectableDecoratorNode
 
 #if canImport(UIKit)
 import UIKit
@@ -29,7 +30,7 @@ extension CommandType {
 }
 
 #if canImport(UIKit)
-public class ImageNode: DecoratorNode {
+public class ImageNode: SelectableDecoratorNode {
   var url: URL?
   var size = CGSize.zero
   var sourceID: String = ""
@@ -90,14 +91,14 @@ public class ImageNode: DecoratorNode {
     Self(url: url?.absoluteString ?? "", size: size, sourceID: sourceID, key: key)
   }
 
-  override public func createView() -> UIImageView {
+  override public func createContentView() -> UIImageView {
     editorForTapHandling = getActiveEditor()
     let imageView = createImageView()
     loadImage(imageView: imageView)
     return imageView
   }
 
-  override open func decorate(view: UIView) {
+  override open func decorateContentView(view: UIView, wrapper: SelectableDecoratorView) {
     if let view = view as? UIImageView {
       for gr in view.gestureRecognizers ?? [] {
         view.removeGestureRecognizer(gr)
@@ -197,7 +198,7 @@ public class ImageNode: DecoratorNode {
   }
 }
 #elseif os(macOS)
-public class ImageNode: DecoratorNode {
+public class ImageNode: SelectableDecoratorNode {
   var url: URL?
   var size = CGSize.zero
   var sourceID: String = ""
@@ -257,14 +258,14 @@ public class ImageNode: DecoratorNode {
     Self(url: url?.absoluteString ?? "", size: size, sourceID: sourceID, key: key)
   }
 
-  override public func createView() -> NSImageView {
+  override public func createContentView() -> NSImageView {
     editorForTapHandling = getActiveEditor()
     let imageView = createImageView()
     loadImage(imageView: imageView)
     return imageView
   }
 
-  override open func decorate(view: NSView) {
+  override open func decorateContentView(view: NSView, wrapper: SelectableDecoratorView) {
     if let view = view as? NSImageView {
       for gr in view.gestureRecognizers {
         view.removeGestureRecognizer(gr)
