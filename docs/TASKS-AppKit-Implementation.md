@@ -23,7 +23,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (341 tests)
+- `swift test` passes on macOS (359 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -81,13 +81,17 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
    - Some decorator-related tests may now work on AppKit
    - Composition/IME tests (may need NSTextInputClient differences)
    - Tests using `editor.frontend` (UIKit-specific Frontend protocol)
-   - Core functionality and LexicalView parity tests enabled (341 tests pass)
+   - Core functionality and LexicalView parity tests enabled (359 tests pass)
    - Additional tests converted to cross-platform:
      - `DecoratorBlockNodeTests` (5 tests)
      - `OptimizedReconcilerDecoratorParityTests` (4 tests)
      - `OptimizedReconcilerDecoratorBlockBoundaryParityTests` (2 tests)
      - `OptimizedReconcilerRangeDeleteComplexParityTests` (1 test)
      - `OptimizedReconcilerTypingAroundDecoratorParityTests` (1 test)
+     - `ReconcilerTests` (7 tests)
+     - `UtilsTests` (5 tests)
+     - `ShadowCompareScenarioTests` (3 tests)
+     - `OptimizedReconcilerTests` (3 tests)
 
 ---
 
