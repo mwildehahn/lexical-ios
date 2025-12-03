@@ -37,6 +37,8 @@ class ViewController: UIViewController, UIToolbarDelegate {
 
     // Initial build for selected reconciler
     rebuildEditor(useOptimized: control.selectedSegmentIndex == 1)
+    // Clear persisted state for debugging (start fresh with just an image)
+    UserDefaults.standard.removeObject(forKey: editorStatePersistenceKey)
     // Immediately restore any persisted editor state to avoid a first-cycle
     // empty hydration and ensure TS has content before user input.
     restoreEditorState()
@@ -99,18 +101,37 @@ class ViewController: UIViewController, UIToolbarDelegate {
       return
     }
 
-    guard let jsonString = UserDefaults.standard.value(forKey: editorStatePersistenceKey) as? String else {
+    // Try to restore from persisted state
+    if let jsonString = UserDefaults.standard.value(forKey: editorStatePersistenceKey) as? String,
+       let newEditorState = try? EditorState.fromJSON(json: jsonString, editor: editor) {
+      try? editor.setEditorState(newEditorState)
+      if activeOptimizedFlags.verboseLogging { print("🔥 STATE: restored json.len=\(jsonString.count)") }
       return
     }
 
-    // turn the JSON back into a new editor state
-    guard let newEditorState = try? EditorState.fromJSON(json: jsonString, editor: editor) else {
-      return
-    }
+    // No persisted state - set up default state with just an image for testing
+    setUpDefaultStateWithImage()
+  }
 
-    // install the new editor state into editor
-    try? editor.setEditorState(newEditorState)
-    if activeOptimizedFlags.verboseLogging { print("🔥 STATE: restored json.len=\(jsonString.count)") }
+  private func setUpDefaultStateWithImage() {
+    guard let editor = lexicalView?.editor else { return }
+
+    try? editor.update {
+      guard let root = getRoot() else { return }
+      // Clear existing content
+      try root.getChildren().forEach { try $0.remove() }
+
+      // Create a paragraph with just an image
+      let paragraph = createParagraphNode()
+      let imageNode = ImageNode(url: "https://placecats.com/300/200", size: CGSize(width: 300, height: 200), sourceID: "test-image")
+      try paragraph.append([imageNode])
+      try root.append([paragraph])
+
+      // Add an empty paragraph after for cursor placement
+      let emptyParagraph = createParagraphNode()
+      try root.append([emptyParagraph])
+    }
+    if activeOptimizedFlags.verboseLogging { print("🔥 STATE: set up default with image") }
   }
 
   func setUpExportMenu() {

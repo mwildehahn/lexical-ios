@@ -754,6 +754,14 @@ public class Editor: NSObject {
     if isMounting {
       return
     }
+    // If we're inside a controller mode update, UIKit's text storage editing session is still active.
+    // Layout operations are not allowed during this time, so defer until the next run loop iteration.
+    if textStorage?.isInControllerModeUpdate == true {
+      DispatchQueue.main.async { [weak self] in
+        self?.mountDecoratorSubviewsIfNecessary()
+      }
+      return
+    }
     isMounting = true
     defer {
       isMounting = false

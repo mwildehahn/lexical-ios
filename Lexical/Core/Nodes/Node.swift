@@ -553,6 +553,14 @@ open class Node: @preconcurrency Codable {
   public static func removeNode(nodeToRemove: Node, restoreSelection: Bool) throws {
     try errorOnReadOnly()
     let key = nodeToRemove.key
+
+    // Debug: track when decorator nodes are removed
+    if nodeToRemove is DecoratorNode {
+      print("🎯 REMOVE-NODE: removing decorator key=\(key) parent=\(nodeToRemove.parent ?? "nil")")
+      // Print stack trace to find who is removing the decorator
+      Thread.callStackSymbols.prefix(15).forEach { print("🎯 REMOVE-NODE STACK: \($0)") }
+    }
+
     guard let parent = nodeToRemove.getParent() else {
       return
     }
@@ -665,6 +673,9 @@ open class Node: @preconcurrency Codable {
     let writableSelf = try getWritable()
     let writableNodeToInsert = try nodeToInsert.getWritable()
 
+    // Debug: log state before getting parent
+    print("🎯 INSERT-BEFORE: self.key=\(key) self.parent=\(parent ?? "nil") writableSelf.parent=\(writableSelf.parent ?? "nil")")
+
     if let oldParent = writableNodeToInsert.getParent() {
       let writableParent = try oldParent.getWritable() as ElementNode
       let children = writableParent.children
@@ -680,14 +691,18 @@ open class Node: @preconcurrency Codable {
     }
 
     let writableParent = try getParentOrThrow().getWritable() as ElementNode
+    print("🎯 INSERT-BEFORE: writableParent.key=\(writableParent.key) writableParent.children=\(writableParent.children)")
     let insertKey = writableNodeToInsert.key
     writableNodeToInsert.parent = writableSelf.parent
     let children = writableParent.children
     let index = children.firstIndex(of: writableSelf.key)
+    print("🎯 INSERT-BEFORE: looking for \(writableSelf.key) in \(children), found at index=\(index?.description ?? "nil")")
 
     if let index {
       writableParent.children.insert(insertKey, at: index)
+      print("🎯 INSERT-BEFORE: inserted \(insertKey) at \(index), new children=\(writableParent.children)")
     } else {
+      print("🎯 INSERT-BEFORE: ERROR - \(writableSelf.key) not found in parent \(writableParent.key) children \(children)")
       throw LexicalError.invariantViolation("Node is not a child of its parent")
     }
 

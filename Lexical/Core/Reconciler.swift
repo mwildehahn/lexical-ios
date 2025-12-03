@@ -269,6 +269,7 @@ internal enum Reconciler {
       editor.log(.reconciler, .verbose, "DEC: remove key=\(key)")
       decoratorView(forKey: key, createIfNecessary: false)?.removeFromSuperview()
       destroyCachedDecoratorView(forKey: key)
+      print("🎯 DEC-REMOVE-C: removing key=\(key) from position cache (Reconciler UIKit)")
       textStorage.decoratorPositionCache[key] = nil
     }
     reconcilerState.decoratorsToAdd.forEach { key in
@@ -289,6 +290,46 @@ internal enum Reconciler {
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
       editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
     }
+    // Update positions for ALL decorators (not just dirty ones) and invalidate display for moved ones.
+    // Without this, decorator views won't move when content is inserted above them.
+    print("🎯 DEC-LEGACY: start cacheCount=\(textStorage.decoratorPositionCache.count)")
+    var movedDecorators: [(NodeKey, Int, Int)] = []
+    for (key, oldLoc) in textStorage.decoratorPositionCache {
+      if let newLoc = reconcilerState.nextRangeCache[key]?.location {
+        print("🎯 DEC-LEGACY: key=\(key) old=\(oldLoc) new=\(newLoc) changed=\(oldLoc != newLoc)")
+        if oldLoc != newLoc {
+          movedDecorators.append((key, oldLoc, newLoc))
+          textStorage.decoratorPositionCache[key] = newLoc
+        }
+      }
+    }
+    // IMPORTANT: Defer invalidation to next run loop to avoid crash when textStorage is editing.
+    if !movedDecorators.isEmpty {
+      let editorWeak = editor
+      let movedCopy = movedDecorators
+      let nextRangeCache = reconcilerState.nextRangeCache
+      DispatchQueue.main.async {
+        guard let layoutManager = editorWeak.frontend?.layoutManager,
+              let ts = editorWeak.textStorage else {
+          print("🎯 DEC-LEGACY: deferred - NO LAYOUT MANAGER")
+          return
+        }
+        print("🎯 DEC-LEGACY: deferred invalidation for \(movedCopy.count) decorators")
+        for (key, oldLoc, _) in movedCopy {
+          if let range = nextRangeCache[key]?.range {
+            print("🎯 DEC-LEGACY: invalidateDisplay newRange=\(range)")
+            layoutManager.invalidateDisplay(forCharacterRange: range)
+          }
+          let oldRange = NSRange(location: oldLoc, length: 1)
+          if oldRange.location < ts.length {
+            print("🎯 DEC-LEGACY: invalidateDisplay oldRange=\(oldRange)")
+            layoutManager.invalidateDisplay(forCharacterRange: oldRange)
+          }
+        }
+        print("🎯 DEC-LEGACY: deferred end")
+      }
+    }
+    print("🎯 DEC-LEGACY: end movedCount=\(movedDecorators.count)")
     editor.log(.reconciler, .verbose, "DEC: end cacheCount=\(textStorage.decoratorPositionCache.count)")
     #elseif os(macOS) && !targetEnvironment(macCatalyst)
     // AppKit decorator handling - update position cache only
@@ -296,6 +337,7 @@ internal enum Reconciler {
     if let appKitStorage = textStorage as? ReconcilerTextStorageAppKit {
       decoratorsToRemove.forEach { key in
         editor.log(.reconciler, .verbose, "DEC: remove key=\(key)")
+        print("🎯 DEC-REMOVE-D: removing key=\(key) from position cache (Reconciler AppKit)")
         appKitStorage.decoratorPositionCache[key] = nil
       }
       reconcilerState.decoratorsToAdd.forEach { key in
@@ -315,6 +357,35 @@ internal enum Reconciler {
         guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
         appKitStorage.decoratorPositionCache[key] = rangeCacheItem.location
         editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
+      }
+      // Update positions for ALL decorators (not just dirty ones) and invalidate display for moved ones.
+      var movedDecorators: [(NodeKey, Int, Int)] = []
+      for (key, oldLoc) in appKitStorage.decoratorPositionCache {
+        if let newLoc = reconcilerState.nextRangeCache[key]?.location {
+          if oldLoc != newLoc {
+            movedDecorators.append((key, oldLoc, newLoc))
+            appKitStorage.decoratorPositionCache[key] = newLoc
+          }
+        }
+      }
+      // IMPORTANT: Defer invalidation to next run loop to avoid crash when textStorage is editing.
+      if !movedDecorators.isEmpty {
+        let editorWeak = editor
+        let movedCopy = movedDecorators
+        let nextRangeCache = reconcilerState.nextRangeCache
+        let storageLen = appKitStorage.length
+        DispatchQueue.main.async {
+          guard let layoutManager = editorWeak.frontendAppKit?.layoutManager else { return }
+          for (key, oldLoc, _) in movedCopy {
+            if let range = nextRangeCache[key]?.range {
+              layoutManager.invalidateDisplay(forCharacterRange: range)
+            }
+            let oldRange = NSRange(location: oldLoc, length: 1)
+            if oldRange.location < storageLen {
+              layoutManager.invalidateDisplay(forCharacterRange: oldRange)
+            }
+          }
+        }
       }
       editor.log(.reconciler, .verbose, "DEC: end cacheCount=\(appKitStorage.decoratorPositionCache.count)")
     }

@@ -296,8 +296,28 @@ public class RangeSelection: BaseSelection {
     let style = style
 
     if isBefore && anchor.type == .element {
+      // Debug: check for decorators BEFORE transfer
+      if let ed = getActiveEditor(), let state = getActiveEditorState() {
+        for (key, node) in state.nodeMap where node is DecoratorNode {
+          print("🎯 INSERT-TEXT-A: decorator \(key) parent=\(node.parent ?? "nil")")
+          if let parentKey = node.parent, let parent = state.nodeMap[parentKey] as? ElementNode {
+            print("🎯 INSERT-TEXT-A: parent \(parentKey) children=\(parent.children) contains_decorator=\(parent.children.contains(key))")
+          }
+        }
+      }
       try transferStartingElementPointToTextPoint(
         start: anchor, end: focus, format: format, style: style)
+      // Debug: check for decorators AFTER transfer
+      if let ed = getActiveEditor(), let state = getActiveEditorState() {
+        for (key, node) in state.nodeMap where node is DecoratorNode {
+          print("🎯 INSERT-TEXT-B: decorator \(key) parent=\(node.parent ?? "nil")")
+          if let parentKey = node.parent, let parent = state.nodeMap[parentKey] as? ElementNode {
+            print("🎯 INSERT-TEXT-B: parent \(parentKey) children=\(parent.children) contains_decorator=\(parent.children.contains(key))")
+          } else {
+            print("🎯 INSERT-TEXT-B: decorator parent \(node.parent ?? "nil") not found in nodeMap or not ElementNode")
+          }
+        }
+      }
     } else if !isBefore && focus.type == .element {
       try transferStartingElementPointToTextPoint(
         start: focus, end: anchor, format: format, style: style)
@@ -305,6 +325,10 @@ public class RangeSelection: BaseSelection {
 
     let selectedNodes = try getNodes()
     let selectedNodesLength = selectedNodes.count
+    // Debug: log selected nodes to understand multi-node removal
+    print("🎯 INSERT-NODES: count=\(selectedNodesLength) keys=\(selectedNodes.map { $0.key }) types=\(selectedNodes.map { String(describing: type(of: $0)) })")
+    print("🎯 INSERT-NODES: anchor=\(anchor.key):\(anchor.offset):\(anchor.type) focus=\(focus.key):\(focus.offset):\(focus.type)")
+
     let firstPoint = isBefore ? anchor : focus
     let endPoint = isBefore ? focus : anchor
     let startOffset = firstPoint.offset
@@ -1224,7 +1248,9 @@ public class RangeSelection: BaseSelection {
 
       // Handle the deletion around decorators.
       let adjacentNode = try getAdjacentNode(focus: focus, isBackward: isBackwards)
+      print("🎯 DELETE-DECORATOR: adjacentNode=\(adjacentNode?.key ?? "nil") type=\(adjacentNode.map { String(describing: type(of: $0)) } ?? "nil")")
       if let adjacentNode = adjacentNode as? DecoratorNode {
+        print("🎯 DELETE-DECORATOR: is decorator, isInline=\(adjacentNode.isInline()) anchorNode=\(anchorNode?.key ?? "nil") anchorIsElement=\(anchorNode is ElementNode) anchorIsEmpty=\((anchorNode as? ElementNode)?.isEmpty() ?? false)")
         if adjacentNode.isInline() {
           // Make it possible to move selection from range selection to
           // node selection on the node.
@@ -1232,10 +1258,12 @@ public class RangeSelection: BaseSelection {
           let anchorNode = anchorNode as? ElementNode,
             anchorNode.isEmpty()
           {
+            print("🎯 DELETE-DECORATOR: removing empty anchor paragraph \(anchorNode.key), selecting decorator \(adjacentNode.key)")
             try anchorNode.remove()
             let nodeSelection = NodeSelection(nodes: Set([adjacentNode.key]))
             try setSelection(nodeSelection)
           } else {
+            print("🎯 DELETE-DECORATOR: selecting and removing decorator \(adjacentNode.key)")
             try adjacentNode.selectStart()
             try adjacentNode.remove()
             if let editor = getActiveEditor() {
@@ -1244,12 +1272,14 @@ public class RangeSelection: BaseSelection {
           }
         } else {
           if let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
+            print("🎯 DELETE-DECORATOR: block decorator, removing empty anchor paragraph \(anchorNode.key)")
             try anchorNode.remove()
             try adjacentNode.selectEnd()
           } else {
             if try adjacentNode.collapseAtStart(selection: self) {
               return
             } else {
+              print("🎯 DELETE-DECORATOR: block decorator, selecting and removing decorator \(adjacentNode.key)")
               try adjacentNode.selectPrevious(anchorOffset: nil, focusOffset: nil)
               try adjacentNode.remove()
             }

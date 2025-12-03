@@ -35,6 +35,7 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
   }
 
   override public func drawGlyphs(forGlyphRange drawingGlyphRange: NSRange, at origin: CGPoint) {
+    print("🎯 DEC-LM: drawGlyphs range=\(drawingGlyphRange) origin=\(origin)")
     super.drawGlyphs(forGlyphRange: drawingGlyphRange, at: origin)
     draw(forGlyphRange: drawingGlyphRange, at: origin, handlers: customDrawingText)
     drawCustomTruncationIfNeeded(forGlyphRange: drawingGlyphRange, at: origin)
@@ -159,10 +160,8 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
 
   private func positionAllDecorators() {
     guard let textStorage = textStorage as? TextStorage else { return }
-    if editor?.featureFlags.verboseLogging == true {
-      let tsPtr = Unmanaged.passUnretained(textStorage).toOpaque()
-      print("🔥 DEC-LM: positionAllDecorators count=\(textStorage.decoratorPositionCache.count) ts.ptr=\(tsPtr)")
-    }
+    let tsPtr = Unmanaged.passUnretained(textStorage).toOpaque()
+    print("🎯 DEC-LM: positionAllDecorators count=\(textStorage.decoratorPositionCache.count) ts.ptr=\(tsPtr)")
     for (key, location) in textStorage.decoratorPositionCache {
       positionDecorator(forKey: key, characterIndex: location)
     }
@@ -175,12 +174,14 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       return
     }
 
+    print("🎯 DEC-LM-POS-START: key=\(key) charIndex=\(characterIndex) ts.len=\(textStorage.length)")
+
     if textStorage.length == 0 { return }
     let clampedCharIndex = max(0, min(characterIndex, textStorage.length - 1))
     let glyphIndex = glyphIndexForCharacter(at: clampedCharIndex)
     var glyphIsInTextContainer = NSLocationInRange(glyphIndex, glyphRange(for: textContainer))
 
-    // If the glyph isn’t laid out yet (e.g., immediately after insertion and
+    // If the glyph isn't laid out yet (e.g., immediately after insertion and
     // before a draw pass), force layout for this glyph and re-check containment
     // to avoid transiently hiding the decorator view.
     if !glyphIsInTextContainer {
@@ -204,17 +205,34 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
         as? TextAttachment
     }
 
-    guard let attr = attribute, let key = attr.key, let editor = attr.editor else {
-      editor?.log(.TextView, .warning, "called with no attachment")
+    guard let attr = attribute, let attrKey = attr.key, let editor = attr.editor else {
+      print("🎯 DEC-LM-POS-FAIL: key=\(key) charIndex=\(characterIndex) - no attachment found at this location")
+      // Try to find where this attachment actually is - cache may be stale
+      var foundAt: Int? = nil
+      textStorage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: textStorage.length)) { value, range, stop in
+        if let att = value as? TextAttachment, att.key == key {
+          foundAt = range.location
+          stop.pointee = true
+        }
+      }
+      if let actual = foundAt {
+        print("🎯 DEC-LM-POS-RECOVER: attachment for key=\(key) is actually at \(actual), not \(characterIndex) - repositioning with correct index")
+        // Update the cache with the correct position
+        if let ts = textStorage as? TextStorage {
+          ts.decoratorPositionCache[key] = actual
+        }
+        // Recursively call with the correct position
+        positionDecorator(forKey: key, characterIndex: actual)
+        return
+      }
+      self.editor?.log(.TextView, .warning, "called with no attachment")
       return
     }
 
     let textContainerInset = self.editor?.frontend?.textContainerInsets ?? UIEdgeInsets.zero
 
     try? editor.read {
-      if editor.featureFlags.verboseLogging {
-        print("🔥 DEC-LM: key=\(key) charIndex=\(characterIndex) glyphIndex=\(glyphIndex) inContainer=\(glyphIsInTextContainer) hide=\(shouldHideView) ts.len=\(textStorage.length)")
-      }
+      print("🎯 DEC-LM-POS: key=\(key) charIndex=\(characterIndex) glyphIndex=\(glyphIndex) inContainer=\(glyphIsInTextContainer) hide=\(shouldHideView) ts.len=\(textStorage.length)")
       guard let decoratorView = decoratorView(forKey: key, createIfNecessary: !shouldHideView)
       else {
         editor.log(.TextView, .warning, "create decorator view failed")
@@ -222,9 +240,7 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
       }
 
       if shouldHideView {
-        if editor.featureFlags.verboseLogging {
-          print("🔥 DEC-LM: hide view key=\(key)")
-        }
+        print("🎯 DEC-LM-POS: hide view key=\(key)")
         decoratorView.isHidden = true
         return
       }
@@ -238,10 +254,9 @@ public class LayoutManager: NSLayoutManager, @unchecked Sendable {
 
       decoratorOrigin.y += (glyphBoundingRect.height - attr.bounds.height)  // bottom left now!
 
+      let oldFrame = decoratorView.frame
       decoratorView.frame = CGRect(origin: decoratorOrigin, size: attr.bounds.size)
-      if editor.featureFlags.verboseLogging {
-        print("🔥 DEC-LM: positioned key=\(key) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
-      }
+      print("🎯 DEC-LM-POS: positioned key=\(key) oldFrame=\(oldFrame) newFrame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect)")
     }
   }
 
