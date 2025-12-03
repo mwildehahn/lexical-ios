@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -11,13 +8,17 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class MetricsTests: XCTestCase {
 
   func testReconcilerRecordsMetricsForLargeDocument() throws {
     let metrics = TestMetricsContainer()
     let editorConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: metrics)
-    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: FeatureFlags())
+    let textKitContext = makeReadOnlyContext(editorConfig: editorConfig, featureFlags: FeatureFlags())
     let editor = textKitContext.editor
 
     metrics.resetMetrics()
@@ -63,5 +64,3 @@ final class TestMetricsContainer: EditorMetricsContainer {
     reconcilerRuns.removeAll()
   }
 }
-
-#endif
