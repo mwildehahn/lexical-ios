@@ -1,6 +1,3 @@
-// This test uses UIKit-specific types and is only available on iOS/Catalyst
-#if !os(macOS) || targetEnvironment(macCatalyst)
-
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -11,12 +8,17 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
+@MainActor
 class GarbageCollectionTests: XCTestCase {
 
-  var view: LexicalView?
+  var testView: TestEditorView?
   var editor: Editor {
     get {
-      guard let editor = view?.editor else {
+      guard let editor = testView?.editor else {
         XCTFail("Editor unexpectedly nil")
         fatalError()
       }
@@ -25,11 +27,11 @@ class GarbageCollectionTests: XCTestCase {
   }
 
   override func setUp() {
-    view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    testView = createTestEditorView()
   }
 
   override func tearDown() {
-    view = nil
+    testView = nil
   }
 
   func testGarbageCollectDetachedNodes() throws {
@@ -109,5 +111,3 @@ class GarbageCollectionTests: XCTestCase {
     XCTAssertEqual(editor.getEditorState().nodeMap.count, 3)
   }
 }
-
-#endif
