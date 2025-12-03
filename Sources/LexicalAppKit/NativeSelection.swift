@@ -133,11 +133,15 @@ extension TextViewAppKit {
   /// - Parameters:
   ///   - range: The range to select.
   ///   - affinity: The selection affinity.
+  ///
+  /// Note: This method sets `isUpdatingNativeSelection` to prevent the selection change
+  /// from being synced back to Lexical. This is used both for reconciler-driven selection
+  /// updates and for programmatic selection changes.
   public func applySelection(range: NSRange, affinity: NSSelectionAffinity = .downstream) {
-    guard !isUpdatingNativeSelection else { return }
-
+    // Save current state and ensure flag is set during the update
+    let wasUpdating = isUpdatingNativeSelection
     isUpdatingNativeSelection = true
-    defer { isUpdatingNativeSelection = false }
+    defer { isUpdatingNativeSelection = wasUpdating }
 
     setSelectedRange(range, affinity: affinity, stillSelecting: false)
   }
@@ -152,13 +156,22 @@ extension TextViewAppKit {
   ///
   /// This method converts a Lexical RangeSelection to native selection coordinates
   /// and updates the text view's selection.
+  ///
+  /// Note: This method does NOT check `isUpdatingNativeSelection` because it's called
+  /// by the reconciler to set the native selection. The `isUpdatingNativeSelection` flag
+  /// is only used to prevent the `handleSelectionChange` callback from syncing the
+  /// native selection back to Lexical during reconciliation.
   public func applyLexicalSelection(_ selection: RangeSelection, editor: Editor) {
-    guard !isUpdatingNativeSelection else { return }
-
     do {
       let nativeSelection = try createNativeSelectionAppKit(from: selection, editor: editor)
+      if editor.featureFlags.verboseLogging {
+        print("🔥 NATIVE_SEL: applyLexicalSelection anchor=\(selection.anchor.key):\(selection.anchor.offset) focus=\(selection.focus.key):\(selection.focus.offset) → native=\(nativeSelection.range?.description ?? "nil")")
+      }
       applySelection(nativeSelection)
     } catch {
+      if editor.featureFlags.verboseLogging {
+        print("🔥 NATIVE_SEL: applyLexicalSelection FAILED: \(error)")
+      }
       // Selection conversion failed - this can happen if nodes aren't in range cache yet
     }
   }
@@ -181,16 +194,22 @@ public func createNativeSelectionAppKit(from selection: RangeSelection, editor: 
     affinity = .forward
   }
 
-  guard let anchorLocation = try stringLocationForPoint(selection.anchor, editor: editor),
-    let focusLocation = try stringLocationForPoint(selection.focus, editor: editor)
-  else {
+  let anchorLocation = try stringLocationForPoint(selection.anchor, editor: editor)
+  let focusLocation = try stringLocationForPoint(selection.focus, editor: editor)
+
+  guard let anchorLoc = anchorLocation, let focusLoc = focusLocation else {
+    if editor.featureFlags.verboseLogging {
+      let anchorInCache = editor.rangeCache[selection.anchor.key] != nil
+      let focusInCache = editor.rangeCache[selection.focus.key] != nil
+      print("🔥 NATIVE_SEL: createNativeSelectionAppKit FAILED - anchorLoc=\(anchorLocation?.description ?? "nil") focusLoc=\(focusLocation?.description ?? "nil") anchorInCache=\(anchorInCache) focusInCache=\(focusInCache)")
+    }
     return NativeSelectionAppKit()
   }
 
-  let location = isBefore ? anchorLocation : focusLocation
+  let location = isBefore ? anchorLoc : focusLoc
 
   return NativeSelectionAppKit(
-    range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
+    range: NSRange(location: location, length: abs(anchorLoc - focusLoc)),
     lexicalAffinity: affinity)
 }
 
@@ -208,7 +227,6 @@ extension TextViewAppKit {
     let selection = nativeSelection
 
     // Notify Lexical about selection change
-    // This will be expanded to update Lexical's selection state
     notifyLexicalOfSelectionChange(selection)
   }
 
@@ -216,15 +234,28 @@ extension TextViewAppKit {
   private func notifyLexicalOfSelectionChange(_ selection: NativeSelectionAppKit) {
     guard let range = selection.range else { return }
 
-    // Convert native range to Lexical selection points before the update
+    // Convert native range to Lexical selection points
+    // This must be done inside a read block because pointAtStringLocation
+    // internally uses getNodeByKey which requires an active Lexical context
     let affinity = selection.affinity
     let rangeCache = editor.rangeCache
 
-    guard let anchor = try? pointAtStringLocation(
-      range.location, searchDirection: affinity, rangeCache: rangeCache),
-      let focus = try? pointAtStringLocation(
-        range.location + range.length, searchDirection: affinity, rangeCache: rangeCache)
-    else {
+    var anchor: Point?
+    var focus: Point?
+
+    do {
+      try editor.read {
+        anchor = try pointAtStringLocation(
+          range.location, searchDirection: affinity, rangeCache: rangeCache)
+        focus = try pointAtStringLocation(
+          range.location + range.length, searchDirection: affinity, rangeCache: rangeCache)
+      }
+    } catch {
+      // Conversion failed - this can happen if range cache is stale
+      return
+    }
+
+    guard let anchor = anchor, let focus = focus else {
       return
     }
 
@@ -246,6 +277,9 @@ extension TextViewAppKit {
         try? setSelection(newSelection)
       }
     }
+
+    // Dispatch selection change command so listeners are notified
+    editor.dispatchCommand(type: .selectionChange, payload: nil)
   }
 }
 

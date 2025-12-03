@@ -15,14 +15,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Create the main window
         window = NSWindow(
-            contentRect: NSRect(x: 100, y: 100, width: 800, height: 600),
+            contentRect: NSRect(x: 100, y: 100, width: 1100, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Lexical Demo"
         window.center()
-        window.minSize = NSSize(width: 400, height: 300)
+        window.minSize = NSSize(width: 600, height: 400)
 
         // Create and set the view controller
         viewController = ViewController()

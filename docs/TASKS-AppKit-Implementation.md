@@ -20,7 +20,7 @@ This task list is designed for an LLM agent to implement AppKit support for Lexi
 
 **Current Status:** AppKit support implementation complete!
 - `swift build` succeeds on macOS for all targets
-- `swift test` passes on macOS (297 tests)
+- `swift test` passes on macOS (298 tests)
 - `LexicalAppKit` provides AppKit-based text editing
 - `LexicalSwiftUI` provides SwiftUI wrappers for both platforms
 - README updated with platform support and usage examples
@@ -1448,6 +1448,180 @@ For practical implementation, this is the recommended order:
 **Files Modified:**
 - `Lexical/Core/Selection/RangeSelection.swift:1616-1620` - LineBreakNode check for backspace
 - `Lexical/Core/Selection/RangeSelection.swift:1689-1693` - LineBreakNode check for forward delete
+
+### Native Selection to Lexical Selection Sync (Fixed)
+
+**Issue:** When the native NSTextView selection changed (e.g., user clicks to move cursor), the Lexical selection was not updated. This caused selection to become stale and operations to occur at the wrong position.
+
+**Symptom:** Debug panel showed Lexical selection staying at old position (e.g., anchor/focus at offset 143) while native selection moved to different positions (e.g., position 98).
+
+**Root Cause:** In `notifyLexicalOfSelectionChange()` in `Sources/LexicalAppKit/NativeSelection.swift`, the `pointAtStringLocation()` function was called outside of an `editor.read {}` block. Since `pointAtStringLocation()` internally uses `getNodeByKey()` which requires an active Lexical context, the conversion always failed and returned early.
+
+**Fix:** Wrapped `pointAtStringLocation()` calls in an `editor.read {}` block:
+```swift
+// Before (broken):
+guard let anchor = try? pointAtStringLocation(range.location, ...)
+// Always failed because no active Lexical context
+
+// After (fixed):
+var anchor: Point?
+var focus: Point?
+do {
+  try editor.read {
+    anchor = try pointAtStringLocation(range.location, ...)
+    focus = try pointAtStringLocation(range.location + range.length, ...)
+  }
+} catch {
+  return
+}
+```
+
+**Tests Added:**
+- `NativeSelectionSyncParityTests.swift` with 3 tests verifying:
+  1. Collapsed selection changes are synced
+  2. Range selection changes are synced
+  3. Selection across multiple paragraphs is synced
+
+**Files Modified:**
+- `Sources/LexicalAppKit/NativeSelection.swift:215-241` - Wrapped `pointAtStringLocation` in `editor.read {}`
+- `LexicalTests/Tests/NativeSelectionSyncParityTests.swift` - New test file (300 tests total now pass)
+
+### Backspace Into Empty Previous Paragraph (Fixed)
+
+**Issue:** When backspacing at the start of a paragraph where the previous paragraph was empty (no text content), the `deleteCharacter` AppKit implementation called `collapseAtStart()` which returns `false` for ParagraphNode, resulting in no action being taken.
+
+**Symptom:** In the demo app, there was an empty first paragraph (from default Editor initialization). When the user moved cursor to start of "Welcome" paragraph and pressed backspace, nothing happened. The selection would also jump to an incorrect native position (e.g., position 30 instead of 0).
+
+**Root Cause:** The code at `RangeSelection.swift:1662-1666` tried to use `collapseAtStart()` to handle empty previous elements, but `ElementNode.collapseAtStart()` returns `false` by default, so nothing happened.
+
+**Fix:** Changed the logic to directly remove the empty previous element instead of relying on `collapseAtStart()`:
+```swift
+// Before (broken):
+} else {
+  // Previous element has no text, try to collapse
+  if try parent.collapseAtStart(selection: self) {
+    return
+  }
+}
+
+// After (fixed):
+} else {
+  // Previous element has no text - remove the empty element
+  // and keep cursor at start of current paragraph
+  try prevElement.remove()
+  return
+}
+```
+
+**Files Modified:**
+- `Lexical/Core/Selection/RangeSelection.swift:1662-1666` - Remove empty previous element directly
+
+### Demo App Empty Paragraph at Start (Fixed)
+
+**Issue:** The macOS demo app showed an empty paragraph at the start of the document content, before the "Welcome to Lexical on macOS!" heading.
+
+**Root Cause:** In `ViewController.swift`, the `addSampleContent()` method used `root.append([...])` to add sample paragraphs, but the Editor creates a default empty paragraph during initialization. The append added content after this default paragraph instead of replacing it.
+
+**Fix:** Clear existing children before adding sample content:
+```swift
+private func addSampleContent() {
+    try? lexicalView.editor.update {
+        guard let root = getRoot() else { return }
+
+        // Clear any existing children (e.g., default empty paragraph) before adding sample content
+        for child in root.getChildren() {
+            try? child.remove()
+        }
+
+        let heading = createParagraphNode()
+        // ... rest of content
+    }
+}
+```
+
+**Files Modified:**
+- `Examples/LexicalDemo/Mac/ViewController.swift:271-278` - Clear root children before adding sample content
+
+### Native Selection Not Applied During Reconciliation (Fixed)
+
+**Issue:** After operations like `insertParagraph`, the native cursor would visually appear at the end of the document, even though text was inserted at the correct position.
+
+**Symptom:** User presses Enter at the start of a paragraph. The text is correctly modified (new empty paragraph inserted), but the cursor visually jumps to the end of the document instead of staying at the start of the original content.
+
+**Root Cause:** The `applySelection(range:affinity:)` method in `NativeSelection.swift` had a guard:
+```swift
+guard !isUpdatingNativeSelection else { return }
+```
+But during reconciliation, the Editor sets `isUpdatingNativeSelection = true` to prevent the selection change callback from syncing native→Lexical. This same flag was blocking the reconciler from applying Lexical→native selection!
+
+**Fix:** Changed `applySelection(range:affinity:)` to preserve and restore the flag instead of early-returning:
+```swift
+// Before (broken):
+guard !isUpdatingNativeSelection else { return }
+isUpdatingNativeSelection = true
+defer { isUpdatingNativeSelection = false }
+setSelectedRange(range, affinity: affinity, stillSelecting: false)
+
+// After (fixed):
+let wasUpdating = isUpdatingNativeSelection
+isUpdatingNativeSelection = true
+defer { isUpdatingNativeSelection = wasUpdating }
+setSelectedRange(range, affinity: affinity, stillSelecting: false)
+```
+
+**Tests Added:**
+- `InsertParagraphAtStartParityTests.testAppKit_InsertParagraphAtStart_NativeSelectionSyncedCorrectly` - Verifies native selection is correctly positioned after insertParagraph at start
+
+**Files Modified:**
+- `Sources/LexicalAppKit/NativeSelection.swift:140-146` - Remove guard, preserve flag state instead
+
+### Backspace on Empty Paragraph Does Nothing (Fixed)
+
+**Issue:** When the cursor is on an empty paragraph (element selection with offset 0) and the user presses backspace, nothing happened. The selection stayed on the empty paragraph.
+
+**Symptom:** In the demo app, typing some content, pressing Enter multiple times to create empty paragraphs, then positioning cursor on one of those empty paragraphs and pressing backspace did nothing. The selection remained stuck.
+
+**Root Cause:** In `RangeSelection.swift` AppKit `deleteCharacter()` function, when the anchor type was `.element` (empty paragraph), the code only called `collapseAtStart(selection:)`. For ParagraphNode, `collapseAtStart()` returns `false` by default (it's designed for special nodes like HeadingNode to collapse to a paragraph). After `collapseAtStart()` returned `false`, the code fell through to `removeText()` which did nothing since the selection was collapsed.
+
+**Fix:** Added explicit empty element handling in the `.element` anchor type case:
+```swift
+if element.isEmpty() {
+  // Find the previous element to move cursor to
+  if let prevElement = element.getPreviousSibling() as? ElementNode {
+    // Move cursor to end of previous element
+    if let lastText = findLastTextNodeInElement(prevElement) {
+      let endOffset = lastText.getTextContentSize()
+      try lastText.select(anchorOffset: endOffset, focusOffset: endOffset)
+    } else {
+      try prevElement.selectEnd()
+    }
+    // Remove the empty current element
+    try element.remove()
+    return
+  }
+}
+```
+
+Also added similar logic for forward delete on empty elements.
+
+**Tests Added:**
+- `BackspaceEmptyParagraphParityTests.swift` with 5 tests:
+  1. `testParity_BackspaceOnEmptyParagraph_DeletesItAndMovesToPrevious` - Backspace removes empty paragraph and moves cursor to end of previous
+  2. `testParity_BackspaceOnEmptyParagraph_BetweenTwoParagraphs` - Backspace on empty between two paragraphs removes the empty one
+  3. `testParity_BackspaceOnMultipleEmptyParagraphs_DeletesOneAtATime` - Each backspace removes one empty paragraph
+  4. `testParity_BackspaceOnFirstEmptyParagraph_DoesNothing` - Backspace on the only paragraph does nothing
+  5. `testParity_ForwardDeleteOnEmptyParagraph_DeletesItAndMovesToNext` - Forward delete on empty paragraph moves cursor to next
+
+**Files Modified:**
+- `Lexical/Core/Selection/RangeSelection.swift:1750-1800` - Added empty element handling for backspace and forward delete
+
+---
+
+## Future Work / Cleanup
+
+- [ ] Remove verbose debug logging from `NativeSelection.swift` (`applyLexicalSelection`, `createNativeSelectionAppKit`)
+- [ ] Remove verbose logging flag from demo app (`ViewController.swift:163`)
+- [ ] Investigate "Failed to get mergeAction" warnings in EditorHistoryPlugin
 
 ---
 

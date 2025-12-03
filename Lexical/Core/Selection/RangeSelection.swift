@@ -1660,10 +1660,10 @@ public class RangeSelection: BaseSelection {
                 try lastText.select(anchorOffset: cursorOffset, focusOffset: cursorOffset)
                 return
               } else {
-                // Previous element has no text, try to collapse
-                if try parent.collapseAtStart(selection: self) {
-                  return
-                }
+                // Previous element has no text - remove the empty element
+                // and keep cursor at start of current paragraph
+                try prevElement.remove()
+                return
               }
             } else {
               // No previous element - try collapseAtStart as fallback for empty elements
@@ -1751,8 +1751,49 @@ public class RangeSelection: BaseSelection {
       // Selection is on an element node (empty element)
       if let element = anchorNode as? ElementNode {
         if isBackwards {
+          // First try collapseAtStart (works for Heading, Code, Quote nodes)
           if try element.collapseAtStart(selection: self) {
             return
+          }
+
+          // For ParagraphNode and other elements, handle empty element deletion directly
+          if element.isEmpty() {
+            // Find the previous element to move cursor to
+            if let prevElement = element.getPreviousSibling() as? ElementNode {
+              // Move cursor to end of previous element
+              if let lastText = findLastTextNodeInElement(prevElement) {
+                let endOffset = lastText.getTextContentSize()
+                try lastText.select(anchorOffset: endOffset, focusOffset: endOffset)
+              } else {
+                // Previous element is also empty, select it
+                try prevElement.selectEnd()
+              }
+              // Remove the empty current element
+              try element.remove()
+              return
+            } else {
+              // No previous element, we're at the very start
+              // Nothing to do
+              return
+            }
+          }
+        } else {
+          // Forward delete on empty element
+          if element.isEmpty() {
+            if let nextElement = element.getNextSibling() as? ElementNode {
+              // Move cursor to start of next element
+              if let firstText = findFirstTextNodeInElement(nextElement) {
+                try firstText.select(anchorOffset: 0, focusOffset: 0)
+              } else {
+                try nextElement.selectStart()
+              }
+              // Remove the empty current element
+              try element.remove()
+              return
+            } else {
+              // No next element, nothing to do
+              return
+            }
           }
         }
       }
