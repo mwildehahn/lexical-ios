@@ -10,6 +10,8 @@ import Lexical
 import LexicalAppKit
 import LexicalListPlugin
 import EditorHistoryPlugin
+import LexicalInlineImagePlugin
+import SelectableDecoratorNode
 
 // MARK: - Debug Action Log
 
@@ -102,6 +104,22 @@ final class ViewController: NSViewController, NSSplitViewDelegate {
         separator2.widthAnchor.constraint(equalToConstant: 1).isActive = true
         toolbar.addArrangedSubview(separator2)
 
+        // Inline image button
+        let imageButton = NSButton(title: "Image", target: self, action: #selector(insertInlineImage))
+        imageButton.bezelStyle = .rounded
+        toolbar.addArrangedSubview(imageButton)
+
+        // Selectable image button
+        let selectableImageButton = NSButton(title: "Sel. Image", target: self, action: #selector(insertSelectableImage))
+        selectableImageButton.bezelStyle = .rounded
+        toolbar.addArrangedSubview(selectableImageButton)
+
+        // Separator
+        let separator2b = NSBox()
+        separator2b.boxType = .separator
+        separator2b.widthAnchor.constraint(equalToConstant: 1).isActive = true
+        toolbar.addArrangedSubview(separator2b)
+
         // Undo button
         let undoButton = NSButton(title: "Undo", target: self, action: #selector(performUndo))
         undoButton.bezelStyle = .rounded
@@ -157,7 +175,8 @@ final class ViewController: NSViewController, NSSplitViewDelegate {
         let theme = Theme()
         let listPlugin = ListPlugin()
         let historyPlugin = EditorHistoryPlugin()
-        let editorConfig = EditorConfig(theme: theme, plugins: [listPlugin, historyPlugin])
+        let inlineImagePlugin = InlineImagePlugin()
+        let editorConfig = EditorConfig(theme: theme, plugins: [listPlugin, historyPlugin, inlineImagePlugin])
 
         // Enable verbose logging to debug selection sync issues
         let flags = FeatureFlags(verboseLogging: true)
@@ -253,6 +272,9 @@ final class ViewController: NSViewController, NSSplitViewDelegate {
             self.splitView.setPosition(self.view.bounds.width - 280, ofDividerAt: 0)
         }
 
+        // Register SelectableImageNode type
+        try? lexicalView.editor.registerNode(nodeType: NodeType.selectableImage, class: SelectableImageNode.self)
+
         // Add sample content
         addSampleContent()
 
@@ -316,6 +338,28 @@ final class ViewController: NSViewController, NSSplitViewDelegate {
 
     @objc private func insertNumberedList() {
         lexicalView.editor.dispatchCommand(type: .insertOrderedList, payload: nil)
+    }
+
+    @objc private func insertInlineImage() {
+        // Use a sample image URL
+        let imageURL = "https://placecats.com/200/150"
+        try? lexicalView.editor.update {
+            let imageNode = ImageNode(url: imageURL, size: CGSize(width: 200, height: 150), sourceID: "sample-image")
+            if let selection = try getSelection() {
+                _ = try selection.insertNodes(nodes: [imageNode], selectStart: false)
+            }
+        }
+    }
+
+    @objc private func insertSelectableImage() {
+        // Use a sample image URL
+        let imageURL = "https://placecats.com/200/150"
+        try? lexicalView.editor.update {
+            let imageNode = SelectableImageNode(url: imageURL, size: CGSize(width: 200, height: 150), sourceID: "sample-selectable-image")
+            if let selection = try getSelection() {
+                _ = try selection.insertNodes(nodes: [imageNode], selectStart: false)
+            }
+        }
     }
 
     @objc private func performUndo() {
@@ -505,10 +549,17 @@ final class ViewController: NSViewController, NSSplitViewDelegate {
         var logDetails = ""
 
         try? lexicalView.editor.read {
-            if let selection = try? getSelection() as? RangeSelection {
-                let anchor = selection.anchor
-                let focus = selection.focus
-                logDetails = "anchor=(\(anchor.key),\(anchor.offset),\(anchor.type)) focus=(\(focus.key),\(focus.offset),\(focus.type))"
+            if let selection = try? getSelection() {
+                if let rangeSelection = selection as? RangeSelection {
+                    let anchor = rangeSelection.anchor
+                    let focus = rangeSelection.focus
+                    logDetails = "anchor=(\(anchor.key),\(anchor.offset),\(anchor.type)) focus=(\(focus.key),\(focus.offset),\(focus.type))"
+                } else if let nodeSelection = selection as? NodeSelection {
+                    let keys = (try? nodeSelection.getNodes().map { $0.key }) ?? []
+                    logDetails = "NodeSelection keys=[\(keys.joined(separator: ", "))]"
+                } else {
+                    logDetails = "unknown selection type: \(type(of: selection))"
+                }
             } else {
                 logDetails = "nil selection"
             }

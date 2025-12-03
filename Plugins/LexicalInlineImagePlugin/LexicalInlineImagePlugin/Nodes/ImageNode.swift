@@ -177,7 +177,10 @@ public class ImageNode: DecoratorNode {
   override open func sizeForDecoratorView(
     textViewWidth: CGFloat, attributes: [NSAttributedString.Key: Any]
   ) -> CGSize {
-
+    // If textViewWidth is 0 or not set, return the original size
+    guard textViewWidth > 0 else {
+      return size
+    }
     if size.width <= textViewWidth {
       return size
     }
@@ -335,6 +338,10 @@ public class ImageNode: DecoratorNode {
   override open func sizeForDecoratorView(
     textViewWidth: CGFloat, attributes: [NSAttributedString.Key: Any]
   ) -> CGSize {
+    // If textViewWidth is 0 or not set, return the original size
+    guard textViewWidth > 0 else {
+      return size
+    }
     if size.width <= textViewWidth {
       return size
     }

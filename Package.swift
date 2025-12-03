@@ -249,6 +249,8 @@ let package = Package(
         "LexicalAppKit",
         "LexicalListPlugin",
         "EditorHistoryPlugin",
+        "LexicalInlineImagePlugin",
+        "SelectableDecoratorNode",
       ],
       path: "Examples/LexicalDemo/Mac"),
 

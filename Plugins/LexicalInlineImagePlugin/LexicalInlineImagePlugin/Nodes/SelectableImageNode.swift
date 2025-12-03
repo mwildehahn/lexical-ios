@@ -17,7 +17,7 @@ import AppKit
 #endif
 
 extension NodeType {
-  static let selectableImage = NodeType(rawValue: "selectableImage")
+  public static let selectableImage = NodeType(rawValue: "selectableImage")
 }
 
 #if canImport(UIKit)
@@ -118,7 +118,10 @@ public class SelectableImageNode: SelectableDecoratorNode {
   let maxImageHeight: CGFloat = 600.0
 
   override open func sizeForDecoratorView(textViewWidth: CGFloat, attributes: [NSAttributedString.Key: Any]) -> CGSize {
-
+    // If textViewWidth is 0 or not set, return the original size
+    guard textViewWidth > 0 else {
+      return size
+    }
     if size.width <= textViewWidth {
       return size
     }
@@ -221,6 +224,10 @@ public class SelectableImageNode: SelectableDecoratorNode {
   let maxImageHeight: CGFloat = 600.0
 
   override open func sizeForDecoratorView(textViewWidth: CGFloat, attributes: [NSAttributedString.Key: Any]) -> CGSize {
+    // If textViewWidth is 0 or not set, return the original size
+    guard textViewWidth > 0 else {
+      return size
+    }
     if size.width <= textViewWidth {
       return size
     }

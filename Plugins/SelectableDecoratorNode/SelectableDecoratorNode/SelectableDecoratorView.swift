@@ -131,8 +131,16 @@ public class SelectableDecoratorView: NSView {
           let nodes = try selection.getNodes().map { node in
             node.getKey()
           }
-          self?.setDrawsSelectionBorder(nodes.contains(nodeKey))
+          let shouldSelect = nodes.contains(nodeKey)
+          if editor.featureFlags.verboseLogging {
+            print("🎨 SEL-BORDER: updateListener fired, NodeSelection contains \(nodes), checking key=\(nodeKey), shouldSelect=\(shouldSelect)")
+          }
+          self?.setDrawsSelectionBorder(shouldSelect)
         } else {
+          if editor.featureFlags.verboseLogging {
+            let selType = type(of: selection)
+            print("🎨 SEL-BORDER: updateListener fired, selection is \(selType), hiding border for key=\(nodeKey)")
+          }
           self?.setDrawsSelectionBorder(false)
         }
       }

@@ -221,10 +221,21 @@ extension TextViewAppKit {
   ///
   /// Override point for tracking selection changes and syncing with Lexical.
   internal func handleSelectionChange() {
-    guard !isUpdatingNativeSelection else { return }
+    if editor.featureFlags.verboseLogging {
+      print("🎯 HANDLE-SEL: called, isUpdatingNativeSelection=\(isUpdatingNativeSelection)")
+    }
+    guard !isUpdatingNativeSelection else {
+      if editor.featureFlags.verboseLogging {
+        print("🎯 HANDLE-SEL: skipped due to isUpdatingNativeSelection")
+      }
+      return
+    }
 
     // Get the current selection
     let selection = nativeSelection
+    if editor.featureFlags.verboseLogging {
+      print("🎯 HANDLE-SEL: proceeding with native range=\(selection.range?.description ?? "nil")")
+    }
 
     // Notify Lexical about selection change
     notifyLexicalOfSelectionChange(selection)
@@ -261,7 +272,25 @@ extension TextViewAppKit {
 
     // Apply the selection change
     try? editor.update {
-      // Get or create the selection
+      // Check if there's an existing NodeSelection - if so, preserve it
+      // NodeSelection can't be represented in native selection, so we shouldn't
+      // overwrite it when the native selection changes (e.g., during reconciliation)
+      if let existingSelection = try? getSelection() {
+        if existingSelection is NodeSelection {
+          if editor.featureFlags.verboseLogging {
+            print("🎯 SEL-SYNC: Preserving NodeSelection, not overwriting with RangeSelection")
+          }
+          // Keep the NodeSelection - don't overwrite with a RangeSelection
+          return
+        }
+      }
+
+      if editor.featureFlags.verboseLogging {
+        let existingType = (try? getSelection()).map { String(describing: type(of: $0)) } ?? "nil"
+        print("🎯 SEL-SYNC: Converting native range to RangeSelection (existing=\(existingType))")
+      }
+
+      // Get or create the RangeSelection
       if let existingSelection = try? getSelection() as? RangeSelection {
         // Update existing selection
         existingSelection.anchor.key = anchor.key

@@ -66,6 +66,9 @@ public func pointAtStringLocation(
     let searchResult = try evaluateNode(
       kRootNodeKey, stringLocation: location, searchDirection: searchDirection,
       rangeCache: rangeCache)
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+      print("🔥 POINT-AT-LOC: location=\(location) dir=\(searchDirection == .forward ? "fwd" : "bwd") → result=\(searchResult.map { "\($0.nodeKey):\($0.offset ?? -1) type=\($0.type)" } ?? "nil")")
+    }
     guard let searchResult, let offset = searchResult.offset else {
       return nil
     }

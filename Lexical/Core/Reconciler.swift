@@ -337,6 +337,8 @@ internal enum Reconciler {
     if let appKitStorage = textStorage as? ReconcilerTextStorageAppKit {
       decoratorsToRemove.forEach { key in
         editor.log(.reconciler, .verbose, "DEC: remove key=\(key)")
+        decoratorView(forKey: key, createIfNecessary: false)?.removeFromSuperview()
+        destroyCachedDecoratorView(forKey: key)
         print("🎯 DEC-REMOVE-D: removing key=\(key) from position cache (Reconciler AppKit)")
         appKitStorage.decoratorPositionCache[key] = nil
       }

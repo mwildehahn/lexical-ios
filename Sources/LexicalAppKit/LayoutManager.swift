@@ -229,20 +229,44 @@ public class LayoutManagerAppKit: NSLayoutManager, @unchecked Sendable {
       // We have a valid location, make sure view is not hidden
       decoratorView.isHidden = false
 
+      // Get decorator size - compute it if bounds is zero (attachmentBounds may not have been called)
+      var decoratorSize = attr.bounds.size
+      var needsLayoutInvalidation = false
+      if decoratorSize.width == 0 && decoratorSize.height == 0 {
+        // Compute size directly from the decorator node
+        if let decoratorNode = getNodeByKey(key: attachmentKey) as? DecoratorNode {
+          let textViewWidth = attachmentEditor.frontendAppKit?.textLayoutWidth ?? 0
+          let attributes = textStorage.attributes(at: characterIndex, effectiveRange: nil)
+          decoratorSize = decoratorNode.sizeForDecoratorView(textViewWidth: textViewWidth, attributes: attributes)
+          // Cache the computed bounds on the attachment
+          attr.bounds = NSRect(origin: .zero, size: decoratorSize)
+          needsLayoutInvalidation = true
+        }
+      }
+
+      // If we just computed new bounds, invalidate layout so text reflows around the image
+      if needsLayoutInvalidation {
+        let range = NSRange(location: characterIndex, length: 1)
+        DispatchQueue.main.async { [weak self] in
+          guard let self = self else { return }
+          self.invalidateLayout(forCharacterRange: range, actualCharacterRange: nil)
+          if let container = self.textContainers.first {
+            self.ensureLayout(for: container)
+          }
+        }
+      }
+
       // Calculate decorator origin: start at top-left of glyph rect, offset by container insets
-      var decoratorOrigin = CGPoint(
+      // In NSTextView's flipped coordinates, y=0 is at top, increasing downward
+      let decoratorOrigin = CGPoint(
         x: glyphBoundingRect.origin.x + textContainerInset.left,
         y: glyphBoundingRect.origin.y + textContainerInset.top
       )
 
-      // Adjust y-position: move from top-left to bottom-left (NSView coordinates)
-      // In AppKit, y increases upward, so we add the difference
-      decoratorOrigin.y += (glyphBoundingRect.height - attr.bounds.height)
-
-      decoratorView.frame = CGRect(origin: decoratorOrigin, size: attr.bounds.size)
+      decoratorView.frame = CGRect(origin: decoratorOrigin, size: decoratorSize)
 
       if attachmentEditor.featureFlags.verboseLogging {
-        print("🔥 DEC-LM: positioned key=\(attachmentKey) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(attr.bounds.size)")
+        print("🔥 DEC-LM: positioned key=\(attachmentKey) frame=\(decoratorView.frame) glyphRect=\(glyphBoundingRect) attrSize=\(decoratorSize)")
       }
     }
   }
@@ -283,6 +307,74 @@ public class LayoutManagerAppKit: NSLayoutManager, @unchecked Sendable {
 /// Handles glyph generation for text transforms (uppercase/lowercase).
 @MainActor
 class LayoutManagerDelegateAppKit: NSObject, @preconcurrency NSLayoutManagerDelegate {
+
+  // MARK: - Line Fragment Adjustment for Decorators
+
+  /// Adjusts line fragment height to accommodate decorator attachments.
+  ///
+  /// When a line contains a text attachment (decorator), this method ensures
+  /// the line fragment is tall enough to fully contain the decorator view.
+  func layoutManager(
+    _ layoutManager: NSLayoutManager,
+    shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
+    lineFragmentUsedRect: UnsafeMutablePointer<NSRect>,
+    baselineOffset: UnsafeMutablePointer<CGFloat>,
+    in textContainer: NSTextContainer,
+    forGlyphRange glyphRange: NSRange
+  ) -> Bool {
+    guard let textStorage = layoutManager.textStorage else { return false }
+
+    // Convert glyph range to character range
+    let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+    guard charRange.location != NSNotFound, charRange.length > 0 else { return false }
+
+    // Check for attachments in this range
+    var maxAttachmentHeight: CGFloat = 0
+
+    textStorage.enumerateAttribute(.attachment, in: charRange, options: []) { value, _, _ in
+      guard let attachment = value as? TextAttachmentAppKit else { return }
+
+      // Get the attachment size from the cached bounds
+      var attachmentSize = attachment.bounds.size
+
+      // If bounds is zero, try to compute it
+      if attachmentSize.width == 0 && attachmentSize.height == 0 {
+        if let key = attachment.key, let editor = attachment.editor {
+          try? editor.read {
+            if let decoratorNode = getNodeByKey(key: key) as? DecoratorNode {
+              let textViewWidth = editor.frontendAppKit?.textLayoutWidth ?? 0
+              attachmentSize = decoratorNode.sizeForDecoratorView(textViewWidth: textViewWidth, attributes: [:])
+              attachment.bounds = NSRect(origin: .zero, size: attachmentSize)
+            }
+          }
+        }
+      }
+
+      if attachmentSize.height > maxAttachmentHeight {
+        maxAttachmentHeight = attachmentSize.height
+      }
+    }
+
+    // If no large attachments, let layout manager handle it normally
+    if maxAttachmentHeight <= lineFragmentRect.pointee.height {
+      return false
+    }
+
+    // Expand the line fragment to accommodate the attachment
+    let currentHeight = lineFragmentRect.pointee.height
+    let heightDelta = maxAttachmentHeight - currentHeight
+
+    // Adjust rect heights
+    lineFragmentRect.pointee.size.height = maxAttachmentHeight
+    lineFragmentUsedRect.pointee.size.height = maxAttachmentHeight
+
+    // Adjust baseline to keep text at bottom of expanded line
+    baselineOffset.pointee += heightDelta
+
+    return true
+  }
+
+  // MARK: - Glyph Generation for Text Transforms
 
   func layoutManager(
     _ layoutManager: NSLayoutManager,

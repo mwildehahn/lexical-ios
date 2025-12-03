@@ -92,8 +92,31 @@ public class NodeSelection: BaseSelection {
 
   @MainActor
   public func deleteCharacter(isBackwards: Bool) throws {
-    for node in try getNodes() {
+    let nodesToDelete = try getNodes()
+    guard !nodesToDelete.isEmpty else { return }
+
+    // Before deleting, capture the parent and index for selection restoration
+    // Use the first node's position to place the cursor after deletion
+    var parentKey: NodeKey?
+    var insertionIndex: Int?
+
+    if let firstNode = nodesToDelete.first,
+       let parent = firstNode.getParent(),
+       let index = firstNode.getIndexWithinParent() {
+      parentKey = parent.getKey()
+      insertionIndex = index
+    }
+
+    // Delete all selected nodes
+    for node in nodesToDelete {
       try node.remove()
+    }
+
+    // After deletion, create a collapsed RangeSelection at the deletion point
+    if let parentKey = parentKey, let index = insertionIndex {
+      let point = Point(key: parentKey, offset: index, type: .element)
+      let newSelection = RangeSelection(anchor: point, focus: point, format: TextFormat())
+      try setSelection(newSelection)
     }
   }
 

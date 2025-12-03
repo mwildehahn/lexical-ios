@@ -32,8 +32,10 @@ public class TextAttachmentAppKit: NSTextAttachment {
     characterIndex charIndex: Int
   ) -> NSRect {
     guard let key, let editor else {
+      print("🔥 ATTACH-BOUNDS: no key/editor, returning zero")
       return NSRect.zero
     }
+    print("🔥 ATTACH-BOUNDS: called for key=\(key) charIndex=\(charIndex) lineFrag=\(lineFrag)")
 
     let attributes =
       textContainer?.layoutManager?.textStorage?.attributes(at: charIndex, effectiveRange: nil)
@@ -50,19 +52,35 @@ public class TextAttachmentAppKit: NSTextAttachment {
     }
 
     self.bounds = bounds  // cache the value so that our LayoutManager can pull it back out later
+    print("🔥 ATTACH-BOUNDS: returning bounds=\(bounds) for key=\(key)")
     return bounds
   }
 
   // MARK: - Image Override
 
-  /// Returns an empty image to prevent AppKit from drawing a placeholder.
+  /// Returns a transparent image matching the decorator size.
+  ///
+  /// This is needed because the layout manager uses the image size to determine
+  /// horizontal space allocation for the attachment. If we return a 1x1 image,
+  /// the attachment only occupies 1px of width and text flows behind the decorator.
   public override func image(
     forBounds imageBounds: NSRect,
     textContainer: NSTextContainer?,
     characterIndex charIndex: Int
   ) -> NSImage? {
-    // Return empty image to stop AppKit drawing a placeholder
-    return NSImage(size: NSSize(width: 1, height: 1))
+    // Use bounds size if available, otherwise use imageBounds
+    let size = bounds.size.width > 0 ? bounds.size : imageBounds.size
+    guard size.width > 0 && size.height > 0 else {
+      return NSImage(size: NSSize(width: 1, height: 1))
+    }
+
+    // Return transparent image matching decorator size so layout reserves correct space
+    let image = NSImage(size: size)
+    image.lockFocus()
+    NSColor.clear.set()
+    NSRect(origin: .zero, size: size).fill()
+    image.unlockFocus()
+    return image
   }
 }
 #endif  // os(macOS) && !targetEnvironment(macCatalyst)

@@ -1603,12 +1603,18 @@ public class RangeSelection: BaseSelection {
     if let adjacentNode = adjacentNode as? DecoratorNode {
       if adjacentNode.isInline() {
         if let anchorNode = anchorNode as? ElementNode, anchorNode.isEmpty() {
+          // Remove the empty element and position cursor BEFORE the decorator
+          // (not selecting it - that happens on the NEXT backspace)
           try anchorNode.remove()
-          let nodeSelection = NodeSelection(nodes: Set([adjacentNode.key]))
-          try setSelection(nodeSelection)
+          try adjacentNode.selectPrevious(anchorOffset: nil, focusOffset: nil)
         } else {
-          try adjacentNode.selectStart()
-          try adjacentNode.remove()
+          // Instead of immediately deleting, select the decorator first
+          // The user will need to press backspace again to delete it
+          let nodeSelection = NodeSelection(nodes: Set([adjacentNode.key]))
+          if editor.featureFlags.verboseLogging {
+            print("🎯 NODE-SEL-CREATE: Creating NodeSelection for decorator key=\(adjacentNode.key)")
+          }
+          try setSelection(nodeSelection)
           editor.dispatchCommand(type: .selectionChange)
         }
       } else {
@@ -1778,7 +1784,7 @@ public class RangeSelection: BaseSelection {
         }
       }
     } else if anchor.type == .element {
-      // Selection is on an element node (empty element)
+      // Selection is on an element node (empty element or element position)
       if let element = anchorNode as? ElementNode {
         if isBackwards {
           // First try collapseAtStart (works for Heading, Code, Quote nodes)
@@ -1804,6 +1810,51 @@ public class RangeSelection: BaseSelection {
             } else {
               // No previous element, we're at the very start
               // Nothing to do
+              return
+            }
+          } else if anchor.offset == 0 {
+            // Non-empty element, but cursor is at offset 0 (before first child)
+            // Merge current element's content into the previous element
+            if let prevElement = element.getPreviousSibling() as? ElementNode {
+              // Remember the number of children in previous element before merge
+              let originalChildCount = prevElement.getChildrenSize()
+
+              // Move all children from current element to previous element
+              let children = element.getChildren()
+              for child in children {
+                try prevElement.append([child])
+              }
+
+              // Remove the now-empty current element
+              try element.remove()
+
+              // Position cursor at the join point (element offset = original child count)
+              // This puts the cursor BEFORE the first merged child
+              // If the first merged child is a decorator, this allows proper decorator selection on next backspace
+              if let firstMergedChild = children.first, firstMergedChild is DecoratorNode {
+                // Use element selection to position cursor BEFORE the decorator
+                try prevElement.select(anchorOffset: originalChildCount, focusOffset: originalChildCount)
+              } else if let lastText = findLastTextNodeInElement(prevElement) {
+                // Find the last text node that was in prevElement BEFORE the merge
+                let prevChildren = prevElement.getChildren()
+                for (index, child) in prevChildren.enumerated() {
+                  if index < originalChildCount {
+                    if let textNode = child as? TextNode {
+                      let offset = textNode.getTextContentSize()
+                      try textNode.select(anchorOffset: offset, focusOffset: offset)
+                      return
+                    }
+                  }
+                }
+                // Fallback: use element selection at the join point
+                try prevElement.select(anchorOffset: originalChildCount, focusOffset: originalChildCount)
+              } else {
+                // Previous element was empty, use element selection at the join point
+                try prevElement.select(anchorOffset: originalChildCount, focusOffset: originalChildCount)
+              }
+              return
+            } else {
+              // No previous element, nothing to delete
               return
             }
           }
