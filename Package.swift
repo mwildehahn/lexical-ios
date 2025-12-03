@@ -238,5 +238,30 @@ let package = Package(
         .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
       ],
       path: "./Plugins/LexicalMarkdown/LexicalMarkdownTests"),
+
+    // MARK: - Demo Apps (macOS only)
+
+    // macOS AppKit demo app
+    .executableTarget(
+      name: "LexicalDemoMac",
+      dependencies: [
+        "Lexical",
+        "LexicalAppKit",
+        "LexicalListPlugin",
+        "EditorHistoryPlugin",
+      ],
+      path: "Examples/LexicalDemo/Mac"),
+
+    // SwiftUI demo app (multi-platform)
+    .executableTarget(
+      name: "LexicalDemoSwiftUI",
+      dependencies: [
+        "Lexical",
+        "LexicalSwiftUI",
+        "LexicalListPlugin",
+        "EditorHistoryPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
+      path: "Examples/LexicalDemo.SwiftUI"),
   ]
 )
