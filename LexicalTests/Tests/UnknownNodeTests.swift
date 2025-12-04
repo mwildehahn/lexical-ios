@@ -11,21 +11,6 @@ import XCTest
 
 class UnknownNodeTests: XCTestCase {
 
-  var textView: TextView?
-  var editor: Editor? {
-    get {
-      return textView?.editor
-    }
-  }
-
-  override func setUp() {
-    textView = TextView()
-  }
-
-  override func tearDown() {
-    textView = nil
-  }
-
   func testCanEncodeAndDecodeAnyJson() throws {
     let simpleJson = """
 {"id": "test-id","type": "a-random-string", "randomValue": [1, "2", true, false, { "3": 4.5 }, null]}

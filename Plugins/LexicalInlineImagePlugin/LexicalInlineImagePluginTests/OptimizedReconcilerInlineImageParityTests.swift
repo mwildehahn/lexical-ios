@@ -5,6 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+// This test uses UIKit-specific types (LexicalReadOnlyTextKitContext)
+// and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 @testable import Lexical
 @testable import LexicalInlineImagePlugin
 import XCTest
@@ -561,3 +565,5 @@ final class OptimizedReconcilerInlineImageParityTests: XCTestCase {
     XCTAssertEqual(remaining.count, 2)
   }
 }
+
+#endif

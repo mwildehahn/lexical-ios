@@ -1,10 +1,21 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class FenwickCentralAggregationTests: XCTestCase {
 
-  private func makeEditorWithCentralAgg() -> (Editor, LexicalReadOnlyTextKitContext) {
+  private func makeEditorWithCentralAgg() -> (Editor, any ReadOnlyTextKitContextProtocol) {
     let flags = FeatureFlags(
       reconcilerSanityCheck: false,
       proxyTextViewInputDelegate: false,
@@ -15,12 +26,12 @@ final class FenwickCentralAggregationTests: XCTestCase {
       useOptimizedReconcilerStrictMode: true,
       useReconcilerFenwickCentralAggregation: true
     )
-    let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
     return (ctx.editor, ctx)
   }
 
   func testMultiSiblingTextChangesAggregatedOnce() throws {
-    let (editor, ctx) = makeEditorWithCentralAgg()
+    let (editor, ctx) = makeEditorWithCentralAgg(); _ = ctx // Keep context alive
     // Build: P -> [T1("Hello"), T2("World")]
     var k1: NodeKey = ""; var k2: NodeKey = ""
     try editor.update {

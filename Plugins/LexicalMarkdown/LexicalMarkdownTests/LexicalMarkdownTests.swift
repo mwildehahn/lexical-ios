@@ -11,9 +11,18 @@ import Foundation
 @testable import LexicalMarkdown
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 class LexicalMarkdownTests: XCTestCase {
-  var lexicalView: LexicalView?
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  var lexicalView: LexicalAppKit.LexicalView?
+  #else
+  var lexicalView: Lexical.LexicalView?
+  #endif
+
   var editor: Editor? {
     get {
       return lexicalView?.editor
@@ -21,7 +30,11 @@ class LexicalMarkdownTests: XCTestCase {
   }
 
   override func setUp() {
-    lexicalView = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    lexicalView = LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #else
+    lexicalView = Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #endif
   }
 
   override func tearDown() {

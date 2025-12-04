@@ -1,22 +1,36 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class SelectionClampParityTests: XCTestCase {
 
-  private func makeViews() -> (opt: LexicalView, leg: LexicalView) {
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  private func makeViews() -> (opt: LexicalAppKit.LexicalView, leg: LexicalAppKit.LexicalView) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalView(editorConfig: cfg, featureFlags: FeatureFlags())
+    let opt = LexicalAppKit.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = LexicalAppKit.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags())
     opt.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
     leg.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
     return (opt, leg)
   }
+  #else
+  private func makeViews() -> (opt: Lexical.LexicalView, leg: Lexical.LexicalView) {
+    let cfg = EditorConfig(theme: Theme(), plugins: [])
+    let opt = Lexical.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = Lexical.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags())
+    opt.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    leg.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    return (opt, leg)
+  }
+  #endif
 
   func testParity_DeleteCharacter_WithPreExpandedSelection_DeletesOneChar() throws {
     let (opt, leg) = makeViews()
-    func run(_ v: LexicalView) throws -> String {
-      let ed = v.editor
+    func run(_ ed: Editor) throws -> String {
       var key: NodeKey!
       try ed.update {
         guard let root = getRoot() else { return }
@@ -30,9 +44,8 @@ final class SelectionClampParityTests: XCTestCase {
         }
       }
       try ed.update { try (getSelection() as? RangeSelection)?.deleteCharacter(isBackwards: true) }
-      return v.attributedText.string
+      return ed.textStorage?.string ?? ""
     }
-    XCTAssertEqual(try run(opt), try run(leg))
+    XCTAssertEqual(try run(opt.editor), try run(leg.editor))
   }
 }
-

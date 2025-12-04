@@ -5,6 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+// UIKit-only: This test relies on UIKit-specific text input behavior
+// (select all + insert replaces text) that works differently on AppKit
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 @testable import Lexical
 import XCTest
 
@@ -35,3 +39,5 @@ class MutationsTests: XCTestCase {
     }
   }
 }
+
+#endif

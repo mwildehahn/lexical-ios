@@ -5,7 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
+import LexicalCore
 
 internal class LexicalReadOnlySizeCache {
 
@@ -337,3 +340,4 @@ internal class LexicalReadOnlySizeCache {
     context.restoreGState()
   }
 }
+#endif  // canImport(UIKit)

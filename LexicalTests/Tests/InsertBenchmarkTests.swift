@@ -1,14 +1,25 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class InsertBenchmarkTests: XCTestCase {
 
   struct Variation { let name: String; let flags: FeatureFlags }
 
-  func makeEditors(flags: FeatureFlags) -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+  func makeEditors(flags: FeatureFlags) -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
+    let optCtx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let legCtx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
     return ((optCtx.editor, optCtx), (legCtx.editor, legCtx))
   }
 

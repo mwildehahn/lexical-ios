@@ -5,7 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
+import LexicalCore
 
 @objc public extension Editor {
   func registerCommandObjC(_ commandName: String, priority: CommandPriority, block: @escaping ((_ payload: Any?) -> Bool)) -> () -> Void {
@@ -32,3 +35,4 @@ import Foundation
     return textStorage?.string
   }
 }
+#endif  // canImport(UIKit)

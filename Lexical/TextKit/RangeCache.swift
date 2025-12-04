@@ -5,7 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import UIKit
+import Foundation
+import LexicalCore
 
 /* The range cache is used when updating the NSTextStorage following a change to Lexical's
  * data model. In order to do the update with nuance, changing only the bits of the string
@@ -13,30 +14,32 @@ import UIKit
  * is how this information is stored, to save having to regenerate it (an expensive operation).
  */
 
-struct RangeCacheItem {
+public struct RangeCacheItem {
   // Legacy absolute location (TextKit 1)
-  var location: Int = 0
+  public var location: Int = 0
   // Optional index for Fenwick-backed absolute locations (optimized reconciler)
   // 0 indicates unused in this branch.
-  var nodeIndex: Int = 0
+  public var nodeIndex: Int = 0
   // the length of the full preamble, including any special characters
-  var preambleLength: Int = 0
+  public var preambleLength: Int = 0
   // the length of any special characters in the preamble
-  var preambleSpecialCharacterLength: Int = 0
-  var childrenLength: Int = 0
-  var textLength: Int = 0
-  var postambleLength: Int = 0
+  public var preambleSpecialCharacterLength: Int = 0
+  public var childrenLength: Int = 0
+  public var textLength: Int = 0
+  public var postambleLength: Int = 0
 
-  var range: NSRange {
+  public init() {}
+
+  public var range: NSRange {
     NSRange(
       location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 
   // Optimized (Fenwick) helpers — compatibility layer
   @MainActor
-  func locationFromFenwick(using fenwickTree: FenwickTree? = nil) -> Int { location }
+  public func locationFromFenwick(using fenwickTree: FenwickTree? = nil) -> Int { location }
   @MainActor
-  func rangeFromFenwick(using fenwickTree: FenwickTree? = nil) -> NSRange {
+  public func rangeFromFenwick(using fenwickTree: FenwickTree? = nil) -> NSRange {
     NSRange(location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
 }
@@ -56,13 +59,16 @@ struct RangeCacheItem {
  * first Text node, or at the start of the second Text node.
  */
 @MainActor
-internal func pointAtStringLocation(
-  _ location: Int, searchDirection: UITextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
+public func pointAtStringLocation(
+  _ location: Int, searchDirection: LexicalTextStorageDirection, rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> Point? {
   do {
     let searchResult = try evaluateNode(
       kRootNodeKey, stringLocation: location, searchDirection: searchDirection,
       rangeCache: rangeCache)
+    if let ed = getActiveEditor(), ed.featureFlags.verboseLogging {
+      print("🔥 POINT-AT-LOC: location=\(location) dir=\(searchDirection == .forward ? "fwd" : "bwd") → result=\(searchResult.map { "\($0.nodeKey):\($0.offset ?? -1) type=\($0.type)" } ?? "nil")")
+    }
     guard let searchResult, let offset = searchResult.offset else {
       return nil
     }
@@ -82,7 +88,7 @@ internal func pointAtStringLocation(
 
 @MainActor
 private func evaluateNode(
-  _ nodeKey: NodeKey, stringLocation: Int, searchDirection: UITextStorageDirection,
+  _ nodeKey: NodeKey, stringLocation: Int, searchDirection: LexicalTextStorageDirection,
   rangeCache: [NodeKey: RangeCacheItem]
 ) throws -> RangeCacheSearchResult? {
   guard let rangeCacheItem = rangeCache[nodeKey], let node = getNodeByKey(key: nodeKey) else {
@@ -197,17 +203,17 @@ extension NSRange {
 }
 
 extension RangeCacheItem {
-  func entireRange() -> NSRange {
+  public func entireRange() -> NSRange {
     return NSRange(
       location: location, length: preambleLength + childrenLength + textLength + postambleLength)
   }
-  func textRange() -> NSRange {
+  public func textRange() -> NSRange {
     return NSRange(location: location + preambleLength + childrenLength, length: textLength)
   }
-  func childrenRange() -> NSRange {
+  public func childrenRange() -> NSRange {
     return NSRange(location: location + preambleLength, length: childrenLength)
   }
-  func selectableRange() -> NSRange {
+  public func selectableRange() -> NSRange {
     return NSRange(
       location: location,
       length: preambleLength + childrenLength + textLength + postambleLength

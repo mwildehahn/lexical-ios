@@ -1,22 +1,33 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import XCTest
 @testable import Lexical
 @testable import EditorHistoryPlugin
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class OptimizedReconcilerHistoryTypingParityTests: XCTestCase {
 
-  private func makeEditorsWithHistory() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
+  private func makeEditorsWithHistory() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
     let cfgOpt = EditorConfig(theme: Theme(), plugins: [EditorHistoryPlugin()])
     let cfgLeg = EditorConfig(theme: Theme(), plugins: [EditorHistoryPlugin()])
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfgOpt, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfgLeg, featureFlags: FeatureFlags())
+    let opt = makeReadOnlyContext(editorConfig: cfgOpt, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = makeReadOnlyContext(editorConfig: cfgLeg, featureFlags: FeatureFlags())
     return ((opt.editor, opt), (leg.editor, leg))
   }
 
   func testParity_UndoRedo_TypingCoalesced() throws {
     let (opt, leg) = makeEditorsWithHistory()
 
-    func run(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> (String, String) {
+    func run(on pair: (Editor, any ReadOnlyTextKitContextProtocol)) throws -> (String, String) {
       let editor = pair.0; let ctx = pair.1
       try editor.update {
         guard let root = getRoot() else { return }
@@ -40,4 +51,3 @@ final class OptimizedReconcilerHistoryTypingParityTests: XCTestCase {
     XCTAssertEqual(aRedo, bRedo)
   }
 }
-

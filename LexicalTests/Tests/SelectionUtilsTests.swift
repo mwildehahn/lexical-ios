@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -608,4 +611,80 @@ class SelectionUtilsTests: XCTestCase {
       XCTAssertEqual(getIndexFromPossibleClone(node: textNode, parent: rootNode, nodeMap: nodeMap), nil)
     }
   }
+
+  /// Regression test: inserting text before a decorator with a collapsed element selection
+  /// should not delete the decorator.
+  ///
+  /// The bug was in `transferStartingElementPointToTextPoint`: for a collapsed selection at
+  /// element offset 0, the function incremented the end (focus) offset before checking if the
+  /// selection was collapsed. This caused the selection to span from the new text node to the
+  /// end of the paragraph (including the decorator), causing the decorator to be removed.
+  func testInsertTextBeforeDecoratorPreservesDecorator() throws {
+    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let editor = view.editor
+
+    // Register the test decorator node
+    try editor.registerNode(
+      nodeType: NodeType.testDecoratorCrossplatform,
+      class: TestDecoratorNodeCrossplatform.self
+    )
+
+    var decoratorKey: NodeKey = ""
+    var paragraphKey: NodeKey = ""
+
+    // Set up: paragraph with only a decorator, collapsed selection at element offset 0
+    try editor.update {
+      guard let editorState = getActiveEditorState(),
+            let rootNode = editorState.getRootNode()
+      else {
+        XCTFail("should have editor state")
+        return
+      }
+
+      let decorator = TestDecoratorNodeCrossplatform()
+      decoratorKey = decorator.key
+
+      let paragraphNode = ParagraphNode()
+      paragraphKey = paragraphNode.key
+      try paragraphNode.append([decorator])
+      try rootNode.append([paragraphNode])
+
+      // Set collapsed selection at element offset 0 (before the decorator)
+      let point = createPoint(key: paragraphNode.key, offset: 0, type: .element)
+      let selection = RangeSelection(anchor: point, focus: point, format: TextFormat())
+      editorState.selection = selection
+    }
+
+    // Now insert text - this should create a text node before the decorator, not delete it
+    try editor.update {
+      guard let selection = try getSelection() as? RangeSelection else {
+        XCTFail("Expected range selection")
+        return
+      }
+      try selection.insertText("E")
+    }
+
+    // Verify the decorator is still in the paragraph
+    try editor.read {
+      guard let paragraph = getNodeByKey(key: paragraphKey) as? ParagraphNode else {
+        XCTFail("Paragraph not found")
+        return
+      }
+
+      let children = paragraph.getChildrenKeys(fromLatest: true)
+
+      // Should have 2 children: the new text node and the decorator
+      XCTAssertEqual(children.count, 2, "Paragraph should have 2 children (text + decorator)")
+      XCTAssertTrue(children.contains(decoratorKey), "Decorator should still be in paragraph children")
+
+      // Verify decorator still exists and is attached
+      guard let decorator = getNodeByKey(key: decoratorKey) as? DecoratorNode else {
+        XCTFail("Decorator was deleted from nodeMap")
+        return
+      }
+      XCTAssertEqual(decorator.parent, paragraphKey, "Decorator should still have paragraph as parent")
+    }
+  }
 }
+
+#endif

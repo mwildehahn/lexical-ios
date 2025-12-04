@@ -1,33 +1,25 @@
+// Cross-platform range delete with decorator tests
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class OptimizedReconcilerRangeDeleteComplexParityTests: XCTestCase {
 
-  final class TestInlineDecorator: DecoratorNode {
-    override public func clone() -> Self { Self() }
-    override public func createView() -> UIView { UIView() }
-    override public func decorate(view: UIView) {}
-    override public func sizeForDecoratorView(textViewWidth: CGFloat, attributes: [NSAttributedString.Key : Any]) -> CGSize { CGSize(width: 8, height: 8) }
-  }
-
-  private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags())
-    return ((opt.editor, opt), (leg.editor, leg))
-  }
-
   func testParity_RangeDelete_MultiParagraph_WithDecoratorMiddle() throws {
-    let (opt, leg) = makeEditors()
+    let (opt, leg) = makeParityTestEditorsWithDecorators()
 
-    func scenario(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> String {
+    func scenario(on pair: (Editor, any ReadOnlyTextKitContextProtocol)) throws -> String {
       let editor = pair.0
       var t1: TextNode! = nil; var t3: TextNode! = nil
       try editor.update {
         guard let root = getRoot() else { return }
         let p1 = createParagraphNode(); let p2 = createParagraphNode(); let p3 = createParagraphNode()
-        t1 = createTextNode(text: "AAAAA"); let d = TestInlineDecorator(); let mid = createTextNode(text: "MID"); t3 = createTextNode(text: "BBBBB")
+        t1 = createTextNode(text: "AAAAA"); let d = TestDecoratorNodeCrossplatform(); let mid = createTextNode(text: "MID"); t3 = createTextNode(text: "BBBBB")
         try p1.append([t1])
         try p2.append([d, mid])
         try p3.append([t3])
@@ -47,4 +39,3 @@ final class OptimizedReconcilerRangeDeleteComplexParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 }
-

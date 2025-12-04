@@ -5,7 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
+import LexicalCore
 
 @MainActor
 struct NodePartDiff: Sendable {
@@ -43,3 +46,4 @@ func computePartDiffs(
   }
   return out
 }
+#endif  // canImport(UIKit)

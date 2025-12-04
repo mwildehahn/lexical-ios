@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 /* These functions will return a value when inside a read or update block. They should not be used when
  * not inside a read or update block (and will return nil in that case).

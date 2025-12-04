@@ -1,18 +1,22 @@
 import XCTest
 @testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class RangeCachePointMappingLargeDocParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: Editor, leg: Editor, optCtx: LexicalReadOnlyTextKitContext, legCtx: LexicalReadOnlyTextKitContext) {
+  private func makeEditors() -> (opt: Editor, leg: Editor, optCtx: any ReadOnlyTextKitContextProtocol, legCtx: any ReadOnlyTextKitContextProtocol) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags())
+    let optCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let legCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: FeatureFlags())
     return (optCtx.editor, legCtx.editor, optCtx, legCtx)
   }
 
   func testRoundTrip_SampledLocations_LargeDoc_Parity() throws {
-    let (opt, leg, _o, _l) = makeEditors()
+    let (opt, leg, oCtx, lCtx) = makeEditors(); _ = oCtx; _ = lCtx
 
     func seed(on editor: Editor, count: Int) throws {
       try editor.update {
@@ -27,10 +31,10 @@ final class RangeCachePointMappingLargeDocParityTests: XCTestCase {
     try seed(on: opt, count: 30)
     try seed(on: leg, count: 30)
 
-    XCTAssertEqual(opt.frontend?.textStorage.string, leg.frontend?.textStorage.string)
+    XCTAssertEqual(opt.textStorage?.string, leg.textStorage?.string)
 
     func roundTripSampled(editor: Editor) throws {
-      let s = editor.frontend?.textStorage.string ?? ""; let ns = s as NSString
+      let s = editor.textStorage?.string ?? ""; let ns = s as NSString
       let total = ns.length
       let step = max(1, total / 100) // sample ~100 positions
       var loc = 0
@@ -45,4 +49,3 @@ final class RangeCachePointMappingLargeDocParityTests: XCTestCase {
     try roundTripSampled(editor: leg)
   }
 }
-

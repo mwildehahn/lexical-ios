@@ -7,7 +7,12 @@
 
 import Foundation
 import Lexical
+#if canImport(UIKit)
 import UIKit
+#elseif os(macOS)
+import AppKit
+import LexicalAppKit
+#endif
 
 extension CommandType {
   public static let link = CommandType(rawValue: "link")
@@ -82,7 +87,7 @@ open class LinkPlugin: Plugin {
         try toggleLink(url: linkPayload?.urlString)
         modifiedSelection = try getSelection()?.clone()
       }
-      lexicalView?.textViewBecomeFirstResponder()
+      _ = lexicalView?.textViewBecomeFirstResponder()
       try editor.update {
         getActiveEditorState()?.selection = modifiedSelection
       }

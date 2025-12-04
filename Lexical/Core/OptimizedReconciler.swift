@@ -5,8 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+import Foundation
+import LexicalCore
 import QuartzCore
 
 // Optimized reconciler entry point. Initially a thin wrapper so we can land
@@ -254,6 +256,7 @@ internal enum OptimizedReconciler {
               editor.textStorage?.decoratorPositionCache[key] = loc
             }
           case .decoratorRemove(let key):
+            print("🎯 DEC-REMOVE-A: removing key=\(key) from position cache")
             editor.textStorage?.decoratorPositionCache[key] = nil
           case .decoratorDecorate(let key):
             if let loc = editor.rangeCache[key]?.location {
@@ -426,27 +429,62 @@ internal enum OptimizedReconciler {
   }
   
   // MARK: - Batch Decorator Position Updates
-  
+
   @MainActor
   private static func batchUpdateDecoratorPositions(editor: Editor) {
     guard let textStorage = editor.textStorage else { return }
-    
+
+    print("🎯 DEC-BATCH: start cacheCount=\(textStorage.decoratorPositionCache.count)")
+
     // Batch update all decorator positions at once
-    var updates: [(NodeKey, Int)] = []
+    var updates: [(NodeKey, Int, Int)] = [] // (key, oldLocation, newLocation)
     updates.reserveCapacity(textStorage.decoratorPositionCache.count)
-    
-    for (key, _) in textStorage.decoratorPositionCache {
+
+    for (key, oldLocation) in textStorage.decoratorPositionCache {
       if let newLocation = editor.rangeCache[key]?.location {
-        updates.append((key, newLocation))
+        updates.append((key, oldLocation, newLocation))
+        print("🎯 DEC-BATCH: key=\(key) old=\(oldLocation) new=\(newLocation) changed=\(oldLocation != newLocation)")
       }
     }
-    
+
     // Apply all updates in single pass without animations
     UIView.performWithoutAnimation {
-      for (key, location) in updates {
-        textStorage.decoratorPositionCache[key] = location
+      for (key, _, newLocation) in updates {
+        textStorage.decoratorPositionCache[key] = newLocation
       }
     }
+
+    // Invalidate display for decorators whose positions changed so they get repositioned
+    // during the next draw pass. Without this, decorator views won't move when content
+    // is inserted above them (e.g., pressing Enter before an image).
+    // IMPORTANT: Defer invalidation to next run loop to avoid crash when textStorage is editing.
+    let movedDecorators = updates.filter { $0.1 != $0.2 }
+    if !movedDecorators.isEmpty {
+      let editorWeak = editor
+      DispatchQueue.main.async {
+        guard let layoutManager = editorWeak.frontend?.layoutManager,
+              let ts = editorWeak.textStorage else {
+          print("🎯 DEC-BATCH: deferred - NO LAYOUT MANAGER")
+          return
+        }
+        print("🎯 DEC-BATCH: deferred invalidation for \(movedDecorators.count) decorators")
+        for (key, oldLocation, _) in movedDecorators {
+          // Invalidate both old and new positions to ensure the view moves
+          if let range = editorWeak.rangeCache[key]?.range {
+            print("🎯 DEC-BATCH: invalidateDisplay newRange=\(range)")
+            layoutManager.invalidateDisplay(forCharacterRange: range)
+          }
+          // Also invalidate the old location area
+          let oldRange = NSRange(location: oldLocation, length: 1)
+          if oldRange.location < ts.length {
+            print("🎯 DEC-BATCH: invalidateDisplay oldRange=\(oldRange)")
+            layoutManager.invalidateDisplay(forCharacterRange: oldRange)
+          }
+        }
+        print("🎯 DEC-BATCH: deferred end")
+      }
+    }
+    print("🎯 DEC-BATCH: end")
   }
   
   // MARK: - Instruction application & coalescing
@@ -661,6 +699,49 @@ internal enum OptimizedReconciler {
     }
 
     // Early-out optimization: if only a simple insert was handled and no further dirty work remains, return.
+    print("🎯 INSERT-CHECK: didInsertFastPath=\(didInsertFastPath) dirtyNodes.isEmpty=\(editor.dirtyNodes.isEmpty) dirtyNodes.count=\(editor.dirtyNodes.count)")
+    if let ts = editor.textStorage {
+      print("🎯 INSERT-CHECK: decoratorCache.count=\(ts.decoratorPositionCache.count) rangeCache.count=\(editor.rangeCache.count)")
+      for (key, pos) in ts.decoratorPositionCache {
+        let rangeCachePos = editor.rangeCache[key]?.location
+        print("🎯 INSERT-CHECK: decPos key=\(key) cached=\(pos) rangeCache=\(rangeCachePos ?? -1)")
+      }
+    }
+
+    // ALWAYS update decorator positions if rangeCache has different values than decoratorPositionCache.
+    // This handles all cases: early-out, no dirty nodes, etc.
+    if let ts = editor.textStorage, !ts.decoratorPositionCache.isEmpty {
+      var movedDecorators: [(NodeKey, Int, Int)] = []
+      for (key, oldLoc) in ts.decoratorPositionCache {
+        if let newLoc = editor.rangeCache[key]?.location {
+          print("🎯 DEC-UPDATE: key=\(key) old=\(oldLoc) new=\(newLoc) changed=\(oldLoc != newLoc)")
+          if oldLoc != newLoc {
+            movedDecorators.append((key, oldLoc, newLoc))
+          }
+          ts.decoratorPositionCache[key] = newLoc
+        }
+      }
+      // Defer layout invalidation to avoid crash when textStorage is still editing
+      if !movedDecorators.isEmpty {
+        let editorWeak = editor
+        let movedCopy = movedDecorators
+        DispatchQueue.main.async {
+          guard let layoutManager = editorWeak.frontend?.layoutManager,
+                let ts = editorWeak.textStorage else { return }
+          print("🎯 DEC-UPDATE: deferred invalidation for \(movedCopy.count) decorators")
+          for (key, oldLoc, _) in movedCopy {
+            if let range = editorWeak.rangeCache[key]?.range {
+              layoutManager.invalidateDisplay(forCharacterRange: range)
+            }
+            let oldRange = NSRange(location: oldLoc, length: 1)
+            if oldRange.location < ts.length {
+              layoutManager.invalidateDisplay(forCharacterRange: oldRange)
+            }
+          }
+        }
+      }
+    }
+
     if didInsertFastPath && editor.dirtyNodes.isEmpty {
       if editor.featureFlags.verboseLogging {
         print("🔥 INSERT-FAST: early-out (no further dirty)")
@@ -756,11 +837,47 @@ internal enum OptimizedReconciler {
         if editor.featureFlags.useModernTextKitOptimizations {
           batchUpdateDecoratorPositions(editor: editor)
         } else if let ts = editor.textStorage {
-          for (key, _) in ts.decoratorPositionCache {
-            if let loc = editor.rangeCache[key]?.location { ts.decoratorPositionCache[key] = loc }
+          print("🎯 DEC-NONMODERN: start cacheCount=\(ts.decoratorPositionCache.count)")
+          // Update positions and invalidate display for moved decorators
+          var movedDecorators: [(NodeKey, Int, Int)] = []
+          for (key, oldLoc) in ts.decoratorPositionCache {
+            if let newLoc = editor.rangeCache[key]?.location {
+              print("🎯 DEC-NONMODERN: key=\(key) old=\(oldLoc) new=\(newLoc) changed=\(oldLoc != newLoc)")
+              if oldLoc != newLoc {
+                movedDecorators.append((key, oldLoc, newLoc))
+              }
+              ts.decoratorPositionCache[key] = newLoc
+            }
           }
+          // Invalidate display for moved decorators
+          // IMPORTANT: Defer invalidation to next run loop to avoid crash when textStorage is editing.
+          if !movedDecorators.isEmpty {
+            let editorWeak = editor
+            let movedCopy = movedDecorators
+            DispatchQueue.main.async {
+              guard let layoutManager = editorWeak.frontend?.layoutManager,
+                    let ts = editorWeak.textStorage else {
+                print("🎯 DEC-NONMODERN: deferred - NO LAYOUT MANAGER")
+                return
+              }
+              print("🎯 DEC-NONMODERN: deferred invalidation for \(movedCopy.count) decorators")
+              for (key, oldLoc, _) in movedCopy {
+                if let range = editorWeak.rangeCache[key]?.range {
+                  print("🎯 DEC-NONMODERN: invalidateDisplay newRange=\(range)")
+                  layoutManager.invalidateDisplay(forCharacterRange: range)
+                }
+                let oldRange = NSRange(location: oldLoc, length: 1)
+                if oldRange.location < ts.length {
+                  print("🎯 DEC-NONMODERN: invalidateDisplay oldRange=\(oldRange)")
+                  layoutManager.invalidateDisplay(forCharacterRange: oldRange)
+                }
+              }
+              print("🎯 DEC-NONMODERN: deferred end")
+            }
+          }
+          print("🎯 DEC-NONMODERN: end movedCount=\(movedDecorators.count)")
         }
-        
+
         if editor.featureFlags.useOptimizedReconciler && editor.featureFlags.useModernTextKitOptimizations {
           CATransaction.commit()
         }
@@ -1446,13 +1563,19 @@ internal enum OptimizedReconciler {
       )
       // After inserting a decorator, force a minimal layout/display invalidation over
       // the character range so LayoutManager positions and unhides the view immediately.
+      // IMPORTANT: Defer to next run loop to avoid crash when textStorage is editing.
       if let _ = pendingEditorState.nodeMap[addedKey] as? DecoratorNode,
          let range = editor.rangeCache[addedKey]?.range {
-        editor.frontend?.layoutManager.invalidateLayout(forCharacterRange: range, actualCharacterRange: nil)
-        editor.frontend?.layoutManager.invalidateDisplay(forCharacterRange: range)
-        // Proactively ensure glyph layout to avoid relying on an external draw pass.
-        let glyphRange = editor.frontend?.layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil) ?? range
-        editor.frontend?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+        let editorWeak = editor
+        let rangeCopy = range
+        DispatchQueue.main.async {
+          guard let layoutManager = editorWeak.frontend?.layoutManager else { return }
+          layoutManager.invalidateLayout(forCharacterRange: rangeCopy, actualCharacterRange: nil)
+          layoutManager.invalidateDisplay(forCharacterRange: rangeCopy)
+          // Proactively ensure glyph layout to avoid relying on an external draw pass.
+          let glyphRange = layoutManager.glyphRange(forCharacterRange: rangeCopy, actualCharacterRange: nil)
+          layoutManager.ensureLayout(forGlyphRange: glyphRange)
+        }
       }
       if editor.featureFlags.verboseLogging {
         if let n = pendingEditorState.nodeMap[addedKey] as? DecoratorNode {
@@ -2510,20 +2633,55 @@ internal enum OptimizedReconciler {
       let keys = subtreeKeysDFS(rootKey: root, state: state)
       var out: Set<NodeKey> = []
       for k in keys { if state.nodeMap[k] is DecoratorNode { out.insert(k) } }
+      // Debug: log all ElementNode children to help diagnose orphaned decorators
+      if out.isEmpty && !state.nodeMap.values.filter({ $0 is DecoratorNode }).isEmpty {
+        print("🎯 DEC-ORPHAN-DEBUG: decorators exist in nodeMap but not in tree under \(root)")
+        for (key, node) in state.nodeMap {
+          if let el = node as? ElementNode {
+            let children = el.getChildrenKeys(fromLatest: false)
+            print("🎯 DEC-ORPHAN-DEBUG: node \(key) type=\(type(of: node)) children=\(children)")
+          }
+          if node is DecoratorNode {
+            print("🎯 DEC-ORPHAN-DEBUG: decorator \(key) parent=\(node.parent ?? "nil") isAttached=\(node.isAttached())")
+          }
+        }
+      }
       return out
     }
 
     let prevDecos = decoratorKeys(in: prevState, under: ancestorKey)
     let nextDecos = decoratorKeys(in: nextState, under: ancestorKey)
 
+    print("🎯 DEC-RECON-OPS: ancestorKey=\(ancestorKey) prevDecos=\(prevDecos) nextDecos=\(nextDecos)")
+
     // Removals: purge position + cache and destroy views
     let removed = prevDecos.subtracting(nextDecos)
     for k in removed {
+      // Double-check: only skip removal if the decorator moved to a different subtree.
+      // If we're scanning from root and can't find it, it's orphaned - must remove.
+      let decoratorNode = nextState.nodeMap[k] as? DecoratorNode
+      let existsInNextState = decoratorNode != nil
+      let isAttached = decoratorNode?.isAttached() ?? false
+      print("🎯 DEC-REMOVE-B: key=\(k) existsInNextState=\(existsInNextState) isAttached=\(isAttached) ancestorKey=\(ancestorKey)")
+      if existsInNextState && isAttached && ancestorKey != kRootNodeKey {
+        // The decorator still exists in the next state AND is attached, just not under this ancestor.
+        // This can happen during paragraph merges. Don't remove it.
+        print("🎯 DEC-REMOVE-B: SKIPPING removal - decorator moved to different subtree")
+        continue
+      }
+      if existsInNextState && !isAttached {
+        // Decorator is in nodeMap but orphaned (parent=nil) - must remove
+        print("🎯 DEC-REMOVE-B: decorator is ORPHANED (in nodeMap but not attached) - removing")
+      } else if existsInNextState && ancestorKey == kRootNodeKey {
+        // Decorator is in nodeMap but not reachable from root - it's orphaned!
+        print("🎯 DEC-REMOVE-B: decorator is ORPHANED (in nodeMap but not in tree) - removing")
+      }
       if editor.featureFlags.verboseLogging {
         print("🔥 DEC-RECON: remove key=\(k)")
       }
       decoratorView(forKey: k, createIfNecessary: false)?.removeFromSuperview()
       destroyCachedDecoratorView(forKey: k)
+      print("🎯 DEC-REMOVE-B: removing key=\(k) from position cache (reconcileDecoratorOps)")
       textStorage.decoratorPositionCache[k] = nil
     }
 
@@ -2570,3 +2728,4 @@ internal enum OptimizedReconciler {
     }
   }
 }
+#endif  // canImport(UIKit)

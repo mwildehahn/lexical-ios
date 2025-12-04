@@ -8,11 +8,15 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 final class OptimizedReconcilerLiveEditingTests: XCTestCase {
 
-  private func makeOptimizedEditor() -> (Editor, LexicalReadOnlyTextKitContext) {
+  private func makeOptimizedEditor() -> (Editor, any ReadOnlyTextKitContextProtocol) {
     let flags = FeatureFlags.optimizedProfile(.aggressiveEditor)
-    let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: flags)
     return (ctx.editor, ctx)
   }
 
@@ -91,7 +95,7 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
 
   func testLegacyParityBackspaceSingleChar() throws {
     // Legacy flags: ensure single char delete works identically
-    let ctx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
     let editor = ctx.editor
     try editor.update {
       guard let root = getRoot() else { return }
@@ -494,6 +498,8 @@ final class OptimizedReconcilerLiveEditingTests: XCTestCase {
       if let sel = try getSelection() as? RangeSelection { XCTAssertEqual(sel.anchor.offset, 3) }
     }
   }
+
+  // MARK: - LineBreakNode deletion tests
 
   func testBackspaceAcrossLineBreakMergesLines() throws {
     let (editor, frontend) = makeOptimizedEditor(); _ = frontend

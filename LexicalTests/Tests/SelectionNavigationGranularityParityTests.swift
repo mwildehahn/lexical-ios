@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 
@@ -77,3 +80,5 @@ final class SelectionNavigationGranularityParityTests: XCTestCase {
     XCTAssertEqual(try selectionRange(opt.0), try selectionRange(leg.0))
   }
 }
+
+#endif

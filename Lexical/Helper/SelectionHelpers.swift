@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 // Leaving commented code for later when these properties/nodes are implemented
 @MainActor

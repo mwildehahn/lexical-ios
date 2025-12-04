@@ -1,20 +1,21 @@
 import XCTest
 @testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class OptimizedReconcilerCodeLineJoinSplitParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags())
-    return ((opt.editor, opt), (leg.editor, leg))
+  private func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
+    return makeParityTestEditors()
   }
 
   func testParity_CodeLineBackspaceJoinAndSplit() throws {
     let (opt, leg) = makeEditors()
 
-    func run(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> String {
+    func run(on pair: (Editor, any ReadOnlyTextKitContextProtocol)) throws -> String {
       let editor = pair.0; let ctx = pair.1
       var t1: TextNode! = nil; var t2: TextNode! = nil
       try editor.update {
@@ -41,4 +42,3 @@ final class OptimizedReconcilerCodeLineJoinSplitParityTests: XCTestCase {
     XCTAssertEqual(a, b)
   }
 }
-

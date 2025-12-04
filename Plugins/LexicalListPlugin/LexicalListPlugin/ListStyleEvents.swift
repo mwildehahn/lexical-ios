@@ -234,7 +234,9 @@ public func insertList(editor: Editor, listType: ListType, withPlaceholders: Boo
       return
     }
 
+#if canImport(UIKit)
     editor.resetTypingAttributes(for: try selection.anchor.getNode())
+#endif
   }
 }
 

@@ -5,7 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
+import LexicalCore
 
 // TODO for see more:
 // 1. correctly decode the 'bold' attribute using Lexical rules
@@ -69,3 +72,4 @@ public class TextContainer: NSTextContainer {
     return lineFragmentRect
   }
 }
+#endif  // canImport(UIKit)

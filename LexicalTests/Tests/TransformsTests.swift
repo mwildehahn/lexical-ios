@@ -8,6 +8,10 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 class TransformTests: XCTestCase {
   static let infiniteTransformKey = "I"
   static let combinedTransformKey = "G"
@@ -20,7 +24,11 @@ class TransformTests: XCTestCase {
 
   var teardowns: [() -> Void] = []
 
-  var view: LexicalView?
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  var view: LexicalAppKit.LexicalView?
+  #else
+  var view: Lexical.LexicalView?
+  #endif
   var editor: Editor {
     get {
       guard let editor = view?.editor else {
@@ -32,7 +40,11 @@ class TransformTests: XCTestCase {
   }
 
   override func setUp() {
-    view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    view = LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #else
+    view = Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #endif
 
     // To test the transform logic, we want to test the order of the logic of the transforms
     // A-E: Adds an entry to the log with the name "[A-F][Number of update]"

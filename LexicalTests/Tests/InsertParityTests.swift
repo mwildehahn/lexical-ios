@@ -1,22 +1,22 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class InsertParityTests: XCTestCase {
 
-  func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let optFlags = FeatureFlags(
-      reconcilerSanityCheck: false,
-      proxyTextViewInputDelegate: false,
-      useOptimizedReconciler: true,
-      useReconcilerFenwickDelta: true,
-      useOptimizedReconcilerStrictMode: true,
-      useReconcilerInsertBlockFenwick: true
-    )
-    let legFlags = FeatureFlags()
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: optFlags)
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: legFlags)
-    return ((opt.editor, opt), (leg.editor, leg))
+  func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
+    return makeParityTestEditors()
   }
 
   func seed(_ editor: Editor, paragraphs: Int) throws {

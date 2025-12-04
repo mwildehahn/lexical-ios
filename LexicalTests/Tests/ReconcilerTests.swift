@@ -1,25 +1,25 @@
-/*
- * Copyright (c) Meta Platforms, Inc. and affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
+// Cross-platform reconciler tests
 
-@testable import Lexical
 import XCTest
+@testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
+@MainActor
 class ReconcilerTests: XCTestCase {
 
   func testRangeCacheHasEmptyItemForNewRootNode() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
     XCTAssertNotNil(editor.rangeCache[kRootNodeKey])
   }
 
   func testHelloWorld() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
-    XCTAssertEqual(editor.textStorage?.string, "")
+    XCTAssertEqual(view.text, "")
 
     try editor.update {
       guard let editorState = getActiveEditorState(), let rootNode: RootNode = try editorState.getRootNode()?.getWritable() else {
@@ -41,13 +41,13 @@ class ReconcilerTests: XCTestCase {
       try textNode2.setText("world!")
       try paragraphNode.append([textNode2])
     }
-    XCTAssertEqual(editor.textStorage?.string, "Hello world!")
+    XCTAssertEqual(view.text, "Hello world!")
   }
 
   func testRemoveOldAddNew() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
-    XCTAssertEqual(editor.textStorage?.string, "")
+    XCTAssertEqual(view.text, "")
 
     var childNodeKey: NodeKey?
     try editor.update {
@@ -71,7 +71,7 @@ class ReconcilerTests: XCTestCase {
       try paragraphNode.append([textNode2])
       childNodeKey = textNode2.getKey()
     }
-    XCTAssertEqual(editor.textStorage?.string, "Hello world!")
+    XCTAssertEqual(view.text, "Hello world!")
 
     try editor.update {
       guard let childNodeKey, let childNode = getNodeByKey(key: childNodeKey) as? TextNode else {
@@ -80,13 +80,13 @@ class ReconcilerTests: XCTestCase {
       }
       try childNode.setText("everyone!")
     }
-    XCTAssertEqual(editor.textStorage?.string, "Hello everyone!")
+    XCTAssertEqual(view.text, "Hello everyone!")
   }
 
   func testDidMarkParentNodesDirty() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
-    XCTAssertEqual(editor.textStorage?.string, "")
+    XCTAssertEqual(view.text, "")
 
     var childNode: TextNode?
     try editor.update {
@@ -110,7 +110,7 @@ class ReconcilerTests: XCTestCase {
       try paragraphNode.append([textNode2])
       childNode = textNode2
     }
-    XCTAssertEqual(editor.textStorage?.string, "Hello world!")
+    XCTAssertEqual(view.text, "Hello world!")
 
     try editor.update {
       guard let childNode: TextNode = try childNode?.getWritable() else {
@@ -126,7 +126,7 @@ class ReconcilerTests: XCTestCase {
   }
 
   func testDidMarkSiblingNodesDirty() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
 
     try editor.update {
@@ -155,7 +155,7 @@ class ReconcilerTests: XCTestCase {
   }
 
   func testMultipleUpdates() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
 
     try editor.update {
@@ -178,7 +178,7 @@ class ReconcilerTests: XCTestCase {
       XCTAssertEqual(pNode.getChildren().count, 2, "Expected two children on main para node")
     }
     try editor.update { }
-    XCTAssertEqual("AB", view.textStorage.string, "Text should be AB")
+    XCTAssertEqual("AB", view.text, "Text should be AB")
     try editor.update {
       guard let node = getNodeByKey(key: "1") as? TextNode else {
         XCTFail("Couldn't find node")
@@ -186,7 +186,7 @@ class ReconcilerTests: XCTestCase {
       }
       try node.setText("C")
     }
-    XCTAssertEqual("CB", view.textStorage.string, "Should be CB")
+    XCTAssertEqual("CB", view.text, "Should be CB")
     try editor.update { }
 
     try editor.update {
@@ -205,13 +205,11 @@ class ReconcilerTests: XCTestCase {
 
       try pNode.getFirstChild()?.remove()
     }
-    XCTAssertEqual("B", view.textStorage.string, "Should have deleted 'A'")
-
-    // TODO: @alexmattice - Address rangeCache growth in follow-on diff
-    // XCTAssertNil(editor.rangeCache["2"], "Should not have a node 2 any more!")
+    XCTAssertEqual("B", view.text, "Should have deleted 'A'")
   }
+
   func testErrorRecovery() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
 
     try editor.update {
@@ -242,12 +240,14 @@ class ReconcilerTests: XCTestCase {
         throw LexicalError.internal("example-error")
       }
     } catch {
-      XCTAssertEqual("AB", view.textStorage.string, "Text should be AB")
+      XCTAssertEqual("AB", view.text, "Text should be AB")
     }
   }
 
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // This test uses view.textView.selectedRange which has different behavior on AppKit
   func testParagraphStyleNormalisationWhenInserting() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = createTestEditorView()
     let editor = view.editor
 
     try editor.update {
@@ -272,18 +272,19 @@ class ReconcilerTests: XCTestCase {
       try root.append([codeNode, paragraph3])
     }
 
-    XCTAssertEqual(view.textView.text, "Hello\nworld\nagain")
+    XCTAssertEqual(view.text, "Hello\nworld\nagain")
 
     // get paragraph style at start of the last paragraph
-    let paraStyle = view.textView.textStorage.attribute(.paragraphStyle, at: 12, effectiveRange: nil) as? NSParagraphStyle
+    let paraStyle = view.view.textView.textStorage.attribute(.paragraphStyle, at: 12, effectiveRange: nil) as? NSParagraphStyle
 
     // insert a new character at end of the code node
-    view.textView.selectedRange = NSRange(location: 11, length: 0)
-    view.textView.insertText("x")
+    view.setSelectedRange(NSRange(location: 11, length: 0))
+    view.insertText("x")
 
     // get paragraph style at start of the last paragraph again
-    let paraStyle2 = view.textView.textStorage.attribute(.paragraphStyle, at: 13, effectiveRange: nil) as? NSParagraphStyle
+    let paraStyle2 = view.view.textView.textStorage.attribute(.paragraphStyle, at: 13, effectiveRange: nil) as? NSParagraphStyle
 
     XCTAssertEqual(paraStyle, paraStyle2, "Expected two equal paragraph styles when editing previous Code node")
   }
+  #endif
 }

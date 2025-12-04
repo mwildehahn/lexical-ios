@@ -5,7 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
+import LexicalCore
 
 /*
  * This file, Mutations, contains the logic for Lexical's `non-controlled` mode. In this mode,
@@ -85,3 +87,4 @@ internal func handleTextMutation(textStorage: TextStorage, rangeOfChange: NSRang
 public func getIsProcessingMutations() -> Bool {
   return isProcessingMutations
 }
+#endif  // canImport(UIKit)

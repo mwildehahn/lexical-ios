@@ -1,10 +1,21 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class SelectionMappingParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
+  private func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
     let theme = Theme(); let cfg = EditorConfig(theme: theme, plugins: [])
     let optFlags = FeatureFlags(
       reconcilerSanityCheck: false, proxyTextViewInputDelegate: false,
@@ -14,8 +25,8 @@ final class SelectionMappingParityTests: XCTestCase {
       useReconcilerFenwickCentralAggregation: true
     )
     let legFlags = FeatureFlags(reconcilerSanityCheck: false, proxyTextViewInputDelegate: false, useOptimizedReconciler: false)
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: optFlags)
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legFlags)
+    let optCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: optFlags)
+    let legCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: legFlags)
     return ((optCtx.editor, optCtx), (legCtx.editor, legCtx))
   }
 

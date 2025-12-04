@@ -5,7 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 @objc public class NodeKeyMultiplier: NSObject {
   let depthBlockSize: UInt64
@@ -27,9 +33,12 @@ import UIKit
   public let plugins: [Plugin]
   public let editorStateVersion: Int
   public let nodeKeyMultiplier: NodeKeyMultiplier?
+  #if canImport(UIKit)
   public let keyCommands: [UIKeyCommand]?
+  #endif
   public let metricsContainer: EditorMetricsContainer?
 
+  #if canImport(UIKit)
   public init(
     theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
     nodeKeyMultiplier: NodeKeyMultiplier? = nil, keyCommands: [UIKeyCommand]? = nil,
@@ -56,15 +65,28 @@ import UIKit
       metricsContainer: nil
     )
   }
+  #else
+  public init(
+    theme: Theme, plugins: [Plugin], editorStateVersion: Int = 1,
+    nodeKeyMultiplier: NodeKeyMultiplier? = nil,
+    metricsContainer: EditorMetricsContainer? = nil
+  ) {
+    self.theme = theme
+    self.plugins = plugins
+    self.editorStateVersion = editorStateVersion
+    self.nodeKeyMultiplier = nodeKeyMultiplier
+    self.metricsContainer = metricsContainer
+  }
+  #endif
 }
 
 internal enum DecoratorCacheItem {
   case needsCreation
-  case cachedView(UIView)
-  case unmountedCachedView(UIView)
-  case needsDecorating(UIView)
+  case cachedView(LexicalNativeView)
+  case unmountedCachedView(LexicalNativeView)
+  case needsDecorating(LexicalNativeView)
 
-  var view: UIView? {
+  var view: LexicalNativeView? {
     switch self {
     case .needsCreation:
       return nil
@@ -91,6 +113,7 @@ public class Editor: NSObject {
   private var pendingEditorState: EditorState?
   private var theme: Theme
 
+  #if canImport(UIKit)
   internal var textStorage: TextStorage? {
     frontend?.textStorage
   }
@@ -108,6 +131,31 @@ public class Editor: NSObject {
       }
     }
   }
+  #elseif os(macOS) && !targetEnvironment(macCatalyst)
+  internal var textStorage: NSTextStorage? {
+    frontendAppKit?.textStorage
+  }
+
+  public weak var frontendAppKit: FrontendAppKit? {
+    didSet {
+      if pendingEditorState != nil {
+        if let textStorage = frontendAppKit?.textStorage {
+          // We need to clear the text storage, but mode property is on the subclass
+          // For now, just do direct replacement
+          let range = NSRange(location: 0, length: textStorage.string.lengthAsNSString())
+          textStorage.beginEditing()
+          textStorage.replaceCharacters(in: range, with: "")
+          textStorage.endEditing()
+        }
+        try? beginUpdate({}, mode: UpdateBehaviourModificationMode(), reason: .initialization)
+      }
+    }
+  }
+
+  /// Flag to indicate if this editor is using a read-only frontend context.
+  /// This is used by RootNode to strip leading newlines for parity with UIKit.
+  public var isReadOnlyFrontend: Bool = false
+  #endif
 
   internal var infiniteUpdateLoopCount = 0
   // keyCounter is the next available node key to be used.
@@ -122,7 +170,7 @@ public class Editor: NSObject {
   internal var isRecoveringFromError: Bool = false
 
   // See description in RangeCache.swift.
-  internal var rangeCache: [NodeKey: RangeCacheItem] = [:]
+  public internal(set) var rangeCache: [NodeKey: RangeCacheItem] = [:]
   private var dfsOrderCache: [NodeKey]? = nil
   internal var dirtyNodes: DirtyNodeMap = [:]
   internal var cloneNotNeeded: Set<NodeKey> = Set()
@@ -196,6 +244,7 @@ public class Editor: NSObject {
     super.init()
     initializePlugins(plugins)
 
+    #if canImport(UIKit) || os(macOS)
     // registering custom drawing for built in nodes
     try? registerCustomDrawing(
       customAttribute: .inlineCodeBackgroundColor, layer: .background, granularity: .characterRuns,
@@ -206,6 +255,7 @@ public class Editor: NSObject {
     try? registerCustomDrawing(
       customAttribute: .quoteCustomDrawing, layer: .background, granularity: .contiguousParagraphs,
       handler: QuoteNode.quoteBackgroundDrawing)
+    #endif
 
     resetEditor()
   }
@@ -261,6 +311,7 @@ public class Editor: NSObject {
   public func update(reason: EditorUpdateReason = .update, _ closure: () throws -> Void) throws {
     let mode: UpdateBehaviourModificationMode
     if reason == .sync {
+      #if canImport(UIKit)
       mode = UpdateBehaviourModificationMode(
         suppressReconcilingSelection: false,
         suppressSanityCheck: false,
@@ -270,6 +321,14 @@ public class Editor: NSObject {
         skipTransforms: true,
         allowUpdateWithoutTextStorage: false
       )
+      #else
+      mode = UpdateBehaviourModificationMode(
+        suppressReconcilingSelection: false,
+        suppressSanityCheck: false,
+        skipTransforms: true,
+        allowUpdateWithoutTextStorage: false
+      )
+      #endif
     } else {
       mode = UpdateBehaviourModificationMode()
     }
@@ -398,6 +457,7 @@ public class Editor: NSObject {
     return registeredNodes
   }
 
+  #if canImport(UIKit)
   internal struct CustomDrawingHandlerInfo {
     let customDrawingHandler: CustomDrawingHandler
     let granularity: CustomDrawingGranularity
@@ -419,6 +479,34 @@ public class Editor: NSObject {
         customDrawingHandler: handler, granularity: granularity)
     }
   }
+  #elseif os(macOS)
+  public struct CustomDrawingHandlerInfo {
+    public let customDrawingHandler: CustomDrawingHandler
+    public let granularity: CustomDrawingGranularity
+
+    public init(customDrawingHandler: @escaping CustomDrawingHandler, granularity: CustomDrawingGranularity) {
+      self.customDrawingHandler = customDrawingHandler
+      self.granularity = granularity
+    }
+  }
+
+  public var customDrawingBackground: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
+  public var customDrawingText: [NSAttributedString.Key: CustomDrawingHandlerInfo] = [:]
+
+  public func registerCustomDrawing(
+    customAttribute: NSAttributedString.Key, layer: CustomDrawingLayer,
+    granularity: CustomDrawingGranularity, handler: @escaping CustomDrawingHandler
+  ) throws {
+    switch layer {
+    case .text:
+      customDrawingText[customAttribute] = CustomDrawingHandlerInfo(
+        customDrawingHandler: handler, granularity: granularity)
+    case .background:
+      customDrawingBackground[customAttribute] = CustomDrawingHandlerInfo(
+        customDrawingHandler: handler, granularity: granularity)
+    }
+  }
+  #endif
 
   // MARK: - Other public API
 
@@ -457,6 +545,7 @@ public class Editor: NSObject {
     dfsOrderCache = nil
     dfsOrderCache = nil
 
+    #if canImport(UIKit)
     if let textStorage = frontend?.textStorage {
       let oldMode = textStorage.mode
       textStorage.mode = .controllerMode
@@ -477,23 +566,28 @@ public class Editor: NSObject {
       }
       decoratorCache.removeValue(forKey: key)
     }
+    #endif
 
     if let pendingEditorState {
       for (_, node) in pendingEditorState.nodeMap {
         node.didMoveTo(newEditor: self)
       }
+      #if canImport(UIKit)
       try? updateWithCustomBehaviour(
         mode: UpdateBehaviourModificationMode(
           suppressReconcilingSelection: false, suppressSanityCheck: true, markedTextOperation: nil,
           skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .reset
       ) {}
-    } else {
-      // create a default paragraph node here
+      #else
       try? updateWithCustomBehaviour(
         mode: UpdateBehaviourModificationMode(
-          suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil,
-          skipTransforms: true, allowUpdateWithoutTextStorage: true), reason: .reset
-      ) {
+          suppressReconcilingSelection: false, suppressSanityCheck: true,
+          skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .reset
+      ) {}
+      #endif
+    } else {
+      // create a default paragraph node here
+      let createDefaultParagraph: () throws -> Void = {
         guard let root = getRoot() else { return }
         if root.getFirstChild() == nil {
           let paragraph = createParagraphNode()
@@ -507,8 +601,25 @@ public class Editor: NSObject {
           }
         }
       }
+      #if canImport(UIKit)
+      try? updateWithCustomBehaviour(
+        mode: UpdateBehaviourModificationMode(
+          suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil,
+          skipTransforms: true, allowUpdateWithoutTextStorage: true), reason: .reset,
+        createDefaultParagraph
+      )
+      #else
+      try? updateWithCustomBehaviour(
+        mode: UpdateBehaviourModificationMode(
+          suppressReconcilingSelection: true, suppressSanityCheck: true,
+          skipTransforms: true, allowUpdateWithoutTextStorage: true), reason: .reset,
+        createDefaultParagraph
+      )
+      #endif
     }
+    #if canImport(UIKit)
     frontend?.showPlaceholderText()
+    #endif
   }
 
   internal func resetReconciler(pendingEditorState: EditorState) {
@@ -527,6 +638,7 @@ public class Editor: NSObject {
     return compositionKey != nil
   }
 
+  #if canImport(UIKit)
   public func isTextViewEmpty() -> Bool {
     return frontend?.isEmpty ?? true
   }
@@ -534,6 +646,7 @@ public class Editor: NSObject {
   public func resetTypingAttributes(for node: Node) {
     frontend?.resetTypingAttributes(for: node)
   }
+  #endif
 
   public func clearEditor() throws {
     resetEditor(pendingEditorState: nil)
@@ -542,13 +655,14 @@ public class Editor: NSObject {
 
   // MARK: - Selection
 
+  #if canImport(UIKit)
   internal func getNativeSelection() -> NativeSelection {
     return frontend?.nativeSelection ?? NativeSelection()
   }
 
   internal func moveNativeSelection(
-    type: NativeSelectionModificationType, direction: UITextStorageDirection,
-    granularity: UITextGranularity
+    type: NativeSelectionModificationType, direction: LexicalTextStorageDirection,
+    granularity: LexicalTextGranularity
   ) {
     if featureFlags.verboseLogging {
       if let rng = getNativeSelection().range {
@@ -566,6 +680,7 @@ public class Editor: NSObject {
       }
     }
   }
+  #endif
 
   // MARK: - Internal
 
@@ -590,9 +705,11 @@ public class Editor: NSObject {
     dirtyType = .fullReconcile
     cloneNotNeeded = Set()
     if compositionKey != nil {
+      #if canImport(UIKit)
       if let frontend, frontend.isFirstResponder {
         frontend.unmarkTextWithoutUpdate()
       }
+      #endif
       compositionKey = nil
     }
 
@@ -622,11 +739,11 @@ public class Editor: NSObject {
 
   // MARK: - Decorators
 
+  #if canImport(UIKit)
   internal func frontendDidUnattachView() {
     self.log(.editor, .verbose)
     unmountDecoratorSubviewsIfNecessary()
   }
-
   internal func frontendDidAttachView() {
     self.log(.editor, .verbose)
     mountDecoratorSubviewsIfNecessary()
@@ -635,6 +752,14 @@ public class Editor: NSObject {
   var isMounting = false
   internal func mountDecoratorSubviewsIfNecessary() {
     if isMounting {
+      return
+    }
+    // If we're inside a controller mode update, UIKit's text storage editing session is still active.
+    // Layout operations are not allowed during this time, so defer until the next run loop iteration.
+    if textStorage?.isInControllerModeUpdate == true {
+      DispatchQueue.main.async { [weak self] in
+        self?.mountDecoratorSubviewsIfNecessary()
+      }
       return
     }
     isMounting = true
@@ -767,6 +892,152 @@ public class Editor: NSObject {
       }
     }
   }
+  #elseif os(macOS)
+  internal func frontendDidUnattachView() {
+    self.log(.editor, .verbose)
+    unmountDecoratorSubviewsIfNecessary()
+  }
+  internal func frontendDidAttachView() {
+    self.log(.editor, .verbose)
+    mountDecoratorSubviewsIfNecessary()
+  }
+
+  var isMounting = false
+  internal func mountDecoratorSubviewsIfNecessary() {
+    if isMounting {
+      return
+    }
+    isMounting = true
+    defer {
+      isMounting = false
+    }
+
+    guard let superview = frontendAppKit?.viewForDecoratorSubviews else {
+      self.log(.editor, .verbose, "No view for mounting decorator subviews.")
+      return
+    }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: begin cache.count=\(decoratorCache.count) ts.len=\(textStorage?.length ?? -1)")
+    }
+    try? self.read {
+      for (nodeKey, decoratorCacheItem) in decoratorCache {
+        switch decoratorCacheItem {
+        case .needsCreation:
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: create key=\(nodeKey)") }
+          guard let view = decoratorView(forKey: nodeKey, createIfNecessary: true),
+            let node = getNodeByKey(key: nodeKey) as? DecoratorNode
+          else {
+            break
+          }
+          view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
+          superview.addSubview(view)
+          node.decoratorWillAppear(view: view)
+          decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            // Always invalidate layout so TextKit positions and unhides the decorator immediately,
+            // regardless of dynamic sizing. Legacy reconciler relies on this for first-frame render.
+            frontendAppKit?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            // Proactively ensure layout for the affected glyphs so that a draw pass
+            // isn't required before LayoutManager can position the decorator. This
+            // helps the immediate-mount case when inserting a decorator after a newline.
+            let glyphRange = frontendAppKit?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontendAppKit?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
+
+          self.log(
+            .editor, .verbose,
+            "needsCreation -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
+        case .cachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: cached key=\(nodeKey)") }
+          // This shouldn't be needed if our appear/disappear logic is perfect, but it turns out we do currently need this.
+          superview.addSubview(view)
+          self.log(
+            .editor, .verbose,
+            "no-op, already cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
+        case .unmountedCachedView(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: remount key=\(nodeKey)") }
+          view.isHidden = true  // decorators will be hidden until they are layed out by TextKit
+          superview.addSubview(view)
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decoratorWillAppear(view: view)
+          }
+          decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            frontendAppKit?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontendAppKit?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontendAppKit?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: remount invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
+          self.log(
+            .editor, .verbose,
+            "unmounted -> cached. Key \(nodeKey). Frame \(view.frame). Superview \(String(describing: view.superview))"
+          )
+        case .needsDecorating(let view):
+          if featureFlags.verboseLogging { print("🔥 DEC-MOUNT: decorate key=\(nodeKey)") }
+          superview.addSubview(view)
+          decoratorCache[nodeKey] = DecoratorCacheItem.cachedView(view)
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decorate(view: view)
+          }
+          if let rangeCacheItem = rangeCache[nodeKey] {
+            // required so that TextKit does the new size calculation, and correctly hides or unhides the view
+            frontendAppKit?.layoutManager.invalidateLayout(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil)
+            let glyphRange = frontendAppKit?.layoutManager.glyphRange(
+              forCharacterRange: rangeCacheItem.range, actualCharacterRange: nil) ?? .init(location: rangeCacheItem.range.location, length: rangeCacheItem.range.length)
+            frontendAppKit?.layoutManager.ensureLayout(forGlyphRange: glyphRange)
+            if featureFlags.verboseLogging {
+              print("🔥 DEC-MOUNT: decorate invalidate key=\(nodeKey) range=\(NSStringFromRange(rangeCacheItem.range))")
+            }
+          }
+        }
+      }
+    }
+    if featureFlags.verboseLogging {
+      print("🔥 DEC-MOUNT: end cache.count=\(decoratorCache.count)")
+    }
+  }
+
+  internal func unmountDecoratorSubviewsIfNecessary() {
+    try? self.read {
+      for (nodeKey, decoratorCacheItem) in decoratorCache {
+        switch decoratorCacheItem {
+        case .needsCreation:
+          break
+        case .cachedView(let view):
+          view.removeFromSuperview()
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decoratorDidDisappear(view: view)
+            decoratorCache[nodeKey] = DecoratorCacheItem.unmountedCachedView(view)
+          } else {
+            decoratorCache[nodeKey] = nil
+          }
+        case .unmountedCachedView:
+          break
+        case .needsDecorating(let view):
+          view.removeFromSuperview()
+          if let node = getNodeByKey(key: nodeKey) as? DecoratorNode {
+            node.decoratorDidDisappear(view: view)
+            decoratorCache[nodeKey] = DecoratorCacheItem.unmountedCachedView(view)
+          } else {
+            decoratorCache[nodeKey] = nil
+          }
+        }
+      }
+    }
+  }
+  #endif
 
   // MARK: - Manipulating the editor state
 
@@ -818,7 +1089,12 @@ public class Editor: NSObject {
       self.isUpdating = true
 
       if editorStateWasCloned {
+        #if canImport(UIKit)
         pendingEditorState.selection = try createSelection(editor: self)
+        #else
+        // On AppKit, just clone the existing selection if available
+        pendingEditorState.selection = self.editorState.selection?.clone()
+        #endif
       }
 
       do {
@@ -843,12 +1119,20 @@ public class Editor: NSObject {
           }
         }
 
+        #if canImport(UIKit)
         if mode.allowUpdateWithoutTextStorage && textStorage == nil {
           // we want to leave the pending editor state as pending here; it will be reconciled when a text storage is attached
           self.isUpdating = previouslyUpdating
           return
         }
+        #elseif os(macOS) && !targetEnvironment(macCatalyst)
+        if mode.allowUpdateWithoutTextStorage && textStorage == nil {
+          self.isUpdating = previouslyUpdating
+          return
+        }
+        #endif
 
+        #if canImport(UIKit)
         if !headless {
           if featureFlags.verboseLogging {
             let tsLen = textStorage?.length ?? -1
@@ -883,6 +1167,30 @@ public class Editor: NSObject {
             print("🔥 RECONCILE: end dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLenAfter)")
           }
         }
+        #elseif os(macOS) && !targetEnvironment(macCatalyst)
+        // AppKit reconciliation path - use legacy Reconciler only (no optimized path yet)
+        if !headless {
+          // Prevent selection feedback during reconciliation
+          frontendAppKit?.isUpdatingNativeSelection = true
+          defer { frontendAppKit?.isUpdatingNativeSelection = false }
+
+          if featureFlags.verboseLogging {
+            let tsLen = textStorage?.length ?? -1
+            print("🔥 RECONCILE: begin (AppKit) dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLen)")
+          }
+          try Reconciler.updateEditorState(
+            currentEditorState: editorState,
+            pendingEditorState: pendingEditorState,
+            editor: self,
+            shouldReconcileSelection: !mode.suppressReconcilingSelection,
+            markedTextOperation: nil  // AppKit uses different IME handling
+          )
+          if featureFlags.verboseLogging {
+            let tsLenAfter = textStorage?.length ?? -1
+            print("🔥 RECONCILE: end (AppKit) dirty=\(dirtyNodes.count) type=\(dirtyType) ts.len=\(tsLenAfter)")
+          }
+        }
+        #endif
         self.isUpdating = previouslyUpdating
         garbageCollectDetachedNodes(
           prevEditorState: editorState, editorState: pendingEditorState, dirtyLeaves: dirtyNodes)
@@ -921,7 +1229,9 @@ public class Editor: NSObject {
       dirtyType = .noDirtyNodes
       cloneNotNeeded.removeAll()
 
+      #if canImport(UIKit) || os(macOS)
       mountDecoratorSubviewsIfNecessary()
+      #endif
     }
 
     if isInsideNestedEditorBlock {
@@ -943,6 +1253,7 @@ public class Editor: NSObject {
         previousEditorState: previousEditorStateForListeners)
     }
 
+    #if canImport(UIKit)
     frontend?.isUpdatingNativeSelection = false
 
     if featureFlags.reconcilerSanityCheck && !mode.suppressSanityCheck && compositionKey == nil,
@@ -967,6 +1278,7 @@ public class Editor: NSObject {
         }
       }
     }
+    #endif
   }
 
   private func beginRead(_ closure: () throws -> Void) throws {
@@ -1177,57 +1489,82 @@ public class Editor: NSObject {
       self.headless = previousHeadless
     }
 
+    let updateClosure: () throws -> Void = {
+      let serializedEditorState = try JSONDecoder().decode(SerializedEditorState.self, from: json)
+      guard let editor = getActiveEditor() else {
+        throw LexicalError.invariantViolation("Editor is unexpectedly nil")
+      }
+      editor.setEditorStateVersion(serializedEditorState.version)
+
+      guard let serializedRootNode = serializedEditorState.rootNode, let rootNode = getRoot()
+      else {
+        throw LexicalError.internal("Failed to decode RootNode")
+      }
+
+      try rootNode.append(serializedRootNode.getChildren())
+      try rootNode.setDirection(direction: serializedRootNode.direction)
+    }
+
+    #if canImport(UIKit)
     try self.beginUpdate(
-      {
-        let serializedEditorState = try JSONDecoder().decode(SerializedEditorState.self, from: json)
-        guard let editor = getActiveEditor() else {
-          throw LexicalError.invariantViolation("Editor is unexpectedly nil")
-        }
-        editor.setEditorStateVersion(serializedEditorState.version)
-
-        guard let serializedRootNode = serializedEditorState.rootNode, let rootNode = getRoot()
-        else {
-          throw LexicalError.internal("Failed to decode RootNode")
-        }
-
-        try rootNode.append(serializedRootNode.getChildren())
-        try rootNode.setDirection(direction: serializedRootNode.direction)
-      },
+      updateClosure,
       mode: UpdateBehaviourModificationMode(
         suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil,
         skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .parseState)
+    #else
+    try self.beginUpdate(
+      updateClosure,
+      mode: UpdateBehaviourModificationMode(
+        suppressReconcilingSelection: true, suppressSanityCheck: true,
+        skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .parseState)
+    #endif
 
     for migration in migrations where self.editorState.version == migration.fromVersion {
-      try self.beginUpdate(
-        {
-          guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
-            throw LexicalError.invariantViolation("Editor is unexpectedly nil")
-          }
+      let migrationClosure: () throws -> Void = {
+        guard let editor = getActiveEditor(), let editorState = getActiveEditorState() else {
+          throw LexicalError.invariantViolation("Editor is unexpectedly nil")
+        }
 
-          try migration.handler(editorState)
-          editor.setEditorStateVersion(migration.toVersion)
-        },
+        try migration.handler(editorState)
+        editor.setEditorStateVersion(migration.toVersion)
+      }
+
+      #if canImport(UIKit)
+      try self.beginUpdate(
+        migrationClosure,
         mode: UpdateBehaviourModificationMode(
           suppressReconcilingSelection: true, suppressSanityCheck: true, markedTextOperation: nil,
           skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .migrateState)
+      #else
+      try self.beginUpdate(
+        migrationClosure,
+        mode: UpdateBehaviourModificationMode(
+          suppressReconcilingSelection: true, suppressSanityCheck: true,
+          skipTransforms: true, allowUpdateWithoutTextStorage: false), reason: .migrateState)
+      #endif
     }
 
     return self.editorState
   }
 }
 
+#if canImport(UIKit)
 internal enum NativeSelectionModificationType {
   case move
   case extend
 }
+#endif
 
 internal struct UpdateBehaviourModificationMode {
+  #if canImport(UIKit)
   let markedTextOperation: MarkedTextOperation?
+  #endif
   let skipTransforms: Bool
   let suppressReconcilingSelection: Bool
   let suppressSanityCheck: Bool
   let allowUpdateWithoutTextStorage: Bool
 
+  #if canImport(UIKit)
   internal init(
     suppressReconcilingSelection: Bool = false,
     suppressSanityCheck: Bool = false,
@@ -1241,4 +1578,17 @@ internal struct UpdateBehaviourModificationMode {
     self.skipTransforms = skipTransforms
     self.allowUpdateWithoutTextStorage = allowUpdateWithoutTextStorage
   }
+  #else
+  internal init(
+    suppressReconcilingSelection: Bool = false,
+    suppressSanityCheck: Bool = false,
+    skipTransforms: Bool = false,
+    allowUpdateWithoutTextStorage: Bool = false
+  ) {
+    self.suppressReconcilingSelection = suppressReconcilingSelection
+    self.suppressSanityCheck = suppressSanityCheck
+    self.skipTransforms = skipTransforms
+    self.allowUpdateWithoutTextStorage = allowUpdateWithoutTextStorage
+  }
+  #endif
 }

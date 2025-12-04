@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 extension String {
   public func lengthAsNSString() -> Int {

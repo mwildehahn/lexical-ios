@@ -5,19 +5,25 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 // This is an ObjC class because it needs to conform to NSObject's equality, otherwise the Layout Manager
 // can't iterate through attributes properly.
 @objc public class CodeBlockCustomDrawingAttributes: NSObject {
-  public init(background: UIColor, border: UIColor, borderWidth: CGFloat) {
+  public init(background: LexicalColor, border: LexicalColor, borderWidth: CGFloat) {
     self.background = background
     self.border = border
     self.borderWidth = borderWidth
   }
 
-  let background: UIColor
-  let border: UIColor
+  let background: LexicalColor
+  let border: LexicalColor
   let borderWidth: CGFloat
 
   override public func isEqual(_ object: Any?) -> Bool {
@@ -153,12 +159,13 @@ public class CodeNode: ElementNode {
   }
 }
 
+#if canImport(UIKit) || os(macOS)
 extension CodeNode {
   internal static var codeBlockBackgroundDrawing: CustomDrawingHandler {
     return {
       attributeKey, attributeValue, layoutManager, attributeRunCharacterRange,
       granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
-      guard let context = UIGraphicsGetCurrentContext(),
+      guard let context = lexicalGraphicsGetCurrentContext(),
         let attributeValue = attributeValue as? CodeBlockCustomDrawingAttributes
       else { return }
       context.setFillColor(attributeValue.background.cgColor)
@@ -169,3 +176,4 @@ extension CodeNode {
     }
   }
 }
+#endif

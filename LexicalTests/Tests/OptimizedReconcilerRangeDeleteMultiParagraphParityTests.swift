@@ -1,20 +1,28 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class OptimizedReconcilerRangeDeleteMultiParagraphParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags())
-    return ((opt.editor, opt), (leg.editor, leg))
+  private func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
+    return makeParityTestEditors()
   }
 
   func testParity_RangeDeleteAcrossThreeParagraphs() throws {
     let (opt, leg) = makeEditors()
 
-    func buildAndDelete(on pair: (Editor, LexicalReadOnlyTextKitContext)) throws -> String {
+    func buildAndDelete(on pair: (Editor, any ReadOnlyTextKitContextProtocol)) throws -> String {
       var t1: TextNode! = nil; var t2: TextNode! = nil; var t3: TextNode! = nil
       let editor = pair.0
       try editor.update {
@@ -39,4 +47,3 @@ final class OptimizedReconcilerRangeDeleteMultiParagraphParityTests: XCTestCase 
     XCTAssertEqual(a, "AACC")
   }
 }
-

@@ -5,14 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
-
-public enum NodePart {
-  case preamble
-  case text
-  case postamble
-}
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 private struct ReconcilerInsertion {
   var location: Int
@@ -125,6 +124,7 @@ internal enum Reconciler {
           var total = 0
           for k in childKeys { total += subtreeTotalLengthLocal(nodeKey: k, state: pendingEditorState) }
           if total > 0 {
+            #if canImport(UIKit)
             let t0 = CFAbsoluteTimeGetCurrent()
             try OptimizedReconciler.hydrateFreshDocumentFully(pendingState: pendingEditorState, editor: editor)
             let dt = CFAbsoluteTimeGetCurrent() - t0
@@ -152,6 +152,7 @@ internal enum Reconciler {
               }
             }
             return
+            #endif  // UIKit-only hydration path
           }
         }
       }
@@ -205,8 +206,13 @@ internal enum Reconciler {
       reconcilerState.rangesToDelete.append(NSRange(location: 0, length: textStorage.length))
     }
 
+    #if canImport(UIKit)
     let previousMode = textStorage.mode
     textStorage.mode = .controllerMode
+    #elseif os(macOS) && !targetEnvironment(macCatalyst)
+    let previousMode: TextStorageEditingMode = (textStorage as? ReconcilerTextStorageAppKit)?.mode ?? .none
+    (textStorage as? ReconcilerTextStorageAppKit)?.mode = .controllerMode
+    #endif
     textStorage.beginEditing()
 
     editor.log(
@@ -257,10 +263,13 @@ internal enum Reconciler {
     let decoratorsToDecorate = reconcilerState.decoratorsToDecorate.filter { key in
       return !reconcilerState.decoratorsToAdd.contains(key)
     }
+
+    #if canImport(UIKit)
     decoratorsToRemove.forEach { key in
       editor.log(.reconciler, .verbose, "DEC: remove key=\(key)")
       decoratorView(forKey: key, createIfNecessary: false)?.removeFromSuperview()
       destroyCachedDecoratorView(forKey: key)
+      print("🎯 DEC-REMOVE-C: removing key=\(key) from position cache (Reconciler UIKit)")
       textStorage.decoratorPositionCache[key] = nil
     }
     reconcilerState.decoratorsToAdd.forEach { key in
@@ -281,7 +290,108 @@ internal enum Reconciler {
       textStorage.decoratorPositionCache[key] = rangeCacheItem.location
       editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
     }
+    // Update positions for ALL decorators (not just dirty ones) and invalidate display for moved ones.
+    // Without this, decorator views won't move when content is inserted above them.
+    print("🎯 DEC-LEGACY: start cacheCount=\(textStorage.decoratorPositionCache.count)")
+    var movedDecorators: [(NodeKey, Int, Int)] = []
+    for (key, oldLoc) in textStorage.decoratorPositionCache {
+      if let newLoc = reconcilerState.nextRangeCache[key]?.location {
+        print("🎯 DEC-LEGACY: key=\(key) old=\(oldLoc) new=\(newLoc) changed=\(oldLoc != newLoc)")
+        if oldLoc != newLoc {
+          movedDecorators.append((key, oldLoc, newLoc))
+          textStorage.decoratorPositionCache[key] = newLoc
+        }
+      }
+    }
+    // IMPORTANT: Defer invalidation to next run loop to avoid crash when textStorage is editing.
+    if !movedDecorators.isEmpty {
+      let editorWeak = editor
+      let movedCopy = movedDecorators
+      let nextRangeCache = reconcilerState.nextRangeCache
+      DispatchQueue.main.async {
+        guard let layoutManager = editorWeak.frontend?.layoutManager,
+              let ts = editorWeak.textStorage else {
+          print("🎯 DEC-LEGACY: deferred - NO LAYOUT MANAGER")
+          return
+        }
+        print("🎯 DEC-LEGACY: deferred invalidation for \(movedCopy.count) decorators")
+        for (key, oldLoc, _) in movedCopy {
+          if let range = nextRangeCache[key]?.range {
+            print("🎯 DEC-LEGACY: invalidateDisplay newRange=\(range)")
+            layoutManager.invalidateDisplay(forCharacterRange: range)
+          }
+          let oldRange = NSRange(location: oldLoc, length: 1)
+          if oldRange.location < ts.length {
+            print("🎯 DEC-LEGACY: invalidateDisplay oldRange=\(oldRange)")
+            layoutManager.invalidateDisplay(forCharacterRange: oldRange)
+          }
+        }
+        print("🎯 DEC-LEGACY: deferred end")
+      }
+    }
+    print("🎯 DEC-LEGACY: end movedCount=\(movedDecorators.count)")
     editor.log(.reconciler, .verbose, "DEC: end cacheCount=\(textStorage.decoratorPositionCache.count)")
+    #elseif os(macOS) && !targetEnvironment(macCatalyst)
+    // AppKit decorator handling - update position cache only
+    // Full decorator view support requires additional implementation
+    if let appKitStorage = textStorage as? ReconcilerTextStorageAppKit {
+      decoratorsToRemove.forEach { key in
+        editor.log(.reconciler, .verbose, "DEC: remove key=\(key)")
+        decoratorView(forKey: key, createIfNecessary: false)?.removeFromSuperview()
+        destroyCachedDecoratorView(forKey: key)
+        print("🎯 DEC-REMOVE-D: removing key=\(key) from position cache (Reconciler AppKit)")
+        appKitStorage.decoratorPositionCache[key] = nil
+      }
+      reconcilerState.decoratorsToAdd.forEach { key in
+        if editor.decoratorCache[key] == nil {
+          editor.decoratorCache[key] = DecoratorCacheItem.needsCreation
+          editor.log(.reconciler, .verbose, "DEC: add key=\(key) state=needsCreation")
+        }
+        guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
+        appKitStorage.decoratorPositionCache[key] = rangeCacheItem.location
+        editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
+      }
+      decoratorsToDecorate.forEach { key in
+        if let cacheItem = editor.decoratorCache[key], let view = cacheItem.view {
+          editor.decoratorCache[key] = DecoratorCacheItem.needsDecorating(view)
+          editor.log(.reconciler, .verbose, "DEC: decorate key=\(key) state=needsDecorating")
+        }
+        guard let rangeCacheItem = reconcilerState.nextRangeCache[key] else { return }
+        appKitStorage.decoratorPositionCache[key] = rangeCacheItem.location
+        editor.log(.reconciler, .verbose, "DEC: pos key=\(key) loc=\(rangeCacheItem.location)")
+      }
+      // Update positions for ALL decorators (not just dirty ones) and invalidate display for moved ones.
+      var movedDecorators: [(NodeKey, Int, Int)] = []
+      for (key, oldLoc) in appKitStorage.decoratorPositionCache {
+        if let newLoc = reconcilerState.nextRangeCache[key]?.location {
+          if oldLoc != newLoc {
+            movedDecorators.append((key, oldLoc, newLoc))
+            appKitStorage.decoratorPositionCache[key] = newLoc
+          }
+        }
+      }
+      // IMPORTANT: Defer invalidation to next run loop to avoid crash when textStorage is editing.
+      if !movedDecorators.isEmpty {
+        let editorWeak = editor
+        let movedCopy = movedDecorators
+        let nextRangeCache = reconcilerState.nextRangeCache
+        let storageLen = appKitStorage.length
+        DispatchQueue.main.async {
+          guard let layoutManager = editorWeak.frontendAppKit?.layoutManager else { return }
+          for (key, oldLoc, _) in movedCopy {
+            if let range = nextRangeCache[key]?.range {
+              layoutManager.invalidateDisplay(forCharacterRange: range)
+            }
+            let oldRange = NSRange(location: oldLoc, length: 1)
+            if oldRange.location < storageLen {
+              layoutManager.invalidateDisplay(forCharacterRange: oldRange)
+            }
+          }
+        }
+      }
+      editor.log(.reconciler, .verbose, "DEC: end cacheCount=\(appKitStorage.decoratorPositionCache.count)")
+    }
+    #endif
 
     editor.log(
       .reconciler, .verbose, "about to do rangesToAdd: total \(reconcilerState.rangesToAdd.count)")
@@ -323,7 +433,7 @@ internal enum Reconciler {
     editor.log(.reconciler, .verbose, "did rangesToAdd: non-empty \(nonEmptyRangesToAddCount)")
 
     // BLOCK LEVEL ATTRIBUTES
-
+    #if canImport(UIKit)
     let lastDescendentAttributes = getRoot()?.getLastChild()?.getAttributedStringAttributes(
       theme: editor.getTheme())
 
@@ -353,11 +463,17 @@ internal enum Reconciler {
         attributes, cacheItem: cacheItem, textStorage: textStorage, nodeKey: nodeKey,
         lastDescendentAttributes: lastDescendentAttributes ?? [:])
     }
+    #endif
 
     editor.rangeCache = reconcilerState.nextRangeCache
     textStorage.endEditing()
+    #if canImport(UIKit)
     textStorage.mode = previousMode
+    #elseif os(macOS) && !targetEnvironment(macCatalyst)
+    (textStorage as? ReconcilerTextStorageAppKit)?.mode = previousMode
+    #endif
 
+    #if canImport(UIKit)
     if let markedTextOperation,
       markedTextOperation.createMarkedText,
       let markedTextAttributedString,
@@ -382,6 +498,25 @@ internal enum Reconciler {
       // The selection will be correctly set as part of the setMarkedTextFromReconciler() call.
       return
     }
+    #elseif os(macOS) && !targetEnvironment(macCatalyst)
+    if let markedTextOperation,
+      markedTextOperation.createMarkedText,
+      let markedTextAttributedString,
+      let startPoint = markedTextPointForAddition,
+      let frontendAppKit = editor.frontendAppKit
+    {
+      // AppKit marked text handling
+      let length = markedTextOperation.markedTextString.lengthAsNSString()
+      let endPoint = Point(key: startPoint.key, offset: startPoint.offset + length, type: .text)
+      try frontendAppKit.updateNativeSelection(
+        from: RangeSelection(anchor: startPoint, focus: endPoint, format: TextFormat()))
+      let attributedSubstring = markedTextAttributedString.attributedSubstring(
+        from: NSRange(location: startPoint.offset, length: length))
+      frontendAppKit.setMarkedTextFromReconciler(
+        attributedSubstring, selectedRange: markedTextOperation.markedTextInternalSelection)
+      return
+    }
+    #endif
 
     var selectionsAreDifferent = false
     if let nextSelection, let currentSelection {
@@ -752,7 +887,11 @@ internal enum Reconciler {
           return
         }
 
+        #if canImport(UIKit)
         editor.frontend?.resetSelectedRange()
+        #elseif os(macOS) && !targetEnvironment(macCatalyst)
+        editor.frontendAppKit?.resetSelectedRange()
+        #endif
       }
 
       return
@@ -760,7 +899,11 @@ internal enum Reconciler {
 
     // TODO: if node selection, go tell decorator nodes to select themselves!
 
+    #if canImport(UIKit)
     try editor.frontend?.updateNativeSelection(from: nextSelection)
+    #elseif os(macOS) && !targetEnvironment(macCatalyst)
+    try editor.frontendAppKit?.updateNativeSelection(from: nextSelection)
+    #endif
   }
 }
 

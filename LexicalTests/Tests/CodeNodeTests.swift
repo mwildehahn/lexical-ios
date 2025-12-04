@@ -8,20 +8,25 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
+@MainActor
 class CodeNodeTests: XCTestCase {
-  var view: LexicalView?
+  var testView: TestEditorView?
   var editor: Editor? {
     get {
-      return view?.editor
+      return testView?.editor
     }
   }
 
   override func setUp() {
-    view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    testView = createTestEditorView()
   }
 
   override func tearDown() {
-    view = nil
+    testView = nil
   }
 
   func testInsertNewAfter() throws {

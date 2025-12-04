@@ -5,7 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 public class RootNode: ElementNode {
 
@@ -49,9 +55,15 @@ public class RootNode: ElementNode {
       includeInert: includeInert,
       includeDirectionless: includeDirectionless,
       maxLength: maxLength)
+    #if canImport(UIKit)
     if let ed = getActiveEditor(), ed.frontend is LexicalReadOnlyTextKitContext, s.hasPrefix("\n") {
       return String(s.dropFirst(1))
     }
+    #elseif canImport(AppKit)
+    if let ed = getActiveEditor(), ed.isReadOnlyFrontend, s.hasPrefix("\n") {
+      return String(s.dropFirst(1))
+    }
+    #endif
     return s
   }
 

@@ -8,10 +8,19 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 class ParagraphNodeTests: XCTestCase {
+
+  private func makeEditor() -> (Editor, any ReadOnlyTextKitContextProtocol) {
+    let ctx = makeReadOnlyContext(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    return (ctx.editor, ctx)
+  }
+
   func testinsertNewAfter() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
-    let editor = view.editor
+    let (editor, ctx) = makeEditor(); _ = ctx // Keep context alive
 
     try editor.update {
       guard let editorState = getActiveEditorState(),
@@ -23,20 +32,17 @@ class ParagraphNodeTests: XCTestCase {
 
       let paragraphNode = ParagraphNode()
       try rootNode.append([paragraphNode])
+      // Create a selection to use in the test
+      try paragraphNode.selectStart()
     }
 
     try editor.update {
-      guard let editorState = getActiveEditorState() else {
-        XCTFail("should have editor state")
-        return
-      }
-
       guard let paragraphNode = getNodeByKey(key: "0") as? ParagraphNode else {
         XCTFail("Paragraph node not found")
         return
       }
 
-      guard let selection = editorState.selection as? RangeSelection else {
+      guard let selection = try getSelection() as? RangeSelection else {
         XCTFail("Expected range selection")
         return
       }

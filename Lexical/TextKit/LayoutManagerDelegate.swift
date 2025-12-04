@@ -5,7 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
+import LexicalCore
 
 @MainActor
 class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {
@@ -189,3 +192,4 @@ class LayoutManagerDelegate: NSObject, @preconcurrency NSLayoutManagerDelegate {
     return fail == true ? 0 : bufferLength
   }
 }
+#endif  // canImport(UIKit)

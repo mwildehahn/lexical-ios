@@ -49,11 +49,10 @@ internal func longestIncreasingSubsequenceIndices(_ arr: [Int]) -> [Int] {
 
 /// Given prev and next child key arrays that contain the same keys, compute the set of keys
 /// that can stay in place (LIS by prev positions in next order).
-internal func computeStableChildKeys(prev: [NodeKey], next: [NodeKey]) -> Set<NodeKey> {
+public func computeStableChildKeys(prev: [NodeKey], next: [NodeKey]) -> Set<NodeKey> {
   let indexInPrev: [NodeKey: Int] = Dictionary(uniqueKeysWithValues: prev.enumerated().map { ($1, $0) })
   let mapped: [Int] = next.compactMap { indexInPrev[$0] }
   let lisIdx = longestIncreasingSubsequenceIndices(mapped)
   let stable = lisIdx.map { next[$0] }
   return Set(stable)
 }
-

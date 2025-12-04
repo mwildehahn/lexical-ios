@@ -1,10 +1,14 @@
 import XCTest
 @testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class RangeCachePointMappingParityTests: XCTestCase {
 
-  private func makeEditors(centralAgg: Bool) -> (opt: Editor, leg: Editor, optCtx: LexicalReadOnlyTextKitContext, legCtx: LexicalReadOnlyTextKitContext) {
+  private func makeEditors(centralAgg: Bool) -> (opt: Editor, leg: Editor, optCtx: any ReadOnlyTextKitContextProtocol, legCtx: any ReadOnlyTextKitContextProtocol) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
     let optFlags = FeatureFlags(
       reconcilerSanityCheck: false,
@@ -21,13 +25,13 @@ final class RangeCachePointMappingParityTests: XCTestCase {
       proxyTextViewInputDelegate: false,
       useOptimizedReconciler: false
     )
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: optFlags)
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legFlags)
+    let optCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: optFlags)
+    let legCtx = makeReadOnlyContext(editorConfig: cfg, featureFlags: legFlags)
     return (optCtx.editor, legCtx.editor, optCtx, legCtx)
   }
 
   func testRoundTripAcrossAllLocations_Parity() throws {
-    let (opt, leg, _optCtx, _legCtx) = makeEditors(centralAgg: true)
+    let (opt, leg, optCtx, legCtx) = makeEditors(centralAgg: true); _ = optCtx; _ = legCtx
 
     // Build: Root -> [ P1("Hello"), P2("World") ]
     func build(on editor: Editor) throws {
@@ -46,10 +50,10 @@ final class RangeCachePointMappingParityTests: XCTestCase {
     try leg.update {}; try leg.update {}
 
     // Strings must match first
-    XCTAssertEqual(opt.frontend?.textStorage.string, leg.frontend?.textStorage.string)
+    XCTAssertEqual(opt.textStorage?.string, leg.textStorage?.string)
 
     func roundTripAllLocations(editor: Editor) throws {
-      let s = editor.frontend?.textStorage.string ?? ""
+      let s = editor.textStorage?.string ?? ""
       let ns = s as NSString
       for loc in 0...ns.length {
         let p = try? pointAtStringLocation(loc, searchDirection: .forward, rangeCache: editor.rangeCache)

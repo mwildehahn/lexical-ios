@@ -5,7 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 /**
  A node that renders an arbitrary `UIView` inline in the text.
@@ -65,24 +71,24 @@ open class DecoratorNode: Node {
     Self(key)
   }
 
-  /// Create your `UIView` here.
+  /// Create your view here.
   ///
   /// Do not add it to the view hierarchy or size it; Lexical will do that later.
-  open func createView() -> UIView {
+  open func createView() -> LexicalNativeView {
     fatalError("createView: base method not extended")
   }
 
   /// Called by Lexical when reconciling a dirty decorator node. This is where you update your view to match
   /// the state encapsulated in the decorator node.
-  open func decorate(view: UIView) {
+  open func decorate(view: LexicalNativeView) {
     fatalError("decorate: base method not extended")
   }
 
-  open func decoratorWillAppear(view: UIView) {
+  open func decoratorWillAppear(view: LexicalNativeView) {
     // no-op unless overridden
   }
 
-  open func decoratorDidDisappear(view: UIView) {
+  open func decoratorDidDisappear(view: LexicalNativeView) {
     // no-op unless overridden
   }
 
@@ -137,14 +143,33 @@ open class DecoratorNode: Node {
   }
 
   override public func getAttributedStringAttributes(theme: Theme) -> [NSAttributedString.Key: Any] {
-    let textAttachment = TextAttachment()
-
     guard let editor = getActiveEditor() else { return [:] }
 
+    #if canImport(UIKit)
+    let textAttachment = TextAttachment()
     textAttachment.editor = editor
     textAttachment.key = key
-
     return [.attachment: textAttachment]
+    #elseif os(macOS)
+    let textAttachment = TextAttachmentAppKit()
+    textAttachment.editor = editor
+    textAttachment.key = key
+    // Pre-compute bounds and set a placeholder image for layout
+    let textViewWidth = editor.frontendAppKit?.textLayoutWidth ?? 300
+    let size = sizeForDecoratorView(textViewWidth: textViewWidth, attributes: [:])
+    textAttachment.bounds = NSRect(origin: .zero, size: size)
+    // Create a transparent placeholder image so layout manager reserves correct space
+    // NSLayoutManager uses the image size for glyph advance width calculations
+    let placeholderImage = NSImage(size: size)
+    placeholderImage.lockFocus()
+    NSColor.clear.set()
+    NSRect(origin: .zero, size: size).fill()
+    placeholderImage.unlockFocus()
+    textAttachment.image = placeholderImage
+    return [.attachment: textAttachment]
+    #else
+    return [:]
+    #endif
   }
 
   @discardableResult

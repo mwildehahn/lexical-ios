@@ -1,42 +1,21 @@
-//
-//  DecoratorBlockNodeTests.swift
-//  Lexical
-//
-//  Created by Michael Hahn on 12/11/24.
-//
+// Cross-platform decorator block node tests
 
 import XCTest
-
 @testable import Lexical
 
-extension NodeType {
-  static let testDecoratorBlockNode = NodeType(rawValue: "testDecoratorBlockNode")
-}
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
-class TestDecoratorBlockNode: DecoratorBlockNode {
-  override func createView() -> UIImageView {
-    return UIImageView()
-  }
-
-  override func decorate(view: UIView) {
-    print("Decorating view")
-  }
-
-  override func sizeForDecoratorView(
-    textViewWidth: CGFloat, attributes: [NSAttributedString.Key: Any]
-  ) -> CGSize {
-    return CGSize(width: 100, height: 100)
-  }
-}
-
+@MainActor
 class DecoratorBlockNodeTests: XCTestCase {
-  func createLexicalView() -> LexicalView {
-    return LexicalView(
-      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+
+  func createEditorView() -> TestEditorView {
+    return createTestEditorView()
   }
 
   func testIsDecoratorBlockNode() throws {
-    let view = createLexicalView()
+    let view = createEditorView()
     let editor = view.editor
 
     try editor.update {
@@ -49,8 +28,9 @@ class DecoratorBlockNodeTests: XCTestCase {
   }
 
   func testInsertDecoratorBlockNode() throws {
-    let view = createLexicalView()
+    let view = createEditorView()
     let editor = view.editor
+    try registerTestDecoratorBlockNode(on: editor)
 
     try editor.update {
       guard let root = getRoot() else {
@@ -63,7 +43,7 @@ class DecoratorBlockNodeTests: XCTestCase {
       try paragraph1.append([text1])
       try root.append([paragraph1])
 
-      let decoratorNode = TestDecoratorBlockNode()
+      let decoratorNode = TestDecoratorBlockNodeCrossplatform()
       try text1.select(anchorOffset: 5, focusOffset: 5)
       guard let selection = try getSelection() as? RangeSelection else {
         XCTFail("No selection")
@@ -80,13 +60,14 @@ class DecoratorBlockNodeTests: XCTestCase {
 
       // Verify structure
       XCTAssertEqual(root.getChildrenSize(), 3)
-      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNodeCrossplatform)
     }
   }
 
   func testInsertDecoratorBlockNodeAtStart() throws {
-    let view = createLexicalView()
+    let view = createEditorView()
     let editor = view.editor
+    try registerTestDecoratorBlockNode(on: editor)
 
     try editor.update {
       guard let root = getRoot() else {
@@ -99,7 +80,7 @@ class DecoratorBlockNodeTests: XCTestCase {
       try paragraph1.append([text1])
       try root.append([paragraph1])
 
-      let decoratorNode = TestDecoratorBlockNode()
+      let decoratorNode = TestDecoratorBlockNodeCrossplatform()
       try text1.select(anchorOffset: 0, focusOffset: 0)
       guard let selection = try getSelection() as? RangeSelection else {
         XCTFail("No selection")
@@ -117,13 +98,14 @@ class DecoratorBlockNodeTests: XCTestCase {
       // Verify structure
       XCTAssertEqual(root.getChildrenSize(), 3)
       XCTAssertTrue(root.getChildAtIndex(index: 1) is ParagraphNode)
-      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNodeCrossplatform)
     }
   }
 
   func testInsertDecoratorBlockNodeInMiddle() throws {
-    let view = createLexicalView()
+    let view = createEditorView()
     let editor = view.editor
+    try registerTestDecoratorBlockNode(on: editor)
 
     try editor.update {
       guard let root = getRoot() else {
@@ -141,7 +123,7 @@ class DecoratorBlockNodeTests: XCTestCase {
 
       try root.append([paragraph1, paragraph2])
 
-      let decoratorNode = TestDecoratorBlockNode()
+      let decoratorNode = TestDecoratorBlockNodeCrossplatform()
       try text1.select(anchorOffset: 5, focusOffset: 5)
       guard let selection = try getSelection() as? RangeSelection else {
         XCTFail("No selection")
@@ -159,7 +141,7 @@ class DecoratorBlockNodeTests: XCTestCase {
       // Verify structure
       XCTAssertEqual(root.getChildrenSize(), 4)
       XCTAssertTrue(root.getChildAtIndex(index: 1) is ParagraphNode)
-      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNodeCrossplatform)
       XCTAssertTrue(root.getChildAtIndex(index: 3) is ParagraphNode)
 
       // Verify text content
@@ -171,8 +153,9 @@ class DecoratorBlockNodeTests: XCTestCase {
   }
 
   func testInsertDecoratorBlockNodeAfterExistingOne() throws {
-    let view = createLexicalView()
+    let view = createEditorView()
     let editor = view.editor
+    try registerTestDecoratorBlockNode(on: editor)
 
     try editor.update {
       guard let root = getRoot() else {
@@ -184,7 +167,7 @@ class DecoratorBlockNodeTests: XCTestCase {
       let text = createTextNode(text: "Hello")
       try paragraph.append([text])
 
-      let decoratorNode1 = TestDecoratorBlockNode()
+      let decoratorNode1 = TestDecoratorBlockNodeCrossplatform()
       try root.append([paragraph, decoratorNode1])
 
       // Select the first decorator node
@@ -206,10 +189,10 @@ class DecoratorBlockNodeTests: XCTestCase {
       XCTAssertEqual(root.getChildrenSize(), 3)
       XCTAssertTrue(root.getChildAtIndex(index: 0) is ParagraphNode)
       XCTAssertTrue(root.getChildAtIndex(index: 1) is ParagraphNode)
-      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNodeCrossplatform)
 
       // Insert second decorator node
-      let decoratorNode2 = TestDecoratorBlockNode()
+      let decoratorNode2 = TestDecoratorBlockNodeCrossplatform()
       _ = try selection.insertNodes(nodes: [decoratorNode2])
     }
 
@@ -221,9 +204,9 @@ class DecoratorBlockNodeTests: XCTestCase {
 
       // Verify structure
       XCTAssertEqual(root.getChildrenSize(), 3)
-      XCTAssertTrue(root.getChildAtIndex(index: 0) is TestDecoratorBlockNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 0) is TestDecoratorBlockNodeCrossplatform)
       XCTAssertTrue(root.getChildAtIndex(index: 1) is ParagraphNode)
-      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNode)
+      XCTAssertTrue(root.getChildAtIndex(index: 2) is TestDecoratorBlockNodeCrossplatform)
     }
 
   }

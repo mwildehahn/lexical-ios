@@ -5,8 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 func createPoint(key: NodeKey, offset: Int, type: SelectionType) -> Point {
   Point(key: key, offset: offset, type: type)
@@ -48,6 +53,7 @@ public func getSelection(allowInvalidPositions: Bool = false) throws -> BaseSele
     getActiveEditor()?.log(.other, .warning, "Selection failed sanity check")
   }
 
+  #if canImport(UIKit)
   if let editor = getActiveEditor() {
     do {
       let selection = try createSelection(editor: editor)
@@ -61,6 +67,21 @@ public func getSelection(allowInvalidPositions: Bool = false) throws -> BaseSele
 
   // Could not get active editor. This is unexpected, but we can't log since logging requires editor!
   throw LexicalError.invariantViolation("called getSelection() without an active editor")
+  #elseif os(macOS) && !targetEnvironment(macCatalyst)
+  if let editor = getActiveEditor() {
+    do {
+      let selection = try createSelectionAppKit(editor: editor)
+      editorState?.selection = selection
+      return selection
+    } catch {
+      editor.log(.other, .warning, "Exception while creating range selection on AppKit")
+      return nil
+    }
+  }
+
+  // Could not get active editor. This is unexpected, but we can't log since logging requires editor!
+  throw LexicalError.invariantViolation("called getSelection() without an active editor")
+  #endif
 }
 
 @MainActor
@@ -188,7 +209,7 @@ func editorStateHasDirtySelection(pendingEditorState: EditorState, editor: Edito
 }
 
 @MainActor
-func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
+public func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   let rangeCache = editor.rangeCache
 
   guard let rangeCacheItem = rangeCache[point.key] else { return nil }
@@ -220,6 +241,7 @@ func stringLocationForPoint(_ point: Point, editor: Editor) throws -> Int? {
   }
 }
 
+#if canImport(UIKit)
 @MainActor
 public func createNativeSelection(from selection: RangeSelection, editor: Editor) throws
   -> NativeSelection
@@ -243,6 +265,7 @@ public func createNativeSelection(from selection: RangeSelection, editor: Editor
     range: NSRange(location: location, length: abs(anchorLocation - focusLocation)),
     affinity: affinity)
 }
+#endif
 
 @MainActor
 func createEmptyRangeSelection() -> RangeSelection {
@@ -258,6 +281,7 @@ func createEmptyRangeSelection() -> RangeSelection {
 /// If a selection gets changed, and requires a update to native iOS selection, it gets marked as "dirty".
 /// If the selection changes, but matches with the existing native selection, then we only need to sync it.
 /// Otherwise, we generally bail out of doing an update to selection during reconciliation unless there are dirty nodes that need reconciling.
+#if canImport(UIKit)
 @MainActor
 func createSelection(editor: Editor) throws -> BaseSelection? {
   let currentEditorState = editor.getEditorState()
@@ -288,6 +312,49 @@ func createSelection(editor: Editor) throws -> BaseSelection? {
   // we have a last selection. Clone it!
   return lastSelection.clone()
 }
+#elseif os(macOS) && !targetEnvironment(macCatalyst)
+@MainActor
+func createSelectionAppKit(editor: Editor) throws -> BaseSelection? {
+  let currentEditorState = editor.getEditorState()
+  let lastSelection = currentEditorState.selection
+
+  guard let lastSelection else {
+    // Get native selection from AppKit frontend
+    guard let frontend = editor.frontendAppKit else {
+      return nil
+    }
+
+    let range = frontend.nativeSelectionRange
+    let affinity: LexicalTextStorageDirection = frontend.nativeSelectionAffinity == .downstream ? .forward : .backward
+
+    // If rangeCache is empty, we can't convert native selection to Lexical selection yet
+    // This happens during initialization - return a default selection at root
+    if editor.rangeCache.isEmpty {
+      // Return selection at start of first paragraph if it exists
+      if let root = editor.getEditorState().getRootNode(),
+         let firstChild = root.getFirstChild() {
+        let point = Point(key: firstChild.key, offset: 0, type: .element)
+        return RangeSelection(anchor: point, focus: point, format: TextFormat())
+      }
+      return nil
+    }
+
+    if let anchor = try pointAtStringLocation(
+      range.location, searchDirection: affinity, rangeCache: editor.rangeCache),
+      let focus = try pointAtStringLocation(
+        range.location + range.length, searchDirection: affinity,
+        rangeCache: editor.rangeCache)
+    {
+      return RangeSelection(anchor: anchor, focus: focus, format: TextFormat())
+    }
+
+    return nil
+  }
+
+  // we have a last selection. Clone it!
+  return lastSelection.clone()
+}
+#endif
 
 /// This is used to make a selection when the existing selection is null or should be replaced,
 /// i.e. forcing selection on the editor when it current exists outside the editor.
@@ -473,7 +540,13 @@ func transferStartingElementPointToTextPoint(
 ) throws {
   guard let element = try start.getNode() as? ElementNode else { return }
 
+  // Debug logging for decorator orphaning investigation
+  print("🎯 TRANSFER: element=\(element.key) type=\(type(of: element)) start.offset=\(start.offset)")
+  print("🎯 TRANSFER: element.children=\(element.getChildrenKeys(fromLatest: true))")
+
   let placementNode = element.getChildAtIndex(index: start.offset)
+  print("🎯 TRANSFER: placementNode=\(placementNode?.key ?? "nil") type=\(placementNode.map { String(describing: type(of: $0)) } ?? "nil")")
+
   let textNode = try createTextNode(text: nil).setFormat(format: format)
   var target: Node
 
@@ -487,14 +560,20 @@ func transferStartingElementPointToTextPoint(
 
   _ = try textNode.setFormat(format: format)
 
+  // Save whether selection is collapsed BEFORE modifying end point
+  // (needed because offset adjustment below would make them unequal)
+  let wasCollapsed = (start == end)
+
   if let placementNode {
     if let elementNode = placementNode as? ElementNode {
       try elementNode.append([target])
     } else {
+      print("🎯 TRANSFER: calling placementNode.insertBefore(textNode=\(textNode.key))")
       let _ = try placementNode.insertBefore(nodeToInsert: target)
+      print("🎯 TRANSFER: after insertBefore, element.children=\(element.getChildrenKeys(fromLatest: true))")
       // fix the end point offset if it refers to the same element as start,
-      // as we've now inserted another element before it.
-      if end.type == .element && end.key == start.key {
+      // as we've now inserted another element before it (but only for non-collapsed selections).
+      if !wasCollapsed && end.type == .element && end.key == start.key {
         end.updatePoint(key: end.key, offset: end.offset + 1, type: .element)
       }
     }
@@ -502,7 +581,7 @@ func transferStartingElementPointToTextPoint(
     try element.append([target])
   }
 
-  if start == end {
+  if wasCollapsed {
     end.updatePoint(key: textNode.getKey(), offset: 0, type: .text)
   }
 
@@ -706,6 +785,7 @@ internal func normalizeSelectionPointsForBoundaries(
   }
 }
 
+#if canImport(UIKit)
 @MainActor
 func validatePosition(
   textView: UITextView, position: UITextPosition, direction: UITextStorageDirection
@@ -741,3 +821,4 @@ func validatePosition(
 
   return currentPosition
 }
+#endif

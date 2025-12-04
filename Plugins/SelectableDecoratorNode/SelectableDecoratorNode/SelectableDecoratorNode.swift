@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Lexical
 import UIKit
 
@@ -40,3 +41,40 @@ open class SelectableDecoratorNode: DecoratorNode {
     fatalError("decorateContentView: base method not extended")
   }
 }
+#elseif os(macOS)
+import Lexical
+import AppKit
+
+open class SelectableDecoratorNode: DecoratorNode {
+
+  // if you're using SelectableDecoratorNode, override `createContentView()` instead of `createView()`
+  override public final func createView() -> NSView {
+    guard let editor = getActiveEditor() else {
+      fatalError() // TODO: refactor decorator API to throws
+    }
+    let contentView = createContentView()
+    let wrapper = SelectableDecoratorView(frame: .zero)
+    wrapper.contentView = contentView
+    wrapper.editor = editor
+    wrapper.nodeKey = getKey()
+    try? wrapper.setUpListeners()
+    return wrapper
+  }
+
+  // if you're using SelectableDecoratorNode, override `decorateContentView()` instead of `decorate()`
+  override public final func decorate(view: NSView) {
+    guard let view = view as? SelectableDecoratorView, let contentView = view.contentView else {
+      return // TODO: refactor decorator API to throws
+    }
+    decorateContentView(view: contentView, wrapper: view)
+  }
+
+  open func createContentView() -> NSView {
+    fatalError("createContentView: base method not extended")
+  }
+
+  open func decorateContentView(view: NSView, wrapper: SelectableDecoratorView) {
+    fatalError("decorateContentView: base method not extended")
+  }
+}
+#endif

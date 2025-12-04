@@ -5,9 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Foundation
 import MobileCoreServices
 import UIKit
+import LexicalCore
 import UniformTypeIdentifiers
 
 @MainActor
@@ -374,3 +376,4 @@ extension NSAttributedString {
     return result
   }
 }
+#endif  // canImport(UIKit)

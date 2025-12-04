@@ -1,16 +1,22 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 @testable import Lexical
 import XCTest
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class BackspaceMergeAtParagraphStartParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext), leg: (Editor, LexicalReadOnlyTextKitContext)) {
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let optFlags = FeatureFlags.optimizedProfile(.aggressiveEditor)
-    let legFlags = FeatureFlags()
-    let opt = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: optFlags)
-    let leg = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legFlags)
-    return ((opt.editor, opt), (leg.editor, leg))
+  private func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol), leg: (Editor, any ReadOnlyTextKitContextProtocol)) {
+    return makeParityTestEditors()
   }
 
   func testParity_BackspaceAtStartOfParagraph_MergesWithPrevious_NotWholeWord() throws {
@@ -44,4 +50,3 @@ final class BackspaceMergeAtParagraphStartParityTests: XCTestCase {
     XCTAssertEqual(a, "HelloWorld")
   }
 }
-

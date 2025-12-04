@@ -7,7 +7,6 @@
 
 import Foundation
 import Lexical
-import UIKit
 
 open class HTMLPlugin: Plugin {
   public init() {}

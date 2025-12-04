@@ -1,3 +1,6 @@
+// UIKit-only: Uses computePartDiffs which is in UIKit-only code
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 
@@ -49,3 +52,5 @@ final class PlanDiffTests: XCTestCase {
     }
   }
 }
+
+#endif

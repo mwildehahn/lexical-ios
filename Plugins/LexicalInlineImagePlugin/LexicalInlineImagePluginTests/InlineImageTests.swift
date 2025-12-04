@@ -5,6 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+// This test uses UIKit-specific types (LexicalView, ImageNode, UIGraphics)
+// and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 @testable import Lexical
 @testable import LexicalInlineImagePlugin
 import XCTest
@@ -470,3 +474,5 @@ class InlineImageTests: XCTestCase {
   // Unmount semantics are covered by persistence tests which assert position cache
   // clearing and by reconciler tests that remove decorator keys from caches.
 }
+
+#endif

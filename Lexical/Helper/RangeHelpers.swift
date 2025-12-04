@@ -5,7 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
+import LexicalCore
 
 public enum RangeSearchInclusionResult {
   case include
@@ -132,3 +135,4 @@ public func allNodeKeysSortedByLocation() -> [NodeKey] {
       element.key
     }
 }
+#endif  // canImport(UIKit)

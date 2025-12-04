@@ -5,8 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
 import UIKit
+import LexicalCore
 
 /// A Lexical Frontend is an object that contains the TextKit stack used by Lexical, along with handling
 /// user interactions, incoming events, etc. The Frontend protocol provides a hard boundary for what are
@@ -41,3 +44,4 @@ internal protocol Frontend: AnyObject {
   func showPlaceholderText()
   func resetTypingAttributes(for selectedNode: Node)
 }
+#endif  // canImport(UIKit)

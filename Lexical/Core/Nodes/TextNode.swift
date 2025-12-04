@@ -5,7 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 public enum TextNodeThemeSubtype {
   public static let code = "code"
@@ -83,64 +89,7 @@ public struct SerializedTextFormat: OptionSet, Codable {
   }
 }
 
-public struct TextFormat: Equatable, Codable {
-
-  public var bold: Bool
-  public var italic: Bool
-  public var underline: Bool
-  public var strikethrough: Bool
-  public var code: Bool
-  public var subScript: Bool
-  public var superScript: Bool
-
-  public init() {
-    self.bold = false
-    self.italic = false
-    self.underline = false
-    self.strikethrough = false
-    self.code = false
-    self.subScript = false
-    self.superScript = false
-  }
-
-  public func isTypeSet(type: TextFormatType) -> Bool {
-    switch type {
-    case .bold:
-      return bold
-    case .italic:
-      return italic
-    case .underline:
-      return underline
-    case .strikethrough:
-      return strikethrough
-    case .code:
-      return code
-    case .subScript:
-      return subScript
-    case .superScript:
-      return superScript
-    }
-  }
-
-  public mutating func updateFormat(type: TextFormatType, value: Bool) {
-    switch type {
-    case .bold:
-      bold = value
-    case .italic:
-      italic = value
-    case .underline:
-      underline = value
-    case .strikethrough:
-      strikethrough = value
-    case .code:
-      code = value
-    case .subScript:
-      subScript = value
-    case .superScript:
-      superScript = value
-    }
-  }
-}
+// TextFormat is now defined in LexicalCore/TextFormat.swift
 
 struct SerializedTextNodeDetail: OptionSet, Codable {
   public let rawValue: Int
@@ -316,7 +265,7 @@ open class TextNode: Node {
         attributeDictionary.merge(themeDict) { (_, new) in new }
       } else {
         attributeDictionary[NSAttributedString.Key.fontFamily] = "Courier"
-        attributeDictionary[NSAttributedString.Key.backgroundColor] = UIColor.lightGray
+        attributeDictionary[NSAttributedString.Key.backgroundColor] = LexicalColor.lightGray
       }
     }
 
@@ -746,30 +695,22 @@ extension TextNode: CustomDebugStringConvertible {
   }
 }
 
-extension TextFormat: CustomDebugStringConvertible {
-  public var debugDescription: String {
-    var debugStyleStatus = [String]()
-    if bold { debugStyleStatus.append("bold") }
-    if italic { debugStyleStatus.append("italic") }
-    if underline { debugStyleStatus.append("underline") }
-    if strikethrough { debugStyleStatus.append("strikeThrough") }
-    if code { debugStyleStatus.append("code") }
-    return debugStyleStatus.joined(separator: ", ")
-  }
-}
+// TextFormat: CustomDebugStringConvertible is now defined in LexicalCore/TextFormat.swift
 
 public extension NSAttributedString.Key {
   static let inlineCodeBackgroundColor: NSAttributedString.Key = .init(rawValue: "inlineCodeBackgroundColor")
 }
 
+#if canImport(UIKit) || os(macOS)
 extension TextNode {
   internal static var inlineCodeBackgroundDrawing: CustomDrawingHandler {
     get {
       return { attributeKey, attributeValue, layoutManager, attributeRunCharacterRange, granularityExpandedCharacterRange, glyphRange, rect, firstLineFragment in
-        guard let attributeValue = attributeValue as? UIColor else { return }
+        guard let attributeValue = attributeValue as? LexicalColor else { return }
         attributeValue.setFill()
-        UIRectFill(rect)
+        lexicalRectFill(rect)
       }
     }
   }
 }
+#endif

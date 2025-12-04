@@ -10,11 +10,20 @@ import PackageDescription
 
 let package = Package(
   name: "Lexical",
-  platforms: [.iOS(.v16)],
+  platforms: [.iOS(.v16), .macOS(.v13), .macCatalyst(.v16)],
   products: [
     .library(
       name: "Lexical",
       targets: ["Lexical"]),
+    .library(
+      name: "LexicalCore",
+      targets: ["LexicalCore"]),
+    .library(
+      name: "LexicalUIKit",
+      targets: ["LexicalUIKit"]),
+    .library(
+      name: "LexicalAppKit",
+      targets: ["LexicalAppKit"]),
     .library(
       name: "LexicalListPlugin",
       targets: ["LexicalListPlugin"]),
@@ -45,19 +54,86 @@ let package = Package(
     .library(
       name: "LexicalMarkdown",
       targets: ["LexicalMarkdown"]),
+    .library(
+      name: "LexicalSwiftUI",
+      targets: ["LexicalSwiftUI"]),
   ],
   dependencies: [
     .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
     .package(url: "https://github.com/apple/swift-markdown.git", branch: "main"),
   ],
   targets: [
+    // MARK: - Core Lexical Targets
+
+    // Main Lexical target - currently contains all UIKit code at ./Lexical
+    // During migration, code will move to LexicalCore/LexicalUIKit, and this
+    // will become a thin umbrella that re-exports platform-specific targets.
+    // For now, it remains iOS/Catalyst only.
     .target(
       name: "Lexical",
-      dependencies: [],
+      dependencies: ["LexicalCore"],
       path: "./Lexical"),
+
+    // Platform-agnostic core (nodes, selection, reconciler, editor state)
+    // Files will be migrated here in Phase 2
+    .target(
+      name: "LexicalCore",
+      dependencies: [],
+      path: "Sources/LexicalCore"),
+
+    // UIKit implementation (iOS/Catalyst)
+    // Files will be migrated here in Phase 3
+    .target(
+      name: "LexicalUIKit",
+      dependencies: ["LexicalCore"],
+      path: "Sources/LexicalUIKit"),
+
+    // AppKit implementation (macOS)
+    // Depends on Lexical (which includes Editor, EditorConfig) rather than just LexicalCore
+    // The Lexical target builds on macOS via conditional compilation
+    .target(
+      name: "LexicalAppKit",
+      dependencies: ["Lexical"],
+      path: "Sources/LexicalAppKit"),
+
+    // MARK: - SwiftUI Targets
+
+    // SwiftUI umbrella module - re-exports platform-specific SwiftUI wrappers
+    .target(
+      name: "LexicalSwiftUI",
+      dependencies: [
+        .target(name: "LexicalSwiftUIUIKit", condition: .when(platforms: [.iOS, .macCatalyst])),
+        .target(name: "LexicalSwiftUIAppKit", condition: .when(platforms: [.macOS])),
+      ],
+      path: "Sources/LexicalSwiftUI"),
+
+    // UIKit SwiftUI wrapper (iOS/Catalyst)
+    .target(
+      name: "LexicalSwiftUIUIKit",
+      dependencies: ["Lexical"],
+      path: "Sources/LexicalSwiftUIUIKit"),
+
+    // AppKit SwiftUI wrapper (macOS)
+    .target(
+      name: "LexicalSwiftUIAppKit",
+      dependencies: ["LexicalAppKit"],
+      path: "Sources/LexicalSwiftUIAppKit"),
+
     .testTarget(
       name: "LexicalTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin", "LexicalListPlugin", "LexicalMarkdown", "LexicalHTML", "LexicalListHTMLSupport", "LexicalLinkHTMLSupport", "LexicalAutoLinkPlugin", "EditorHistoryPlugin", "LexicalInlineImagePlugin"],
+      dependencies: [
+        "Lexical",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+        "LexicalLinkPlugin",
+        "LexicalListPlugin",
+        "LexicalMarkdown",
+        "LexicalHTML",
+        "LexicalListHTMLSupport",
+        "LexicalLinkHTMLSupport",
+        "LexicalAutoLinkPlugin",
+        "EditorHistoryPlugin",
+        "LexicalInlineImagePlugin",
+      ],
       path: "./LexicalTests"),
 
     .target(
@@ -66,7 +142,11 @@ let package = Package(
       path: "./Plugins/LexicalListPlugin/LexicalListPlugin"),
     .testTarget(
       name: "LexicalListPluginTests",
-      dependencies: ["Lexical", "LexicalListPlugin"],
+      dependencies: [
+        "Lexical",
+        "LexicalListPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalListPlugin/LexicalListPluginTests"),
     .target(
       name: "LexicalListHTMLSupport",
@@ -79,7 +159,12 @@ let package = Package(
       path: "./Plugins/LexicalHTML/LexicalHTML"),
     .testTarget(
       name: "LexicalHTMLTests",
-      dependencies: ["Lexical", "LexicalHTML", "SwiftSoup"],
+      dependencies: [
+        "Lexical",
+        "LexicalHTML",
+        "SwiftSoup",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalHTML/LexicalHTMLTests"),
 
     .target(
@@ -93,7 +178,11 @@ let package = Package(
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPlugin"),
     .testTarget(
       name: "LexicalLinkPluginTests",
-      dependencies: ["Lexical", "LexicalLinkPlugin"],
+      dependencies: [
+        "Lexical",
+        "LexicalLinkPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalLinkPlugin/LexicalLinkPluginTests"),
     .target(
       name: "LexicalLinkHTMLSupport",
@@ -106,7 +195,11 @@ let package = Package(
       path: "./Plugins/LexicalInlineImagePlugin/LexicalInlineImagePlugin"),
     .testTarget(
       name: "LexicalInlineImagePluginTests",
-      dependencies: ["Lexical", "LexicalInlineImagePlugin"],
+      dependencies: [
+        "Lexical",
+        "LexicalInlineImagePlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/LexicalInlineImagePlugin/LexicalInlineImagePluginTests"),
 
     .target(
@@ -120,7 +213,11 @@ let package = Package(
       path: "./Plugins/EditorHistoryPlugin/EditorHistoryPlugin"),
     .testTarget(
       name: "EditorHistoryPluginTests",
-      dependencies: ["Lexical", "EditorHistoryPlugin"],
+      dependencies: [
+        "Lexical",
+        "EditorHistoryPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
       path: "./Plugins/EditorHistoryPlugin/EditorHistoryPluginTests"),
 
     .target(
@@ -138,7 +235,35 @@ let package = Package(
         "Lexical",
         "LexicalMarkdown",
         .product(name: "Markdown", package: "swift-markdown"),
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
       ],
       path: "./Plugins/LexicalMarkdown/LexicalMarkdownTests"),
+
+    // MARK: - Demo Apps (macOS only)
+
+    // macOS AppKit demo app
+    .executableTarget(
+      name: "LexicalDemoMac",
+      dependencies: [
+        "Lexical",
+        "LexicalAppKit",
+        "LexicalListPlugin",
+        "EditorHistoryPlugin",
+        "LexicalInlineImagePlugin",
+        "SelectableDecoratorNode",
+      ],
+      path: "Examples/LexicalDemo/Mac"),
+
+    // SwiftUI demo app (multi-platform)
+    .executableTarget(
+      name: "LexicalDemoSwiftUI",
+      dependencies: [
+        "Lexical",
+        "LexicalSwiftUI",
+        "LexicalListPlugin",
+        "EditorHistoryPlugin",
+        .target(name: "LexicalAppKit", condition: .when(platforms: [.macOS])),
+      ],
+      path: "Examples/LexicalDemo.SwiftUI"),
   ]
 )

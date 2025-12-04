@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 /// MainActor-isolated context manager for managing editor state during updates
 /// Replaces the thread dictionary pattern for Swift 6 compatibility
@@ -55,7 +56,12 @@ final class EditorContext {
     )
 
     defer { current = previous }
-    return try operation()
+
+    // Wire up NodeContextProvider so that LexicalCore types can access
+    // the editor context via the protocol-based dependency injection
+    return try NodeContextProvider.withContext(getSharedNodeContext()) {
+      try operation()
+    }
   }
 
   static func getActiveEditor() -> Editor? {

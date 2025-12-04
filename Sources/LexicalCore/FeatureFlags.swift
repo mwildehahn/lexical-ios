@@ -143,12 +143,6 @@ import Foundation
         prePostAttrsOnlyMaxTargets: 16
       )
     case .aggressiveEditor:
-      // Safer defaults for live editing in Editor tab:
-      // - Keep all structural fast paths ON
-      // - Disable pre/post attrs-only multi to avoid unexpected no-ops during typing
-      // - Keep central aggregation ON for text multi
-      // - Modern TextKit ON
-      // - Gating threshold 0 (unused since pre/post attrs-only is OFF)
       return FeatureFlags(
         reconcilerSanityCheck: false,
         proxyTextViewInputDelegate: false,
@@ -156,8 +150,6 @@ import Foundation
         useReconcilerFenwickDelta: true,
         useReconcilerKeyedDiff: true,
         useReconcilerBlockRebuild: true,
-        // UI typing should delete a full grapheme cluster by default.
-        // Strict (scalar) mode remains available via explicit flags in tests.
         useOptimizedReconcilerStrictMode: false,
         useReconcilerFenwickCentralAggregation: true,
         useReconcilerShadowCompare: false,

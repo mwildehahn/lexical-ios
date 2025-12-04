@@ -8,9 +8,24 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 class SelectionHelpersTests: XCTestCase {
+
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  private func makeView() -> LexicalAppKit.LexicalView {
+    LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+  }
+  #else
+  private func makeView() -> Lexical.LexicalView {
+    Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+  }
+  #endif
+
   func testRangeWithMultipleParagraphs() throws {
-    let view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    let view = makeView()
     let editor = view.editor
 
     try editor.update {

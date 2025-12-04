@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 // MARK: - Datatypes
 enum PartialCodingKeys: String, CodingKey {

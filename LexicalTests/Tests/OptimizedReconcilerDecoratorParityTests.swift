@@ -1,55 +1,29 @@
+// Cross-platform decorator reconciler parity tests
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
 
-  func makeEditors() -> (optimized: (Editor, LexicalReadOnlyTextKitContext), legacy: (Editor, LexicalReadOnlyTextKitContext)) {
-    let theme = Theme()
-    let cfg = EditorConfig(theme: theme, plugins: [])
-
-    let optFlags = FeatureFlags(
-      reconcilerSanityCheck: false,
-      proxyTextViewInputDelegate: false,
-      useOptimizedReconciler: true,
-      useReconcilerFenwickDelta: true,
-      useReconcilerKeyedDiff: true,
-      useReconcilerBlockRebuild: true,
-      useOptimizedReconcilerStrictMode: true,
-      useReconcilerShadowCompare: false
-    )
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: optFlags)
-
-    let legFlags = FeatureFlags(
-      reconcilerSanityCheck: false,
-      proxyTextViewInputDelegate: false,
-      useOptimizedReconciler: false
-    )
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: legFlags)
-
-    return ((optCtx.editor, optCtx), (legCtx.editor, legCtx))
-  }
-
-  func registerDecoratorNode(on editor: Editor) throws {
-    try editor.registerNode(nodeType: NodeType.testNode, class: TestDecoratorNode.self)
-  }
-
   func testParagraphReorderWithDecoratorMiddle() throws {
-    let (opt, leg) = makeEditors()
-    try registerDecoratorNode(on: opt.0)
-    try registerDecoratorNode(on: leg.0)
+    let (opt, leg) = makeParityTestEditorsWithDecorators()
 
     // Build: P -> [A, D, B]
     try opt.0.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode()
-      try p.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
+      try p.append([createTextNode(text: "A"), TestDecoratorNodeCrossplatform(), createTextNode(text: "B")])
       try root.append([p])
     }
     try leg.0.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode()
-      try p.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
+      try p.append([createTextNode(text: "A"), TestDecoratorNodeCrossplatform(), createTextNode(text: "B")])
       try root.append([p])
     }
 
@@ -75,23 +49,21 @@ final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
   }
 
   func testNestedReorderWithDecorators() throws {
-    let (opt, leg) = makeEditors()
-    try registerDecoratorNode(on: opt.0)
-    try registerDecoratorNode(on: leg.0)
+    let (opt, leg) = makeParityTestEditorsWithDecorators()
 
     // Build: Quote -> [ P1[A,D1,B], P2[C,D2,D] ]
     try opt.0.update {
       guard let root = getRoot() else { return }
       let quote = QuoteNode()
-      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
-      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "C"), TestDecoratorNode(), createTextNode(text: "D") ])
+      let p1 = createParagraphNode(); try p1.append([createTextNode(text: "A"), TestDecoratorNodeCrossplatform(), createTextNode(text: "B")])
+      let p2 = createParagraphNode(); try p2.append([createTextNode(text: "C"), TestDecoratorNodeCrossplatform(), createTextNode(text: "D")])
       try quote.append([p1, p2]); try root.append([quote])
     }
     try leg.0.update {
       guard let root = getRoot() else { return }
       let quote = QuoteNode()
-      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
-      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "C"), TestDecoratorNode(), createTextNode(text: "D") ])
+      let p1 = createParagraphNode(); try p1.append([createTextNode(text: "A"), TestDecoratorNodeCrossplatform(), createTextNode(text: "B")])
+      let p2 = createParagraphNode(); try p2.append([createTextNode(text: "C"), TestDecoratorNodeCrossplatform(), createTextNode(text: "D")])
       try quote.append([p1, p2]); try root.append([quote])
     }
 
@@ -121,18 +93,16 @@ final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
   }
 
   func testDeepNestedReorderWithDecoratorsMultiLevel() throws {
-    let (opt, leg) = makeEditors()
-    try registerDecoratorNode(on: opt.0)
-    try registerDecoratorNode(on: leg.0)
+    let (opt, leg) = makeParityTestEditorsWithDecorators()
 
     // Build: Quote -> [ P1[A,D1,B], Quote2 -> [ P2[C,D2,D], P3[E,D3,F] ] ]
     try opt.0.update {
       guard let root = getRoot() else { return }
       let quote = QuoteNode()
-      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
+      let p1 = createParagraphNode(); try p1.append([createTextNode(text: "A"), TestDecoratorNodeCrossplatform(), createTextNode(text: "B")])
       let quote2 = QuoteNode()
-      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "C"), TestDecoratorNode(), createTextNode(text: "D") ])
-      let p3 = createParagraphNode(); try p3.append([ createTextNode(text: "E"), TestDecoratorNode(), createTextNode(text: "F") ])
+      let p2 = createParagraphNode(); try p2.append([createTextNode(text: "C"), TestDecoratorNodeCrossplatform(), createTextNode(text: "D")])
+      let p3 = createParagraphNode(); try p3.append([createTextNode(text: "E"), TestDecoratorNodeCrossplatform(), createTextNode(text: "F")])
       try quote2.append([p2, p3])
       try quote.append([p1, quote2])
       try root.append([quote])
@@ -140,10 +110,10 @@ final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
     try leg.0.update {
       guard let root = getRoot() else { return }
       let quote = QuoteNode()
-      let p1 = createParagraphNode(); try p1.append([ createTextNode(text: "A"), TestDecoratorNode(), createTextNode(text: "B") ])
+      let p1 = createParagraphNode(); try p1.append([createTextNode(text: "A"), TestDecoratorNodeCrossplatform(), createTextNode(text: "B")])
       let quote2 = QuoteNode()
-      let p2 = createParagraphNode(); try p2.append([ createTextNode(text: "C"), TestDecoratorNode(), createTextNode(text: "D") ])
-      let p3 = createParagraphNode(); try p3.append([ createTextNode(text: "E"), TestDecoratorNode(), createTextNode(text: "F") ])
+      let p2 = createParagraphNode(); try p2.append([createTextNode(text: "C"), TestDecoratorNodeCrossplatform(), createTextNode(text: "D")])
+      let p3 = createParagraphNode(); try p3.append([createTextNode(text: "E"), TestDecoratorNodeCrossplatform(), createTextNode(text: "F")])
       try quote2.append([p2, p3])
       try quote.append([p1, quote2])
       try root.append([quote])
@@ -174,23 +144,21 @@ final class OptimizedReconcilerDecoratorParityTests: XCTestCase {
   }
 
   func testLargeParagraphReorderWithInterleavedDecorators() throws {
-    let (opt, leg) = makeEditors()
-    try registerDecoratorNode(on: opt.0)
-    try registerDecoratorNode(on: leg.0)
+    let (opt, leg) = makeParityTestEditorsWithDecorators()
 
     // Build paragraph with interleaved Text and Decorator nodes: T0,D0,T1,D1,...,T4,D4
     try opt.0.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode()
       var nodes: [Node] = []
-      for i in 0..<5 { nodes.append(createTextNode(text: "T\(i)")); nodes.append(TestDecoratorNode()) }
+      for i in 0..<5 { nodes.append(createTextNode(text: "T\(i)")); nodes.append(TestDecoratorNodeCrossplatform()) }
       try p.append(nodes); try root.append([p])
     }
     try leg.0.update {
       guard let root = getRoot() else { return }
       let p = createParagraphNode()
       var nodes: [Node] = []
-      for i in 0..<5 { nodes.append(createTextNode(text: "T\(i)")); nodes.append(TestDecoratorNode()) }
+      for i in 0..<5 { nodes.append(createTextNode(text: "T\(i)")); nodes.append(TestDecoratorNodeCrossplatform()) }
       try p.append(nodes); try root.append([p])
     }
 

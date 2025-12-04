@@ -5,7 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import Foundation
+import LexicalCore
 
 public class QuoteNode: ElementNode {
   override public init() {
@@ -63,17 +69,17 @@ public class QuoteNode: ElementNode {
 }
 
 @objc public class QuoteCustomDrawingAttributes: NSObject {
-  public init(barColor: UIColor, barWidth: CGFloat, rounded: Bool, barInsets: UIEdgeInsets) {
+  public init(barColor: LexicalColor, barWidth: CGFloat, rounded: Bool, barInsets: LexicalEdgeInsets) {
     self.barColor = barColor
     self.barWidth = barWidth
     self.rounded = rounded
     self.barInsets = barInsets
   }
 
-  let barColor: UIColor
+  let barColor: LexicalColor
   let barWidth: CGFloat
   let rounded: Bool
-  let barInsets: UIEdgeInsets
+  let barInsets: LexicalEdgeInsets
 
   override public func isEqual(_ object: Any?) -> Bool {
     let lhs = self
@@ -91,6 +97,7 @@ public extension NSAttributedString.Key {
   static let quoteCustomDrawing: NSAttributedString.Key = .init(rawValue: "quoteCustomDrawing")
 }
 
+#if canImport(UIKit) || os(macOS)
 extension QuoteNode {
   internal static var quoteBackgroundDrawing: CustomDrawingHandler {
     get {
@@ -104,12 +111,13 @@ extension QuoteNode {
         attributeValue.barColor.setFill()
 
         if attributeValue.rounded {
-          let bezierPath = UIBezierPath(roundedRect: barRect, cornerRadius: attributeValue.barWidth / 2)
+          let bezierPath = LexicalBezierPath(roundedRect: barRect, cornerRadius: attributeValue.barWidth / 2)
           bezierPath.fill()
         } else {
-          UIRectFill(barRect)
+          lexicalRectFill(barRect)
         }
       }
     }
   }
 }
+#endif

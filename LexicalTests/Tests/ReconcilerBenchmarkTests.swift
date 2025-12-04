@@ -1,5 +1,16 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 import XCTest
 @testable import Lexical
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class ReconcilerBenchmarkTests: XCTestCase {
@@ -12,8 +23,7 @@ final class ReconcilerBenchmarkTests: XCTestCase {
     func resetMetrics() { runs.removeAll() }
   }
 
-  func makeEditors() -> (opt: (Editor, LexicalReadOnlyTextKitContext, TestMetricsContainer), leg: (Editor, LexicalReadOnlyTextKitContext, TestMetricsContainer)) {
-    let cfg = EditorConfig(theme: Theme(), plugins: [])
+  func makeEditors() -> (opt: (Editor, any ReadOnlyTextKitContextProtocol, TestMetricsContainer), leg: (Editor, any ReadOnlyTextKitContextProtocol, TestMetricsContainer)) {
     let optFlags = FeatureFlags(
       reconcilerSanityCheck: false,
       proxyTextViewInputDelegate: false,
@@ -24,7 +34,10 @@ final class ReconcilerBenchmarkTests: XCTestCase {
       useOptimizedReconcilerStrictMode: true
     )
     let optMetrics = TestMetricsContainer()
-    let optCtx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: [], metricsContainer: optMetrics), featureFlags: optFlags)
+    let optCtx = makeReadOnlyContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [], metricsContainer: optMetrics),
+      featureFlags: optFlags
+    )
 
     let legFlags = FeatureFlags(
       reconcilerSanityCheck: false,
@@ -32,7 +45,10 @@ final class ReconcilerBenchmarkTests: XCTestCase {
       useOptimizedReconciler: false
     )
     let legMetrics = TestMetricsContainer()
-    let legCtx = LexicalReadOnlyTextKitContext(editorConfig: EditorConfig(theme: Theme(), plugins: [], metricsContainer: legMetrics), featureFlags: legFlags)
+    let legCtx = makeReadOnlyContext(
+      editorConfig: EditorConfig(theme: Theme(), plugins: [], metricsContainer: legMetrics),
+      featureFlags: legFlags
+    )
     return ((optCtx.editor, optCtx, optMetrics), (legCtx.editor, legCtx, legMetrics))
   }
 

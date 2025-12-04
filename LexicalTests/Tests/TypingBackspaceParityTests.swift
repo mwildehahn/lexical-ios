@@ -1,10 +1,21 @@
 /*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/*
  * Parity tests between legacy and optimized reconcilers for backspace behavior
  * around punctuation, newlines, and while typing a new word. Legacy is ground truth.
  */
 
 @testable import Lexical
 import XCTest
+
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
 
 @MainActor
 final class TypingBackspaceParityTests: XCTestCase {

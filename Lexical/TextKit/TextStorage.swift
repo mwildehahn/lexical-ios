@@ -5,7 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import UIKit
+import LexicalCore
 
 @MainActor
 public class TextStorage: NSTextStorage {
@@ -16,6 +19,9 @@ public class TextStorage: NSTextStorage {
   private var backingAttributedString: NSMutableAttributedString
   var mode: TextStorageEditingMode
   weak var editor: Editor?
+  /// True while inside `performControllerModeUpdate`, indicating that UIKit's text storage editing
+  /// session is still active. Layout operations must be deferred until this is false.
+  internal var isInControllerModeUpdate = false
 
   override public init() {
     backingAttributedString = NSMutableAttributedString()
@@ -113,8 +119,10 @@ public class TextStorage: NSTextStorage {
 
   private func performControllerModeUpdate(_ str: String, range: NSRange) {
     mode = .controllerMode
+    isInControllerModeUpdate = true
     defer {
       mode = .none
+      isInControllerModeUpdate = false
     }
 
     do {
@@ -198,3 +206,4 @@ extension TextStorage {
       "TextStorage[\(backingAttributedString.string.utf16.enumerated().map { "(\($0)=U+\(String(format:"%04X",$1)))" }.joined())]"
   }
 }
+#endif  // canImport(UIKit)

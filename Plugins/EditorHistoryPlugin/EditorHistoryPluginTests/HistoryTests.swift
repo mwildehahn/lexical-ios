@@ -9,10 +9,19 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 class HistoryTests: XCTestCase {
 
-  var view: LexicalView?
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  var view: LexicalAppKit.LexicalView?
+  #else
+  var view: Lexical.LexicalView?
+  #endif
+
   var historyPlugin: EditorHistoryPlugin?
   var editor: Editor {
     get {
@@ -38,7 +47,11 @@ class HistoryTests: XCTestCase {
     let historyPlugin = EditorHistoryPlugin()
     self.historyPlugin = historyPlugin
 
-    view = LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [historyPlugin]), featureFlags: FeatureFlags())
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    view = LexicalAppKit.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [historyPlugin]), featureFlags: FeatureFlags())
+    #else
+    view = Lexical.LexicalView(editorConfig: EditorConfig(theme: Theme(), plugins: [historyPlugin]), featureFlags: FeatureFlags())
+    #endif
   }
 
   override func tearDown() {
@@ -96,6 +109,8 @@ class HistoryTests: XCTestCase {
     }
   }
 
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // UIKit-specific test that uses textStorage and insertText APIs
   func testApplyHistory() throws {
     guard let view else { XCTFail(); return }
 
@@ -105,4 +120,5 @@ class HistoryTests: XCTestCase {
     view.editor.dispatchCommand(type: .undo)
     XCTAssertEqual(view.textStorage.string, "", "Text storage should be empty")
   }
+  #endif
 }

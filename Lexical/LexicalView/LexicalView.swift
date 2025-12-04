@@ -5,8 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
+
 import Foundation
 import UIKit
+import LexicalCore
 
 /// The LexicalViewDelegate allows customisation of certain things, most of which correspond to
 /// UITextView delegate methods.
@@ -574,3 +577,4 @@ extension LexicalView: LexicalTextViewDelegate {
     return true
   }
 }
+#endif  // canImport(UIKit)

@@ -6,14 +6,9 @@
  */
 
 import Foundation
+import LexicalCore
 
-public enum SelectionType: String {
-  case text = "text"
-  case element = "element"
-  case range = "range"
-  case node = "node"
-  case grid = "grid"
-}
+// SelectionType is now defined in LexicalCore/CoreTypes.swift
 
 public class Point {
   public var key: NodeKey
@@ -29,7 +24,7 @@ public class Point {
   }
 
   @MainActor
-  func isBefore(point b: Point) throws -> Bool {
+  public func isBefore(point b: Point) throws -> Bool {
     var aNode = try getNode()
     var bNode = try b.getNode()
     let aOffset = offset

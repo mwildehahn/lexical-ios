@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#if canImport(UIKit)
 import Lexical
 import UIKit
 
@@ -43,3 +44,4 @@ class TableNodeScrollableWrapperView: UIView {
     tableNodeView.frame = CGRect(x: 0, y: 0, width: contentWidth, height: self.bounds.height)
   }
 }
+#endif

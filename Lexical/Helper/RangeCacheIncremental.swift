@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 @MainActor
 internal func applyLengthDelta(
   editor: Editor,

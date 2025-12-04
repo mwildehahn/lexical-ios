@@ -10,17 +10,30 @@ import XCTest
 @testable import Lexical
 @testable import LexicalListPlugin
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 class ListItemNodeTests: XCTestCase {
-  var view: LexicalView?
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  var view: LexicalAppKit.LexicalView?
+  #else
+  var view: Lexical.LexicalView?
+  #endif
 
   var editor: Editor? {
     return view?.editor
   }
 
   override func setUp() {
-    view = LexicalView(
+    #if os(macOS) && !targetEnvironment(macCatalyst)
+    view = LexicalAppKit.LexicalView(
       editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #else
+    view = Lexical.LexicalView(
+      editorConfig: EditorConfig(theme: Theme(), plugins: []), featureFlags: FeatureFlags())
+    #endif
   }
 
   override func tearDown() {
@@ -29,7 +42,9 @@ class ListItemNodeTests: XCTestCase {
 
   func debugEditor(_ editor: Editor) {
     print((try? getNodeHierarchy(editorState: editor.getEditorState())) ?? "")
+    #if !os(macOS) || targetEnvironment(macCatalyst)
     print(view?.textStorage.debugDescription ?? "")
+    #endif
     print((try? getSelectionData(editorState: editor.getEditorState())) ?? "")
     print((try? editor.getEditorState().toJSON(outputFormatting: .sortedKeys)) ?? "")
   }
@@ -104,6 +119,7 @@ class ListItemNodeTests: XCTestCase {
     }
   }
 
+  // Tests that use deleteCharacter - now implemented on both AppKit and UIKit
   func testRemoveEmptyListItemNodes() throws {
     guard let editor else {
       XCTFail("Editor unexpectedly nil")
@@ -389,6 +405,8 @@ class ListItemNodeTests: XCTestCase {
     }
   }
 
+  #if !os(macOS) || targetEnvironment(macCatalyst)
+  // UIKit-specific tests that use UITextView APIs
   func testEditEmptyListItemNodesInMiddleOfList() throws {
     guard let editor else {
       XCTFail("Editor unexpectedly nil")
@@ -560,5 +578,6 @@ class ListItemNodeTests: XCTestCase {
       try selection.deleteCharacter(isBackwards: true)
     }
   }
+  #endif
 
 }

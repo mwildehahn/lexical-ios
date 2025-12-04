@@ -1,3 +1,6 @@
+// This test uses UIKit-specific types and is only available on iOS/Catalyst
+#if !os(macOS) || targetEnvironment(macCatalyst)
+
 import XCTest
 @testable import Lexical
 
@@ -153,4 +156,60 @@ final class OptimizedReconcilerDecoratorOpsTests: XCTestCase {
     // Position should be tracked in textStorage
     XCTAssertNotNil(ctx.textStorage.decoratorPositionCache[key])
   }
+
+  /// Regression test: orphaned decorators should be removed from UI during subtree reconciliation.
+  ///
+  /// The bug was that when reconciling a subtree (ancestorKey != root), the reconciler would skip
+  /// removing decorators that "still exist in nextState" even if they were orphaned (parent=nil).
+  /// This caused decorator views to remain visible after the decorator was deleted.
+  func testOrphanedDecoratorRemovedFromUIOnSubtreeReconcile() throws {
+    let ctx = makeReadOnlyContext()
+    let editor = ctx.editor
+    try editor.registerNode(nodeType: .testNode, class: TestDecoratorNode.self)
+
+    // Attach a read-only view so decorator subviews can mount
+    let roView = LexicalReadOnlyView()
+    roView.textKitContext = ctx
+    roView.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+
+    var decoratorKey: NodeKey?
+    try editor.update {
+      guard let root = getRoot() else { return }
+      let p = createParagraphNode()
+      let d = TestDecoratorNode(); decoratorKey = d.getKey()
+      try p.append([d])
+      try root.append([p])
+    }
+    guard let decoratorKey else { XCTFail("no decorator key"); return }
+
+    // Ensure decorator view is created and mounted
+    var decoratorView: UIView?
+    try editor.read {
+      decoratorView = Lexical.decoratorView(forKey: decoratorKey, createIfNecessary: true)
+    }
+    XCTAssertNotNil(decoratorView, "expected decorator view to be created")
+    XCTAssertNotNil(editor.decoratorCache[decoratorKey], "expected decorator in cache")
+    XCTAssertNotNil(ctx.textStorage.decoratorPositionCache[decoratorKey], "expected position in cache")
+
+    // Remove the decorator - this makes it orphaned (parent=nil) but still in nodeMap briefly
+    try editor.update {
+      guard let d = getNodeByKey(key: decoratorKey) as? DecoratorNode else { return }
+      try d.remove()
+    }
+
+    // Trigger reconciliation pass
+    try editor.update {}
+
+    // Verify decorator is fully removed from caches
+    XCTAssertNil(ctx.textStorage.decoratorPositionCache[decoratorKey],
+                 "orphaned decorator position should be removed from cache")
+    XCTAssertNil(editor.decoratorCache[decoratorKey],
+                 "orphaned decorator should be removed from decorator cache")
+
+    // Verify the view was removed from superview
+    XCTAssertNil(decoratorView?.superview,
+                 "orphaned decorator view should be removed from superview")
+  }
 }
+
+#endif

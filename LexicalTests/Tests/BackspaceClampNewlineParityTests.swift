@@ -1,25 +1,39 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class BackspaceClampNewlineParityTests: XCTestCase {
 
-  private func makeViews() -> (opt: LexicalView, leg: LexicalView) {
+  #if os(macOS) && !targetEnvironment(macCatalyst)
+  private func makeViews() -> (opt: LexicalAppKit.LexicalView, leg: LexicalAppKit.LexicalView) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let opt = LexicalView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let leg = LexicalView(editorConfig: cfg, featureFlags: FeatureFlags())
+    let opt = LexicalAppKit.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = LexicalAppKit.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags())
     opt.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
     leg.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
     return (opt, leg)
   }
+  #else
+  private func makeViews() -> (opt: Lexical.LexicalView, leg: Lexical.LexicalView) {
+    let cfg = EditorConfig(theme: Theme(), plugins: [])
+    let opt = Lexical.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let leg = Lexical.LexicalView(editorConfig: cfg, featureFlags: FeatureFlags())
+    opt.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    leg.frame = CGRect(x: 0, y: 0, width: 320, height: 200)
+    return (opt, leg)
+  }
+  #endif
 
   // Build: "Hello\nworld" then simulate native expansion selecting the entire
   // second-line word before issuing backspace. Ensure only one character is deleted
   // (parity with legacy reconciler).
   func testParity_BackspaceAfterNewline_WithPreExpandedSelection_DeletesOneChar() throws {
     let (opt, leg) = makeViews()
-    func run(_ v: LexicalView) throws -> String {
-      let ed = v.editor
+    func run(_ ed: Editor) throws -> String {
       // Compose the two-line document and place caret after "world"
       try ed.update {
         guard let root = getRoot() else { return }
@@ -34,7 +48,7 @@ final class BackspaceClampNewlineParityTests: XCTestCase {
 
       // Simulate an over-eager native selection expansion that selects the full word on the second line
       // by selecting string range corresponding to "world".
-      let full = v.attributedText.string as NSString
+      let full = (ed.textStorage?.string ?? "") as NSString
       let wordRange = full.range(of: "world")
       XCTAssertNotEqual(wordRange.location, NSNotFound, "Should find 'world' in attributed text")
 
@@ -53,8 +67,8 @@ final class BackspaceClampNewlineParityTests: XCTestCase {
       return out
     }
 
-    let optOut = try run(opt)
-    let legOut = try run(leg)
+    let optOut = try run(opt.editor)
+    let legOut = try run(leg.editor)
     XCTAssertEqual(optOut, legOut)
   }
 
@@ -62,8 +76,7 @@ final class BackspaceClampNewlineParityTests: XCTestCase {
   // from caret to a wider range). Backspace should still clamp to a single character delete.
   func testParity_BackspaceAfterNewline_ExpandedFromBreakThroughWord_DeletesOneChar() throws {
     let (opt, leg) = makeViews()
-    func run(_ v: LexicalView) throws -> String {
-      let ed = v.editor
+    func run(_ ed: Editor) throws -> String {
       try ed.update {
         guard let root = getRoot() else { return }
         let p1 = createParagraphNode(); let t1 = createTextNode(text: "Hello")
@@ -73,11 +86,11 @@ final class BackspaceClampNewlineParityTests: XCTestCase {
       }
       try ed.update { try (getSelection() as? RangeSelection)?.insertText("world") }
 
-      let full = v.attributedText.string as NSString
+      let full = (ed.textStorage?.string ?? "") as NSString
       // Build a range that starts at the newline character and spans the whole word "world".
       // This simulates an aggressive native expansion crossing the line boundary.
       guard let nlRange = full.range(of: "\n").location != NSNotFound ? Optional(full.range(of: "\n")) : nil else {
-        return v.attributedText.string
+        return ed.textStorage?.string ?? ""
       }
       let wordRange = full.range(of: "world")
       let combined = NSRange(location: nlRange.location, length: (wordRange.location + wordRange.length) - nlRange.location)
@@ -94,8 +107,8 @@ final class BackspaceClampNewlineParityTests: XCTestCase {
       return out
     }
 
-    let optOut = try run(opt)
-    let legOut = try run(leg)
+    let optOut = try run(opt.editor)
+    let legOut = try run(leg.editor)
     XCTAssertEqual(optOut, legOut)
   }
 }

@@ -1,0 +1,249 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import Foundation
+
+// MARK: - NodeKey
+
+public typealias NodeKey = String
+
+/// The key used for the root node in EditorState's nodeMap
+public let kRootNodeKey: NodeKey = "root"
+
+// MARK: - LexicalConstants
+
+/// Platform-agnostic constants for Lexical
+public enum LexicalCoreConstants {
+  /// Sentinel value for nodes that haven't been assigned a key yet
+  public static let uninitializedNodeKey: NodeKey = ""
+}
+
+// MARK: - SelectionType
+
+/// The type of a selection point
+public enum SelectionType: String, Equatable, Sendable {
+  case text = "text"
+  case element = "element"
+  case range = "range"
+  case node = "node"
+  case grid = "grid"
+}
+
+// MARK: - NodeType
+
+public struct NodeType: Hashable, RawRepresentable, Sendable {
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+  public let rawValue: String
+
+  public static let unknown = NodeType(rawValue: "unknown")
+  public static let root = NodeType(rawValue: "root")
+  public static let text = NodeType(rawValue: "text")
+  public static let paragraph = NodeType(rawValue: "paragraph")
+  public static let element = NodeType(rawValue: "element")
+  public static let heading = NodeType(rawValue: "heading")
+  public static let quote = NodeType(rawValue: "quote")
+  public static let linebreak = NodeType(rawValue: "linebreak")
+  public static let code = NodeType(rawValue: "code")
+  public static let codeHighlight = NodeType(rawValue: "code-highlight")
+  public static let placeholder = NodeType(rawValue: "placeholder")
+}
+
+// MARK: - Mode
+
+public enum Mode: String, Codable {
+  case normal
+  case token
+  case segmented
+  case inert
+}
+
+// MARK: - Direction
+
+public enum Direction: String, Codable {
+  case ltr
+  case rtl
+}
+
+// MARK: - Destination
+
+public enum Destination: Codable {
+  case clone
+  case html
+}
+
+// MARK: - CommandType
+
+public struct CommandType: RawRepresentable, Hashable, Sendable {
+  public var rawValue: String
+  public init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+
+  public static let selectionChange = CommandType(rawValue: "selectionChange")
+  public static let beginEditing = CommandType(rawValue: "beginEditing")
+  public static let endEditing = CommandType(rawValue: "endEditing")
+  public static let click = CommandType(rawValue: "click")
+  public static let deleteCharacter = CommandType(rawValue: "deleteCharacter")
+  public static let insertLineBreak = CommandType(rawValue: "insertLineBreak")
+  public static let insertParagraph = CommandType(rawValue: "insertParagraph")
+  public static let insertText = CommandType(rawValue: "insertText")
+  public static let paste = CommandType(rawValue: "paste")
+  public static let cut = CommandType(rawValue: "cut")
+  public static let copy = CommandType(rawValue: "copy")
+  public static let removeText = CommandType(rawValue: "removeText")
+  public static let deleteWord = CommandType(rawValue: "deleteWord")
+  public static let deleteLine = CommandType(rawValue: "deleteLine")
+  public static let formatText = CommandType(rawValue: "formatText")
+  public static let keyArrowRight = CommandType(rawValue: "keyArrowRight")
+  public static let keyArrowLeft = CommandType(rawValue: "keyArrowLeft")
+  public static let keyArrowUp = CommandType(rawValue: "keyArrowUp")
+  public static let keyArrowDown = CommandType(rawValue: "keyArrowDown")
+  public static let keyEnter = CommandType(rawValue: "keyEnter")
+  public static let keyBackspace = CommandType(rawValue: "keyBackspace")
+  public static let keyEscape = CommandType(rawValue: "keyEscape")
+  public static let keyDelete = CommandType(rawValue: "keyDelete")
+  public static let keyTab = CommandType(rawValue: "keyTab")
+  public static let clearEditor = CommandType(rawValue: "clearEditor")
+  public static let linkTapped = CommandType(rawValue: "linkTapped")
+  public static let truncationIndicatorTapped = CommandType(rawValue: "truncationIndicatorTapped")
+  public static let readOnlyViewTapped = CommandType(rawValue: "readOnlyViewTapped")
+  public static let indentContent = CommandType(rawValue: "indentContent")
+  public static let outdentContent = CommandType(rawValue: "outdentContent")
+  public static let updatePlaceholderVisibility = CommandType(
+    rawValue: "updatePlaceholderVisibility")
+}
+
+// MARK: - CommandPriority
+
+@objc public enum CommandPriority: Int {
+  case Editor
+  case Low
+  case Normal
+  case High
+  case Critical
+}
+
+// MARK: - TextFormatType
+
+@objc public enum TextFormatType: Int {
+  case bold
+  case italic
+  case underline
+  case strikethrough
+  case code
+  case subScript
+  case superScript
+}
+
+// MARK: - DirtyStatusCause
+
+public enum DirtyStatusCause {
+  case userInitiated
+  case editorInitiated
+}
+
+// MARK: - DirtyType
+
+public enum DirtyType {
+  case noDirtyNodes
+  case hasDirtyNodes
+  case fullReconcile
+}
+
+// MARK: - EditorUpdateReason
+
+public enum EditorUpdateReason: String {
+  case update = "update"
+  case reset = "reset"
+  case parseState = "parseState"
+  case migrateState = "migrateState"
+  case setState = "setState"
+  case errorRecovery = "errorRecovery"
+  case initialization = "initialization"
+  case sync = "sync"
+}
+
+// MARK: - TextStorageEditingMode
+
+public enum TextStorageEditingMode {
+  case none
+  case controllerMode
+}
+
+// MARK: - TextTransform
+
+public enum TextTransform: String {
+  case lowercase = "lowercase"
+  case uppercase = "uppercase"
+  case none = "none"
+}
+
+// MARK: - CustomDrawingLayer
+
+public enum CustomDrawingLayer {
+  case background
+  case text
+}
+
+// MARK: - CustomDrawingGranularity
+
+public enum CustomDrawingGranularity {
+  case characterRuns
+  case singleParagraph
+  case contiguousParagraphs
+}
+
+// MARK: - BlockLevelAttributes
+
+@objc public class BlockLevelAttributes: NSObject {
+  public init(
+    marginTop: CGFloat, marginBottom: CGFloat, paddingTop: CGFloat, paddingBottom: CGFloat
+  ) {
+    self.marginTop = marginTop
+    self.marginBottom = marginBottom
+    self.paddingTop = paddingTop
+    self.paddingBottom = paddingBottom
+  }
+
+  public let marginTop: CGFloat
+  public let marginBottom: CGFloat
+  public let paddingTop: CGFloat
+  public let paddingBottom: CGFloat
+
+  override public func isEqual(_ object: Any?) -> Bool {
+    if let object = object as? BlockLevelAttributes {
+      return self.marginTop == object.marginTop && self.marginBottom == object.marginBottom
+        && self.paddingTop == object.paddingTop && self.paddingBottom == object.paddingBottom
+    }
+    return false
+  }
+
+  override public var hash: Int {
+    var hasher = Hasher()
+    hasher.combine(marginTop)
+    hasher.combine(marginBottom)
+    hasher.combine(paddingTop)
+    hasher.combine(paddingBottom)
+    return hasher.finalize()
+  }
+}
+
+// MARK: - DirtyNodeMap
+
+public typealias DirtyNodeMap = [NodeKey: DirtyStatusCause]
+
+// MARK: - NodePart
+
+/// Represents which part of a node's string representation is being referenced.
+/// Used by the RangeCache system to track positions in the text storage.
+public enum NodePart {
+  case preamble
+  case text
+  case postamble
+}

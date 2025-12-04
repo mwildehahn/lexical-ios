@@ -8,13 +8,17 @@
 @testable import Lexical
 import XCTest
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class MetricsTests: XCTestCase {
 
   func testReconcilerRecordsMetricsForLargeDocument() throws {
     let metrics = TestMetricsContainer()
     let editorConfig = EditorConfig(theme: Theme(), plugins: [], metricsContainer: metrics)
-    let textKitContext = LexicalReadOnlyTextKitContext(editorConfig: editorConfig, featureFlags: FeatureFlags())
+    let textKitContext = makeReadOnlyContext(editorConfig: editorConfig, featureFlags: FeatureFlags())
     let editor = textKitContext.editor
 
     metrics.resetMetrics()

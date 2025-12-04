@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 /// Returns node keys sorted by their string location ascending, breaking ties by longer range first.
 /// Mirrors sorting used in RangeHelpers.allNodeKeysSortedByLocation but operates on an explicit cache.
@@ -21,4 +22,3 @@ internal func sortedNodeKeysByLocation(rangeCache: [NodeKey: RangeCacheItem]) ->
     }
     .map { $0.key }
 }
-

@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 open class ElementNode: Node {
   enum CodingKeys: String, CodingKey {

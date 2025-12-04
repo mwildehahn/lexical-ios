@@ -1,18 +1,22 @@
 import XCTest
 @testable import Lexical
 
+#if os(macOS) && !targetEnvironment(macCatalyst)
+@testable import LexicalAppKit
+#endif
+
 @MainActor
 final class RangeCachePointMappingAfterEditsParityTests: XCTestCase {
 
-  private func makeEditors() -> (opt: Editor, leg: Editor, o: LexicalReadOnlyTextKitContext, l: LexicalReadOnlyTextKitContext) {
+  private func makeEditors() -> (opt: Editor, leg: Editor, o: any ReadOnlyTextKitContextProtocol, l: any ReadOnlyTextKitContextProtocol) {
     let cfg = EditorConfig(theme: Theme(), plugins: [])
-    let o = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
-    let l = LexicalReadOnlyTextKitContext(editorConfig: cfg, featureFlags: FeatureFlags())
+    let o = makeReadOnlyContext(editorConfig: cfg, featureFlags: FeatureFlags.optimizedProfile(.aggressiveEditor))
+    let l = makeReadOnlyContext(editorConfig: cfg, featureFlags: FeatureFlags())
     return (o.editor, l.editor, o, l)
   }
 
   func testRoundTripSampled_AfterSeriesOfEdits() throws {
-    let (opt, leg, _o, _l) = makeEditors()
+    let (opt, leg, oCtx, lCtx) = makeEditors(); _ = oCtx; _ = lCtx
 
     func seed(on editor: Editor) throws {
       try editor.update {
@@ -47,10 +51,10 @@ final class RangeCachePointMappingAfterEditsParityTests: XCTestCase {
     }
     try edits(on: opt); try edits(on: leg)
 
-    XCTAssertEqual(opt.frontend?.textStorage.string, leg.frontend?.textStorage.string)
+    XCTAssertEqual(opt.textStorage?.string, leg.textStorage?.string)
 
     func roundTripSampled(editor: Editor) throws {
-      let s = editor.frontend?.textStorage.string ?? ""; let ns = s as NSString
+      let s = editor.textStorage?.string ?? ""; let ns = s as NSString
       let total = ns.length
       let step = max(1, total / 80)
       var loc = 0
@@ -64,4 +68,3 @@ final class RangeCachePointMappingAfterEditsParityTests: XCTestCase {
     try roundTripSampled(editor: leg)
   }
 }
-

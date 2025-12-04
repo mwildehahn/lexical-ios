@@ -6,6 +6,7 @@
  */
 
 import Foundation
+import LexicalCore
 
 @MainActor
 public protocol EditorMetricsContainer: AnyObject {
